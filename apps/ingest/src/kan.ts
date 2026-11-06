@@ -196,6 +196,8 @@ export async function crawlKan(
 ): Promise<{
   pages: number;
   newEpisodes: number;
+  /** Show images copied in this slice (a publish carries them). */
+  artSaved?: number;
   note: string;
   failed?: boolean;
   readShows?: string[];
@@ -214,6 +216,7 @@ export async function crawlKan(
   let loader: PageLoader | undefined = opts.loader;
   let pages = 0;
   let newEpisodes = 0;
+  let artSaved = 0;
   let problems = 0;
   let stopped = false;
   /** Server errors in a row, per site (kan.org.il and kankids.org.il fail independently). */
@@ -242,8 +245,11 @@ export async function crawlKan(
   };
   /** The image fetched along with the last page that asked for one. */
   let lastImage: LoadedPage['image'];
+  /** The images fetched along with the last page that asked for several (a lobby's posters). */
+  let lastImages: LoadedPage['images'];
   const load = async (url: string, kind: Kind = 'listing', loadOpts?: LoadOptions) => {
     lastImage = undefined;
+    lastImages = undefined;
     if (pages > 0) await sleep(opts.pageIntervalMs);
     pages++;
     let r: Awaited<ReturnType<PageLoader['load']>>;
@@ -259,6 +265,7 @@ export async function crawlKan(
     try {
       r = await loader.load(url, loadOpts);
       lastImage = r.image;
+      lastImages = r.images;
     } catch (err) {
       const message = `${url}: ${firstLine(err)}`;
       // The proxy or this machine's network is down, or the browser died: back off, charge nobody.
@@ -305,16 +312,38 @@ export async function crawlKan(
   };
 
   try {
-    // 1. Lobbies, once a day.
-    if (!state.lobbiesAt || !state.lobbyPosters || now - Date.parse(state.lobbiesAt) > DAY_MS) {
+    // 1. Lobbies, once a day — and whenever a show's poster has no saved copy yet (copies are made from the
+    // lobby, which shows them all: Kan refuses its share images).
+    const artDue = (poster: string, s: ShowState | undefined) =>
+      !!opts.artworkDir &&
+      s?.art?.from !== poster &&
+      (!s?.artTriedAt || now - Date.parse(s.artTriedAt) > DAY_MS);
+    const missingArt = Object.values(state.shows).some((s) => s.lobbyPoster && artDue(s.lobbyPoster, s));
+    if (!state.lobbiesAt || !state.lobbyPosters || missingArt || now - Date.parse(state.lobbiesAt) > DAY_MS) {
       const byUrl = new Map<string, string>();
+      const captured = new Map<string, NonNullable<LoadedPage['images']>[number]>();
       let lobbyEmpty = false;
       for (const l of KAN_LOBBIES) {
         if (!byUrl.has(l.url) && pages >= opts.pagesPerRun) break;
         let html = byUrl.get(l.url);
         if (html === undefined) {
           try {
-            html = await load(l.url);
+            const lobby = l;
+            html = await load(
+              l.url,
+              'listing',
+              opts.artworkDir
+                ? {
+                    images: (page) =>
+                      [...parseLobbyPosters(page)]
+                        .filter(([path, u]) =>
+                          artDue(new URL(u, lobby.origin).toString(), state.shows[`${lobby.origin}${path}`]),
+                        )
+                        .map(([, u]) => new URL(u, lobby.origin).toString()),
+                  }
+                : undefined,
+            );
+            for (const img of lastImages ?? []) captured.set(img.url, img);
           } catch (err) {
             // One lobby failing (its site down, or the page moved) must not stop the other site or the known
             // shows: note it, keep going, and read the lobbies again next slice.
@@ -348,12 +377,23 @@ export async function crawlKan(
             ...(state.lobbiesAt ? { lastNewAt: new Date(now).toISOString() } : {}),
           };
           const poster = posters.get(path);
-          if (poster) state.shows[key].lobbyPoster = new URL(poster, l.origin).toString();
+          const show = state.shows[key];
+          if (poster && show) {
+            show.lobbyPoster = new URL(poster, l.origin).toString();
+            show.image = show.lobbyPoster;
+            const img = captured.get(show.lobbyPoster);
+            if (img && opts.artworkDir && saveArtwork(show, key, img, opts.artworkDir, warn)) artSaved++;
+          }
         }
       }
       if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size) {
         state.lobbiesAt = new Date(now).toISOString();
         state.lobbyPosters = true;
+        // Shows whose poster could not be copied this time (or is no longer on a lobby) wait a day, so a missing
+        // copy never makes every slice read the lobbies.
+        for (const show of Object.values(state.shows))
+          if (show.lobbyPoster && artDue(show.lobbyPoster, show))
+            show.artTriedAt = new Date(now).toISOString();
       }
       log(`kan: ${Object.keys(state.shows).length} shows known`);
     }
@@ -405,7 +445,7 @@ export async function crawlKan(
         continue;
       }
       s.checkedAt = new Date().toISOString();
-      if (opts.artworkDir && lastImage) saveArtwork(s, key, lastImage, opts.artworkDir, warn);
+      if (opts.artworkDir && lastImage && saveArtwork(s, key, lastImage, opts.artworkDir, warn)) artSaved++;
       readShows.push(key);
       attemptedShows.push(key);
       if (page.title) s.title = page.title;
@@ -551,7 +591,15 @@ export async function crawlKan(
     if (!opts.loader) await loader?.close();
   }
   log(`kan: ${note}`);
-  return { pages, newEpisodes, note, readShows, attemptedShows, ...(stopped ? { failed: true } : {}) };
+  return {
+    pages,
+    newEpisodes,
+    artSaved,
+    note,
+    readShows,
+    attemptedShows,
+    ...(stopped ? { failed: true } : {}),
+  };
 }
 
 function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[], runId: number): number {
@@ -627,16 +675,17 @@ function saveArtwork(
   image: NonNullable<LoadedPage['image']>,
   dir: string,
   warn: (seriesId: string | null | undefined, message: string) => void,
-): void {
+): boolean {
   s.artTriedAt = new Date().toISOString();
   if (!image.jpeg || image.jpeg.length < 1000) {
     warn(null, `Kan ${key}: could not copy its image (${image.error ?? `HTTP ${image.status}`})`);
-    return;
+    return false;
   }
   mkdirSync(dir, { recursive: true });
   const file = kanArtworkFile(key);
   writeFileSync(join(dir, file), image.jpeg);
   s.art = { from: image.url, file };
+  return true;
 }
 
 /** Saved images by Kan show page URL (for rendering). */

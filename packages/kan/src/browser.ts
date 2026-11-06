@@ -11,12 +11,23 @@ export interface LoadedPage {
   html: string;
   challenged: boolean;
   /** The image asked for with `image`, fetched in the same session and resized to a JPEG. */
-  image?: { url: string; status: number; jpeg?: Uint8Array; error?: string };
+  image?: CapturedImage;
+  /** The images asked for with `images`, likewise. */
+  images?: CapturedImage[];
+}
+
+export interface CapturedImage {
+  url: string;
+  status: number;
+  jpeg?: Uint8Array;
+  error?: string;
 }
 
 export interface LoadOptions {
   /** An image the page links to (e.g. its share image), to fetch in the same browser session. */
   image?: (html: string) => string | undefined;
+  /** Several images the page shows (e.g. a lobby's posters), each fetched the same way. */
+  images?: (html: string) => string[];
   /** Largest width of the resized image. */
   imageWidth?: number;
 }
@@ -96,10 +107,10 @@ export async function createChromeLoader(
       const context = await browser.newContext({ locale: 'he-IL', timezoneId: 'Asia/Jerusalem' });
       try {
         // Heavy resources are not loaded, except the one image asked for (see `image`).
-        let allowImage: string | undefined;
+        const allowImage = new Set<string>();
         await context.route('**/*', (route) => {
           const req = route.request();
-          return ['image', 'font', 'media'].includes(req.resourceType()) && req.url() !== allowImage
+          return ['image', 'font', 'media'].includes(req.resourceType()) && !allowImage.has(req.url())
             ? route.abort()
             : route.continue();
         });
@@ -110,40 +121,55 @@ export async function createChromeLoader(
         const html = await page.content();
         const challenged = isChallenge(html);
         const src = !challenged && opts.image ? opts.image(html) : undefined;
-        if (!src) return { status: res?.status() ?? 0, html, challenged };
-        // The show page loads the image the way it would show it (an image request, from that page, in this
-        // session: Kan refuses its images to a script's fetch and to opening them as a page). Its bytes are taken
-        // from the browser's answer and scaled down in a blank tab from a data: URL, so a canvas is never tainted
-        // by an image from another site (kankids).
-        allowImage = new URL(src, page.url()).toString();
-        const want = allowImage;
-        const response = page.waitForResponse((r) => r.url() === want, { timeout: 30_000 }).catch(() => null);
-        await page.evaluate((u) => {
-          const img = new (globalThis as unknown as { Image: new () => { src: string } }).Image();
-          img.src = u;
-        }, want);
-        const answer = await response;
-        const answered = answer?.status() ?? 0;
-        let got: { status: number; b64?: string; error?: string } = { status: answered };
-        if (answer && answered === 200) {
-          const body = await answer.body();
-          const type = (answer.headers()['content-type'] ?? 'image/jpeg').split(';')[0];
-          const blank = await context.newPage();
-          got = await blank.evaluate(fetchResized, {
-            src: `data:${type};base64,${body.toString('base64')}`,
-            width: opts.imageWidth ?? 960,
-          });
+        const many = !challenged && opts.images ? opts.images(html) : [];
+        if (!src && many.length === 0) return { status: res?.status() ?? 0, html, challenged };
+        // The page loads each image the way it would show it (an image request, from that page, in this session:
+        // Kan refuses its images to a script's fetch and to opening them as a page). The bytes are taken from the
+        // browser's answer and scaled down in a blank tab from a data: URL, so a canvas is never tainted by an
+        // image from another site (kankids).
+        let blank: Awaited<ReturnType<typeof context.newPage>> | undefined;
+        const capture = async (given: string): Promise<CapturedImage> => {
+          const want = new URL(given, page.url()).toString();
+          allowImage.add(want);
+          const response = page
+            .waitForResponse((r) => r.url() === want, { timeout: 30_000 })
+            .catch(() => null);
+          await page.evaluate((u) => {
+            const img = new (globalThis as unknown as { Image: new () => { src: string } }).Image();
+            img.src = u;
+          }, want);
+          const answer = await response;
+          const answered = answer?.status() ?? 0;
+          let got: { status: number; b64?: string; error?: string } = { status: answered };
+          if (answer && answered === 200) {
+            const body = await answer.body();
+            const type = (answer.headers()['content-type'] ?? 'image/jpeg').split(';')[0];
+            blank ??= await context.newPage();
+            got = await blank.evaluate(fetchResized, {
+              src: `data:${type};base64,${body.toString('base64')}`,
+              width: opts.imageWidth ?? 960,
+            });
+          }
+          return {
+            url: given,
+            status: got.status,
+            ...(got.b64 ? { jpeg: Buffer.from(got.b64, 'base64') } : {}),
+            ...(got.error ? { error: got.error } : {}),
+          };
+        };
+        const image = src ? await capture(src) : undefined;
+        const images: CapturedImage[] = [];
+        // One after another, a moment apart: what a person scrolling the lobby would load.
+        for (const u of many) {
+          images.push(await capture(u));
+          await page.waitForTimeout(250);
         }
         return {
           status: res?.status() ?? 0,
           html,
           challenged,
-          image: {
-            url: src,
-            status: got.status,
-            ...(got.b64 ? { jpeg: Buffer.from(got.b64, 'base64') } : {}),
-            ...(got.error ? { error: got.error } : {}),
-          },
+          ...(image ? { image } : {}),
+          ...(images.length ? { images } : {}),
         };
       } finally {
         await context.close();

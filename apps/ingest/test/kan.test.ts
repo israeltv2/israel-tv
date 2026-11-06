@@ -514,3 +514,48 @@ test('a show whose image has no copy yet is due, at most once a day', async () =
     showDue({ ...fresh, image: 'https://x/i.jpg', art: { from: 'https://x/i.jpg', file: 'f' } }, now, 14),
   ).toBe(false);
 });
+
+test('lobby posters are copied from the lobby read itself, and a failed copy waits a day', async () => {
+  const { mkdtempSync, readdirSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { kanArtwork } = await import('../src/kan.ts');
+  const run = async (ok: boolean) => {
+    const dir = mkdtempSync(join(tmpdir(), 'lobby-art-'));
+    const store = Store.open(join(dir, 'israel-tv.sqlite'));
+    const base = loader(routes);
+    const lobbyReads: string[] = [];
+    const withImages = {
+      ...base,
+      async load(url: string, o?: { images?: (html: string) => string[] }) {
+        const page = await base.load(url);
+        const wanted = o?.images?.(page.html) ?? [];
+        if (wanted.length) lobbyReads.push(url);
+        return wanted.length
+          ? {
+              ...page,
+              images: wanted.map((u) =>
+                ok ? { url: u, status: 200, jpeg: new Uint8Array(4000).fill(7) } : { url: u, status: 403 },
+              ),
+            }
+          : page;
+      },
+    };
+    const artworkDir = join(dir, 'artwork');
+    await crawlKan(store, { ...opts(withImages, 3), artworkDir });
+    const first = lobbyReads.length;
+    await crawlKan(store, { ...opts(withImages, 3), artworkDir });
+    return { store, artworkDir, first, second: lobbyReads.length - first };
+  };
+  const good = await run(true);
+  expect(good.first).toBeGreaterThan(0);
+  // Every show on a lobby card has its copy after the first slice, before any show page was read.
+  expect(readdirSync(good.artworkDir).length).toBeGreaterThanOrEqual(42);
+  expect(
+    kanArtwork(good.store, good.artworkDir).has('https://www.kan.org.il/content/kan/kan-11/p-1088672/'),
+  ).toBe(true);
+  expect(good.second).toBe(0);
+  const bad = await run(false);
+  expect(bad.first).toBeGreaterThan(0);
+  expect(bad.second).toBe(0); // not every slice: the failed copies are tried again the next day
+});

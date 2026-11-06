@@ -879,3 +879,9 @@ show's poster on its lobby card (portrait 300×450 on Kan 11; on the kids lobby 
 character picture), loaded from the show page's session — confirmed 200, 300×450. The share image is only a
 fallback for shows with no card. The catalog had been pointing at share images, so Kan posters were not showing
 for anyone; the copies fix that too.
+- **Copies come from the lobby read, not the show re-read.** Waiting for each show's page to be re-read left the
+  copies behind the episode backlog (slices spend their pages on episodes). Each lobby shows all its posters, so a
+  lobby read now also copies every poster that has no copy yet, from the lobby's own session; the lobbies are read
+  whenever a show still lacks its copy (each show at most once a day, so a missing poster never makes every slice
+  read them), and a slice that copied images publishes. Test: every card's poster is saved in the first slice,
+  before any show page, and a failed copy does not bring the lobbies back next slice.

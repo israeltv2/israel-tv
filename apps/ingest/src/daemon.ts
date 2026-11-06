@@ -215,7 +215,8 @@ export class Daemon {
         // page was tried and failed is done (it shows on /status) and is not retried in a loop.
         const attempted = new Set(r.attemptedShows ?? []);
         for (const k of priority) if (!attempted.has(k)) this.kanRefresh.add(k);
-        if (r.newEpisodes > 0) this.enqueue('publish', () => this.publish());
+        // New episodes, or newly copied show images.
+        if (r.newEpisodes > 0 || (r.artSaved ?? 0) > 0) this.enqueue('publish', () => this.publish());
         return arrived && r.pages > 0;
       })
       .catch((err) => {
