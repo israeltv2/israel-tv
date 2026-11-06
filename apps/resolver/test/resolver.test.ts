@@ -297,3 +297,30 @@ test('a Reshet episode is relayed only when its direct stream is refused from he
   expect(relayed).toHaveLength(1);
   expect(relayed[0]?.url).toContain('/relay/');
 });
+
+test('when Akamai refuses a Mako master, the next CDN Mako lists is tried', async () => {
+  const events: { kind: string; detail?: Record<string, unknown> }[] = [];
+  const app = createResolverApp({
+    episode: () => ({ key: 'k', title: 't', streams: [], play: { vcmid: 'v', channelId: 'c' } }),
+    onEvent: (e) => events.push(e),
+    fetch: async (url) => {
+      if (url.includes('playlist.jsp'))
+        return Response.json({
+          media: [
+            { url: 'https://live.akamaized.net/k12/index.m3u8', cdn: 'AKAMAI' },
+            { url: 'https://d1.cloudfront.net/k12/master.m3u8', cdn: 'AWS' },
+          ],
+        });
+      if (url.includes('entitlement')) return Response.json({ tickets: [{ ticket: 'hdnea%3Dx' }] });
+      if (url.includes('akamaized')) return new Response('', { status: 403 });
+      return new Response('#EXTM3U\nv.m3u8\n', { status: 200 });
+    },
+  });
+  const r = await app.request('/play/mako/iltv_mako_1%3A2%3A3.m3u8');
+  expect(r.status).toBe(200);
+  expect(await r.text()).toContain('https://d1.cloudfront.net/k12/v.m3u8');
+  const play = events.find((e) => e.kind === 'play_start');
+  expect(String(play?.detail?.upstream)).toMatch(
+    /cdn AKAMAI, ticket 200, master 403, cdn AWS, ticket 200, master 200/,
+  );
+});

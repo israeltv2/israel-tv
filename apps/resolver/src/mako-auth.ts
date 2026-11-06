@@ -182,9 +182,20 @@ export function makoAuth(d: MakoAuthDeps) {
           run.up.push(`playlist ${pr.status}`);
           if (!pr.ok) return new Response(`Mako playlist HTTP ${pr.status}`, { status: 502 });
           const media = parsePlaylist(await pr.json());
-          const pick = media.find((m) => m.cdn === 'AKAMAI') ?? media[0];
-          if (!pick) return new Response('Mako returned no media', { status: 502 });
-          return masterFor(makoUrl(pick.url), pick.cdn ?? 'AKAMAI', playerUA(c), run);
+          if (media.length === 0) return new Response('Mako returned no media', { status: 502 });
+          // Akamai first; when it refuses the master (e.g. an episode still airing, served from the live
+          // window), the next CDN Mako lists usually plays.
+          const ordered = [
+            ...media.filter((m) => m.cdn === 'AKAMAI'),
+            ...media.filter((m) => m.cdn !== 'AKAMAI'),
+          ];
+          let last: Response | undefined;
+          for (const m of ordered) {
+            run.up.push(`cdn ${m.cdn ?? '?'}`);
+            last = await masterFor(makoUrl(m.url), m.cdn ?? 'AKAMAI', playerUA(c), run);
+            if (last.ok) return last;
+          }
+          return last as Response;
         },
       );
     });

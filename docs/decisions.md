@@ -667,3 +667,15 @@ the catalog — the newest episode of the most recently aired show whose last re
 ends or a renumbering never breaks the canary. A segment answered 200 instead of 206 (a CDN that ignores
 `Range`) passes. Results are events, shown per source on `/status` and the dashboard; `POST /run/canary` runs it
 on demand.
+
+### What the first canary found (2026-11-06)
+
+- **Mako episodes that are airing right now** failed with `master 403`: Mako lists an episode before its
+  broadcast ends, and its media is then the channel's live window (Akamai and CloudFront entries). Akamai
+  refused the resolver's ticket for it; CloudFront served it. The resolver now tries Mako's media entries in
+  order (Akamai first) and falls back to the next CDN when one refuses the master; each attempt is in the play's
+  upstream statuses (`cdn AKAMAI, ticket 200, master 403, cdn AWS, ticket 200, master 200`).
+- **Kan through geo-relay** played, but the canary reported its segment as failing: the relay named relayed URLs
+  `.m3u8` whenever the original URL contained "playlist" or "manifest" anywhere (Kan's segment URLs do), and the
+  canary believed the name. The relay now names a URL a playlist only when its path ends in `.m3u8` or is
+  Kaltura's `playManifest`, and the canary decides from the answer itself (a playlist starts with `#EXTM3U`).

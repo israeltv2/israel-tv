@@ -64,10 +64,9 @@ export function geoRelay(d: GeoRelayDeps) {
 
   function relayUrl(origin: string, url: string, playId?: string): string {
     const u = Buffer.from(url).toString('base64url');
+    // Named by what it is: a playlist when its path ends in .m3u8 (or is Kaltura's playManifest), else a segment.
     const ext =
-      /\.m3u8(\?|$)/.test(new URL(url).pathname) || /playManifest|playlist|manifest/i.test(url)
-        ? 'm3u8'
-        : 'ts';
+      /\.m3u8$/.test(new URL(url).pathname) || /\/playManifest\//.test(new URL(url).pathname) ? 'm3u8' : 'ts';
     const path = `${origin}/relay/${sign(d.secret, u)}/${u}.${ext}`;
     return playId ? withPlayId(path, playId) : path;
   }
