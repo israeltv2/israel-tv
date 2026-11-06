@@ -65,7 +65,7 @@ test('two Workers: the public one runs only its router for dynamic paths; the AP
     '/meta/*',
   ]);
   expect(c.services).toEqual([{ binding: 'API', service: 'w-api' }]);
-  expect(c.main.endsWith('/catalog/src/router.ts')).toBe(true);
+  expect(c.main.replaceAll('\\', '/').endsWith('/catalog/src/router.ts')).toBe(true);
   // Limits, counting and logs belong to the API Worker.
   expect(c.analytics_engine_datasets).toBeUndefined();
   expect(c.ratelimits).toBeUndefined();
@@ -73,7 +73,7 @@ test('two Workers: the public one runs only its router for dynamic paths; the AP
   expect(a.name).toBe('w-api');
   expect(a.workers_dev).toBe(false);
   expect(a.preview_urls).toBe(false);
-  expect(String(a.main).endsWith('/catalog/src/api.ts')).toBe(true);
+  expect(String(a.main).replaceAll('\\', '/').endsWith('/catalog/src/api.ts')).toBe(true);
   expect(a.analytics_engine_datasets).toEqual([{ binding: 'USAGE', dataset: 'israel_tv_usage' }]);
   expect(a.observability).toEqual({
     enabled: true,
