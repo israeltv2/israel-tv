@@ -224,7 +224,7 @@ export function overview(d: Daemon, now = Date.now()): Overview {
       d7: totals(home7, minutes(7)),
       d30: totals(dash.home.d30, minutes(30)),
       perDay: home,
-      topShows: dash.home.topShows.map(line),
+      topShows: dash.home.topShows.filter((t) => t.plays > 0).map(line),
     },
     public: {
       counted: dash.public.via === 'analytics-engine',
@@ -233,7 +233,7 @@ export function overview(d: Daemon, now = Date.now()): Overview {
       d7: totals(dash.public.d7),
       d30: totals(dash.public.d30),
       perDay: perDay('public'),
-      topShows: dash.public.topShows.map(line),
+      topShows: dash.public.topShows.filter((t) => t.plays > 0).map(line),
     },
     failureRate7d: home7.plays + home7.failures ? home7.failures / (home7.plays + home7.failures) : 0,
     freshness: status.sources.map((s) => {
