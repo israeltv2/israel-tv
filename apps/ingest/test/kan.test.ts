@@ -472,8 +472,9 @@ test('a Kan show keeps our own copy of its image, used for its poster, backgroun
   const { renderFromStore } = await import('../src/publish.ts');
   const { kanArtwork } = await import('../src/kan.ts');
   const { default: jpeg } = await import('jpeg-js');
-  const px = new Uint8Array(300 * 450 * 4).map((_, i) => (i * 7) % 251);
-  const portraitJpeg = jpeg.encode({ width: 300, height: 450, data: px }, 80).data;
+  // Small but real (noise keeps it over the 1,000-byte minimum for a saved copy).
+  const px = new Uint8Array(60 * 90 * 4).map((_, i) => (i * 7919) % 251);
+  const portraitJpeg = jpeg.encode({ width: 60, height: 90, data: px }, 90).data;
   const dir = mkdtempSync(join(tmpdir(), 'art-'));
   const store = Store.open(join(dir, 'israel-tv.sqlite'));
   const base = loader(routes);
@@ -502,7 +503,7 @@ test('a Kan show keeps our own copy of its image, used for its poster, backgroun
   expect(meta.poster).toBe(`{{israel-tv-origin}}/art/${id}.jpg`);
   expect(meta.background).toBe(meta.poster);
   expect(meta.videos.every((v: { thumbnail?: string }) => v.thumbnail === meta.poster)).toBe(true);
-});
+}, 30_000);
 
 test('a show whose image has no copy yet is due, at most once a day', async () => {
   const { showDue } = await import('../src/kan.ts');

@@ -20,12 +20,44 @@ jobs:
     outputs:
       created: ${{ steps.rp.outputs.release_created }}
       version: ${{ steps.rp.outputs.version }}
+      pr: ${{ steps.rp.outputs.pr }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+  # release-please opens and updates its pull request with the workflow token. GitHub holds the pull_request
+  # workflows of such pull requests for approval (they end "action required" and never run), so the checks the
+  # branch rules require are started here instead, on the release branch (workflow_dispatch is allowed from the
+  # workflow token); their results land on the pull request's head commit under the same names. The held runs are
+  # removed, so the pull request shows only real results.
+  release-pr-checks:
+    needs: release-please
+    if: needs.release-please.outputs.pr != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BRANCH: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+      TITLE: ${{ fromJSON(needs.release-please.outputs.pr).title }}
+    steps:
+      - name: Run the checks on the release pull request
+        run: |
+          gh workflow run ci.yml --ref "$BRANCH"
+          gh workflow run pr-title.yml --ref "$BRANCH" -f title="$TITLE"
+      - name: Remove the runs held for approval
+        run: |
+          # The held runs appear a few seconds after release-please pushes; look for two minutes.
+          for i in $(seq 1 12); do
+            for id in $(gh api "repos/$GH_REPO/actions/runs?branch=$BRANCH&event=pull_request&per_page=50" \
+                --jq '.workflow_runs[] | select(.conclusion == "action_required") | .id'); do
+              gh api -X DELETE "repos/$GH_REPO/actions/runs/$id" && echo "removed held run $id"
+            done
+            sleep 10
+          done
   images:
     needs: release-please
     if: always() && (needs.release-please.outputs.created == 'true' || github.event_name == 'release')

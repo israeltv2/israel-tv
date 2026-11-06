@@ -1296,3 +1296,14 @@ junk names, duplicate ids or numbers, or unreachable posters. Fixed:
   Reshet adapter now gets the stored show, and a season split before is split again whatever one read sees
   (`splitKeys`); the split merges into existing year seasons. Recorded repair `reshet-split-repair-2026-11-06`
   re-split the data and dropped the empty numbers; no episode moved. A test replays the incident.
+
+## Release pull requests and CI (2026-11-06)
+
+- **Biome skips release-please's generated files** (`CHANGELOG.md`, `.release-please-manifest.json`): their format
+  is release-please's, and the release commit failed `biome ci` on main. Everything else stays checked.
+- **Checks on release pull requests.** release-please opens and updates its pull request with the workflow token;
+  GitHub holds the pull_request workflows of such pull requests for approval (they ended "action required" and never
+  ran; the two "failure" runs with no jobs were held runs left behind when the merged branch was deleted). The
+  release workflow now starts `ci` and `pr-title` on the release branch itself (`workflow_dispatch`, allowed from the
+  workflow token), so the required checks run on the pull request's head commit under their usual names, and removes
+  the held runs so the pull request shows only real results. No extra token or secret.

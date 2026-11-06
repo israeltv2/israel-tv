@@ -6,7 +6,14 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/fixtures", "!**/build", "!**/drizzle/meta"]
+    "includes": [
+      "**",
+      "!**/fixtures",
+      "!**/build",
+      "!**/drizzle/meta",
+      "!CHANGELOG.md",
+      "!.release-please-manifest.json"
+    ]
   },
   "formatter": {
     "indentStyle": "space",
