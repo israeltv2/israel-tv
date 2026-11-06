@@ -90,6 +90,8 @@ interface ShowState {
 
 interface CrawlState {
   lobbiesAt?: string;
+  /** Lobbies have been read since posters were taken from them (an older state reads them once more). */
+  lobbyPosters?: true;
   backoffUntil?: string;
   shows: Record<string, ShowState>;
   /** Per site, the last episode page that loaded with a player: the yardstick for a failing episode page. */
@@ -304,7 +306,7 @@ export async function crawlKan(
 
   try {
     // 1. Lobbies, once a day.
-    if (!state.lobbiesAt || now - Date.parse(state.lobbiesAt) > DAY_MS) {
+    if (!state.lobbiesAt || !state.lobbyPosters || now - Date.parse(state.lobbiesAt) > DAY_MS) {
       const byUrl = new Map<string, string>();
       let lobbyEmpty = false;
       for (const l of KAN_LOBBIES) {
@@ -351,6 +353,7 @@ export async function crawlKan(
       }
       if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size)
         state.lobbiesAt = new Date(now).toISOString();
+      state.lobbyPosters = true;
       log(`kan: ${Object.keys(state.shows).length} shows known`);
     }
 
