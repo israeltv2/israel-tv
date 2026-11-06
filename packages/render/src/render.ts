@@ -76,6 +76,8 @@ export interface RenderInput {
   sources?: string[];
   /** Images served as they are: `logo.png`, `background.png`, `logos/<channel id>.png`. */
   assets?: Map<string, Uint8Array>;
+  /** When "ended" is judged (default now). */
+  now?: number;
 }
 
 /** Genres offered as a filter on a row: those of its shows, most common first. */
@@ -155,8 +157,22 @@ function videosFor(s: RenderShow): Video[] {
   return videos.sort((x, y) => (x.season ?? 0) - (y.season ?? 0) || (x.episode ?? 0) - (y.episode ?? 0));
 }
 
-function metaFor(s: RenderShow): Meta {
+/** No episode for this long: the show has ended (a seasonal show off the air for months has not). */
+const ENDED_AFTER_DAYS = 365;
+
+function metaFor(s: RenderShow, now: number): Meta {
   const m: Meta = { ...preview(s), videos: videosFor(s) };
+  // Apps build the year line from these (Nuvio: "2021 - 2024" when ended, "2024 -" while running).
+  const last = s.show.seasons
+    .flatMap((x) => x.episodes.map((e) => e.airDate))
+    .filter((d): d is string => !!d)
+    .sort()
+    .at(-1);
+  if (last) {
+    m.lastAirDate = last;
+    m.status =
+      now - Date.parse(`${last}T00:00:00Z`) > ENDED_AFTER_DAYS * 86_400_000 ? 'Ended' : 'Returning Series';
+  }
   if (s.show.background) m.background = s.show.background;
   if (s.show.pageUrl) m.links = [{ name: 'Source', category: 'Website', url: s.show.pageUrl }];
   return m;
@@ -295,6 +311,7 @@ export function renderSite(input: RenderInput): SiteFiles {
   const extIds: ExtIds = {};
   const rows = new Map<string, MetaPreview[]>();
 
+  const now = input.now ?? Date.now();
   const listed = input.shows.filter((s) => s.state === 'listed' && s.episodes.length > 0);
   listed.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
   for (const s of listed) {
@@ -323,7 +340,7 @@ export function renderSite(input: RenderInput): SiteFiles {
   // Meta and streams for every show ever published (delisted ones too, so watch history still opens).
   for (const s of input.shows) {
     if (s.episodes.length === 0) continue;
-    files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s) }));
+    files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s, now) }));
     for (const [season, streams] of seasonStreamFiles(s)) {
       files.set(sitePaths.seasonStreams(s.seriesId, season), json(streams));
     }

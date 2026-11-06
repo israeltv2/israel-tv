@@ -45,6 +45,10 @@ export interface Video {
 }
 
 export interface Meta extends MetaPreview {
+  /** "Ended" or "Returning Series" (apps such as Nuvio show it, and use it with lastAirDate for the year line). */
+  status?: 'Ended' | 'Returning Series';
+  /** The latest episode's air date (yyyy-mm-dd). */
+  lastAirDate?: string;
   background?: string;
   logo?: string;
   videos?: Video[];

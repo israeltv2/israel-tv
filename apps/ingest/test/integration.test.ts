@@ -153,12 +153,12 @@ test('integration: which addon answers what, at home and abroad', async () => {
         expect(got['community.israel-tv']).toHaveLength(1);
         // Labels: source (and quality, when known) as the name; plainly Israel-only on the public one.
         expect(got['community.israel-tv']?.[0]?.name).toMatch(
-          source === 'reshet' ? /^\u200F?רשת 13/ : /^\u200F?כאן/,
+          source === 'reshet' ? /^[\u200F\u202B]?רשת 13/ : /^[\u200F\u202B]?כאן/,
         );
         expect(got['community.israel-tv']?.[0]?.title).toMatch(/זמין לצפייה רק בישראל/);
         expect(got['community.israel-tv.resolver']).toHaveLength(1);
         expect(got['community.israel-tv.resolver']?.[0]?.name).toMatch(
-          source === 'reshet' ? /^\u200F?רשת 13/ : /^\u200F?כאן/,
+          source === 'reshet' ? /^[\u200F\u202B]?רשת 13/ : /^[\u200F\u202B]?כאן/,
         );
         expect(got['community.israel-tv.resolver']?.[0]?.title).toMatch(/דרך החיבור הישראלי שלך/);
       }
