@@ -28,11 +28,18 @@ import { type PlayInfo, PlaySessions } from './sessions.ts';
 export { absolutize } from './context.ts';
 export { RELAY_HOSTS } from './geo-relay.ts';
 
+/** Our series for an IMDb/TMDB id, with the seasons that share TMDB's numbering. */
+export type ExternalHit = { series: string; seasons: number[] };
+
 export interface ResolverDeps {
   /** Episode data for a published video id, from the home database. */
-  episode(series: string, season: number, episode: number): ScrapedEpisode | undefined;
+  episode(
+    series: string,
+    season: number,
+    episode: number,
+  ): ScrapedEpisode | undefined | Promise<ScrapedEpisode | undefined>;
   /** Our series for an IMDb (`tt…`) or TMDB (`tmdb:…`) id, with the seasons that share TMDB's numbering. */
-  external?(id: string): { series: string; seasons: number[] } | undefined;
+  external?(id: string): ExternalHit | undefined | Promise<ExternalHit | undefined>;
   /** Plain fetch (Mako, and checking direct streams; no proxy). */
   fetch: Fetch;
   /** Fetch through the geo adapter; without it there is no geo-relay. */
@@ -160,7 +167,7 @@ export function createResolverApp(deps: ResolverDeps) {
     const play = (): Play => ({ playId, info });
     // Shows opened from other catalogs (tt123:2:5 or tmdb:123:2:5) map onto ours, numbered seasons only.
     const ext = /^(tt\d+|tmdb:\d+):(\d+):(\d+)$/.exec(id);
-    const mapped = ext?.[1] ? deps.external?.(ext[1]) : undefined;
+    const mapped = ext?.[1] ? await deps.external?.(ext[1]) : undefined;
     const v = mapped?.seasons.includes(Number(ext?.[2]))
       ? { series: mapped.series, season: Number(ext?.[2]), episode: Number(ext?.[3]) }
       : parseVideoId(id);
@@ -168,7 +175,7 @@ export function createResolverApp(deps: ResolverDeps) {
       const video = `${v.series}:${v.season}:${v.episode}`;
       const source = parseSeriesId(v.series)?.source;
       info = { showId: v.series, episodeId: video, ...(source ? { source } : {}) };
-      const ep = deps.episode(v.series, v.season, v.episode);
+      const ep = await deps.episode(v.series, v.season, v.episode);
       if (ep && mako && v.series.startsWith('iltv_mako_') && ep.play?.vcmid)
         streams.push(...mako.streams(origin, play(), { video }));
       // Reshet and Kan video is geo-blocked outside Israel; the relay is offered only when it is refused here.

@@ -425,3 +425,46 @@ test('the daily flush ends only sessions started before today; a play going on s
   expect(events).toHaveLength(1);
   expect(s.active().map((a) => a.playId)).toEqual(['new']);
 });
+
+test('resolver-only: episode details come from the published catalog, with no database', async () => {
+  const { catalogLookup } = await import('../src/server.ts');
+  const calls: string[] = [];
+  const files: Record<string, unknown> = {
+    'play/iltv_mako_1/2.json': { '3': { mako: { vcmid: 'v', channelId: 'c' } } },
+    'play/iltv_reshet_5/1.json': {
+      '1': { direct: 'https://cdnapisec.kaltura.com/p/1/x.m3u8', israelOnly: true },
+    },
+    'ext-ids.json': { tt123: { id: 'iltv_mako_1', seasons: [2] } },
+  };
+  const fakeFetch = (async (url: string) => {
+    calls.push(url);
+    const path = url.replace('https://addon.example/', '');
+    return path in files ? Response.json(files[path]) : new Response('', { status: 404 });
+  }) as unknown as typeof fetch;
+  const c = catalogLookup('https://addon.example/manifest.json', fakeFetch);
+  expect(await c.episode('iltv_mako_1', 2, 3)).toMatchObject({
+    play: { vcmid: 'v', channelId: 'c' },
+    streams: [],
+  });
+  expect(await c.episode('iltv_reshet_5', 1, 1)).toMatchObject({
+    streams: [{ url: 'https://cdnapisec.kaltura.com/p/1/x.m3u8', kind: 'direct' }],
+    availableAbroad: false,
+  });
+  expect(await c.episode('iltv_mako_1', 2, 9)).toBeUndefined();
+  expect(await c.external('tt123')).toEqual({ series: 'iltv_mako_1', seasons: [2] });
+  await c.episode('iltv_mako_1', 2, 3);
+  expect(calls.filter((u) => u.includes('play/iltv_mako_1/2.json'))).toHaveLength(1);
+  // A resolver built on it plays a Mako episode from the catalog's data alone.
+  const app = createResolverApp({
+    ...c,
+    fetch: async (url) => {
+      if (url.includes('playlist.jsp'))
+        return Response.json({ media: [{ url: 'https://x.akamaized.net/m.m3u8', cdn: 'AKAMAI' }] });
+      if (url.includes('entitlement')) return Response.json({ tickets: [{ ticket: 'hdnea%3Dx' }] });
+      return new Response('#EXTM3U\nv.m3u8\n');
+    },
+  });
+  const s = await (await app.request('http://h/stream/series/tt123:2:3.json')).json();
+  const play = new URL(s.streams[0].url);
+  expect((await app.request(`${play.pathname}${play.search}`)).status).toBe(200);
+});

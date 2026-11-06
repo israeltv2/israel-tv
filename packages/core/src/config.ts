@@ -75,6 +75,13 @@ const PublisherCloudflare = z.strictObject({
 });
 
 export const ConfigSchema = z.strictObject({
+  /**
+   * What this instance does. `host` (default): everything — reads the sites, publishes the catalog, runs the
+   * resolver. `local-only`: the same, published on this network only (local publisher). `resolver-only`: only
+   * the home resolver (Mako playback, geo relay), using someone's published catalog (`resolver.catalogUrl`) —
+   * no reading of sites, no publishing, no database of its own.
+   */
+  role: z.enum(['host', 'local-only', 'resolver-only']).default('host'),
   /** Home database (SQLite file). Holds the id registry, numbering and last good data. */
   store: z.strictObject({ path: z.string().default('./data/israel-tv.sqlite') }).prefault({}),
   /**
@@ -107,6 +114,8 @@ export const ConfigSchema = z.strictObject({
       enabled: z.boolean().default(true),
       host: z.string().default('0.0.0.0'),
       port: port.default(7701),
+      /** The published catalog to take episode details from (resolver-only role), e.g. https://…/manifest.json. */
+      catalogUrl: z.url().optional(),
       /** Mako playback: a fresh ticket and the ~1 KB master playlist per play (video comes from Mako's CDN). */
       makoAuth: z.strictObject({ enabled: z.boolean().default(true) }).prefault({}),
       /** Geo-blocked Reshet/Kan video through the geo proxy, only when refused from here (needs `geo`). */

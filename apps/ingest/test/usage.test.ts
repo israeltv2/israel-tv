@@ -211,3 +211,28 @@ test('with the public address known, image URLs are absolute and only catalog ro
   for (const [path, content] of files)
     if (typeof content === 'string') expect(content, path).not.toContain('{{israel-tv-origin}}');
 });
+
+test('each role says plainly what it needs and what does not belong', async () => {
+  const { checkRole } = await import('../src/config.ts');
+  const parse = (o: object) => ConfigSchema.parse(o);
+  expect(() => checkRole(parse({ role: 'resolver-only' }))).toThrow(/resolver\.catalogUrl/);
+  expect(() =>
+    checkRole(
+      parse({
+        role: 'resolver-only',
+        resolver: { catalogUrl: 'https://a.example/manifest.json' },
+        publisher: { type: 'cloudflare' },
+      }),
+    ),
+  ).toThrow(/remove publisher/);
+  expect(() =>
+    checkRole(parse({ role: 'resolver-only', resolver: { catalogUrl: 'https://a.example/manifest.json' } })),
+  ).not.toThrow();
+  expect(() => checkRole(parse({ role: 'local-only', publisher: { type: 'cloudflare' } }))).toThrow(/local/);
+  expect(() => checkRole(parse({}))).not.toThrow();
+  // A resolver-only config needs no Cloudflare or TMDB secret.
+  const { secretOwners } = await import('@israel-tv/core');
+  expect(
+    secretOwners(parse({ role: 'resolver-only', resolver: { catalogUrl: 'https://a.example/' } })),
+  ).toEqual([]);
+});

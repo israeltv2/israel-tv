@@ -160,3 +160,13 @@ test('logo and background are in the manifest only when their images are there, 
   expect(m.background).toBe('{{israel-tv-origin}}/background.jpg');
   expect(files.get('logo.png')).toBe(png);
 });
+
+test('play files carry what a resolver needs per episode', () => {
+  const s = show('iltv_mako_1', '2026-11-05');
+  const mako = s.show.seasons[0]?.episodes[0];
+  if (mako) mako.play = { vcmid: 'v', channelId: 'c' };
+  const files = renderSite({ ...base, shows: [s] });
+  const season = s.seasons[0]?.number ?? 1;
+  const play = read(files, `play/iltv_mako_1/${season}.json`);
+  expect(Object.values(play)[0]).toMatchObject({ mako: { vcmid: 'v', channelId: 'c' } });
+});

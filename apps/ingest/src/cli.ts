@@ -2,9 +2,18 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { ConfigError, parseSeriesId, type Source, secretOwners, tmdbApiKey } from '@israel-tv/core';
+import {
+  type Config,
+  ConfigError,
+  parseSeriesId,
+  type Source,
+  secretOwners,
+  tmdbApiKey,
+  type UsageEvent,
+} from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
+import { PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
 import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
 import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
@@ -100,6 +109,14 @@ async function main(argv: string[]): Promise<number> {
     config.admin.tokenEnv,
     config.resolver.remote.tokenEnv,
   ]);
+  // A resolver-only instance has no catalog database of its own: it plays from a published catalog.
+  if (config.role === 'resolver-only' && !['check-proxy', 'remote-url', 'events'].includes(cmd)) {
+    if (cmd !== 'start' && cmd !== 'resolver')
+      throw new UserError(
+        `\`${cmd}\` is for an instance that reads the sites (role "host" or "local-only"); this one is "resolver-only": use start, check-proxy, remote-url or events`,
+      );
+    return runResolverOnly(config);
+  }
   const store = Store.open(config.store.path);
   store.closeStaleRuns();
   const adapters = createAdapters(config);
@@ -192,7 +209,6 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case 'resolver': {
-        const { resolverApp } = await import('@israel-tv/resolver');
         await listen(
           resolverApp(config, {
             log: (component) => createLogger({ ...config.log, file: undefined }).for(component),
@@ -378,3 +394,52 @@ main(process.argv.slice(2)).then(
     process.exit(1);
   },
 );
+
+/** The resolver-only role: the home resolver (and the remote one, when enabled), from a published catalog. */
+async function runResolverOnly(config: Config): Promise<number> {
+  const logger = createLogger(config.log);
+  const events = EventStore.open(config.events.path);
+  const sessions = new PlaySessions((e) => events.record(e));
+  const shared = {
+    log: (component: string) => logger.for(component),
+    onEvent: (e: UsageEvent) => {
+      events.record(e);
+      const { ts: _ts, component, kind, ...fields } = e;
+      logger.for(component)(kind, fields);
+    },
+    sessions,
+    salt: events.clientSalt(),
+  };
+  await listen(
+    resolverApp(config, shared).fetch as never,
+    config.resolver.host,
+    config.resolver.port,
+    'resolver.port',
+  );
+  logger.log(
+    `resolver (from ${config.resolver.catalogUrl}) — install in your app: ${lanAddresses(config.resolver.host)
+      .map((a) => `http://${a}:${config.resolver.port}/manifest.json`)
+      .join('  ')}`,
+  );
+  if (config.resolver.remote.enabled) {
+    const remote = remoteResolverApp(config, shared);
+    if ('error' in remote) logger.log(`remote resolver not started: ${remote.error}`);
+    else {
+      await listen(
+        remote.fetch as never,
+        config.resolver.remote.host,
+        config.resolver.remote.port,
+        'resolver.remote.port',
+      );
+      logger.log(
+        `remote resolver (Mako away from home) served at ${config.resolver.remote.publicUrl} — \`israel-tv remote-url\` prints the link`,
+      );
+    }
+  }
+  setInterval(() => sessions.flush(), 30_000).unref();
+  await stopSignal(logger.log);
+  sessions.flush(true);
+  events.close();
+  logger.flush();
+  return 0;
+}

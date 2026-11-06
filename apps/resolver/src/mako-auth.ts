@@ -21,7 +21,11 @@ function makoUrl(u: string): string {
 }
 
 export interface MakoAuthDeps extends ModuleContext {
-  episode(series: string, season: number, episode: number): ScrapedEpisode | undefined;
+  episode(
+    series: string,
+    season: number,
+    episode: number,
+  ): ScrapedEpisode | undefined | Promise<ScrapedEpisode | undefined>;
   channels: readonly LiveChannel[];
 }
 
@@ -171,7 +175,7 @@ export function makoAuth(d: MakoAuthDeps) {
         c,
         { source: 'mako', episodeId: id, ...(v ? { showId: v.series } : {}) },
         async (run) => {
-          const ep = v ? d.episode(v.series, v.season, v.episode) : undefined;
+          const ep = v ? await d.episode(v.series, v.season, v.episode) : undefined;
           const play = ep?.play;
           if (!play?.vcmid || !play.channelId) return new Response('unknown episode', { status: 404 });
           const pr = await d.fetch(

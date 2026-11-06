@@ -15,6 +15,13 @@ Relative paths are relative to the config file's folder.
 | ------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `path` | `./data/israel-tv.sqlite` | The database: permanent ids, numbering, last good data, run log. Back it up; `/registry.json` on the addon is a public copy of the id registry. |
 
+## `role`
+
+`host` (default), `local-only` or `resolver-only` — see the README's [Roles](../README.md#roles). It decides which
+settings make sense, and the start refuses a config that mixes roles, with what to change. `resolver-only` needs
+`resolver.catalogUrl` (the public catalog's manifest URL) and runs only the resolver (and `resolver.remote` when
+enabled): no reading of sites, no publishing, no catalog database; usage events and logs are still kept.
+
 ## `branding`
 
 `dir` (default `./branding`): your own addon images, used instead of the bundled ones when present —
@@ -89,6 +96,7 @@ come from Workers Logs).
 | `host`, `port`     | `0.0.0.0`, `7701` |                                                                                                                              |
 | `makoAuth.enabled` | `true`            | Mako playback (a fresh ticket and the ~1 KB playlist per play; video comes from Mako's CDN).                                 |
 | `geoRelay.enabled` | `true`            | Geo-blocked Reshet/Kan video through the `geo` proxy, only when refused from this network. The only part that carries video. |
+| `catalogUrl`       | —                 | The public catalog to play from (role `resolver-only`).                                                                      |
 | `remote.*`         | off               | Mako away from home through your own tunnel (see below).                                                                     |
 
 `remote`: `enabled` (default `false`), `host`/`port` (default `127.0.0.1`, `7703`: for a tunnel connector on the

@@ -780,3 +780,16 @@ described the old Worker routing; series ids are found through a row's search (r
 the local server now serves `freshness.json` too; reproducing a direct (non-resolver) play; that switching to the
 Cloudflare publisher stops the `:7700` addon; restart commands for launchd, systemd and Docker; and how to create
 a tunnel when there is none yet.
+
+### Roles, and a resolver that needs no database
+
+Three roles (`role` in the config): `host` (everything, published to Cloudflare), `local-only` (everything, on
+this network), `resolver-only` (only the home resolver, playing from someone's public catalog). Each has a minimal
+config and `.env.example` in `examples/`; the start refuses a config that mixes roles and says what to change, and
+the secrets check only asks for what the config uses (a resolver-only instance needs none inside Israel).
+
+The resolver read episode details from the home database, so it could not run without ingest. The catalog now
+publishes, per season, what a resolver needs per episode (`play/<series>/<season>.json`: Mako's play ids, the
+direct stream, whether it is Israel-only; about 1,600 more static files, well within the 20,000 limit), and a
+resolver-only instance reads those (and `ext-ids.json`) over HTTP, cached for 10 minutes per season. A full host
+keeps reading its own database, which is faster and always current.

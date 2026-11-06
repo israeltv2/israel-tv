@@ -1,8 +1,9 @@
-// Resolver wiring: home database (read-only) + geo adapter from the config.
-import type { Config, ScrapedEpisode } from '@israel-tv/core';
+// Resolver wiring: episode details (the home database on a full host, or a published catalog for a resolver that
+// runs on its own) + geo adapter from the config.
+import { type Config, type ScrapedEpisode, type SeasonPlay, sitePaths } from '@israel-tv/core';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
-import { createResolverApp, type ResolverDeps } from './app.ts';
+import { createResolverApp, type ExternalHit, type ResolverDeps } from './app.ts';
 import { brandImage } from './branding.ts';
 import { createRemoteResolverApp } from './remote.ts';
 
@@ -43,8 +44,7 @@ export function resolverApp(
     ...extra,
     modules: { makoAuth: config.resolver.makoAuth.enabled, geoRelay: config.resolver.geoRelay.enabled },
     branding: { ...(logo ? { logo } : {}), ...(background ? { background } : {}) },
-    episode: episodeLookup(config.store.path),
-    external: externalLookup(config.store.path),
+    ...lookups(config),
     fetch: (url, init) => fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }),
     ...(proxies.length > 0 ? { geoFetch: createGeoFetch(proxies) } : {}),
   });
@@ -85,9 +85,64 @@ export function remoteResolverApp(
     {
       ...extra,
       branding: { ...(logo ? { logo } : {}), ...(background ? { background } : {}) },
-      episode: episodeLookup(config.store.path),
-      external: externalLookup(config.store.path),
+      ...lookups(config),
       fetch: (url, init) => fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }),
     },
   );
+}
+
+/**
+ * Episode details from a published Israel TV catalog instead of the home database (for a resolver that runs
+ * without ingest): the per-season play files and the external-id map, fetched and kept a while.
+ */
+export function catalogLookup(catalogUrl: string, fetchImpl: typeof fetch = fetch) {
+  const base = catalogUrl.replace(/\/+$/, '').replace(/\/manifest\.json$/, '');
+  const seasons = new Map<string, { at: number; data: Promise<SeasonPlay> }>();
+  let ext: { at: number; data: Promise<Record<string, { id: string; seasons: number[] }>> } | undefined;
+  const getJson = async <T>(path: string, empty: T): Promise<T> => {
+    try {
+      const r = await fetchImpl(`${base}/${path}`, { signal: AbortSignal.timeout(15_000) });
+      return r.ok ? ((await r.json()) as T) : empty;
+    } catch {
+      return empty;
+    }
+  };
+  const SEASON_TTL = 10 * 60_000;
+  return {
+    async episode(series: string, season: number, episode: number): Promise<ScrapedEpisode | undefined> {
+      const key = `${series}/${season}`;
+      let hit = seasons.get(key);
+      if (!hit || Date.now() - hit.at > SEASON_TTL) {
+        hit = { at: Date.now(), data: getJson<SeasonPlay>(sitePaths.seasonPlay(series, season), {}) };
+        seasons.set(key, hit);
+        if (seasons.size > 500) seasons.delete(seasons.keys().next().value as string);
+      }
+      const p = (await hit.data)[String(episode)];
+      if (!p) return undefined;
+      return {
+        key: `${series}:${season}:${episode}`,
+        title: '',
+        streams: p.direct ? [{ url: p.direct, kind: 'direct' }] : [],
+        ...(p.mako ? { play: p.mako } : {}),
+        ...(p.israelOnly ? { availableAbroad: false } : {}),
+      };
+    },
+    async external(id: string): Promise<ExternalHit | undefined> {
+      if (!ext || Date.now() - ext.at > 60 * 60_000)
+        ext = { at: Date.now(), data: getJson(sitePaths.extIds, {}) };
+      const hit = (await ext.data)[id];
+      return hit ? { series: hit.id, seasons: hit.seasons } : undefined;
+    },
+  };
+}
+
+/** Where the resolver gets episode details: a published catalog (resolver-only role) or the home database. */
+export function lookups(config: Config): Pick<ResolverDeps, 'episode' | 'external'> {
+  if (config.role === 'resolver-only') {
+    if (!config.resolver.catalogUrl)
+      throw new Error('resolver.catalogUrl is needed for the resolver-only role');
+    const c = catalogLookup(config.resolver.catalogUrl);
+    return { episode: c.episode, external: c.external };
+  }
+  return { episode: episodeLookup(config.store.path), external: externalLookup(config.store.path) };
 }

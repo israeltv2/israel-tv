@@ -3,6 +3,7 @@ import {
   CATALOG_PAGE_SIZE,
   CATALOGS,
   type EpisodeAssignment,
+  type EpisodePlay,
   type ExtIds,
   type Freshness,
   GEO_LIMITED,
@@ -14,6 +15,7 @@ import {
   type ScrapedShow,
   type SearchRow,
   type SeasonAssignment,
+  type SeasonPlay,
   type SeasonStreams,
   SOURCES,
   type Source,
@@ -124,6 +126,37 @@ function metaFor(s: RenderShow): Meta {
   return m;
 }
 
+/** Per season, what a resolver needs per episode (so it does not need the home database). */
+function seasonPlayFiles(s: RenderShow): Map<number, SeasonPlay> {
+  const epByKey = new Map(s.episodes.map((a) => [a.key, a]));
+  const out = new Map<number, SeasonPlay>();
+  for (const season of s.show.seasons) {
+    for (const ep of season.episodes) {
+      const a = epByKey.get(ep.key);
+      if (!a) continue;
+      const direct = ep.streams.find((x) => x.kind === 'direct' || x.kind === 'resolver')?.url;
+      const play: EpisodePlay = {
+        ...(ep.play?.vcmid && ep.play.channelId
+          ? {
+              mako: {
+                vcmid: ep.play.vcmid,
+                channelId: ep.play.channelId,
+                ...(ep.play.galleryChannelId ? { galleryChannelId: ep.play.galleryChannelId } : {}),
+              },
+            }
+          : {}),
+        ...(direct ? { direct } : {}),
+        ...(ep.availableAbroad === false ? { israelOnly: true } : {}),
+      };
+      if (!play.mako && !play.direct) continue;
+      const file = out.get(a.season) ?? {};
+      file[String(a.episode)] = play;
+      out.set(a.season, file);
+    }
+  }
+  return out;
+}
+
 function seasonStreamFiles(s: RenderShow): Map<number, SeasonStreams> {
   const epByKey = new Map(s.episodes.map((a) => [a.key, a]));
   const out = new Map<number, SeasonStreams>();
@@ -224,6 +257,9 @@ export function renderSite(input: RenderInput): SiteFiles {
     files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s) }));
     for (const [season, streams] of seasonStreamFiles(s)) {
       files.set(sitePaths.seasonStreams(s.seriesId, season), json(streams));
+    }
+    for (const [season, play] of seasonPlayFiles(s)) {
+      files.set(sitePaths.seasonPlay(s.seriesId, season), json(play));
     }
     const numbered = s.seasons
       .filter((a) => a.kind === 'numbered' || a.kind === 'single')
