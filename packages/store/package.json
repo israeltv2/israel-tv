@@ -17,5 +17,6 @@
   },
   "devDependencies": {
     "drizzle-kit": "1.0.0-rc.5"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

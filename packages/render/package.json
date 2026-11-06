@@ -12,5 +12,6 @@
   },
   "dependencies": {
     "@israel-tv/core": "workspace:*"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }
