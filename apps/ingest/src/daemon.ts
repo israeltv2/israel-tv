@@ -24,14 +24,7 @@ import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { pullPublicUsage } from './public-usage.ts';
-import {
-  ANALYTICS_OFF,
-  activeSources,
-  analyticsWanted,
-  buildStatus,
-  cleanSecrets,
-  publishSite,
-} from './publish.ts';
+import { activeSources, analyticsOff, buildStatus, cleanSecrets, publishSite } from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -138,7 +131,31 @@ export class Daemon {
   }
 
   async publish(): Promise<void> {
-    await publishSite(this.store, this.config, this.log, this.events.clientSalt());
+    this.lastPublishAt = Date.now();
+    if (this.publishTimer) clearTimeout(this.publishTimer);
+    this.publishTimer = undefined;
+    await publishSite(this.store, this.config, this.log);
+  }
+
+  private lastPublishAt = 0;
+  private publishTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * Publish routine changes: at once when the last publish is long enough ago, else once when the interval is up
+   * (changes in between are gathered into that one deploy). `urgent` publishes now (owner refresh, full run).
+   */
+  requestPublish(urgent = false): void {
+    const p = this.config.publisher;
+    const gap = p.type === 'cloudflare' ? p.minIntervalMinutes * 60_000 : 0;
+    const wait = urgent ? 0 : this.lastPublishAt + gap - Date.now();
+    if (wait <= 0) {
+      this.enqueue('publish', () => this.publish());
+      return;
+    }
+    this.publishTimer ??= setTimeout(() => {
+      this.publishTimer = undefined;
+      this.enqueue('publish', () => this.publish());
+    }, wait);
   }
 
   fullRun(): void {
@@ -159,7 +176,7 @@ export class Daemon {
       for (const make of Object.values(adapters)) {
         await runAiring(this.store, make(), this.config.schedule.airingWindowDays, this.runOpts);
       }
-      await this.publish();
+      this.requestPublish();
     });
   }
 
@@ -216,7 +233,8 @@ export class Daemon {
         const attempted = new Set(r.attemptedShows ?? []);
         for (const k of priority) if (!attempted.has(k)) this.kanRefresh.add(k);
         // New episodes, or newly copied show images.
-        if (r.newEpisodes > 0 || (r.artSaved ?? 0) > 0) this.enqueue('publish', () => this.publish());
+        // A slice that served an owner's refresh publishes at once; routine slices are gathered.
+        if (r.newEpisodes > 0 || (r.artSaved ?? 0) > 0) this.requestPublish(priority.length > 0);
         return arrived && r.pages > 0;
       })
       .catch((err) => {
@@ -368,9 +386,9 @@ export class Daemon {
 
   status() {
     const notes = [
-      ...(this.config.publisher.type === 'cloudflare' && !analyticsWanted(this.store)
+      ...(this.config.publisher.type === 'cloudflare' && analyticsOff(this.store)
         ? [
-            'Analytics Engine is not enabled on the Cloudflare account (Workers & Pages → Analytics Engine → enable); the public addon is counted from Workers Logs meanwhile',
+            'Analytics Engine is not enabled on the Cloudflare account (Workers & Pages → Analytics Engine → enable, then `pnpm israel-tv deploy-api`); the public addon is counted from Workers Logs meanwhile',
           ]
         : []),
       ...(this.remoteProblem ? [this.remoteProblem] : []),
@@ -480,9 +498,6 @@ export async function startDaemon(
   opts: { initialRun?: boolean } = {},
 ): Promise<Daemon> {
   const log = logger.log;
-  // Analytics Engine refused earlier: try it again on the first publish after a restart (the owner may just have
-  // enabled it), not only after the weekly retry.
-  if (!analyticsWanted(store)) store.setState(ANALYTICS_OFF, { at: new Date(0).toISOString() });
   const d = new Daemon(config, store, events, logger);
   // Every finished run (full, airing, show, crawl slice, publish, match) is also an event.
   store.onRunFinished = (run) =>

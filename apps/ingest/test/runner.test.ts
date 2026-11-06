@@ -1,7 +1,7 @@
 import type { ScrapedShow } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { Store } from '@israel-tv/store';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { buildStatus } from '../src/publish.ts';
 import { runAiring, runFull, runOne } from '../src/runner.ts';
 import type { ShowEntry, SourceAdapter } from '../src/sources.ts';
@@ -315,4 +315,37 @@ test('restore drill: ids and numbers come back identical from registry.json and 
   );
   expect(b.findSeriesId('mako', '/c')).toBe('iltv_mako_3');
   expect(() => b.restoreRegistry(published)).toThrow(/empty/);
+});
+
+test('routine publishes are gathered: at most one per interval; urgent ones go at once', async () => {
+  const { Daemon } = await import('../src/daemon.ts');
+  const { parseConfig } = await import('@israel-tv/core');
+  vi.useFakeTimers({ now: Date.parse('2026-11-06T12:00:00Z') });
+  try {
+    const d = new Daemon(
+      parseConfig({ publisher: { type: 'cloudflare', minIntervalMinutes: 30 } }),
+      Store.open(':memory:'),
+      EventStore.open(':memory:'),
+      quiet,
+    );
+    const at: number[] = [];
+    d.publish = async () => {
+      (d as unknown as { lastPublishAt: number }).lastPublishAt = Date.now();
+      at.push(Date.now());
+    };
+    d.requestPublish(); // first: at once
+    await vi.advanceTimersByTimeAsync(0);
+    d.requestPublish(); // within 30 minutes: waits
+    d.requestPublish(); // gathered with the one above
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(at).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(20 * 60_000);
+    expect(at).toHaveLength(2);
+    expect((at[1] ?? 0) - (at[0] ?? 0)).toBe(30 * 60_000);
+    d.requestPublish(true); // owner refresh: now
+    await vi.advanceTimersByTimeAsync(0);
+    expect(at).toHaveLength(3);
+  } finally {
+    vi.useRealTimers();
+  }
 });

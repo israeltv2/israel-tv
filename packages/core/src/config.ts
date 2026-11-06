@@ -72,7 +72,22 @@ const PublisherCloudflare = z.strictObject({
   dir: z.string().default('./data/site'),
   /** Public base URL once deployed (used in /status links). Optional. */
   publicUrl: z.url().optional(),
+  /**
+   * Routine changes (airing checks, Kan slices) are published at most this often, gathered into one deploy; the end
+   * of a full run and a show refresh asked for by the owner publish at once.
+   */
+  minIntervalMinutes: z.number().int().min(0).max(1440).default(30),
+  /** The private API Worker the public one hands dynamic requests to (default: `<workerName>-api`). */
+  apiWorkerName: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .optional(),
 });
+
+/** The API Worker's name for a Cloudflare publisher. */
+export function apiWorkerName(p: { workerName: string; apiWorkerName?: string | undefined }): string {
+  return p.apiWorkerName ?? `${p.workerName}-api`;
+}
 
 export const ConfigSchema = z.strictObject({
   /**

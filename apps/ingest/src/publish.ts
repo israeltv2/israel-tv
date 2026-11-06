@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  apiWorkerName,
   CATALOGS,
   type Config,
   enabledSources,
@@ -415,47 +416,52 @@ export interface DeployResult {
   url?: string;
 }
 
-/** Run `wrangler deploy` for the catalog Worker with the site folder as its static assets. */
+/** The data Worker's code fingerprint: a new version is deployed when its router or config changes. */
 const WORKER_DEPLOYED = 'publish:worker-fingerprint';
-/** Source folders the Worker is built from (the Worker, the addon app and core). */
-const WORKER_SOURCES = ['apps/catalog/src', 'packages/addon/src', 'packages/core/src'];
+/** What the data Worker is built from: only the router and its contract (the rest is the API Worker). */
+const ROUTER_SOURCES = ['apps/catalog/src/router.ts', 'packages/core/src/router-contract.ts'];
 
-/** A fingerprint of the Worker's code and config, to deploy a new version even when no data changed. */
+/** A fingerprint of the data Worker's code and config, to deploy a new version even when no data changed. */
 export function workerFingerprint(
   p: Extract<PublisherConfig, { type: 'cloudflare' }>,
-  analytics = true,
   originKnown = false,
 ): string {
   const h = createHash('sha256');
-  h.update(JSON.stringify(workerConfig(p, join(REPO_ROOT, 'apps/catalog'), analytics, originKnown)));
-  for (const dir of WORKER_SOURCES) {
-    const abs = join(REPO_ROOT, dir);
-    if (!existsSync(abs)) continue;
-    for (const f of readdirSync(abs, { recursive: true }).map(String).sort()) {
-      const file = join(abs, f);
-      if (statSync(file).isFile()) h.update(f).update(readFileSync(file));
-    }
+  h.update(JSON.stringify(workerConfig(p, join(REPO_ROOT, 'apps/catalog'), originKnown)));
+  for (const f of ROUTER_SOURCES) {
+    const abs = join(REPO_ROOT, f);
+    if (existsSync(abs)) h.update(f).update(readFileSync(abs));
   }
   return h.digest('hex');
 }
 
+function readJsonc(path: string): Record<string, unknown> {
+  return JSON.parse(
+    readFileSync(path, 'utf8')
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('//'))
+      .join('\n'),
+  ) as Record<string, unknown>;
+}
+
+/** Paths the data Worker's router runs for; everything else is served as static assets, without any code. */
+export const ROUTER_PATHS = ['/catalog/*', '/stream/*', '/status*'];
+
 /**
- * The Worker's wrangler config for this deploy: the checked-in one, plus Worker-first routing when request
- * logs are on, and Cloudflare's own invocation logs off (they would keep request metadata; the Worker logs
- * its own events without addresses).
+ * The public data Worker's wrangler config: the catalog as static assets, the router for the dynamic paths, and
+ * the service binding to the private API Worker. Cloudflare's own invocation logs stay off (they would keep
+ * request metadata); the API Worker logs its own events without addresses.
  */
 export function workerConfig(
   p: Extract<PublisherConfig, { type: 'cloudflare' }>,
   catalogDir: string,
-  analytics = true,
-  /** The publish wrote absolute image URLs (it knew the addon's address), so only rows need the Worker. */
+  /** The publish wrote absolute image URLs (it knew the addon's address), so only dynamic paths need code. */
   originKnown = false,
 ): unknown {
-  const text = readFileSync(join(catalogDir, 'wrangler.jsonc'), 'utf8')
-    .split('\n')
-    .filter((l) => !l.trim().startsWith('//'))
-    .join('\n');
-  const base = JSON.parse(text) as { assets: Record<string, unknown>; main: string };
+  const base = readJsonc(join(catalogDir, 'wrangler.jsonc')) as {
+    assets: Record<string, unknown>;
+    main: string;
+  };
   return {
     ...base,
     name: p.workerName,
@@ -463,12 +469,31 @@ export function workerConfig(
     assets: {
       ...base.assets,
       directory: p.dir,
-      // Static files are served without running the Worker (browsing is free and not counted), except catalog
-      // rows (the Worker adds a warning to a row that has not been updated). Only on a first publish, before the
-      // addon's address is known, do the files carrying image URLs also go through it to get the address filled in.
-      run_worker_first: originKnown ? ['/catalog/*'] : ['/manifest.json', '/catalog/*', '/meta/*'],
+      // Only before the addon's address is known do the files carrying image URLs also go through the API, which
+      // fills the address in.
+      run_worker_first: originKnown ? ROUTER_PATHS : [...ROUTER_PATHS, '/manifest.json', '/meta/*'],
     },
-    // The Worker logs its own events (no addresses); Cloudflare's invocation logs would keep request metadata.
+    services: [{ binding: 'API', service: apiWorkerName(p) }],
+    observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },
+  };
+}
+
+/**
+ * The private API Worker's wrangler config: no public URL, the per-client limits, Analytics Engine (when the
+ * account has it on) and its own logs.
+ */
+export function apiWorkerConfig(
+  p: Extract<PublisherConfig, { type: 'cloudflare' }>,
+  catalogDir: string,
+  analytics = true,
+): unknown {
+  const base = readJsonc(join(catalogDir, 'wrangler.api.jsonc')) as { main: string };
+  return {
+    ...base,
+    name: apiWorkerName(p),
+    main: join(catalogDir, base.main),
+    workers_dev: false,
+    preview_urls: false,
     observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },
     // One data point per stream request, counted by Cloudflare (read back once a day; see public-usage.ts).
     // Analytics Engine must be enabled once on the account; until it is, the Worker deploys without it.
@@ -481,64 +506,161 @@ export function workerConfig(
   };
 }
 
-async function deployCloudflare(
-  p: Extract<PublisherConfig, { type: 'cloudflare' }>,
-  env: NodeJS.ProcessEnv,
-  salt?: string,
-  analytics = true,
-  originKnown = false,
-): Promise<DeployResult> {
-  const t0 = Date.now();
-  const cwd = join(REPO_ROOT, 'apps/catalog');
-  const wrangler = join(cwd, 'node_modules/.bin/wrangler');
+interface Wrangler {
+  bin: string;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  home: string;
+  p: Extract<PublisherConfig, { type: 'cloudflare' }>;
+}
+
+/**
+ * wrangler with the configured token and account only. Without them wrangler would fall back to any login stored
+ * on this machine and act on that (possibly unrelated) account: refuse instead, and give it a home of its own so
+ * it never sees a stored login.
+ */
+function wranglerFor(p: Extract<PublisherConfig, { type: 'cloudflare' }>, env: NodeJS.ProcessEnv): Wrangler {
   const token = env[p.apiTokenEnv];
   const account = env[p.accountIdEnv];
-  // Without the configured token wrangler would fall back to any login stored on this machine and deploy to
-  // that (possibly unrelated) account. Refuse instead, and give wrangler a home of its own so it never sees
-  // a stored login.
   if (!token || !account) {
     throw new PublishError(
       `Cloudflare deploy refused: ${p.apiTokenEnv} and ${p.accountIdEnv} must be set (see .env.example)`,
     );
   }
-  const wranglerHome = join(dirname(p.dir), '.wrangler-home');
-  mkdirSync(wranglerHome, { recursive: true });
-  const childEnv: NodeJS.ProcessEnv = {
-    PATH: env.PATH,
-    HOME: wranglerHome,
-    XDG_CONFIG_HOME: join(wranglerHome, 'config'),
-    CLOUDFLARE_ACCOUNT_ID: account,
-    CLOUDFLARE_API_TOKEN: token,
-    WRANGLER_SEND_METRICS: 'false',
-    NO_COLOR: '1',
-    FORCE_COLOR: '0',
+  const cwd = join(REPO_ROOT, 'apps/catalog');
+  const home = join(dirname(p.dir), '.wrangler-home');
+  mkdirSync(home, { recursive: true });
+  return {
+    bin: join(cwd, 'node_modules/.bin/wrangler'),
+    cwd,
+    home,
+    p,
+    env: {
+      PATH: env.PATH,
+      HOME: home,
+      XDG_CONFIG_HOME: join(home, 'config'),
+      CLOUDFLARE_ACCOUNT_ID: account,
+      CLOUDFLARE_API_TOKEN: token,
+      WRANGLER_SEND_METRICS: 'false',
+      NO_COLOR: '1',
+      FORCE_COLOR: '0',
+    },
   };
-  const configPath = join(wranglerHome, 'wrangler.json');
-  writeFileSync(configPath, JSON.stringify(workerConfig(p, cwd, analytics, originKnown), null, 2));
-  const args = ['deploy', '--config', configPath, '--name', p.workerName, '--assets', p.dir];
-  // The client-hash salt goes up as a Worker secret, through a file only this user can read, removed after.
-  const secretsPath = join(wranglerHome, 'secrets.json');
-  if (salt) {
-    writeFileSync(secretsPath, JSON.stringify({ CLIENT_SALT: salt }), { mode: 0o600 });
-    args.push('--secrets-file', secretsPath);
-  }
+}
+
+/** Deploy the public data Worker: the router and the site folder as its static assets. */
+async function deployCloudflare(
+  p: Extract<PublisherConfig, { type: 'cloudflare' }>,
+  env: NodeJS.ProcessEnv,
+  originKnown = false,
+): Promise<DeployResult> {
+  const t0 = Date.now();
+  const w = wranglerFor(p, env);
+  const configPath = join(w.home, 'wrangler.json');
+  writeFileSync(configPath, JSON.stringify(workerConfig(p, w.cwd, originKnown), null, 2));
   try {
-    return await runWrangler(wrangler, args, cwd, childEnv, p, t0);
+    return await runWrangler(
+      w,
+      ['deploy', '--config', configPath, '--name', p.workerName, '--assets', p.dir],
+      t0,
+    );
+  } catch (err) {
+    // The service binding needs the API Worker to exist: a first publish before `deploy-api` says what to do.
+    if (/service|binding|not found|does not exist|10143/i.test((err as Error).message))
+      throw new PublishError(
+        `${(err as Error).message}\nIs the API Worker (${apiWorkerName(p)}) deployed? Run \`pnpm israel-tv deploy-api\` once (and after each update).`,
+      );
+    throw err;
+  }
+}
+
+/**
+ * Deploy the private API Worker (code releases: `israel-tv deploy-api`, or `deploy`; never a catalog publish). The
+ * client-hash salt goes up as its secret through a file only this user can read, removed after. Analytics Engine
+ * is tried every time; while the account has not enabled it, the Worker deploys without it and /status says so.
+ */
+export async function deployApi(
+  config: Config,
+  store: Store,
+  salt: string | undefined,
+  log: (line: string) => void,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<DeployResult> {
+  const p = config.publisher;
+  if (p.type !== 'cloudflare') throw new PublishError('deploy-api is for the Cloudflare publisher');
+  const t0 = Date.now();
+  const w = wranglerFor(p, env);
+  const secretsPath = join(w.home, 'api-secrets.json');
+  const run = async (analytics: boolean) => {
+    const configPath = join(w.home, 'wrangler.api.json');
+    writeFileSync(configPath, JSON.stringify(apiWorkerConfig(p, w.cwd, analytics), null, 2));
+    const args = ['deploy', '--config', configPath, '--name', apiWorkerName(p)];
+    if (salt) {
+      writeFileSync(secretsPath, JSON.stringify({ CLIENT_SALT: salt }), { mode: 0o600 });
+      args.push('--secrets-file', secretsPath);
+    }
+    return runWrangler(w, args, t0);
+  };
+  try {
+    try {
+      const d = await run(true);
+      store.setState(ANALYTICS_OFF, null);
+      return d;
+    } catch (err) {
+      if (!/enable Analytics Engine/i.test((err as Error).message)) throw err;
+      store.setState(ANALYTICS_OFF, { at: new Date().toISOString() });
+      log('deploy-api: Analytics Engine is not enabled on the Cloudflare account; deploying without it');
+      return await run(false);
+    }
   } finally {
     rmSync(secretsPath, { force: true });
   }
 }
 
+export type WorkerRole = 'data' | 'api';
+
+/** The Worker's recent versions (newest first), as wrangler lists them. */
+export async function workerVersions(config: Config, role: WorkerRole, env = process.env): Promise<string> {
+  const p = config.publisher;
+  if (p.type !== 'cloudflare') throw new PublishError('versions are for the Cloudflare publisher');
+  const w = wranglerFor(p, env);
+  const name = role === 'data' ? p.workerName : apiWorkerName(p);
+  return (await runWrangler(w, ['versions', 'list', '--name', name], Date.now())).output;
+}
+
+/**
+ * Roll one Worker back on its own: `data` (the catalog and router as published then) or `api` (the code). Without
+ * a version id, to the one before the current.
+ */
+export async function rollbackWorker(
+  config: Config,
+  role: WorkerRole,
+  versionId: string | undefined,
+  env = process.env,
+): Promise<string> {
+  const p = config.publisher;
+  if (p.type !== 'cloudflare') throw new PublishError('rollback is for the Cloudflare publisher');
+  const w = wranglerFor(p, env);
+  const name = role === 'data' ? p.workerName : apiWorkerName(p);
+  const args = [
+    'rollback',
+    ...(versionId ? [versionId] : []),
+    '--name',
+    name,
+    '--message',
+    `israel-tv rollback ${role}`,
+    '--yes',
+  ];
+  return (await runWrangler(w, args, Date.now())).output;
+}
+
 async function runWrangler(
-  wrangler: string,
+  w: Wrangler,
   args: string[],
-  cwd: string,
-  childEnv: NodeJS.ProcessEnv,
-  p: { apiTokenEnv: string; accountIdEnv: string },
   t0: number,
-): Promise<DeployResult> {
+): Promise<DeployResult & { output: string }> {
   const output = await new Promise<string>((resolve, reject) => {
-    const child = spawn(wrangler, args, { cwd, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(w.bin, args, { cwd: w.cwd, env: w.env, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     child.stdout.on('data', (d) => {
       out += d;
@@ -547,23 +669,21 @@ async function runWrangler(
       out += d;
     });
     child.on('error', reject);
-    child.on('close', (code) => (code === 0 ? resolve(out) : reject(publishError(out, code, p))));
+    child.on('close', (code) => (code === 0 ? resolve(out) : reject(publishError(out, code, w.p))));
   });
   const url = /https:\/\/[^\s]+\.workers\.dev/.exec(output)?.[0];
   const uploaded = /Uploaded (\d+) files?/.exec(output)?.[0] ?? 'no asset changes';
-  return { ms: Date.now() - t0, detail: uploaded, ...(url ? { url } : {}) };
+  return { ms: Date.now() - t0, detail: uploaded, output: cleanSecrets(output), ...(url ? { url } : {}) };
 }
 
 export async function deploy(
   config: Config,
   env: NodeJS.ProcessEnv = process.env,
-  salt?: string,
-  analytics = true,
   originKnown = false,
 ): Promise<DeployResult> {
   const p = config.publisher;
   if (p.type === 'local') return { ms: 0, detail: `served from ${p.dir} by the local server` };
-  return deployCloudflare(p, env, salt, analytics, originKnown);
+  return deployCloudflare(p, env, originKnown);
 }
 
 const PUBLISHED_URL = 'publish:url';
@@ -579,13 +699,12 @@ export function publicBase(config: Config, store: Store): string | undefined {
   return url?.replace(/\/+$/, '');
 }
 
-/** Set while Cloudflare refuses the Analytics Engine binding (not enabled on the account); retried weekly. */
+/** Set while Cloudflare refuses the Analytics Engine binding (not enabled on the account); cleared by a deploy-api with it. */
 export const ANALYTICS_OFF = 'cloudflare:analytics-off';
 
-/** Whether to deploy with Analytics Engine: yes, unless Cloudflare refused it in the last week. */
-export function analyticsWanted(store: Store, now = Date.now()): boolean {
-  const off = store.getState<{ at: string }>(ANALYTICS_OFF);
-  return !off || now - Date.parse(off.at) > 7 * 86_400_000;
+/** Whether the last API deploy went without Analytics Engine (the account has not enabled it). */
+export function analyticsOff(store: Store): boolean {
+  return !!store.getState<{ at: string }>(ANALYTICS_OFF);
 }
 
 /**
@@ -596,8 +715,6 @@ export async function publishSite(
   store: Store,
   config: Config,
   log: (line: string) => void,
-  /** Secret salt for the Worker's client hashes (from the events database). */
-  salt?: string,
 ): Promise<boolean> {
   const t0 = Date.now();
   const kind = config.publisher.type;
@@ -615,13 +732,10 @@ export async function publishSite(
     return false;
   }
   const retry = store.lastRun('publish', kind)?.status === 'failed';
-  // A new version of the Worker (its code or its config) is deployed even when no data changed.
-  let analytics = analyticsWanted(store);
+  // A new version of the data Worker (its router or config) is deployed even when no data changed.
   const originKnown = publicBase(config, store) !== undefined;
   const worker =
-    config.publisher.type === 'cloudflare'
-      ? workerFingerprint(config.publisher, analytics, originKnown)
-      : undefined;
+    config.publisher.type === 'cloudflare' ? workerFingerprint(config.publisher, originKnown) : undefined;
   const workerChanged = worker !== undefined && store.getState<string>(WORKER_DEPLOYED) !== worker;
   if (w.changed.length === 0 && w.deleted === 0 && !retry && !workerChanged) {
     log('publish: nothing changed');
@@ -629,23 +743,9 @@ export async function publishSite(
   }
   const runId = store.startRun('publish', kind);
   try {
-    let d: DeployResult;
-    try {
-      d = await deploy(config, process.env, salt, analytics, originKnown);
-      if (analytics) store.setState(ANALYTICS_OFF, null);
-    } catch (err) {
-      // Analytics Engine is a one-time opt-in on the Cloudflare account: deploy without it meanwhile.
-      if (!analytics || !/enable Analytics Engine/i.test((err as Error).message)) throw err;
-      analytics = false;
-      store.setState(ANALYTICS_OFF, { at: new Date().toISOString() });
-      log(
-        'publish: Analytics Engine is not enabled on the Cloudflare account; deploying without it (see /status)',
-      );
-      d = await deploy(config, process.env, salt, false, originKnown);
-    }
+    const d = await deploy(config, process.env, originKnown);
     store.finishRun(runId, { status: 'ok' });
-    if (worker && config.publisher.type === 'cloudflare')
-      store.setState(WORKER_DEPLOYED, workerFingerprint(config.publisher, analytics, originKnown));
+    if (worker) store.setState(WORKER_DEPLOYED, worker);
     // The first deploy tells us the public address: the next publish writes it into the files.
     if (d.url && config.publisher.type === 'cloudflare' && !config.publisher.publicUrl)
       store.setState(PUBLISHED_URL, d.url);

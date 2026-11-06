@@ -2,7 +2,15 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { ConfigError, parseSeriesId, roleOf, type Source, secretOwners, tmdbApiKey } from '@israel-tv/core';
+import {
+  apiWorkerName,
+  ConfigError,
+  parseSeriesId,
+  roleOf,
+  type Source,
+  secretOwners,
+  tmdbApiKey,
+} from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
 import { checkProxy, printEvents, remoteUrl, resolverApp, runResolverOnly } from '@israel-tv/resolver';
@@ -15,9 +23,12 @@ import { localAddonApp } from './local-server.ts';
 import {
   activeSources,
   buildStatus,
+  deployApi,
   PublishError,
   publishSite,
   renderFromStore,
+  rollbackWorker,
+  workerVersions,
   writeSite,
 } from './publish.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
@@ -33,6 +44,10 @@ const HELP = `israel-tv <command>
   start [--no-initial-run]           Run everything: schedules, admin, local addon server, resolver
   resolver                           Run only the private resolver
   publish                            Render the addon files and deploy them with the configured publisher
+  deploy-api                         Cloudflare: deploy the private API Worker (after each code update)
+  deploy                             Cloudflare: deploy-api, then publish (first setup, or after an update)
+  versions <data|api>                Cloudflare: the Worker's recent versions
+  rollback <data|api> [version-id]   Cloudflare: roll one Worker back on its own (default: the previous version)
   serve [--port N]                   Serve the rendered files (also to preview a Cloudflare build locally)
   kan                                Read one Kan crawl slice now (needs a browser; see docs)
   check-proxy                        Check that the geo proxy works and exits in Israel
@@ -184,13 +199,34 @@ async function main(argv: string[]): Promise<number> {
         const r = await runOne(store, make(), { key, title, ...(poster ? { poster } : {}) }, opts);
         return r.status === 'ok' ? 0 : 1;
       }
-      case 'publish': {
+      case 'publish':
+        return (await publishSite(store, config, log)) ? 0 : 1;
+      case 'deploy-api':
+      case 'deploy': {
         const events = EventStore.open(config.events.path);
         try {
-          return (await publishSite(store, config, log, events.clientSalt())) ? 0 : 1;
+          const d = await deployApi(config, store, events.clientSalt(), log);
+          log(
+            `deploy-api: ${config.publisher.type === 'cloudflare' ? apiWorkerName(config.publisher) : ''} deployed (${Math.round(d.ms / 1000)} s)`,
+          );
         } finally {
           events.close();
         }
+        if (cmd === 'deploy-api') return 0;
+        return (await publishSite(store, config, log)) ? 0 : 1;
+      }
+      case 'versions':
+      case 'rollback': {
+        if (arg !== 'data' && arg !== 'api')
+          throw new UserError(
+            `${cmd} needs the Worker: \`${cmd} data\` (the catalog) or \`${cmd} api\` (the code)`,
+          );
+        const out =
+          cmd === 'versions'
+            ? await workerVersions(config, arg)
+            : await rollbackWorker(config, arg, positionals[2]);
+        console.log(out.trim());
+        return 0;
       }
       case 'start': {
         const logger = createLogger(config.log);
