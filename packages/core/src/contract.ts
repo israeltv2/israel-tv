@@ -7,10 +7,10 @@ import { z } from 'zod';
 export const RESOLVER_CONTRACT_VERSION = 1;
 
 /** One episode's play details (per season: `play/<series id>/<season>.json`, keyed by episode number). */
-export const EpisodePlaySchema = z.strictObject({
+export const EpisodePlaySchema = z.object({
   /** Mako's ids for its playlist service: the resolver gets a fresh ticket and the master per play. */
   mako: z
-    .strictObject({
+    .object({
       vcmid: z.string().min(1),
       channelId: z.string().min(1),
       galleryChannelId: z.string().optional(),
@@ -29,7 +29,7 @@ export type SeasonPlay = z.infer<typeof SeasonPlaySchema>;
 /** `ext-ids.json`: IMDb (`tt…`) / TMDB (`tmdb:…`) id → our series and the seasons that share their numbering. */
 export const ExtIdsSchema = z.record(
   z.string(),
-  z.strictObject({ id: z.string(), seasons: z.array(z.number().int()) }),
+  z.object({ id: z.string(), seasons: z.array(z.number().int()) }),
 );
 
 /** `resolver-contract.json`, at the catalog's root. */

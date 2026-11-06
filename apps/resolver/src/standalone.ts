@@ -11,6 +11,7 @@ import { PlaySessions } from './sessions.ts';
 /** The resolver-only role: the home resolver (and the remote one, when enabled), from a published catalog. */
 export async function runResolverOnly(config: Config): Promise<number> {
   const logger = createLogger(config.log);
+  const log = logger.for('resolver');
   const events = EventStore.open(config.events.path);
   const sessions = new PlaySessions((e) => events.record(e));
   const shared = {
@@ -29,14 +30,14 @@ export async function runResolverOnly(config: Config): Promise<number> {
     config.resolver.port,
     'resolver.port',
   );
-  logger.log(
+  log(
     `resolver (from ${config.resolver.catalogUrl}) — install in your app: ${lanAddresses(config.resolver.host)
       .map((a) => `http://${a}:${config.resolver.port}/manifest.json`)
       .join('  ')}`,
   );
   if (config.resolver.remote.enabled) {
     const remote = remoteResolverApp(config, shared);
-    if ('error' in remote) logger.log(`remote resolver not started: ${remote.error}`);
+    if ('error' in remote) log(`remote resolver not started: ${remote.error}`);
     else {
       await listen(
         remote.fetch as never,
@@ -44,7 +45,7 @@ export async function runResolverOnly(config: Config): Promise<number> {
         config.resolver.remote.port,
         'resolver.remote.port',
       );
-      logger.log(
+      log(
         `remote resolver (Mako away from home) served at ${config.resolver.remote.publicUrl} — \`israel-tv remote-url\` prints the link`,
       );
     }
@@ -53,7 +54,7 @@ export async function runResolverOnly(config: Config): Promise<number> {
   // Daily: the same usage housekeeping as a full instance (rollups, 30-day pruning, VACUUM, size cap).
   const maintain = () => {
     sessions.flush(false, Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`));
-    logger.log('usage events maintained', {
+    log('usage events maintained', {
       ...events.maintain(Date.now(), config.events.maxMB * 1024 * 1024),
     });
   };
@@ -61,9 +62,9 @@ export async function runResolverOnly(config: Config): Promise<number> {
   new Cron(config.schedule.daily, { timezone: config.schedule.timezone, protect: true }, maintain);
   // Say at once if the catalog cannot serve a resolver (a typo, or a host on an older version).
   void checkCatalog(config.resolver.catalogUrl ?? '').then((problem) =>
-    logger.log(problem ? `catalog check: ${problem}` : 'catalog check: ok'),
+    log(problem ? `catalog check: ${problem}` : 'catalog check: ok'),
   );
-  await stopSignal(logger.log);
+  await stopSignal(log);
   sessions.flush(true);
   events.close();
   logger.flush();

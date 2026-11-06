@@ -1,13 +1,13 @@
 # TV checklist
 
-What to check on the TV/phone after installing. `<addon>` is your addon's manifest URL (local:
-`http://<host>:7700/manifest.json`; Cloudflare: `https://<worker>.<subdomain>.workers.dev/manifest.json`),
-`<resolver>` is `http://<home host>:7701/manifest.json`.
+What to check on the TV/phone after installing. `<addon>` is your addon's base URL (local:
+`http://<host>:7700`; Cloudflare: `https://<worker>.<subdomain>.workers.dev`): install `<addon>/manifest.json`.
+`<resolver>` is `http://<home host>:7701`.
 
 ## Install
 
-- [ ] Add `<addon>` in the app (Nuvio: Settings → Addons → Add addon; Stremio: Addons → search box → paste).
-- [ ] Add `<resolver>` the same way, on a device at home.
+- [ ] Add `<addon>/manifest.json` in the app (Nuvio: Settings → Addons → Add addon; Stremio: Addons → search box → paste).
+- [ ] Add `<resolver>/manifest.json` the same way, on a device at home.
 - [ ] Home screen / Discover shows the rows **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער**
   (a "⏳ still loading" item until the Kan crawl has found its first show) and **שידור חי**.
 - [ ] Both addons show their logo in the app's addon list; live channel tiles show the channel logos.
@@ -15,7 +15,7 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
   of rows between addons (this addon's rows vs. others) is set in Nuvio's settings (home screen / catalog
   order), not by the addon.
 
-- [ ] Away from home (phone on mobile data): add the link `pnpm israel-tv remote-url` prints (the "Israel TV · Mako (away
+- [ ] Away from home (phone on mobile data): add the link `pnpm israel-tv remote-url` (resolver-only: `pnpm resolver remote-url`) prints (the "Israel TV · Mako (away
   from home)" addon) and play a Mako episode and קשת 12 live. Remove it again from devices you don't own.
 
 ## Catalogs and metadata
@@ -63,5 +63,5 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
   evening, hourly otherwise) without any action.
 - [ ] For an immediate re-read of one show: `curl -X POST -H "Authorization: Bearer <admin token>" http://<host>:7702/refresh/<series-id>` from the
   home network. The series id (e.g. `iltv_mako_12`) is in the row's search results:
-  `curl -s 'https://<addon>/catalog/series/iltv_keshet12/search=<title>.json'` → `metas[].id` (rows:
+  `curl -s '<addon>/catalog/series/iltv_keshet12/search=<word>.json'` (one word of the title, or `%20` for spaces) → `metas[].id` (rows:
   `iltv_keshet12`, `iltv_reshet13`, `iltv_kan11`, `iltv_kankids`).

@@ -316,3 +316,24 @@ function nextDay(day: string): string {
 }
 
 export { PLAY_KINDS };
+
+const UNIT_MS = { m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
+
+/**
+ * Events by filter, newest first — shared by `/events.json` and `israel-tv events`. `since` is an ISO time or
+ * a span like `30m`, `2h`, `7d`.
+ */
+export function queryEvents(events: EventStore, q: Record<string, string | undefined>): EventRow[] {
+  const span = q.since ? /^(\d+)([mhd])$/.exec(q.since) : null;
+  const since = span
+    ? new Date(Date.now() - Number(span[1]) * UNIT_MS[span[2] as 'm' | 'h' | 'd']).toISOString()
+    : q.since;
+  return events.events({
+    ...(q.playId ? { playId: q.playId } : {}),
+    ...(q.kind ? { kind: q.kind } : {}),
+    ...(q.outcome === 'ok' || q.outcome === 'error' ? { outcome: q.outcome } : {}),
+    ...(q.show ? { showId: q.show } : {}),
+    ...(since ? { since } : {}),
+    limit: Math.min(Number(q.limit) || 100, 1000),
+  });
+}

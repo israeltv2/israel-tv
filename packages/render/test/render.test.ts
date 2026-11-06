@@ -181,3 +181,12 @@ test('contract: what the catalog publishes for resolvers fits the versioned cont
   for (const [path] of files) if (path.startsWith('play/')) SeasonPlaySchema.parse(read(files, path));
   ExtIdsSchema.parse(read(files, 'ext-ids.json'));
 });
+
+test('contract: fields added within a version are ignored by a resolver, not refused', async () => {
+  const { SeasonPlaySchema, ExtIdsSchema } = await import('@israel-tv/core');
+  expect(
+    SeasonPlaySchema.safeParse({ '1': { mako: { vcmid: 'v', channelId: 'c', extra: 1 }, subtitles: 'x' } })
+      .success,
+  ).toBe(true);
+  expect(ExtIdsSchema.safeParse({ tt1: { id: 'iltv_mako_1', seasons: [1], title: 'x' } }).success).toBe(true);
+});

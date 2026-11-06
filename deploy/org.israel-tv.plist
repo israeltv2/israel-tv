@@ -2,13 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   launchd agent (macOS) for a full instance (roles host, local-only). For the resolver on its own (resolver-only), use
-  org.israel-tv.resolver.plist instead. Replace /path/to/israel-tv and /path/to/node-dir (the folder holding bin/node; with Volta, use the
-  folder of `volta which node`), then:
+  org.israel-tv.resolver.plist instead. Replace /path/to/israel-tv, and /path/to/node-dir with the folder ABOVE the bin folder that
+  holds node: if `command -v node` (or `volta which node`) prints /opt/homebrew/bin/node, it is /opt/homebrew.
+  Keep "log": { "file": ... } in the config (the examples have it): logs then go to rotated files there, and the file
+  below only catches a crash before logging starts. Then:
     cp deploy/org.israel-tv.plist ~/Library/LaunchAgents/
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.israel-tv.plist
   Restart (after an update, or a change to the config or .env):
     launchctl kickstart -k gui/$(id -u)/org.israel-tv
-  A LaunchAgent (not a daemon) runs in your login session, which Chrome needs for Kan.
+  A LaunchAgent (not a daemon) runs in your login session, which Chrome needs for Kan. It runs only while you are
+  logged in: after a restart (an update, a power cut) log in, or turn on automatic login (System Settings → Users &
+  Groups; not available with FileVault).
 -->
 <plist version="1.0">
 <dict>
@@ -26,7 +30,7 @@
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
     <key>ThrottleInterval</key><integer>10</integer>
-    <key>StandardOutPath</key><string>/path/to/israel-tv/data/israel-tv.log</string>
-    <key>StandardErrorPath</key><string>/path/to/israel-tv/data/israel-tv.log</string>
+    <key>StandardOutPath</key><string>/path/to/israel-tv/data/launchd.log</string>
+    <key>StandardErrorPath</key><string>/path/to/israel-tv/data/launchd.log</string>
 </dict>
 </plist>

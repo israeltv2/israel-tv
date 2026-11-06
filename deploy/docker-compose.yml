@@ -1,8 +1,9 @@
 # Run from the repo root:
-#   mkdir -p deploy/data && sudo chown -R 1000:1000 deploy/data   # the container runs as uid 1000
+#   mkdir -p deploy/data
 #   cp deploy/docker.config.example.json deploy/data/israel-tv.config.json   # local publisher
 #   (or deploy/docker.cloudflare.config.example.json for the Cloudflare publisher)
-#   cp .env.example deploy/data/.env   # fill in only what your config uses; chmod 600
+#   cp .env.example deploy/data/.env   # fill in only what your config uses; chmod 600 deploy/data/.env
+#   sudo chown -R 1000:1000 deploy/data   # last: the container runs as uid 1000 and must read .env
 #   docker compose -f deploy/docker-compose.yml up -d
 # Data (database, events, backups, rendered files) lives in deploy/data.
 # Commands inside the container, e.g. the admin link (the token is generated on first start unless .env sets

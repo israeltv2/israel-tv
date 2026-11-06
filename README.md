@@ -53,15 +53,16 @@ admin and usage dashboard (local network, owner only): http://192.168.1.20:7702/
 ```
 
 The admin page is yours only: `pnpm israel-tv admin-url` prints its link with your token (open it once; the
-browser keeps it). Add **both** manifest URLs in your app (Stremio: Addons → paste URL; Nuvio: Settings → Addons → Add). The
+browser keeps it for 30 days, then open the link again). Add **both** manifest URLs in your app (Stremio: Addons → paste URL; Nuvio: Settings → Addons → Add). The
 first gives catalogs, metadata and the streams that need no token; the second plays Mako and relays
 geo-blocked video. (If the log shows only `127.0.0.1`, find the machine's address with
 `ipconfig getifaddr en0` on macOS or `hostname -I` on Linux.)
 
-**On a Mac:** reserve the Mac's address in your router (or use `<computer-name>.local` in the addon links), so
-the links in your app keep working; set it not to sleep (_System Settings → Energy → Prevent automatic sleeping_),
+**On a Mac:** reserve the Mac's address in your router, so the links in your app keep working
+(`<computer-name>.local` works on Apple devices and most computers, but often not on Android TV, so prefer the
+reserved address there); set it not to sleep (_System Settings → Energy → Prevent automatic sleeping_),
 or playback and the night's reads stop; and choose _Allow_ when macOS asks whether `node` may accept incoming
-connections.
+connections. The service file runs it while you are logged in: after a restart, log in, or turn on automatic login.
 
 The first start reads Mako and Reshet right away (about 30 minutes; one request per second, so the sites
 are not hammered), then every night, and for shows that are airing every hour (every 15 minutes in the
@@ -128,7 +129,8 @@ GEO_PROXY_PASSWORD=your-proxy-password
 ```
 
 Use the scheme your provider gives: most proxies on ports 3128 or 8080 are `http://`; `https://` is for
-proxies that speak TLS. Then `pnpm israel-tv check-proxy` should say `exits in IL ✓`; if not, it says why
+proxies that speak TLS. Then `pnpm israel-tv check-proxy` (`pnpm resolver check-proxy` on a resolver-only install) should say
+`exits in IL ✓`; if not, it says why
 (wrong login, unknown host, wrong scheme…). Several URLs can be listed; the next one is tried when one fails.
 
 Any HTTP(S) or SOCKS5 proxy with an Israeli exit works: a proxy service, or the proxy endpoints some VPN
@@ -158,7 +160,8 @@ fails, that stream answers 502, the log says why, and the admin `/status` shows 
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Optional, for the public addon's usage counts: add the
    permission **Account → Account Analytics → Read** to the token, and switch on **Workers Analytics Engine**
    once (dashboard → _Workers & Pages_ → _Analytics Engine_ → enable; free). Without them the counts come from
-   Workers Logs, which the template's permissions already read, and `/status` says so.
+   Workers Logs, which the template's permissions already read, and `/status` says so. Enabled it later? Restart
+   Israel TV: the next publish tries Analytics Engine again (otherwise it retries weekly).
 3. In `israel-tv.config.json`: `"publisher": { "type": "cloudflare", "workerName": "israel-tv" }`. With it,
    the `:7700` addon on your machine stops: in your app, replace it with the `workers.dev` manifest URL (ids are
    the same, so watch progress stays).
@@ -206,12 +209,24 @@ do not pass each viewer's address, so all viewers then share one rate limit.
    `"resolver": { "remote": { "enabled": true, "publicUrl": "https://tv-remote.example.net" } }` — the tunnel's
    `https://` address, without the token.
 3. Route that hostname to `http://127.0.0.1:7703` in the tunnel (and nothing else: never the admin port). No
-   tunnel yet? `cloudflared tunnel login`, `cloudflared tunnel create israel-tv`, and run it as a service
-   (`cloudflared service install`) so it survives reboots. With `cloudflared`: add `- hostname: tv-remote.example.net` / `service: http://127.0.0.1:7703` to the ingress
-   list in `~/.cloudflared/config.yml` (before the catch-all), then `cloudflared tunnel route dns <tunnel>
-   tv-remote.example.net` and restart cloudflared.
-4. Restart Israel TV, then install the link `pnpm israel-tv remote-url` prints (it contains the token; keep it
-   private).
+   tunnel yet? In this order: `cloudflared tunnel login`; `cloudflared tunnel create israel-tv` (it prints the
+   tunnel's id and writes `~/.cloudflared/<id>.json`); write `~/.cloudflared/config.yml`:
+
+   ```yaml
+   tunnel: <id>
+   credentials-file: /home/you/.cloudflared/<id>.json   # the full path
+   ingress:
+     - hostname: tv-remote.example.net
+       service: http://127.0.0.1:7703
+     - service: http_status:404
+   ```
+
+   then `cloudflared tunnel route dns israel-tv tv-remote.example.net`, and run it as a service so it survives
+   reboots (`cloudflared service install`; on macOS without sudo that is a login agent, so the same login note
+   applies). A tunnel you already have: add the two `hostname`/`service` lines before its catch-all and restart
+   cloudflared.
+4. Restart Israel TV, then install the link `pnpm israel-tv remote-url` prints (`pnpm resolver remote-url` on a
+   resolver-only install; it contains the token; keep it private).
 
 Only Mako's routes are there — its manifest, stream requests and the small playlist per play; video comes from
 Mako's CDN to the player, never through your home or the tunnel. Every other path, and any request without the
@@ -234,7 +249,8 @@ display, run it under `xvfb-run`, or set `"browser": { "type": "none" }` and Kan
 ## Running it as a service
 
 Example service files are in [`deploy/`](deploy): a launchd agent (macOS), a systemd unit (Linux, with the
-setup commands in its header) and a Docker Compose file (Kan off; instructions at its top). Data (the
+setup commands in its header) and a Docker Compose file (Kan off; instructions at its top). For a resolver-only
+install: `org.israel-tv.resolver.plist`, `israel-tv-resolver.service` and `docker-compose.resolver.yml`. Data (the
 SQLite database and the rendered files) lives in `./data` by default.
 
 ## How it works

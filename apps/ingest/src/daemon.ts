@@ -24,7 +24,14 @@ import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { pullPublicUsage } from './public-usage.ts';
-import { activeSources, analyticsWanted, buildStatus, publishSite } from './publish.ts';
+import {
+  ANALYTICS_OFF,
+  activeSources,
+  analyticsWanted,
+  buildStatus,
+  cleanSecrets,
+  publishSite,
+} from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -249,6 +256,8 @@ export class Daemon {
 
   /** Why the remote resolver is not running, when it is enabled but cannot start. */
   remoteProblem: string | undefined;
+  /** Why the last daily read of the public addon's usage failed (cleared when one succeeds). */
+  publicUsageProblem: string | undefined;
 
   /** Play and relay sessions of the resolver (what is playing now). */
   readonly sessions = new PlaySessions((e) => this.record(e));
@@ -287,8 +296,17 @@ export class Daemon {
       try {
         const r = await pullPublicUsage(this.events, this.config, yesterday);
         if (r) this.log('public addon usage read', { ...r });
+        this.publicUsageProblem = undefined;
       } catch (err) {
-        this.log(`reading the public addon's usage failed: ${(err as Error).message}`);
+        const why = cleanSecrets((err as Error).message);
+        this.publicUsageProblem = `reading the public addon's usage failed on ${new Date(now).toISOString().slice(0, 16)}Z: ${why} (the "Public addon" numbers stop at the last day read)`;
+        this.log(this.publicUsageProblem);
+        // The dashboard shows it next to the public numbers, in red.
+        const last = this.events.getMeta('public-usage:last');
+        this.events.setMeta(
+          'public-usage:last',
+          JSON.stringify({ ...(last ? JSON.parse(last) : {}), note: this.publicUsageProblem }),
+        );
       }
     });
   }
@@ -355,6 +373,7 @@ export class Daemon {
           ]
         : []),
       ...(this.remoteProblem ? [this.remoteProblem] : []),
+      ...(this.publicUsageProblem ? [this.publicUsageProblem] : []),
       ...(this.events.overCap()
         ? [
             `events.sqlite is over its ${this.config.events.maxMB} MB cap: raw events were cut to the last week`,
@@ -460,6 +479,9 @@ export async function startDaemon(
   opts: { initialRun?: boolean } = {},
 ): Promise<Daemon> {
   const log = logger.log;
+  // Analytics Engine refused earlier: try it again on the first publish after a restart (the owner may just have
+  // enabled it), not only after the weekly retry.
+  if (!analyticsWanted(store)) store.setState(ANALYTICS_OFF, { at: new Date(0).toISOString() });
   const d = new Daemon(config, store, events, logger);
   // Every finished run (full, airing, show, crawl slice, publish, match) is also an event.
   store.onRunFinished = (run) =>

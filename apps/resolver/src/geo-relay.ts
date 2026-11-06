@@ -41,6 +41,17 @@ export function geoRelay(d: GeoRelayDeps) {
     const hit = probes.get(key);
     if (hit && Date.now() - hit.at < PROBE_TTL_MS) return hit;
     let result: { blocked: boolean; note: string };
+    // Only a broadcaster's own https host is probed (and could be relayed): a catalog cannot make this resolver
+    // reach anything else.
+    let target: URL | undefined;
+    try {
+      target = new URL(url);
+    } catch {}
+    if (target?.protocol !== 'https:' || !isRelayHost(target.hostname)) {
+      result = { blocked: false, note: 'not a broadcaster host: not probed, not relayed' };
+      probes.set(key, { ...result, at: Date.now() });
+      return result;
+    }
     try {
       const r = await d.fetch(url, {
         headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android) ExoPlayer' },

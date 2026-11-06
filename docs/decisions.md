@@ -845,3 +845,26 @@ the GraphQL API is no substitute (it only has request totals per Worker, not per
   direct stream labelled Israel-only, and the resolver's relay of it) — the catalog is public and stateless and
   cannot know where the viewer is.
 - The README explains why each part exists.
+
+### Review pass after the clean-up (code, security, three personas)
+
+- **Contract tolerance.** The play-file and ext-id schemas accepted no added fields, yet the contract says fields
+  may be added within a version: one new field would have made every older resolver drop every file. They now
+  ignore unknown fields (test added); anything an older resolver cannot safely ignore is a new version.
+- **The local server serves the contract** (`resolver-contract.json`, `play/…`, `ext-ids.json`), so a
+  resolver-only instance can point at a local-only catalog. The integration test now reads the catalog through
+  the catalog addon itself instead of the rendered files.
+- **The resolver's own entry point has every command a resolver-only owner needs:** `check-catalog`,
+  `check-proxy`, `remote-url`, `events` (shared code in `apps/resolver/src/commands.ts`; `queryEvents` moved to
+  `packages/events`). Before, the filtered install could not run them. Its log lines say `component: resolver`.
+- **Security hardening** (below the reporting bar, cheap): the resolver probes a catalog's direct stream only on a
+  broadcaster's https host (the relay allowlist), so someone else's catalog cannot make it reach other hosts; a
+  catalog file over 8 MB is refused unread.
+- **Visible failures:** a failed nightly read of the public addon's usage is shown on `/status` and next to the
+  public numbers (it was only logged). Analytics Engine refused earlier is tried again on the first publish after
+  a restart (the owner may just have enabled it), not only weekly.
+- **Docs and service files:** example configs log to rotated files and the launchd agents keep only a crash file
+  (the old setup grew one log forever); plist Volta/Homebrew path explained correctly; LaunchAgent login note;
+  `.local` names often fail on Android TV; Docker `chown` after copying `.env`; `<addon>` means the base URL
+  everywhere and Hebrew searches use one word or `%20`; the admin cookie lasts 30 days; a first-time tunnel gets
+  a complete `config.yml` in the right order; resolver-only update, restart and log commands.

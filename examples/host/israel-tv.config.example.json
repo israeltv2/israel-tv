@@ -1,4 +1,10 @@
 {
   "role": "host",
-  "publisher": { "type": "cloudflare", "workerName": "israel-tv" }
+  "publisher": {
+    "type": "cloudflare",
+    "workerName": "israel-tv"
+  },
+  "log": {
+    "file": "./data/logs/israel-tv.log"
+  }
 }
