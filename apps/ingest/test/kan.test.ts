@@ -279,3 +279,34 @@ test('a Kan server error backs off without charging the page a try', async () =>
   expect(st?.backoffUntil).toBeDefined();
   expect(Object.values(st?.shows ?? {}).every((s) => !s.retry && s.failed.length === 0)).toBe(true);
 });
+
+test('one episode page that always answers 500 does not stop Kan for good', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const broken = {
+    ...base,
+    async load(url: string) {
+      return url.endsWith('/s1/1006640/') ? { status: 500, html: '', challenged: false } : base.load(url);
+    },
+  };
+  const clear = () => {
+    const st = store.getState<{
+      backoffUntil?: string;
+      shows: Record<string, { retry?: Record<string, { at: string }> }>;
+    }>('kan:crawl');
+    if (!st) return;
+    delete st.backoffUntil;
+    for (const s of Object.values(st.shows))
+      for (const r of Object.values(s.retry ?? {})) r.at = '2000-01-01T00:00:00.000Z';
+    store.setState('kan:crawl', st);
+  };
+  for (let i = 0; i < 60; i++) {
+    await crawlKan(store, opts(broken as never, 10));
+    clear();
+  }
+  const keys = store
+    .listShows({ source: 'kan' })
+    .flatMap((x) => x.show.seasons.flatMap((y) => y.episodes.map((e) => e.key)));
+  expect(keys).not.toContain('kan:1006640');
+  expect(keys.length).toBe(8); // the rest were read after the broken page was given up
+});
