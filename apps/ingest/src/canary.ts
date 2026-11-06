@@ -126,6 +126,7 @@ export async function runCanary(
       const type = t.source === 'live' ? 'tv' : 'series';
       try {
         const r = await fetchImpl(`${resolverBase}/stream/${type}/${encodeURIComponent(id)}.json`, {
+          headers: { 'x-israel-tv-canary': '1' },
           signal: AbortSignal.timeout(20_000),
         });
         const j = (await r.json()) as { streams?: { url?: string }[] };

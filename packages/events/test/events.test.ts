@@ -59,3 +59,27 @@ test('events are batched, queried, rolled up per day, pruned and capped', () => 
   expect(db.overCap()).toBe(true);
   expect(db.clientSalt()).toBe(db.clientSalt());
 });
+
+test('totals are not displaced by events without a source or show, and the canary is not usage', () => {
+  const db = EventStore.open(':memory:');
+  db.record(ev({ client: 'c1' }));
+  db.record(ev({ client: 'c1', playId: 'p2' }));
+  // An unmapped IMDb lookup: no source, no show.
+  db.record({
+    ts: `${day}T11:00:00.000Z`,
+    kind: 'stream_request',
+    component: 'resolver',
+    outcome: 'error',
+    client: 'c2',
+    episodeId: 'tt1:1:1',
+  });
+  // The canary's own play.
+  db.record(ev({ client: 'local', playId: 'canary-x' }));
+  const rows = db.homeDay(day);
+  expect(rows.find((r) => r.source === '' && r.showId === '')).toMatchObject({ plays: 2, uniqueClients: 2 });
+  expect(rows.find((r) => r.source === 'mako' && r.showId === '')).toMatchObject({
+    plays: 2,
+    uniqueClients: 1,
+  });
+  expect(rows.filter((r) => r.source === '' && r.showId === '')).toHaveLength(1);
+});

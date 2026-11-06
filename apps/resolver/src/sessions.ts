@@ -141,16 +141,18 @@ export class PlaySessions {
   /** Plays and relay sessions going on now. */
   active(): ActiveSession[] {
     this.flush();
-    return [...this.sessions.values()].map((s) => ({
-      kind: s.kind,
-      playId: s.playId,
-      since: new Date(s.startedAt).toISOString(),
-      segments: s.segments,
-      bytes: s.bytes,
-      ...(s.source ? { source: s.source } : {}),
-      ...(s.showId ? { showId: s.showId } : {}),
-      ...(s.episodeId ? { episodeId: s.episodeId } : {}),
-      ...(s.client ? { client: s.client } : {}),
-    }));
+    return [...this.sessions.values()]
+      .filter((s) => !s.playId.startsWith('canary-'))
+      .map((s) => ({
+        kind: s.kind,
+        playId: s.playId,
+        since: new Date(s.startedAt).toISOString(),
+        segments: s.segments,
+        bytes: s.bytes,
+        ...(s.source ? { source: s.source } : {}),
+        ...(s.showId ? { showId: s.showId } : {}),
+        ...(s.episodeId ? { episodeId: s.episodeId } : {}),
+        ...(s.client ? { client: s.client } : {}),
+      }));
   }
 }

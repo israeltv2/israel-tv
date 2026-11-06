@@ -1,7 +1,7 @@
 // The usage and diagnostics database (events.sqlite): append-only events, written in batches; nightly daily
 // rollups; pruning, a weekly VACUUM and a size cap. Kept apart from the catalog database.
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, statSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
@@ -136,10 +136,20 @@ export class EventStore {
     const from = `${day}T00:00:00.000Z`;
     const to = `${day}T99`;
     // Per show, per source (show '') and overall (source '' and show ''): each counts its own distinct clients.
+    // Each level only takes the events that belong to it, so a level's rows never share a key with another's
+    // (an event without a show cannot pose as a source total, one without a source as the overall total).
     const levels = [
-      { cols: sql`source, show_id`, group: sql`group by source, show_id` },
-      { cols: sql`source, '' as show_id`, group: sql`group by source` },
-      { cols: sql`'' as source, '' as show_id`, group: sql`` },
+      {
+        cols: sql`source, show_id`,
+        only: sql`and source is not null and source <> '' and show_id is not null and show_id <> ''`,
+        group: sql`group by source, show_id`,
+      },
+      {
+        cols: sql`source, '' as show_id`,
+        only: sql`and source is not null and source <> ''`,
+        group: sql`group by source`,
+      },
+      { cols: sql`'' as source, '' as show_id`, only: sql``, group: sql`` },
     ];
     const out: DailyRow[] = [];
     for (const l of levels) {
@@ -156,7 +166,8 @@ export class EventStore {
             sum(case when kind = 'failure' then 1 else 0 end) as failures,
             coalesce(sum(case when kind = 'relay_session' then json_extract(detail, '$.durationMs') end), 0) / 60000.0 as minutes
           from ${t.events}
-          where ts >= ${from} and ts < ${to} and kind not in ('run', 'canary') ${l.group}`);
+          where ts >= ${from} and ts < ${to} and kind not in ('run', 'canary')
+            and (play_id is null or play_id not like 'canary-%') ${l.only} ${l.group}`);
       for (const r of rows) {
         if ((r.plays ?? 0) + (r.clients ?? 0) + (r.failures ?? 0) === 0) continue;
         out.push({
@@ -254,6 +265,8 @@ export class EventStore {
     const vacuumed = overCap || !lastVacuum || nowMs - Date.parse(lastVacuum) > 7 * DAY_MS;
     if (vacuumed) {
       this.db.$client.exec('VACUUM');
+      // VACUUM in WAL mode writes the whole database into the WAL: fold it back so the file stays small.
+      this.db.$client.exec('PRAGMA wal_checkpoint(TRUNCATE)');
       this.setMeta('vacuum:last', new Date(nowMs).toISOString());
       overCap = this.sizeBytes() > maxBytes;
     }
@@ -263,20 +276,12 @@ export class EventStore {
   }
 
   /** Size of the database file (and its WAL), in bytes. */
+  /** Size of the database's content, in bytes (its pages; not the transient WAL file). */
   sizeBytes(): number {
-    if (this.path === ':memory:') {
-      const r = this.db.get<{ n: number }>(
-        sql`select page_count * page_size as n from pragma_page_count(), pragma_page_size()`,
-      );
-      return r?.n ?? 0;
-    }
-    let n = 0;
-    for (const f of [this.path, `${this.path}-wal`]) {
-      try {
-        n += statSync(f).size;
-      } catch {}
-    }
-    return n;
+    const r = this.db.get<{ n: number }>(
+      sql`select page_count * page_size as n from pragma_page_count(), pragma_page_size()`,
+    );
+    return r?.n ?? 0;
   }
 
   /** Whether the last maintenance found the database over its size cap. */
