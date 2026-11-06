@@ -793,3 +793,14 @@ publishes, per season, what a resolver needs per episode (`play/<series>/<season
 direct stream, whether it is Israel-only; about 1,600 more static files, well within the 20,000 limit), and a
 resolver-only instance reads those (and `ext-ids.json`) over HTTP, cached for 10 minutes per season. A full host
 keeps reading its own database, which is faster and always current.
+
+### Roles: persona check
+
+Fixed: the role example configs were never committed (the `.gitignore` entry for `israel-tv.config.json` also
+matched `examples/*/israel-tv.config.json`) — they are now `israel-tv.config.example.json`; the host example asked
+for a proxy and TMDB key it does not need (now Cloudflare only; the rest are opt-ins); "Sharing with friends"
+still said Mako needs the host's database (friends now run the resolver-only role); a wrong or outdated
+`catalogUrl` failed silently (a resolver-only instance now checks its catalog at start and logs what is wrong);
+what a resolver-only instance has (no admin page or dashboard) is stated; the role check now also covers `host`
+(it must publish to Cloudflare) and refuses `catalogUrl` outside resolver-only; and the role, when not set,
+follows the publisher (Cloudflare: host; local: local-only), so the no-config Quick start is local-only.

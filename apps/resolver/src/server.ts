@@ -1,6 +1,6 @@
 // Resolver wiring: episode details (the home database on a full host, or a published catalog for a resolver that
 // runs on its own) + geo adapter from the config.
-import { type Config, type ScrapedEpisode, type SeasonPlay, sitePaths } from '@israel-tv/core';
+import { type Config, roleOf, type ScrapedEpisode, type SeasonPlay, sitePaths } from '@israel-tv/core';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
 import { createResolverApp, type ExternalHit, type ResolverDeps } from './app.ts';
@@ -138,11 +138,47 @@ export function catalogLookup(catalogUrl: string, fetchImpl: typeof fetch = fetc
 
 /** Where the resolver gets episode details: a published catalog (resolver-only role) or the home database. */
 export function lookups(config: Config): Pick<ResolverDeps, 'episode' | 'external'> {
-  if (config.role === 'resolver-only') {
+  if (roleOf(config) === 'resolver-only') {
     if (!config.resolver.catalogUrl)
       throw new Error('resolver.catalogUrl is needed for the resolver-only role');
     const c = catalogLookup(config.resolver.catalogUrl);
     return { episode: c.episode, external: c.external };
   }
   return { episode: episodeLookup(config.store.path), external: externalLookup(config.store.path) };
+}
+
+/**
+ * Whether a published catalog can serve a resolver: its manifest answers, and one show's play file exists (a
+ * catalog published before play files existed cannot). Returns the problem, or undefined when it is fine.
+ */
+export async function checkCatalog(
+  catalogUrl: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | undefined> {
+  const base = catalogUrl.replace(/\/+$/, '').replace(/\/manifest\.json$/, '');
+  const get = async (path: string) => {
+    try {
+      const r = await fetchImpl(`${base}/${path}`, { signal: AbortSignal.timeout(15_000) });
+      return r.ok ? ((await r.json()) as unknown) : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const manifest = (await get('manifest.json')) as { catalogs?: { id: string; type: string }[] } | undefined;
+  if (!manifest?.catalogs)
+    return `no Israel TV manifest at ${base}/manifest.json (check resolver.catalogUrl)`;
+  for (const c of manifest.catalogs.filter((x) => x.type === 'series')) {
+    const row = (await get(`catalog/series/${c.id}.json`)) as { metas?: { id: string }[] } | undefined;
+    const id = row?.metas?.find((m) => /^iltv_(mako|reshet|kan)_\d+$/.test(m.id))?.id;
+    if (!id) continue;
+    const meta = (await get(`meta/series/${id}.json`)) as
+      | { meta?: { videos?: { season: number }[] } }
+      | undefined;
+    const season = meta?.meta?.videos?.[0]?.season;
+    if (season === undefined) continue;
+    return (await get(sitePaths.seasonPlay(id, season)))
+      ? undefined
+      : `the catalog at ${base} has no play files (its host runs an older Israel TV): Mako and relayed plays will not be offered until it updates`;
+  }
+  return `the catalog at ${base} lists no shows to check`;
 }

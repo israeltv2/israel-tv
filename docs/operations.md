@@ -36,6 +36,10 @@ To find a show's series id: search its row, `curl -s 'https://<addon>/catalog/se
 private network addresses and refuse requests sent by web pages (cross-site), so use curl or a script. A Kan
 show's refresh makes it due for the next crawl slice and starts one.
 
+A **resolver-only** instance (role `resolver-only`) runs only the resolver: its commands are `start` (or
+`resolver`), `check-proxy`, `remote-url` and `events` (`pnpm logs …`); it has no admin page, `/status` or usage
+dashboard, and its events and logs are local. At start it logs `catalog check: …` about the catalog it plays from.
+
 ## Status
 
 `http://<host>:7702/status` (local network, JSON, includes the job queue and the next scheduled runs) and

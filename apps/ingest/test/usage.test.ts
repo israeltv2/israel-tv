@@ -229,7 +229,14 @@ test('each role says plainly what it needs and what does not belong', async () =
     checkRole(parse({ role: 'resolver-only', resolver: { catalogUrl: 'https://a.example/manifest.json' } })),
   ).not.toThrow();
   expect(() => checkRole(parse({ role: 'local-only', publisher: { type: 'cloudflare' } }))).toThrow(/local/);
-  expect(() => checkRole(parse({}))).not.toThrow();
+  expect(() => checkRole(parse({}))).not.toThrow(); // no role: local publisher means local-only
+  expect(() => checkRole(parse({ role: 'host' }))).toThrow(/publishes to Cloudflare/);
+  expect(() => checkRole(parse({ resolver: { catalogUrl: 'https://a.example/' } }))).toThrow(
+    /only for role "resolver-only"/,
+  );
+  const { roleOf } = await import('@israel-tv/core');
+  expect(roleOf(parse({ publisher: { type: 'cloudflare' } }))).toBe('host');
+  expect(roleOf(parse({}))).toBe('local-only');
   // A resolver-only config needs no Cloudflare or TMDB secret.
   const { secretOwners } = await import('@israel-tv/core');
   expect(

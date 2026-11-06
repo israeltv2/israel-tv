@@ -468,3 +468,21 @@ test('resolver-only: episode details come from the published catalog, with no da
   const play = new URL(s.streams[0].url);
   expect((await app.request(`${play.pathname}${play.search}`)).status).toBe(200);
 });
+
+test('a resolver-only instance can tell a catalog it cannot use (a typo, or one without play files)', async () => {
+  const { checkCatalog } = await import('../src/server.ts');
+  const site = (withPlay: boolean) =>
+    (async (url: string) => {
+      const p = url.replace('https://c.example/', '');
+      const files: Record<string, unknown> = {
+        'manifest.json': { catalogs: [{ id: 'iltv_keshet12', type: 'series' }] },
+        'catalog/series/iltv_keshet12.json': { metas: [{ id: 'iltv_stale_x' }, { id: 'iltv_mako_4' }] },
+        'meta/series/iltv_mako_4.json': { meta: { videos: [{ season: 2026 }] } },
+        ...(withPlay ? { 'play/iltv_mako_4/2026.json': { '1': {} } } : {}),
+      };
+      return p in files ? Response.json(files[p]) : new Response('', { status: 404 });
+    }) as unknown as typeof fetch;
+  expect(await checkCatalog('https://c.example/manifest.json', site(true))).toBeUndefined();
+  expect(await checkCatalog('https://c.example/manifest.json', site(false))).toMatch(/no play files/);
+  expect(await checkCatalog('https://wrong.example/', site(true))).toMatch(/no Israel TV manifest/);
+});

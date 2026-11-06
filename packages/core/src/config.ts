@@ -76,12 +76,13 @@ const PublisherCloudflare = z.strictObject({
 
 export const ConfigSchema = z.strictObject({
   /**
-   * What this instance does. `host` (default): everything — reads the sites, publishes the catalog, runs the
-   * resolver. `local-only`: the same, published on this network only (local publisher). `resolver-only`: only
+   * What this instance does. `host`: everything — reads the sites, publishes the catalog to Cloudflare, runs the
+   * resolver. `local-only`: the same, served on this network only (local publisher). When not set, it follows
+   * the publisher. `resolver-only`: only
    * the home resolver (Mako playback, geo relay), using someone's published catalog (`resolver.catalogUrl`) —
    * no reading of sites, no publishing, no database of its own.
    */
-  role: z.enum(['host', 'local-only', 'resolver-only']).default('host'),
+  role: z.enum(['host', 'local-only', 'resolver-only']).optional(),
   /** Home database (SQLite file). Holds the id registry, numbering and last good data. */
   store: z.strictObject({ path: z.string().default('./data/israel-tv.sqlite') }).prefault({}),
   /**
@@ -266,4 +267,9 @@ export function checkSecrets(
         'or remove the option that needs them from the config.',
     );
   }
+}
+
+/** The instance's role: as configured, or by its publisher (Cloudflare: host; local: local-only). */
+export function roleOf(config: Config): 'host' | 'local-only' | 'resolver-only' {
+  return config.role ?? (config.publisher.type === 'cloudflare' ? 'host' : 'local-only');
 }

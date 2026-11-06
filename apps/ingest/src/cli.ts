@@ -6,6 +6,7 @@ import {
   type Config,
   ConfigError,
   parseSeriesId,
+  roleOf,
   type Source,
   secretOwners,
   tmdbApiKey,
@@ -13,7 +14,7 @@ import {
 } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
-import { PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
+import { checkCatalog, PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
 import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
 import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
@@ -110,7 +111,7 @@ async function main(argv: string[]): Promise<number> {
     config.resolver.remote.tokenEnv,
   ]);
   // A resolver-only instance has no catalog database of its own: it plays from a published catalog.
-  if (config.role === 'resolver-only' && !['check-proxy', 'remote-url', 'events'].includes(cmd)) {
+  if (roleOf(config) === 'resolver-only' && !['check-proxy', 'remote-url', 'events'].includes(cmd)) {
     if (cmd !== 'start' && cmd !== 'resolver')
       throw new UserError(
         `\`${cmd}\` is for an instance that reads the sites (role "host" or "local-only"); this one is "resolver-only": use start, check-proxy, remote-url or events`,
@@ -437,6 +438,10 @@ async function runResolverOnly(config: Config): Promise<number> {
     }
   }
   setInterval(() => sessions.flush(), 30_000).unref();
+  // Say at once if the catalog cannot serve a resolver (a typo, or a host on an older version).
+  void checkCatalog(config.resolver.catalogUrl ?? '').then((problem) =>
+    logger.log(problem ? `catalog check: ${problem}` : 'catalog check: ok'),
+  );
   await stopSignal(logger.log);
   sessions.flush(true);
   events.close();
