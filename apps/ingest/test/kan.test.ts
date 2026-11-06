@@ -197,3 +197,34 @@ test('a known Kan show whose page disappears shows as failing', async () => {
   });
   expect(store.getShow(id)?.lastError).toMatch(/404/);
 });
+
+test('a Kan episode page that fails once does not get numbered after the later ones', async () => {
+  const store = Store.open(':memory:');
+  let fail = true;
+  const base = loader(routes);
+  const flaky = {
+    ...base,
+    async load(url: string) {
+      if (url.endsWith('/s1/1006640/') && fail) return { status: 502, html: '', challenged: false };
+      return base.load(url);
+    },
+  };
+  const eps = () =>
+    store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes));
+  for (let i = 0; i < 30; i++) await crawlKan(store, opts(flaky as never, 10));
+  // Read up to the gap and stopped there.
+  expect(eps().map((e) => e.key)).toEqual(['kan:1006639']);
+  // Later (after the retry gap) the page works again: reading continues in order.
+  const state = store.getState<{
+    shows: Record<string, { retry?: Record<string, { n: number; at: string }> }>;
+  }>('kan:crawl');
+  for (const s of Object.values(state?.shows ?? {}))
+    for (const r of Object.values(s.retry ?? {})) r.at = '2000-01-01T00:00:00.000Z';
+  if (state) store.setState('kan:crawl', state);
+  fail = false;
+  for (let i = 0; i < 30 && eps().length < 9; i++) await crawlKan(store, opts(flaky as never, 10));
+  const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
+  const byKey = new Map(store.assignments(id).episodes.map((e) => [e.key, e.episode]));
+  expect(byKey.get('kan:1006639')).toBe(1);
+  expect(byKey.get('kan:1006640')).toBe(2);
+});
