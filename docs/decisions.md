@@ -353,3 +353,11 @@ duplicate episode (a page video is saved only for a show with nothing stored yet
 page lists no episodes is a failed read whether or not it embeds a player); a page budget of 1 never got past
 the first lobby (the budget is at least 2). Kan's stored data (20 episodes, collected in the first hours)
 was cleared once and crawled again, so the missing kids seasons are numbered in Kan's page order.
+
+### Code review, round 10 (2026-11-06)
+
+One finding, a regression from round 9, fixed: a genuine single-video Kan show (its page embeds the video
+and lists no episode pages) would have been marked failed on every re-read; the "lists no episodes" check now
+skips a show whose one stored episode is the page's own video. Everything else the reviewer checked —
+numbering, store, runner, all three readers, the daemon, publishing, rendering, the addon, the Worker, the
+resolver and the network layer — was reported sound.
