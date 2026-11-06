@@ -45,6 +45,12 @@ test('matches are stored with the IMDb id; misses are not searched again', async
   const get = async (url: string) => {
     calls.push(url);
     if (url.includes('/external_ids')) return { imdb_id: 'tt4565380' };
+    if (url.includes('/tv/61186?'))
+      return {
+        name: 'Fauda',
+        original_name: 'פאודה',
+        alternative_titles: { results: [{ title: 'Fauda' }, { title: 'Chaos' }] },
+      };
     return {
       results:
         url.includes(encodeURIComponent('פאודה')) || url.includes('%D7%A4%D7%90%D7%95%D7%93%D7%94')
@@ -54,6 +60,8 @@ test('matches are stored with the IMDb id; misses are not searched again', async
   };
   expect(await matchShows(store, 'k', { get, delayMs: 0 })).toEqual({ checked: 2, matched: 1 });
   expect(store.getShow('iltv_reshet_1')).toMatchObject({ tmdbId: 61186, imdbId: 'tt4565380' });
+  // Its other names, for search: English and alternative titles, not its own Hebrew name again.
+  expect(store.getState('tmdb:aliases')).toEqual({ iltv_reshet_1: ['Fauda', 'Chaos'] });
   calls.length = 0;
   expect(await matchShows(store, 'k', { get, delayMs: 0 })).toEqual({ checked: 0, matched: 0 });
   expect(calls).toEqual([]);

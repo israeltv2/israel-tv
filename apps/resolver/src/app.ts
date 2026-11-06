@@ -16,6 +16,7 @@ import {
   parseVideoId,
   type ScrapedEpisode,
   type Stream,
+  streamName,
   type UsageEvent,
 } from '@israel-tv/core';
 import type { GeoFetch } from '@israel-tv/net';
@@ -184,7 +185,14 @@ export function createResolverApp(deps: ResolverDeps) {
       if (ep && relay && (geoSource || ep.availableAbroad === false)) {
         const direct = ep.streams.find((s) => s.kind === 'direct' || s.kind === 'resolver');
         if (direct) {
-          const r = await relay.streamFor(origin, play(), v.series, direct.url, 'דרך ישראל · via Israel');
+          const r = await relay.streamFor(
+            origin,
+            play(),
+            v.series,
+            direct.url,
+            'דרך החיבור הישראלי שלך',
+            streamName(source ?? '', direct.url),
+          );
           notes.push(r.note);
           if (r.stream) streams.push(r.stream);
           directPlays ||= r.directPlays;
@@ -202,7 +210,8 @@ export function createResolverApp(deps: ResolverDeps) {
               play(),
               `${ch.id}|${l.url}`,
               l.url,
-              `${l.title} · דרך ישראל · via Israel`,
+              `${l.title} · דרך החיבור הישראלי שלך`,
+              ch.name,
             );
             notes.push(r.note);
             if (r.stream) streams.push(r.stream);

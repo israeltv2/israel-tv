@@ -14,3 +14,5 @@ do not run load tests or brute force against the public catalog.
 
 What Israel TV does to stay safe is described in [docs/security-audit.md](docs/security-audit.md) and
 [docs/privacy.md](docs/privacy.md).
+
+Requests to remove a show or a channel from the public addon: [docs/takedown.md](docs/takedown.md).

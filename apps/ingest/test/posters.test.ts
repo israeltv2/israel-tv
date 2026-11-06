@@ -181,3 +181,30 @@ test('the local publisher serves our posters and the placeholder', async () => {
   for (const f of ['iltv_kan_1-poster.jpg', 'placeholder-poster.jpg'])
     expect((await app.request(`/art/${f}`)).headers.get('content-type'), f).toBe('image/jpeg');
 });
+
+test('hidden shows and sources leave everything published, without touching their ids', async () => {
+  const store = Store.open(':memory:');
+  for (const s of [
+    show('mako', 'm1', 'iltv_keshet12'),
+    show('mako', 'm2', 'iltv_keshet12'),
+    show('reshet', 'r1', 'iltv_reshet13'),
+  ]) {
+    const id = store.seriesIdFor(s.source, s.key);
+    store.saveShow(id, s, assignNumbers(s, store.assignments(id)).added, '2026-11-05', true);
+  }
+  const config = ConfigSchema.parse({
+    publisher: { type: 'local' },
+    sources: { kan: false },
+    hide: { shows: ['iltv_mako_2'], sources: ['reshet', 'live'] },
+  });
+  const files = renderFromStore(store, config);
+  const all = [...files.keys()];
+  expect(files.has('meta/series/iltv_mako_1.json')).toBe(true);
+  expect(
+    all.filter((p) => p.includes('iltv_mako_2') || p.includes('iltv_reshet_') || p.includes('iltv_live_')),
+  ).toEqual([]);
+  expect(String(files.get('search.json'))).not.toContain('iltv_mako_2');
+  const catalogs = JSON.parse(String(files.get('manifest.json'))).catalogs.map((c: { id: string }) => c.id);
+  expect(catalogs).toEqual(['iltv_keshet12']);
+  expect(store.findSeriesId('mako', 'm2')).toBe('iltv_mako_2'); // still known: the same id if it comes back
+});

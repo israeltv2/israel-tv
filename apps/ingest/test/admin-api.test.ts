@@ -48,7 +48,16 @@ function setup() {
     detail: { stage: 'relay', reason: 'refused' },
   });
   events.flush();
-  const d = new Daemon(parseConfig({}), Store.open(':memory:'), events, quiet);
+  const store = Store.open(':memory:');
+  store.setState('cloudflare:quota', {
+    day: now.slice(0, 10),
+    at: now,
+    requests: 3293,
+    byScript: [{ script: 'israel-tv', requests: 2049 }],
+    aeWrites: 95,
+    limits: { requests: 100000, aeWrites: 100000 },
+  });
+  const d = new Daemon(parseConfig({}), store, events, quiet);
   return { d, app: adminApp(d, TOKEN) };
 }
 
@@ -80,6 +89,7 @@ test('every admin API answer fits its schema', async () => {
   DeploysSchema.parse(await get('/deploys'));
   const s = SystemSchema.parse(await get('/system'));
   expect(s.eventsPerDay).toHaveLength(30);
+  expect(s.quota?.requests).toBe(3293);
 });
 
 test('the gate: token, CSRF on changes, no token in the address on the API, odd origins refused', async () => {

@@ -586,3 +586,18 @@ test('Kan episodes carry their publication day as the air date; older ones get i
   expect(kanEpisodes(store).every((e) => e.airDate === '2026-03-04')).toBe(true);
   expect(store.assignments(row.seriesId)).toEqual(before);
 });
+
+test('show names stored before cleaning are cleaned in place', async () => {
+  const store = Store.open(':memory:');
+  const l = loader(routes);
+  for (let i = 0; i < 80 && kanEpisodes(store).length < 9; i++) await crawlKan(store, opts(l, 10));
+  const row = store.listShows({ source: 'kan' })[0];
+  if (!row) throw new Error('no show');
+  const junk = `${row.title} - פרקים מלאים לצפייה ישירה`;
+  store.saveShow(row.seriesId, { ...row.show, title: junk }, { seasons: [], episodes: [] }, undefined, false);
+  const state = store.getState<{ shows: Record<string, { title?: string }> }>('kan:crawl');
+  for (const s of Object.values(state?.shows ?? {})) s.title = junk;
+  store.setState('kan:crawl', state);
+  await crawlKan(store, { ...opts(l, 0), browser: { type: 'none' } });
+  expect(store.getShow(row.seriesId)?.title).toBe(row.title);
+});

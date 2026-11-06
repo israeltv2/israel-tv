@@ -43,6 +43,17 @@ or `background.png` (1920×1080). Missing ones fall back to the bundled images i
 
 `mako`, `reshet`, `kan`, `live`: each `true` (default) or `false`.
 
+## `hide` — taking something off without a code change
+
+```json
+"hide": { "shows": ["iltv_mako_12"], "sources": ["kan"] }
+```
+
+Hidden series ids and sources leave every catalog row, search, show page, stream and play file at the next publish
+(restart the service after editing the config; it publishes on start). They are still read, so their ids and episode
+numbers stay as they are if they come back. A series id is in the show's address in the app, or on `/status`. Turning
+a source off in `sources` instead stops reading it too. See [removal requests](takedown.md).
+
 ## `geo` — reaching Israel-only content
 
 Only needed **outside Israel**.

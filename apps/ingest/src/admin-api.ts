@@ -325,6 +325,7 @@ export function system(d: Daemon, revision: string, now = Date.now()): System {
   const backup = d.store.getState<{ file: string; at: string; bytes?: number; check?: string }>(
     'backup:last',
   );
+  const quota = d.store.getState<System['quota']>('cloudflare:quota');
   return {
     revision,
     node: process.version,
@@ -349,6 +350,7 @@ export function system(d: Daemon, revision: string, now = Date.now()): System {
           },
         }
       : {}),
+    ...(quota ? { quota } : {}),
     eventsPerDay: (() => {
       const byDay = new Map(dash.data.eventsPerDay.map((r) => [r.day, r.n]));
       return days(30, now).map((day) => ({ day, n: byDay.get(day) ?? 0 }));

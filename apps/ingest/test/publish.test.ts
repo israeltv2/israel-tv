@@ -43,3 +43,15 @@ test('a Cloudflare deploy without the configured token is refused (never falls b
   const config = parseConfig({ publisher: { type: 'cloudflare', dir: join(dir(), 'site') } });
   await expect(deploy(config, { PATH: process.env.PATH })).rejects.toThrow(/deploy refused/);
 });
+
+test('static headers: every path gets one Cache-Control value (rules add up on Cloudflare)', async () => {
+  const { HEADERS_FILE } = await import('../src/publish.ts');
+  const rules: { path: string; lines: string[] }[] = [];
+  for (const line of HEADERS_FILE.split('\n').filter(Boolean)) {
+    if (!line.startsWith(' ')) rules.push({ path: line, lines: [] });
+    else rules.at(-1)?.lines.push(line.trim());
+  }
+  const sets = (r: { lines: string[] }) => r.lines.some((l) => /^cache-control:/i.test(l));
+  for (const r of rules.filter((x) => x.path !== '/*' && sets(x)))
+    expect(r.lines, r.path).toContain('! Cache-Control');
+});

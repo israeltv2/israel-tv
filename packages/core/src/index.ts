@@ -10,4 +10,5 @@ export * from './live.ts';
 export * from './model.ts';
 export * from './numbering.ts';
 export * from './site.ts';
+export * from './stream-label.ts';
 export type * from './stremio.ts';

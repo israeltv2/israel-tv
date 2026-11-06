@@ -81,6 +81,27 @@ export interface KanShowPage {
   episodes: KanEpisodeLink[];
 }
 
+/**
+ * A show's name without what Kan's page titles add around it (measured on the live lobbies): the site name
+ * ("כאן חינוכית | …", "… | כאן"), "- פרקים מלאים לצפייה ישירה" / "- הסרט המלא", "| סדרה … מבית …", and an Arabic
+ * name with its tagline ("מאה אחוז | مئة في المئة - …"). A dash that is part of the name stays.
+ */
+export function cleanKanTitle(raw: string): string {
+  const t = raw
+    .replace(/\s+/g, ' ')
+    .replace(/^כאן(?: חינוכית| 11| ילדים)?\s*\|\s*/, '')
+    .replace(/\s*\|\s*כאן(?:\s.*)?$/, '')
+    .replace(/\s*\|\s*(?:סדרה|סדרת|סרט|תוכנית)[^|]*מבית[^|]*$/, '')
+    .replace(/\s*\|\s*[\u0600-\u06FF][^|]*$/, '')
+    .replace(
+      /\s*[-–]?\s*(?:(?:כל ה)?פרקים מלאים|הסרט המלא|הסדרה המלאה|כל הפרקים)(?:\s*לצפייה ישירה)?\s*$/,
+      '',
+    )
+    .replace(/\s*[-–]?\s*לצפייה ישירה\s*$/, '')
+    .trim();
+  return t || raw.trim();
+}
+
 /** Episode links of a show page: `<show>/<id>/` or `<show>/<season>/<id>/`. */
 export function parseShowPage(html: string, showPath: string): KanShowPage {
   const esc = showPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -102,7 +123,7 @@ export function parseShowPage(html: string, showPath: string): KanShowPage {
   const shown = /<img[^>]*\ssrc="(\/media\/[^"]+\.(?:jpe?g|png|webp)\?[^"]*width=\d+[^"]*)"/i.exec(html)?.[1];
   const image = shown ? shown.replace(/&amp;/g, '&') : meta(html, 'og:image');
   return {
-    title: title.replace(/\s*\|\s*כאן.*$/, '').trim(),
+    title: cleanKanTitle(title),
     ...(description ? { description } : {}),
     ...(image ? { image } : {}),
     episodes: [...seen.values()].sort((a, b) => a.id - b.id),
@@ -133,7 +154,12 @@ export interface KanEpisode {
   description?: string;
   /** The day Kan published the episode (its page's datePublished, Israel's date): the air date we use. */
   published?: string;
+  /** The player config's `subtitles`, as Kan gives it, when not empty (its shape is not known yet: measured). */
+  subtitles?: unknown;
 }
+
+const hasValue = (v: unknown) =>
+  v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
 
 /** The first VOD player config on the page with an HLS URL, or undefined. */
 export function parseEpisodePage(html: string, origin: string = KAN_ORIGIN): KanEpisode | undefined {
@@ -161,6 +187,9 @@ export function parseEpisodePage(html: string, origin: string = KAN_ORIGIN): Kan
       ...(poster ? { poster } : {}),
       ...(description ? { description } : {}),
       ...(published ? { published } : {}),
+      ...(hasValue(raw && typeof raw === 'object' ? (raw as { subtitles?: unknown }).subtitles : undefined)
+        ? { subtitles: (raw as { subtitles: unknown }).subtitles }
+        : {}),
     };
   }
   return undefined;

@@ -1,5 +1,5 @@
 // Live channels: render entries and a health check of their direct streams.
-import { LIVE_CHANNELS, type LiveChannel, ORIGIN_TOKEN, sitePaths } from '@israel-tv/core';
+import { ISRAEL_ONLY, LIVE_CHANNELS, type LiveChannel, ORIGIN_TOKEN, sitePaths } from '@israel-tv/core';
 import type { LiveChannelRender } from '@israel-tv/render';
 import type { Store } from '@israel-tv/store';
 import { runStatus } from './runner.ts';
@@ -13,8 +13,8 @@ export function liveRender(logos: ReadonlySet<string> = new Set()): LiveChannelR
     description: c.description,
     streams: c.direct.map((l) => ({
       url: l.url,
-      name: 'Israel TV',
-      title: c.geo ? `${l.title} · ייתכן חסום מחוץ לישראל` : l.title,
+      name: c.name,
+      title: c.geo ? `${l.title} · ${ISRAEL_ONLY}` : l.title,
     })),
   }));
 }

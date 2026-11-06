@@ -2,7 +2,13 @@
 // that fetched the master playlist, so the resolver hands out its own /play URL; each time the player opens it,
 // this module gets a fresh ticket, fetches the master with the player's User-Agent and returns it (~1 KB) with
 // absolute variant URLs. Video then flows player ↔ Mako's CDN directly: this module never carries video.
-import { type LiveChannel, parseVideoId, type ScrapedEpisode, type Stream } from '@israel-tv/core';
+import {
+  type LiveChannel,
+  parseVideoId,
+  type ScrapedEpisode,
+  SOURCE_LABELS,
+  type Stream,
+} from '@israel-tv/core';
 import { makoPlaylistUrl, parsePlaylist } from '@israel-tv/mako';
 import type { Context, Hono } from 'hono';
 import { absolutize, HLS, type ModuleContext, type Play, playerUA, withPlayId } from './context.ts';
@@ -41,15 +47,15 @@ export function makoAuth(d: MakoAuthDeps) {
       return [
         {
           url: withPlayId(`${origin}/play/mako/${encodeURIComponent(target.video)}.m3u8`, play.playId),
-          name: 'Israel TV',
-          title: 'Mako',
+          name: SOURCE_LABELS.mako ?? 'קשת 12',
+          title: 'דרך העוזר הביתי',
         },
       ];
     }
     return (target.channel?.mako ?? []).map((m, i) => ({
       url: withPlayId(`${origin}/play/mako-live/${target.channel?.id}/${i}.m3u8`, play.playId),
-      name: 'Israel TV',
-      title: m.title,
+      name: target.channel?.name ?? 'קשת 12',
+      title: `${m.title} · דרך העוזר הביתי`,
     }));
   }
 
