@@ -1448,3 +1448,14 @@ frozen clock; every section at 390 px and 1440 px in light and dark; fails on pa
 included — failed requests and sideways scrolling) and `pnpm e2e:dashboard` (a real sandbox instance). The
 screenshots were looked at and the design iterated (Hebrew titles kept next to their posters, uncounted public days
 left blank instead of zero, axis labels, duplicate notes, loading placeholders).
+
+**Reviews of round 6.** A security review of the branch found nothing at high confidence (the admin gate covers the
+new routes, the file server and poster lookup cannot leave their folders, the Analytics Engine query takes only
+internally built ISO times, proxy credentials never reach the exit table). A code review found ten real issues, all
+fixed with tests where they behave: bot-block retries ran early when a job was queued twice (they now run only when
+due) and miscounted non-block failures; the live view could leave a second event stream open after a quick tab
+switch; the relay did not count a refusing exit against itself before moving on; a refused Akamai ticket skipped
+the CloudFront fallback; the health line hid failures blamed on one title (they are counted now, and said so);
+an empty older season page could borrow the show's featured video (only the show's own page uses it now); failures
+without a play id linked to an empty trace; two quadratic or repeated computations; and the fixture proxy names
+looked like a real provider's (now neutral placeholders).

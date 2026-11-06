@@ -279,22 +279,18 @@ export const FIXTURES: Responses = {
       },
     ],
     proxy: {
-      servers: [
-        'https://il100.proxy.example:89',
-        'https://il103.proxy.example:89',
-        'https://il66.proxy.example:89',
-      ],
+      servers: ['https://p1.example:3128', 'https://p2.example:3128', 'https://p3.example:3128'],
       exits: [
         {
-          server: 'https://il100.proxy.example:89',
+          server: 'https://p1.example:3128',
           ok: 412,
           errors: 1,
           lastOkAt: ago(12),
           lastErrorAt: ago(2900),
           lastError: 'upstream answered HTTP 403',
         },
-        { server: 'https://il103.proxy.example:89', ok: 37, errors: 0, lastOkAt: ago(2890) },
-        { server: 'https://il66.proxy.example:89', ok: 0, errors: 0 },
+        { server: 'https://p2.example:3128', ok: 37, errors: 0, lastOkAt: ago(2890) },
+        { server: 'https://p3.example:3128', ok: 0, errors: 0 },
       ],
     },
     kan: { pending: 64, shows: 91, showsDone: 74 },

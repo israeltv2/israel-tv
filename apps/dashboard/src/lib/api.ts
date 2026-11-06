@@ -82,7 +82,8 @@ export function subscribeLive(
   let retry: ReturnType<typeof setTimeout> | undefined;
   let delay = 2000;
   const open = () => {
-    if (document.hidden) return;
+    clearTimeout(retry);
+    if (document.hidden || es) return;
     es = new EventSource(routePath('liveStream'), { withCredentials: true });
     es.addEventListener('live', (e) => {
       delay = 2000;
@@ -99,6 +100,7 @@ export function subscribeLive(
   };
   const visibility = () => {
     if (document.hidden) {
+      clearTimeout(retry);
       es?.close();
       es = undefined;
       onState('closed');

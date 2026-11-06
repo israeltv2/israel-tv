@@ -143,15 +143,15 @@ export function health(d: Daemon, now = Date.now()): Health {
   if (status.tmdb) add('deploys', 'warn', status.tmdb);
   for (const n of status.notes ?? []) add('system', 'warn', n);
   const day = new Date(now - DAY_MS).toISOString();
-  const failed = d.events
-    .events({ kind: 'failure', since: day, limit: 1000, viewersOnly: true })
-    .filter((e) => parseDetail(e.detail).blame !== 'episode');
-  if (failed.length)
+  const failed = d.events.events({ kind: 'failure', since: day, limit: 1000, viewersOnly: true });
+  if (failed.length) {
+    const titles = failed.filter((e) => parseDetail(e.detail).blame === 'episode').length;
     add(
       'failures',
       'warn',
-      `${failed.length} ${failed.length === 1 ? 'play' : 'plays'} failed in the last 24 hours`,
+      `${failed.length} ${failed.length === 1 ? 'play' : 'plays'} failed in the last 24 hours${titles ? ` (${titles} where only that title was refused)` : ''}`,
     );
+  }
   const backup = d.store.getState<{ at: string; check?: string }>('backup:last');
   if (backup && now - Date.parse(backup.at) > 2 * DAY_MS)
     add('system', 'warn', `last backup ${backup.at.slice(0, 10)}`);
@@ -391,10 +391,13 @@ export function plays(d: Daemon, now = Date.now()): Plays {
   const perDay = new Map<string, number[]>();
   for (const e of timed) {
     const day = d.events.dayOf(e.ts);
-    perDay.set(day, [...(perDay.get(day) ?? []), e.latencyMs]);
+    const list = perDay.get(day);
+    if (list) list.push(e.latencyMs);
+    else perDay.set(day, [e.latencyMs]);
   }
+  const week0 = d.events.lastDays(7, now)[0] as string;
   const shows = new Map<string, { source: string; plays: number }>();
-  for (const r of rows.filter((x) => x.showId !== '' && x.day >= (d.events.lastDays(7, now)[0] as string)))
+  for (const r of rows.filter((x) => x.showId !== '' && x.day >= week0))
     shows.set(r.showId, { source: r.source, plays: (shows.get(r.showId)?.plays ?? 0) + r.plays });
   const failures = d.events.events({ kind: 'failure', since: since14, limit: 30, viewersOnly: true });
   return {
@@ -483,7 +486,10 @@ export function failures(d: Daemon, now = Date.now()): Failures {
   }
   return {
     days: week,
-    recent: all.slice(0, 30).map((e) => playLine(d, e)),
+    recent: all
+      .filter((e) => e.playId)
+      .slice(0, 30)
+      .map((e) => playLine(d, e)),
     groups: [...groups.values()].sort((a, b) => b.n - a.n).slice(0, 50),
   };
 }

@@ -37,9 +37,10 @@ export async function fetchShow(
   const byKey = new Map<string, ScrapedEpisode[]>();
   const notes: string[] = [];
   /** A page's episodes; a page with no list but one featured video (films, specials) gives that video. */
-  const episodesOf = async (p: ShowPage): Promise<ScrapedEpisode[]> => {
+  // Only the show's own page: an empty older season's page features the show's newest video, not one of its own.
+  const episodesOf = async (p: ShowPage, featured: boolean): Promise<ScrapedEpisode[]> => {
     const listed = episodesFromPage(p);
-    const vod = listed.length === 0 ? featuredOnly(p) : undefined;
+    const vod = listed.length === 0 && featured ? featuredOnly(p) : undefined;
     if (!vod) return listed;
     let raw: unknown;
     if (vod.pageUrl?.startsWith('/'))
@@ -52,11 +53,11 @@ export async function fetchShow(
     return [featuredEpisode(p, vod, entry.title, raw)];
   };
   const current = refs.find((r) => r.current);
-  if (current) byKey.set(current.key, await episodesOf(page));
+  if (current) byKey.set(current.key, await episodesOf(page, true));
   for (const r of refs) {
     if (byKey.has(r.key) || opts.currentSeasonOnly) continue;
     try {
-      byKey.set(r.key, await episodesOf(parseShowPage(await f.json(`${MAKO_ORIGIN}${r.key}${q}`))));
+      byKey.set(r.key, await episodesOf(parseShowPage(await f.json(`${MAKO_ORIGIN}${r.key}${q}`)), false));
     } catch (err) {
       // Mako sometimes lists a season whose page is gone; skip it rather than lose the whole show.
       if (!(err instanceof HttpError && err.status === 404)) throw err;

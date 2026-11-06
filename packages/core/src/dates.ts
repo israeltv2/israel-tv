@@ -33,16 +33,22 @@ export function zonedDay(ms: number, timeZone = 'UTC'): string {
 }
 
 /** Minutes a time zone is ahead of UTC at a moment. */
+const partsFormat = new Map<string, Intl.DateTimeFormat>();
 function offsetMinutes(ms: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-  }).formatToParts(ms);
+  let f = partsFormat.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    });
+    partsFormat.set(timeZone, f);
+  }
+  const parts = f.formatToParts(ms);
   const n = (t: string) => Number(parts.find((p) => p.type === t)?.value);
   const local = Date.UTC(n('year'), n('month') - 1, n('day'), n('hour'), n('minute'));
   return Math.round((local - Math.floor(ms / 60_000) * 60_000) / 60_000);

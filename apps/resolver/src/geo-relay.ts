@@ -156,6 +156,8 @@ export function geoRelay(d: GeoRelayDeps) {
       if ((r.status === 401 || r.status === 403) && !rotated && d.geoFetch.rotate) {
         rotated = true;
         await r.body?.cancel();
+        // The exit that refused is counted against itself (the dashboard's per-exit table), then the next is tried.
+        d.onRelay?.({ ok: false, error: `upstream answered HTTP ${r.status}`, ...exitNow() });
         const exit = d.geoFetch.rotate();
         d.log('relay refused through this exit; trying the next one', {
           playId,
