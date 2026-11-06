@@ -35,7 +35,7 @@ body{font:14px/1.4 system-ui,sans-serif;margin:16px;background:#fff;color:#111}
 table{border-collapse:collapse;width:100%;margin:8px 0 24px}td,th{border-bottom:1px solid #8884;padding:4px 6px;text-align:start;vertical-align:top}
 .b{padding:1px 6px;border-radius:4px;color:#fff;font-weight:600}.ok{background:#2a7}.warn{background:#c80}.error{background:#c33}
 </style></head><body>
-<h1>Israel TV ${badge(s.health)}</h1><p>Generated ${esc(s.generatedAt)}</p>${s.publish ? `<p><strong>${esc(s.publish)}</strong></p>` : ''}
+<h1>Israel TV ${badge(s.health)}</h1><p>Generated ${esc(s.generatedAt)}</p>${s.publish ? `<p><strong>${esc(s.publish)}</strong></p>` : ''}${s.tmdb ? `<p>${esc(s.tmdb)}</p>` : ''}
 <h2>Sources</h2><table><tr><th>Source</th><th>Health</th><th>Shows</th><th>Episodes</th><th>Last full run</th><th>Last airing check</th><th>Notes</th></tr>${sources}</table>
 <h2>Shows failing (last good data still served)</h2><table><tr><th>Id</th><th>Show</th><th>Error</th><th>Last OK</th></tr>${failing || '<tr><td colspan="4">None</td></tr>'}</table>
 <h2>Recent warnings</h2><table><tr><th>When</th><th>Id</th><th>Code</th><th>Message</th></tr>${warnings || '<tr><td colspan="4">None</td></tr>'}</table>

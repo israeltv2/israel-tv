@@ -334,3 +334,13 @@ answered by neither); a Kan lobby that loads but lists no shows was accepted sil
 partial, retried); the "Israel only" label depended on where ingest ran — Reshet episodes on the access
 profile measured as Israel-only (3387861) are labelled wherever ingest runs, and Kan VOD, geo-blocked per
 title nearly always, is labelled Israel-only without a per-episode probe.
+
+### Code review, round 8 (2026-11-06)
+
+4 findings, all fixed before they touched stored data: refreshing a Kan show whose page fails (e.g. a
+removed show) re-ran slices back to back (a refresh now counts as done once its page was tried without a
+block); a video embedded in a Kan show page was keyed by a per-render container id, which would have added a
+duplicate episode on every re-read (now keyed by Kan's video id from the stream path; no such episode had
+been stored yet); a restart during the first full run left later sources empty until the night (startup now
+runs the full read when any source has had no good run in a day); a failed TMDB matching run (e.g. a revoked
+key) did not show on `/status` (now a `tmdb` note and health warn).

@@ -104,10 +104,20 @@ export function showDue(s: ShowState, now: number, windowDays: number): boolean 
   return age > (airing ? 6 : 7 * 24) * HOUR;
 }
 
+/**
+ * Episode pages have a stable numeric page id. A video embedded in a show page instead gets a per-render
+ * container id, so it is keyed by Kan's video id from the stream path (`/kancdn/vod/<id>/`).
+ */
+export function kanEpisodeKey(e: { id: string; hls: string }): string {
+  if (/^\d+$/.test(e.id)) return `kan:${e.id}`;
+  const vod = /\/kancdn\/vod\/([^/]+)\//.exec(e.hls)?.[1];
+  return vod ? `kan:vod-${vod}` : `kan:${e.id}`;
+}
+
 /** Kan VOD is geo-blocked outside Israel per title, nearly always (measured): labelled Israel-only. */
 export function toEpisode(e: ReturnType<typeof parseEpisodePage> & object): ScrapedEpisode {
   return {
-    key: `kan:${e.id}`,
+    key: kanEpisodeKey(e),
     title: e.title,
     ...(e.description ? { description: e.description } : {}),
     ...(e.poster ? { thumbnail: e.poster } : {}),
@@ -137,7 +147,14 @@ export function mergeEpisodes(
 export async function crawlKan(
   store: Store,
   opts: KanCrawlOptions,
-): Promise<{ pages: number; newEpisodes: number; note: string; failed?: boolean; readShows?: string[] }> {
+): Promise<{
+  pages: number;
+  newEpisodes: number;
+  note: string;
+  failed?: boolean;
+  readShows?: string[];
+  attemptedShows?: string[];
+}> {
   const log = opts.log ?? (() => {});
   const now = Date.now();
   const state = store.getState<CrawlState>(STATE_KEY) ?? { shows: {} };
@@ -154,6 +171,8 @@ export async function crawlKan(
   let blocked = 0;
   let problems = 0;
   const readShows: string[] = [];
+  /** Shows whose page was read or failed without a block (a refresh of them is done either way). */
+  const attemptedShows: string[] = [];
   let note = '';
 
   const origin = (url: string) => new URL(url).origin;
@@ -230,6 +249,7 @@ export async function crawlKan(
         page = parseShowPage(await load(key), path, s.origin);
       } catch (err) {
         if (blocked > 0) throw err;
+        attemptedShows.push(key);
         // A broken show page is that show's problem only: note it and try again next week. A show never read
         // successfully keeps "first read" status, so its backlog is not mistaken for new episodes later.
         if (s.checkedAt) s.checkedAt = new Date().toISOString();
@@ -241,6 +261,7 @@ export async function crawlKan(
       }
       s.checkedAt = new Date().toISOString();
       readShows.push(key);
+      attemptedShows.push(key);
       if (page.title) s.title = page.title;
       if (page.description) s.description = page.description;
       if (page.image) s.image = page.image;
@@ -337,7 +358,14 @@ export async function crawlKan(
     if (!opts.loader) await loader?.close();
   }
   log(`kan: ${note}`);
-  return { pages, newEpisodes, note, readShows, ...(note.startsWith('stopped:') ? { failed: true } : {}) };
+  return {
+    pages,
+    newEpisodes,
+    note,
+    readShows,
+    attemptedShows,
+    ...(note.startsWith('stopped:') ? { failed: true } : {}),
+  };
 }
 
 function saveEpisodes(
