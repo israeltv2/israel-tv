@@ -87,7 +87,10 @@ function readable(line: string): string {
 
 export function createLogger(config: Config['log'], env: NodeJS.ProcessEnv = process.env): Logger {
   const secrets = secretValues(env);
-  const destination = config.file
+  const terminal = process.stdout.isTTY
+    ? { write: (line: string) => process.stdout.write(readable(line)) }
+    : pino.destination(1);
+  const file = config.file
     ? pino.transport({
         target: 'pino-roll',
         options: {
@@ -100,9 +103,15 @@ export function createLogger(config: Config['log'], env: NodeJS.ProcessEnv = pro
           limit: { count: config.keep, removeOtherLogFiles: true },
         },
       })
-    : process.stdout.isTTY
-      ? { write: (line: string) => process.stdout.write(readable(line)) }
-      : pino.destination(1);
+    : undefined;
+  // With a log file, lines also go to a terminal (when there is one) or the container's output (`docker logs`);
+  // a service's own output (launchd, systemd, Task Scheduler) gets nothing, so it never grows unrotated.
+  const alsoShown = process.stdout.isTTY || !!env.ISRAEL_TV_IN_CONTAINER;
+  const destination = !file
+    ? terminal
+    : alsoShown
+      ? pino.multistream([{ stream: file }, { stream: terminal }])
+      : file;
   const root = pino(
     {
       level: config.level,

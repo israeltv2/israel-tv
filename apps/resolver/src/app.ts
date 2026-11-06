@@ -113,7 +113,7 @@ export function createResolverApp(deps: ResolverDeps) {
     c.json({
       id: deps.manifest?.id ?? 'community.israel-tv.resolver',
       version: '1.0.0',
-      name: deps.manifest?.name ?? 'Israel TV · home resolver',
+      name: deps.manifest?.name ?? 'Israel TV · home helper',
       description:
         deps.manifest?.description ??
         'Plays Mako (Keshet 12) episodes and live channels, and relays geo-blocked Reshet/Kan video through your configured proxy when it is refused where you are. Runs on your home network.',

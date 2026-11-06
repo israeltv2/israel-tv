@@ -15,42 +15,53 @@ Copy this link — it is the whole install:
 https://israel-tv.israeltv2.workers.dev/manifest.json
 ```
 
-- **Stremio:** [Install in Stremio](stremio://israel-tv.israeltv2.workers.dev/manifest.json) — or open _Addons_,
-  paste the link into the search box and choose _Install_.
+- **Stremio:** [Install in Stremio](https://web.stremio.com/#/addons?addon=https%3A%2F%2Fisrael-tv.israeltv2.workers.dev%2Fmanifest.json)
+  (opens Stremio's website; signed in, it appears in all your Stremio apps) — or in the app open _Addons_, paste the
+  link into the search box and choose _Install_.
 - **Nuvio:** _Settings → Addons → Add addon_, paste the link.
 
-You will see new rows on the home screen: **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער** and
-**שידור חי** (live). Nothing else is needed to start watching.
+Tip for TVs: install it on your phone or computer, signed in to the same Stremio account — it then appears on the TV
+too.
+
+You will see new rows: **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער** and **שידור חי** (live).
+
+- **In Israel**, the link alone plays everything except Keshet 12.
+- **Abroad**, the link alone gives you all the shows and the live channels 13, 14 and i24; episodes need the home
+  helper with an Israeli connection.
+- **Keshet 12** shows have no play option until you add the [home helper](#want-keshet-12-mako).
 
 ## What you get
 
 Shows in Hebrew, newest episode first, with search and show pages. Your watch progress stays put: episodes keep
 their numbers for good.
 
-| Channel                                                    | What     | In Israel                | Outside Israel                                      |
-| ---------------------------------------------------------- | -------- | ------------------------ | --------------------------------------------------- |
-| Reshet 13                                                  | Episodes | ✅ plays                 | 🏠 needs the home helper with an Israeli connection |
-| Kan 11, Kan Kids & Teens                                   | Episodes | ✅ plays                 | 🏠 needs the home helper with an Israeli connection |
-| Keshet 12 (Mako)                                           | Episodes | 🏠 needs the home helper | 🏠 needs the home helper                            |
-| Live: 13, 14, i24 (4 languages), Knesset, ynet, Calcala 10 | Live     | ✅ plays                 | ✅ plays                                            |
-| Live: Kan 11, Kan Educational, Makan 33                    | Live     | ✅ plays                 | often only plays from Israel                        |
-| Live: Keshet 12, 24, Eretz Nehederet, Savri Maranan        | Live     | 🏠 needs the home helper | 🏠 needs the home helper                            |
+| Channel                                                    | What     | In Israel                | Outside Israel                                                   |
+| ---------------------------------------------------------- | -------- | ------------------------ | ---------------------------------------------------------------- |
+| Reshet 13                                                  | Episodes | ✅ plays                 | 🏠 needs the home helper with an Israeli connection              |
+| Kan 11, Kan Kids & Teens                                   | Episodes | ✅ plays                 | 🏠 needs the home helper with an Israeli connection              |
+| Keshet 12 (Mako)                                           | Episodes | 🏠 needs the home helper | 🏠 needs the home helper                                         |
+| Live: 13, 14, i24 (4 languages), Knesset, ynet, Calcala 10 | Live     | ✅ plays                 | ✅ plays                                                         |
+| Live: Kan 11, Kan Educational, Makan 33                    | Live     | ✅ plays                 | often only from Israel; 🏠 the helper with an Israeli connection |
+| Live: Keshet 12, 24, Eretz Nehederet, Savri Maranan        | Live     | 🏠 needs the home helper | 🏠 needs the home helper                                         |
 
 Some titles **only play from Israel** — that is the broadcaster's choice, not the app's.
 
 ## Want Keshet 12 (Mako)?
 
-Keshet 12 hands out a short-lived pass for every play, and it has to be fetched from your own home internet. So
-Keshet 12 needs a small **home helper**: a little program that runs on a computer that stays on at home (a PC, a
-Mac, a NAS or a Raspberry Pi), which you add to your app as a second link. Setting it up takes about 10 minutes:
+Keshet 12 only lets a video play when your own home internet asks for it. So Keshet 12 needs a small **home helper**:
+a little program on a computer that stays on at home (a desktop PC or Mac, a storage box or a Raspberry Pi), which you
+add to your app as a second link. It then plays at home; on a phone outside the house it needs extra technical setup.
+Setting it up takes about 15 minutes:
 **[Set up the home helper](docs/setup/home-helper.md)**. You can also ask an AI assistant to do it for you:
 [a guide written for assistants](docs/setup/for-agents.md).
 
 ## Watching from abroad?
 
-Everything in the catalog shows up anywhere, and live channels like 13, 14 and i24 play anywhere. Episodes from
-Reshet and Kan only play from an Israeli internet connection: the home helper can fetch them for you through an
-Israeli VPN or proxy service you already have. See
+Everything in the catalog shows up anywhere, and live channels like 13, 14 and i24 play anywhere. Keshet 12 plays
+anywhere with the home helper. Episodes from Reshet and Kan only play from an Israeli internet connection: the home
+helper can fetch them for you through a VPN or proxy service with an Israeli location (a paid service you may already
+have). Those episodes then show a source called **דרך ישראל · via Israel** next to the one marked **ישראל בלבד**
+(Israel only) — pick "via Israel". See
 [Watching from abroad](docs/setup/home-helper.md#watching-from-abroad). You only need this if you live outside
 Israel.
 
@@ -62,8 +73,11 @@ Israel.
 - **Something does not play.** Check the [status page](https://israel-tv.israeltv2.workers.dev/status), then
   [report it](https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml) with the show and episode.
 - **Search finds nothing.** Search in Hebrew, as the channel writes the title.
-- **Does it work with my other addons?** Yes. It only adds its own rows; for shows opened from other catalogs
-  (Cinemeta) it adds streams where the seasons match.
+- **Does it work with my other addons?** Yes. It adds its own rows and shows (ids starting `iltv_`). When you open an
+  Israeli series from another catalog (Cinemeta, TMDB), it adds its streams only if that show was matched to it and the
+  seasons are numbered the same; otherwise it adds nothing. It never touches movies.
+- **Is it maintained?** It is in beta and runs every day. When a channel's site changes, its row shows ⚠ until the
+  reading is fixed; reports help.
 
 ## How it works
 

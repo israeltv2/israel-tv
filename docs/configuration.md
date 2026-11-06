@@ -1,8 +1,18 @@
 # Configuration
 
-One file, `israel-tv.config.json`, in the folder you run from (or the path in `ISRAEL_TV_CONFIG`). It is
-optional: without it every default below applies, which is a working setup inside Israel. Secrets go in
-`.env` next to the config file; the config only names the variables.
+One file, `israel-tv.config.json`, in your config folder (`pnpm israel-tv paths` shows it). It is optional: without
+it every default below applies, which is a working setup inside Israel. Secrets go in `.env` next to the config file;
+the config only names the variables.
+
+Where the config is looked for, in order: the file in `ISRAEL_TV_CONFIG`; `israel-tv.config.json` in the folder in
+`ISRAEL_TV_HOME`; an `israel-tv.config.json` in the current folder; the platform's usual folder (`%LOCALAPPDATA%\israel-tv`
+on Windows, `~/Library/Application Support/israel-tv` on macOS, `$XDG_CONFIG_HOME/israel-tv` or `~/.config/israel-tv`
+on Linux).
+
+**From the environment** (for ready-made containers; a config file always wins): `ISRAEL_TV_CATALOG_URL` (no config
+file: a resolver-only instance playing from that catalog), `ISRAEL_TV_PROXY` (a proxy URL with an Israeli exit, used
+when the config has no `geo`; the login can be in it or in `ISRAEL_TV_PROXY_USER` / `ISRAEL_TV_PROXY_PASSWORD`), and
+`ISRAEL_TV_BROWSER=none` (no browser: Kan episodes off).
 
 The file is checked at startup. A wrong or unknown option stops the program with the option's name and what
 is wrong, e.g. `geo.urls: Too small: expected array to have >=1 items`.
@@ -168,8 +178,10 @@ from another catalog (e.g. Cinemeta) also gets streams.
 
 ## `log`
 
-`{ "file": "./data/israel-tv.log", "maxMB": 20, "keep": 10, "level": "info" }`: JSON log lines (pino) in rotated
-files next to `file` (a new file each day or at `maxMB`, keeping `keep` files; `current.log` points at the
-newest). Without `file`, the log goes to standard output (readable lines on a terminal, JSON otherwise). The
-values of the secrets the config names, and of anything in `.env` named like a token, password, key or secret,
+Defaults: `{ "file": "./data/logs/israel-tv.log", "maxMB": 20, "keep": 10, "level": "info" }`. JSON log lines (pino)
+in rotated files next to `file` (a new file each day or at `maxMB`, keeping `keep` files; `current.log` points at the
+newest), also shown on the terminal when there is one (readable lines) and in a container's output (`docker logs`). A
+service's own output (launchd, systemd, Task Scheduler) gets nothing, so nothing grows unrotated. `"file": ""` logs to
+standard output only. The
+values of the secrets the config names, and of anything in `.env` named like a token, password, key, secret, user, account or proxy,
 never appear in it.

@@ -5,6 +5,7 @@ import type { Config, UsageEvent } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { createLogger, lanAddresses, listen, stopSignal } from '@israel-tv/runtime';
 import { Cron } from 'croner';
+import { checkProxyAtStart } from './commands.ts';
 import { checkCatalog, remoteResolverApp, resolverApp } from './server.ts';
 import { PlaySessions } from './sessions.ts';
 
@@ -61,6 +62,7 @@ export async function runResolverOnly(config: Config): Promise<number> {
   maintain();
   new Cron(config.schedule.daily, { timezone: config.schedule.timezone, protect: true }, maintain);
   // Say at once if the catalog cannot serve a resolver (a typo, or a host on an older version).
+  checkProxyAtStart(config, log);
   void checkCatalog(config.resolver.catalogUrl ?? '').then((problem) =>
     log(problem ? `catalog check: ${problem}` : 'catalog check: ok'),
   );

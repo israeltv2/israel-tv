@@ -211,7 +211,8 @@ export const ConfigSchema = z.strictObject({
   /** JSON logs (pino). With `file`, rotated by size and day, keeping `keep` files. */
   log: z
     .strictObject({
-      file: z.string().optional(),
+      /** Rotated log files (default in the config folder's data/logs); "" logs to the terminal only. */
+      file: z.string().default('./data/logs/israel-tv.log'),
       maxMB: z.number().positive().default(20),
       keep: z.number().int().positive().default(10),
       level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),

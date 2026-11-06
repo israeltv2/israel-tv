@@ -194,11 +194,12 @@ function describe(sources: string[]): string {
     names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : (names[0] ?? 'Israeli TV');
   const notes: string[] = [];
   if (sources.includes('mako'))
-    notes.push(
-      'Mako episodes play through the Israel TV resolver on the home network of whoever runs this instance',
-    );
+    notes.push('Keshet 12 (Mako) plays only with your own Israel TV home helper (see the project page)');
   if (sources.some((s) => GEO_LIMITED.has(s as Source)))
-    notes.push('Reshet and Kan video is mostly limited to Israel');
+    notes.push(
+      'Reshet and Kan episodes play only from Israel (or through the home helper with an Israeli connection)',
+    );
+  if (names.length === 0) return 'Israeli TV.';
   return `Israeli TV: ${list}.${notes.length ? ` ${notes.join('; ')}.` : ''}`;
 }
 
