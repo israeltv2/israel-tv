@@ -78,6 +78,8 @@ export const shows = sqliteTable(
       .default('listed'),
     tmdbId: integer(),
     imdbId: text(),
+    /** Last TMDB lookup (match or miss), so misses are not searched again every night. */
+    tmdbCheckedAt: text(),
   },
   (t) => [index('shows_catalog').on(t.catalog)],
 );
