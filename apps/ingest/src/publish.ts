@@ -12,6 +12,7 @@ import {
   type Health,
   HOUR_MS,
   LIVE_CHANNELS,
+  ORIGIN_TOKEN,
   type PublisherConfig,
   type Source,
   type StatusFile,
@@ -20,6 +21,7 @@ import {
 import { type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
 import { brandImage, channelLogo } from '@israel-tv/resolver';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
+import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
 import { emptyShowsKey, episodeCount } from './runner.ts';
 
@@ -168,11 +170,30 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   const registry = store.registry();
   const seasonsBy = groupBy(registry.seasons, (x) => x.seriesId);
   const episodesBy = groupBy(registry.episodes, (x) => x.seriesId);
+  const assets = new Map<string, Uint8Array>();
+  // Artwork that is refused outside Israel (Kan's) is served from our own copy.
+  const kanArt = config.sources.kan ? kanArtwork(store, kanArtworkDir(config)) : new Map<string, string>();
+  const ownArtwork = (r: (typeof rows)[number]) => {
+    const file = r.show.source === 'kan' ? kanArt.get(r.show.key) : undefined;
+    if (!file) return r.show;
+    const path = sitePaths.artwork(r.seriesId);
+    assets.set(path, readFileSync(file));
+    const url = `${ORIGIN_TOKEN}/${path}`;
+    return {
+      ...r.show,
+      poster: url,
+      background: url,
+      seasons: r.show.seasons.map((s) => ({
+        ...s,
+        episodes: s.episodes.map((e) => ({ ...e, thumbnail: url })),
+      })),
+    };
+  };
   const shows: RenderShow[] = rows.map((r) => ({
     seriesId: r.seriesId,
     catalog: r.catalog,
     title: r.title,
-    show: r.show,
+    show: ownArtwork(r),
     seasons: (seasonsBy.get(r.seriesId) ?? []).map(({ key, number, kind }) => ({ key, number, kind })),
     episodes: (episodesBy.get(r.seriesId) ?? []).map(({ key, season, episode }) => ({
       key,
@@ -185,7 +206,6 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     tmdbId: r.tmdbId,
     imdbId: r.imdbId,
   }));
-  const assets = new Map<string, Uint8Array>();
   for (const [path, name] of [
     [sitePaths.logo, 'logo'],
     [sitePaths.background, 'background'],

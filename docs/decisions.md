@@ -619,3 +619,19 @@ SameSite=Strict cookie and is removed from the address bar. The admin port is ne
 One rotating copy: every night `VACUUM INTO data/backups/israel-tv-YYYY-MM-DD.sqlite`, keeping 7 days; only
 files with that name pattern in that folder are ever removed. (The one-off `before-*` copies made during round 1
 were deleted on the deployment with the owner's approval.)
+
+### Artwork that is refused outside Israel is served from our own copy (Kan)
+
+Measured from a non-Israeli exit (a Netherlands proxy, 2026-11-06), three posters per catalog: Mako
+(`img.mako.co.il`) and Reshet (`media.reshet.tv`, `media3.reshet.tv`) answer 200; every Kan show image and
+episode thumbnail (`www.kan.org.il/media/…`) answers 403 HTML, so Kan tiles were blank abroad. Kan's artwork is
+also refused to plain HTTP clients from Israel (the same bot check as its pages), so it is fetched by the Kan
+crawler's browser, in the same session as the show page, scaled on a canvas in the page to at most 960 px wide
+as a JPEG (no native image library needed), and saved under `data/artwork/`. The publish serves it as
+`/art/<series id>.jpg`, and the show's poster, background and episode thumbnails all point at that copy (Kan's
+episode thumbnails are refused too; the share image fits the landscape tiles the rows use). Shows read before
+this get their copy on a re-read (at most once a day per show until it succeeds). Mako and Reshet keep their own
+URLs; a source whose artwork starts being refused abroad would be added the same way.
+
+File budget: the site is about 1,240 files; Kan artwork adds one per show (about 90 for Kan 11 and Kids/Teens),
+far below Cloudflare's 20,000 files per Worker.

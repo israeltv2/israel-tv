@@ -10,11 +10,59 @@ export interface LoadedPage {
   status: number;
   html: string;
   challenged: boolean;
+  /** The image asked for with `image`, fetched in the same session and resized to a JPEG. */
+  image?: { url: string; status: number; jpeg?: Uint8Array; error?: string };
+}
+
+export interface LoadOptions {
+  /** An image the page links to (e.g. its share image), to fetch in the same browser session. */
+  image?: (html: string) => string | undefined;
+  /** Largest width of the resized image. */
+  imageWidth?: number;
 }
 
 export interface PageLoader {
-  load(url: string): Promise<LoadedPage>;
+  load(url: string, opts?: LoadOptions): Promise<LoadedPage>;
   close(): Promise<void>;
+}
+
+/**
+ * Runs in the page: fetch an image with the page's session (Kan's artwork is behind the same check as its
+ * pages), scale it down on a canvas, and hand back a JPEG as base64.
+ */
+async function fetchResized(arg: {
+  src: string;
+  width: number;
+}): Promise<{ status: number; b64?: string; error?: string }> {
+  // Browser APIs (this runs inside the page), typed here without pulling the DOM types into Node code.
+  const g = globalThis as unknown as {
+    createImageBitmap(b: Blob): Promise<{ width: number; height: number }>;
+    OffscreenCanvas: new (
+      w: number,
+      h: number,
+    ) => {
+      getContext(t: '2d'): { drawImage(i: unknown, x: number, y: number, w: number, h: number): void } | null;
+      convertToBlob(o: { type: string; quality: number }): Promise<Blob>;
+    };
+  };
+  try {
+    const r = await fetch(arg.src, { credentials: 'include' });
+    if (!r.ok) return { status: r.status };
+    const bmp = await g.createImageBitmap(await r.blob());
+    const w = Math.min(arg.width, bmp.width);
+    const h = Math.round((bmp.height * w) / bmp.width);
+    const canvas = new g.OffscreenCanvas(w, h);
+    canvas.getContext('2d')?.drawImage(bmp, 0, 0, w, h);
+    const bytes = new Uint8Array(
+      await (await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.82 })).arrayBuffer(),
+    );
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return { status: r.status, b64: btoa(bin) };
+  } catch (err) {
+    return { status: 0, error: String(err) };
+  }
 }
 
 export async function createChromeLoader(
@@ -44,7 +92,7 @@ export async function createChromeLoader(
     );
   }
   return {
-    async load(url) {
+    async load(url, opts = {}) {
       const context = await browser.newContext({ locale: 'he-IL', timezoneId: 'Asia/Jerusalem' });
       try {
         await context.route('**/*', (route) =>
@@ -57,7 +105,21 @@ export async function createChromeLoader(
         for (let i = 0; i < 25 && isChallenge(await page.content()); i++) await page.waitForTimeout(1000);
         await page.waitForTimeout(1500);
         const html = await page.content();
-        return { status: res?.status() ?? 0, html, challenged: isChallenge(html) };
+        const challenged = isChallenge(html);
+        const src = !challenged && opts.image ? opts.image(html) : undefined;
+        if (!src) return { status: res?.status() ?? 0, html, challenged };
+        const got = await page.evaluate(fetchResized, { src, width: opts.imageWidth ?? 960 });
+        return {
+          status: res?.status() ?? 0,
+          html,
+          challenged,
+          image: {
+            url: src,
+            status: got.status,
+            ...(got.b64 ? { jpeg: Buffer.from(got.b64, 'base64') } : {}),
+            ...(got.error ? { error: got.error } : {}),
+          },
+        };
       } finally {
         await context.close();
       }
