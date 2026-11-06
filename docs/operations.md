@@ -31,7 +31,8 @@ looks like a wrong address. In the examples below, `$T` is that token (`T=…` i
 
 While `start` runs, prefer the admin endpoints (they queue work behind the running job, so only one process
 writes the database): `curl -X POST -H "Authorization: Bearer $T" http://<host>:7702/refresh/iltv_mako_12`.
-To find a show's series id: `https://<addon>/registry.json`, or `failingShows` in `/status`. Admin endpoints answer only
+To find a show's series id: search its row, `curl -s 'https://<addon>/catalog/series/<row>/search=<title>.json'` →
+`metas[].id` (rows `iltv_keshet12`, `iltv_reshet13`, `iltv_kan11`, `iltv_kankids`), or `failingShows` in `/status`. Admin endpoints answer only
 private network addresses and refuse requests sent by web pages (cross-site), so use curl or a script. A Kan
 show's refresh makes it due for the next crawl slice and starts one.
 
@@ -187,11 +188,18 @@ the app is usually the app's own cache (see docs/tv-checklist.md).
    the worker → Logs; one JSON line per request it answered, with `route`, `series`, `status`, `ms`). The
    daily counts are on the usage page.
 
-5. **Reproduce.** Fetch the stream list, then the play URL, a variant playlist and a segment with one
-   User-Agent; a working play gives 200, 200, 206:
+5. **Reproduce.** The video id is in the show's page: `curl -s https://<addon>/meta/series/<series-id>.json |
+   jq -r '.meta.videos[] | .id + "  " + .title'`. Then take the stream list — from the resolver for Mako or a
+   relayed title, from the public addon for a direct one (Reshet and Kan in Israel) — and fetch the play URL, a
+   variant playlist and a segment with one User-Agent; a working play gives 200, 200, 206:
 
    ```bash
-   curl -s http://<host>:7701/stream/series/<video-id>.json | jq -r '.streams[].url'
+   curl -s http://<host>:7701/stream/series/<video-id>.json | jq -r '.streams[].url'   # resolver
+   curl -s https://<addon>/stream/series/<video-id>.json | jq -r '.streams[].url'      # public addon
+   UA='Mozilla/5.0 (Linux; Android 12) ExoPlayer'
+   curl -s -A "$UA" '<stream url>'            # master: note the first non-# line (a variant)
+   curl -s -A "$UA" '<variant url>'           # variant: note the first segment
+   curl -s -A "$UA" -r 0-1023 -o /dev/null -w '%{http_code}\n' '<segment url>'   # 206
    ```
 
 ## Backups and moving
@@ -232,6 +240,8 @@ episodes came back with exactly the published season and episode numbers, none d
 
 ## Updating
 
-Pull, `pnpm install --prod`, restart the service. Database migrations run on start. (`--prod` leaves out
+Pull, `pnpm install --prod`, restart the service: `launchctl kickstart -k gui/$(id -u)/org.israel-tv` (macOS),
+`systemctl restart israel-tv` (Linux), or `docker compose -f deploy/docker-compose.yml up -d --build` (Docker).
+The same restart applies after changing the config or `.env`. Database migrations run on start. (`--prod` leaves out
 the development tools, so `pnpm check` needs a full `pnpm install`.) Deploy tooling may write the deployed
 git revision to a `.revision` file in the repo root; `/status` shows it (`dev` otherwise).

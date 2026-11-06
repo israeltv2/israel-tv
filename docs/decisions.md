@@ -768,3 +768,15 @@ firewall prompt); headless and Docker access to the dashboard, Docker paths, por
 command forms and `journalctl`; a section for "a catalog row says it is old"; what "none needed" means for
 debugging; that remote plays count under "This home"; and log scrubbing now covers every secret the config
 names, whatever its variable is called (it only matched names containing TOKEN, PASS, … before).
+
+### Code review, round 2 (third pass) and intuitiveness re-check
+
+Code, fixed: Kids/Teens show pages are on kankids.org.il but their images on kan.org.il, and a cross-site image
+taints the canvas it is drawn on — the image is now opened in its own tab of the same browser session (where it is
+the document, so same-site) and resized there, for both sites; and the daily job's flush ended relay plays that
+were still going, splitting each into two — it now ends only sessions started before the day began (shutdown
+still ends all). Docs, fixed: `.env.example` still suggested a base64 remote token; `configuration.md` still
+described the old Worker routing; series ids are found through a row's search (registry.json has no titles);
+the local server now serves `freshness.json` too; reproducing a direct (non-resolver) play; that switching to the
+Cloudflare publisher stops the `:7700` addon; restart commands for launchd, systemd and Docker; and how to create
+a tunnel when there is none yet.

@@ -77,6 +77,7 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
   app.get('/status', file(sitePaths.statusPage, CACHE.none, 'text/html; charset=utf-8'));
   app.get('/status.json', file(sitePaths.status, CACHE.none));
   app.get('/registry.json', file(sitePaths.registry, CACHE.list));
+  app.get('/freshness.json', file(sitePaths.freshness, CACHE.none));
 
   // /catalog/:type/:id.json and /catalog/:type/:id/:extra.json
   app.get('/catalog/:type/*', async (c) => {
