@@ -205,7 +205,7 @@ test('a Kan episode page that fails once does not get numbered after the later o
   const flaky = {
     ...base,
     async load(url: string) {
-      if (url.endsWith('/s1/1006640/') && fail) return { status: 502, html: '', challenged: false };
+      if (url.endsWith('/s1/1006640/') && fail) return { status: 404, html: '', challenged: false };
       return base.load(url);
     },
   };
@@ -258,4 +258,24 @@ test('an episode page given up on is not queued again when the show page is re-r
   await crawlKan(store, { ...opts(dead as never, 3), priority: [key] });
   const st = store.getState<{ shows: Record<string, { pending: string[] }> }>('kan:crawl');
   expect(st?.shows[key]?.pending).toEqual([]);
+});
+
+test('a Kan server error backs off without charging the page a try', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const down = {
+    ...base,
+    async load(url: string) {
+      return /\/s1\/\d+\/$/.test(url) ? { status: 503, html: '', challenged: false } : base.load(url);
+    },
+  };
+  let r = await crawlKan(store, opts(down as never, 10));
+  for (let i = 0; i < 10 && !r.failed; i++) r = await crawlKan(store, opts(down as never, 10));
+  expect(r.failed).toBe(true);
+  const st = store.getState<{
+    backoffUntil?: string;
+    shows: Record<string, { retry?: Record<string, unknown>; failed: string[] }>;
+  }>('kan:crawl');
+  expect(st?.backoffUntil).toBeDefined();
+  expect(Object.values(st?.shows ?? {}).every((s) => !s.retry && s.failed.length === 0)).toBe(true);
 });

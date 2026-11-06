@@ -83,9 +83,12 @@ interface CrawlState {
 }
 
 const STATE_KEY = 'kan:crawl';
-/** A failed episode page is tried this many times, at least RETRY_GAP_MS apart, before it is skipped. */
+/**
+ * An episode page that fails for itself (404, no player on it) is tried this many times, at least RETRY_GAP_MS
+ * apart (so over at least a day), before it is skipped.
+ */
 const MAX_EPISODE_TRIES = 3;
-const RETRY_GAP_MS = 2 * 3_600_000;
+const RETRY_GAP_MS = 12 * 3_600_000;
 const HOUR = HOUR_MS;
 
 export interface KanCrawlOptions {
@@ -192,7 +195,9 @@ export async function crawlKan(
       blocked++;
       throw new Error(`${url}: ${(err as Error).message.split('\n')[0]}`);
     }
-    if (r.challenged || r.status === 403 || r.status === 407) {
+    // Challenges, proxy refusals and server-side errors (5xx, rate limiting) say nothing about the page itself:
+    // the slice stops and backs off, and no page is charged a try for them.
+    if (r.challenged || r.status === 403 || r.status === 407 || r.status === 429 || r.status >= 500) {
       blocked++;
       throw new Error(`${url}: ${r.challenged ? 'Cloudflare challenge did not clear' : `HTTP ${r.status}`}`);
     }
