@@ -12,7 +12,7 @@
     "lint": "biome ci --error-on-warnings .",
     "format": "biome check --write .",
     "test": "pnpm -r --no-bail test",
-    "check": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm hygiene && pnpm check:addresses && pnpm test",
+    "check": "pnpm build && pnpm typecheck && pnpm lint && pnpm boundaries && pnpm hygiene && pnpm check:addresses && pnpm test",
     "start": "node apps/ingest/src/cli.ts start",
     "israel-tv": "node apps/ingest/src/cli.ts",
     "logs": "node apps/ingest/src/cli.ts events",
@@ -24,7 +24,9 @@
     "smoke": "node tools/smoke.mjs",
     "check:addresses": "node tools/check-addresses.mjs",
     "e2e:dashboard": "node tools/dashboard-e2e.mjs",
-    "budget:workers": "node tools/worker-budget.mjs"
+    "budget:workers": "node tools/worker-budget.mjs",
+    "shots:dashboard": "node tools/dashboard-shots.mjs",
+    "build": "pnpm --filter @israel-tv/dashboard build"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

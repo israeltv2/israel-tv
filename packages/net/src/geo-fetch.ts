@@ -13,6 +13,8 @@ export type GeoFetch = ((
    * that may be the exit's fault (a CDN that does not take this exit as Israeli). Undefined with one or none.
    */
   rotate?: () => string | undefined;
+  /** The exit requests leave through now (the proxy's address, no credentials); undefined without proxies. */
+  current?: () => string | undefined;
 };
 
 function agentFor(p: ProxyEndpoint): Dispatcher {
@@ -68,6 +70,7 @@ export function createGeoFetch(proxies: ProxyEndpoint[]): GeoFetch {
     }
     throw lastErr;
   };
+  geoFetch.current = () => proxies[current]?.server;
   if (agents.length > 1)
     geoFetch.rotate = () => {
       current = (current + 1) % agents.length;

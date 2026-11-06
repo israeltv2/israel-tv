@@ -63,23 +63,52 @@ numbering conflicts, renumberings at the source, thin results and dead season li
 The dashboard `http://<this computer's address>:7702/dash/` is for the owner only: it answers on the local network
 only, and also needs the admin token (`ISRAEL_TV_ADMIN_TOKEN` in `.env`; without it, one is generated on first start).
 `pnpm israel-tv admin-url` prints the link with the token; open it once in a browser and the token moves into a
-cookie (kept 30 days). Anyone without it gets a plain 404. It works on a phone, follows the system's light or dark
-setting, and has seven sections:
+cookie (kept 30 days). Anyone without it gets a plain 404. It works on a phone (a tab bar at the bottom) and on a
+desktop (a sidebar), follows the system's light or dark setting (or the switch in the top corner, remembered on that
+device), shows every time in the configured time zone (`schedule.timezone`, Israel by default; the UTC time is in
+each time's tooltip) and keeps Hebrew titles in their own direction.
 
-- **Overview** — plays, devices a day, minutes relayed and failure rate (today, 7 and 30 days), plays per day, the
-  most played shows; and, for a Cloudflare catalog, the public link's stream requests (see the two views below).
-- **Sources** — each source's health, last good read against its expected rhythm, staleness, the daily canary (which
-  step failed and why), the proxy and its last error, the Kan reader's backlog; a button runs the canary now.
-- **Plays** — plays per day by source, time to the first playlist (median and 95th percentile), top episodes.
-- **Failures** — the last 7 days grouped by source, stage, status and reason, with a 7-day bar and a link to the
-  **trace** of the latest such play (every event of that play, in order).
-- **Live** — what is playing through the home helper now, updated as it changes (Server-Sent Events).
-- **Catalog & deploys** — shows and episodes per source, the last publish, the two Workers' current versions and the
-  rollback commands (shown, not run); a form refreshes one show.
-- **System** — revision, uptime, memory, disk, database sizes and growth, the last backup and its restore check
-  (each night's copy is opened and integrity-checked), usage events per day.
+At the top of every section, one line answers "is everything OK?": **All good**, **Needs a look** or **Something is
+broken**, with each problem in a sentence that links to its section (`GET /api/v1/health`; the same problems put a
+dot on the section in the menu). Problems come from: a source that is not green, a canary that does not play, a
+catalog row the addon shows as stale, shows that fail to read, a failed publish or TMDB run, the service's own notes
+(Analytics Engine, the remote helper, the free-plan quota, the events database size), plays that failed in the last
+24 hours (not counting a single unavailable title), an old or failed backup, and a nearly full disk.
 
-The same numbers are a JSON API for scripts, `GET /api/v1/{session,overview,sources,plays,failures,trace/<playId>,
+The sections:
+
+- **Overview** — plays today and over 7 days with a 30-day sparkline, viewers (home, and the public addon per day),
+  minutes relayed, the failure rate with its counts, catalog freshness per source and the last publish, today's
+  Cloudflare requests against the free plan; plays per day (home and public), the most watched shows with posters.
+- **Sources** — a card per source: shows, episodes, last good read against its rhythm (with a bar to the point where
+  the addon calls the row stale), the last airing check, the playback canary of the last runs as a strip (green: plays;
+  amber: played after skipping an unavailable title; red: failed — hover for the step and statuses), the notes, the
+  shows the site's bot protection refused and their retries, the shows the site lists with nothing to watch (a count
+  that opens into the list) and the recent reads. Below: each geo proxy exit (what the relay saw through it) and the
+  Kan reader's progress. A button runs the canary now.
+- **Plays** — plays per day by source, the time to the first playlist (median and 95th percentile, per day), the most
+  watched shows with posters, the most played episodes and the recent plays, each opening its trace.
+- **Failures** — failed plays in 7 days, the rate, failures per day by source, the groups (source, stage, status,
+  reason; "one title" when only that title failed) with a 7-day bar, and the recent failures. The project's own checks
+  (`x-israel-tv-probe`) are never counted.
+- **Trace** (`#/trace/<playId>`, from any play or failure) — every event of one play on a timeline: offset from the
+  start, which part (resolver, mako-auth, geo-relay), what happened, its status and how long it took, the upstream
+  statuses in order (`playlist 200, cdn AKAMAI, ticket 200, master 403, …`) and the full detail.
+- **Live now** — what plays through the home helper right now, pushed as it changes (Server-Sent Events; paused while
+  the tab is hidden).
+- **Catalog & deploys** — shows and episodes per source, the last publishes, the two Workers' versions with their
+  rollback commands to copy (shown, never run from the page), the publisher's own catalog check, the shows failing to
+  read, and a form that reads one show again now.
+- **System** — uptime, version and revision, memory and disk with gauges, database sizes and growth, the last backup
+  and its restore check, Cloudflare's free-plan use today (requests and Analytics Engine writes, per Worker), usage
+  events per day.
+
+The page is a static app built from `apps/dashboard` (`pnpm build`; releases and the Docker image include it). It
+loads its own files only (a strict content security policy: no inline script, no other origins except show posters
+over https), reads the API below and never holds the token itself (the browser's cookie does). A copy without the
+build says so at `/dash/` and on `/status`.
+
+The same numbers are a JSON API for scripts, `GET /api/v1/{session,health,overview,sources,plays,failures,trace/<playId>,
 live,deploys,system}` with `Authorization: Bearer <token>` (schemas: `packages/admin-contract`); changes are
 `POST /api/v1/actions/refresh/<series-id>` and `POST /api/v1/actions/canary` (a browser must also send the
 `x-israel-tv-csrf` value from `/session`). The older one-page view stays at `/usage` (no JavaScript needed).

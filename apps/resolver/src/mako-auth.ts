@@ -213,11 +213,19 @@ export function makoAuth(d: MakoAuthDeps) {
           ...media.filter((m) => m.cdn !== 'AKAMAI'),
         ];
         let last: Response | undefined;
+        let thrown: unknown;
         for (const m of ordered) {
           run.up.push(`cdn ${m.cdn ?? '?'}`);
-          last = await masterFor(makoUrl(m.url), m.cdn ?? 'AKAMAI', playerUA(c), run);
+          try {
+            last = await masterFor(makoUrl(m.url), m.cdn ?? 'AKAMAI', playerUA(c), run);
+          } catch (err) {
+            // No ticket on this CDN (refused, or none in the answer): the next one may still give one.
+            thrown = err;
+            continue;
+          }
           if (last.ok) return last;
         }
+        if (!last) throw thrown;
         // Tickets were issued, yet every CDN refused the master: this title, not Mako, is the problem
         // (seen for a few minutes on a freshly published episode before its files reach Akamai).
         if (last && last.status >= 400 && last.status < 500) run.blame = 'episode';

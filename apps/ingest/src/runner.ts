@@ -389,14 +389,15 @@ export async function runBlockedRetry(
   opts: RunOptions,
 ): Promise<BlockedRetry | undefined> {
   const state = store.getState<BlockedRetry | null>(retryKey(adapter.source));
-  if (!state?.pending.length || !state.nextAt) return state ?? undefined;
+  // Not due yet (a timer that fired early, or a job queued twice): nothing to do.
+  if (!state?.pending.length || !state.nextAt || Date.parse(state.nextAt) > (opts.now ?? Date.now()))
+    return state ?? undefined;
   const t0 = Date.now();
   const runId = store.startRun('show', `${adapter.source}:retry`);
   const summary = await runShows(store, adapter, 'show', state.pending, opts, false, runId, t0);
   // A show that now fails for another reason is no longer a block: it shows on /status as a failing show.
   const pending = summary.blocked ?? [];
   const still = new Set(pending.map((b) => b.key));
-  const failedOther = summary.showsFailed - pending.length;
   const recovered = state.pending.filter((p) => !still.has(p.key)).map((p) => p.title);
   const attempts = state.attempts + 1;
   const { nextAt: _due, ...rest } = state;
@@ -405,7 +406,7 @@ export async function runBlockedRetry(
     pending,
     recovered: [...state.recovered, ...recovered],
     attempts,
-    others: state.others + Math.max(0, failedOther),
+    others: state.others + (summary.otherFailures ?? 0),
     ...(pending.length && attempts < BLOCK_RETRIES
       ? { nextAt: new Date((opts.now ?? Date.now()) + retryDelayMs(attempts)).toISOString() }
       : {}),

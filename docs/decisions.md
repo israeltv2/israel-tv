@@ -1392,3 +1392,70 @@ Measured from `events.sqlite` on the home machine and live requests, then fixed:
   milliseconds, a different thing). Readers compare text and take `substr(ts, 1, 10)` as the UTC day, which is right
   for that form; the writer now normalises whatever it is handed (Date, epoch seconds or milliseconds) to that
   form, so no reader can meet another.
+
+## Round 6: the owner's dashboard, rebuilt (2026-11-07)
+
+The round-4 dashboard (Preact + htm without a build, uPlot) worked but read as a plain page. Rebuilt as a polished app.
+Three independent agents were consulted first (stack check with measured sizes; information architecture and visual
+system; a devil's-advocate critique), drawing on Uptime Kuma (status strips, one-line verdict), Plausible/Umami (KPI
+tiles with sparklines over one chart), Vercel/Cloudflare (deploy lists, copyable commands), Grafana (trace waterfall)
+and shadcn/ui's dashboard blocks.
+
+**Stack and why**
+
+- **Vite 8 + React 19 + TypeScript**, **TanStack Query** (caching, refetch on focus, polling) and **TanStack Router**
+  (code-based routes, hash history: one page for the daemon to serve, pasteable trace links, each section a lazily
+  loaded chunk). React over Preact/Solid because the component ecosystem and the pool of contributors are React-first;
+  on a LAN page for one owner, ~60 KB gzip more does not matter. The file-based router plugin was skipped (generated
+  files for eight routes).
+- **Tailwind CSS v4** with the design tokens as CSS variables, components written in shadcn/ui's style (cards,
+  buttons, badges, meters) in the repo instead of a dependency: no Radix needed so far.
+- **Recharts 3** for time series (measured +121 KB gzip vs ECharts' 188 KB; themed by the same CSS variables;
+  keyboard-accessible), loaded only with the sections that draw charts; sparklines, gauges, the canary strip and the
+  trace timeline are plain SVG/CSS. Tremor was rejected (React 18 only, unmaintained since early 2025).
+- **Typed API without Hono's `hc`:** the admin routes are not a chained Hono app and the dashboard must not import the
+  daemon (even its types pull in the store and drizzle). Instead the contract package has a zod-free route table
+  (`@israel-tv/admin-contract/routes`) and a `Responses` type map; each daemon builder returns its contract type
+  (drift fails typecheck), tests parse every answer with the zod schemas, and the page bundles only the route table.
+- **Built where it is deployed from:** UI libraries are devDependencies; `pnpm build` makes `apps/dashboard/dist`.
+  CI builds before testing; the Docker image builds it in a stage on the build machine's platform (the same files
+  for every architecture); the home machine's deploy builds it on the laptop and adds it to the release (the machine
+  installs production dependencies only). A copy without a build says so instead of failing silently.
+- **Security unchanged in kind:** LAN + token (cookie), CSRF on the two actions, a stricter CSP than before
+  (`script-src 'self'` with no hash or inline script; styles from the page plus a per-request nonce; images also from
+  https for posters), no secrets in the bundle (it holds no token; the cookie does).
+- **Budget:** 140 KB gzip of JavaScript for the first load (measured 119 KB), 300 KB in all, 12 KB of CSS (7 KB),
+  enforced on the build in CI.
+
+**Design:** zinc neutrals, one indigo accent, Inter with Noto Sans Hebrew for Hebrew (both served by the daemon),
+tabular numbers. Health is always colour + icon + word; the four source colours avoid green, amber and red so a
+source never reads as a state. One line at the top of every section gives the verdict and links each problem to its
+section (`/health`, computed on the server so the banner and the menu dots agree). Desktop: sidebar; phone: a tab bar
+with "More". Empty, loading and failed states are written out; a failed refresh keeps the last data on screen.
+
+**New data for it** (contract additions, version 1 still: only new fields): `/health`; per source shows, episodes,
+canary history, recent reads, empty-show lists and bot-block retries; per proxy exit what the relay saw; the Kan
+reader's shows done; posters for top shows; time to first playlist per day; recent plays and failures leading to
+traces; failure groups' days and blame; publish history, the catalog check and failing shows; machine totals,
+version and start time; the session's time zone.
+
+**Days follow `schedule.timezone`:** rollups, "today", per-day charts and the public addon's daily read now use the
+configured time zone's calendar days (Israel by default), so a play at 01:00 is on the day the owner lived it.
+Event times stay ISO UTC. No home rollup had been written yet on the deployed instance, so nothing mixes.
+
+**Checked by:** `pnpm shots:dashboard` (the built page under the daemon's own file server and CSP, fixture answers,
+frozen clock; every section at 390 px and 1440 px in light and dark; fails on page or console errors — CSP violations
+included — failed requests and sideways scrolling) and `pnpm e2e:dashboard` (a real sandbox instance). The
+screenshots were looked at and the design iterated (Hebrew titles kept next to their posters, uncounted public days
+left blank instead of zero, axis labels, duplicate notes, loading placeholders).
+
+**Reviews of round 6.** A security review of the branch found nothing at high confidence (the admin gate covers the
+new routes, the file server and poster lookup cannot leave their folders, the Analytics Engine query takes only
+internally built ISO times, proxy credentials never reach the exit table). A code review found ten real issues, all
+fixed with tests where they behave: bot-block retries ran early when a job was queued twice (they now run only when
+due) and miscounted non-block failures; the live view could leave a second event stream open after a quick tab
+switch; the relay did not count a refusing exit against itself before moving on; a refused Akamai ticket skipped
+the CloudFront fallback; the health line hid failures blamed on one title (they are counted now, and said so);
+an empty older season page could borrow the show's featured video (only the show's own page uses it now); failures
+without a play id linked to an empty trace; two quadratic or repeated computations; and the fixture proxy names
+looked like a real provider's (now neutral placeholders).

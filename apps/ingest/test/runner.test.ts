@@ -114,7 +114,11 @@ test('shows refused by bot protection are retried later that night; amber only i
     /1 show refused by the site's bot protection, retry 1 of 3 at 01:30 UTC: \/b/,
   );
   // Still blocked on every retry: amber, and named.
-  for (let i = 0; i < 3; i++) await runBlockedRetry(store, make(), { ...opts, now: t0 });
+  // Not due yet: nothing happens.
+  await runBlockedRetry(store, make(), { ...opts, now: t0 });
+  expect(store.getState<{ attempts: number }>(retryKey('mako'))).toMatchObject({ attempts: 0 });
+  for (let i = 0; i < 3; i++)
+    await runBlockedRetry(store, make(), { ...opts, now: t0 + (i + 1) * 4 * 3_600_000 });
   expect(store.getState<{ attempts: number; nextAt?: string }>(retryKey('mako'))).toMatchObject({
     attempts: 3,
   });
@@ -124,7 +128,7 @@ test('shows refused by bot protection are retried later that night; amber only i
   // A new full run where the retry reads it: green.
   await runFull(store, make(), { ...opts, now: t0 });
   blocking = false;
-  await runBlockedRetry(store, make(), { ...opts, now: t0 });
+  await runBlockedRetry(store, make(), { ...opts, now: t0 + 3_600_000 });
   mako = buildStatus(store, ['mako'], t0).sources[0];
   expect(mako).toMatchObject({ health: 'ok', blocked: { pending: [], recovered: ['/b'], attempts: 1 } });
   expect(store.findSeriesId('mako', '/b')).toBeDefined();

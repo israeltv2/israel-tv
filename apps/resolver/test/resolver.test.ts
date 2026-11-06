@@ -689,3 +689,59 @@ test('a relay refused through one exit is tried once through the next', async ()
   expect(r.status).toBe(200);
   expect(exits).toEqual(['a', 'b']);
 });
+
+test('a CDN whose ticket is refused does not stop the fallback to the next CDN', async () => {
+  const app = createResolverApp({
+    episode: () => ({ key: 'k', title: 't', streams: [], play: { vcmid: 'v', channelId: 'c' } }),
+    fetch: async (url) => {
+      if (url.includes('playlist.jsp'))
+        return Response.json({
+          media: [
+            { url: 'https://x.akamaized.net/m.m3u8', cdn: 'AKAMAI' },
+            { url: 'https://d1.cloudfront.net/k/index.m3u8', cdn: 'AWS' },
+          ],
+        });
+      if (url.includes('entitlement'))
+        return url.includes('rv=AKAMAI')
+          ? new Response('', { status: 403 })
+          : Response.json({ tickets: [{ ticket: 'token%3Dt', url: '/k/index.m3u8' }] });
+      return new Response('#EXTM3U\nv.m3u8\n');
+    },
+  });
+  const r = await app.request('/play/mako/iltv_mako_1%3A2%3A3.m3u8');
+  expect(r.status).toBe(200);
+  expect(await r.text()).toContain('https://d1.cloudfront.net/k/v.m3u8');
+});
+
+test('an exit that refuses is counted against itself before the next is tried', async () => {
+  const seen: { ok: boolean; exit?: string }[] = [];
+  let current = 'a';
+  const geoFetch = Object.assign(
+    async () =>
+      current === 'a' ? new Response('', { status: 403 }) : new Response('#EXTM3U\n', { status: 200 }),
+    {
+      rotate: () => {
+        current = 'b';
+        return current;
+      },
+      current: () => current,
+    },
+  );
+  const app = createResolverApp({
+    episode: () => ({
+      key: 'k',
+      title: 't',
+      streams: [{ url: 'https://r.il.cdn-redge.media/x/playlist.m3u8', kind: 'direct' }],
+    }),
+    geoFetch: geoFetch as never,
+    onRelay: (r) => seen.push(r),
+    fetch: async () => new Response('', { status: 403 }),
+  });
+  const s = await (await app.request('http://h/stream/series/iltv_kan_1:1:1.json')).json();
+  const relay = new URL(s.streams[0].url);
+  await app.request(`${relay.pathname}${relay.search}`);
+  expect(seen).toEqual([
+    { ok: false, error: 'upstream answered HTTP 403', exit: 'a' },
+    { ok: true, exit: 'b' },
+  ]);
+});

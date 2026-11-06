@@ -13,7 +13,7 @@ import {
   ScrapedShow as ScrapedShowSchema,
   type Source,
 } from '@israel-tv/core';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
 import * as t from './schema.ts';
@@ -576,6 +576,33 @@ export class Store {
 
   recentRuns(limit = 20): RunRow[] {
     return this.db.select().from(t.runs).orderBy(desc(t.runs.id)).limit(limit).all();
+  }
+
+  /** Runs of one source (its full reads, airing checks, show reads, retries, crawl slices), newest first. */
+  runsOf(source: string, limit = 20, kinds?: RunKind[]): RunRow[] {
+    return this.db
+      .select()
+      .from(t.runs)
+      .where(
+        and(
+          or(eq(t.runs.scope, source), like(t.runs.scope, `${source}:%`)),
+          kinds ? inArray(t.runs.kind, kinds) : undefined,
+        ),
+      )
+      .orderBy(desc(t.runs.id))
+      .limit(limit)
+      .all();
+  }
+
+  /** Recent runs of one kind (e.g. every publish), newest first. */
+  runsOfKind(kind: RunKind, limit = 20): RunRow[] {
+    return this.db
+      .select()
+      .from(t.runs)
+      .where(eq(t.runs.kind, kind))
+      .orderBy(desc(t.runs.id))
+      .limit(limit)
+      .all();
   }
 
   lastRun(kind: RunKind, scope?: string): RunRow | undefined {

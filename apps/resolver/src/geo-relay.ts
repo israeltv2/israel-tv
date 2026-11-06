@@ -30,10 +30,14 @@ export interface GeoRelayDeps extends ModuleContext {
   /** Secret for signing relay URLs. */
   secret: Buffer;
   /** Outcome of each relay through the geo proxy (for /status). */
-  onRelay?: (r: { ok: boolean; error?: string }) => void;
+  onRelay?: (r: { ok: boolean; error?: string; exit?: string }) => void;
 }
 
 export function geoRelay(d: GeoRelayDeps) {
+  const exitNow = (): { exit?: string } => {
+    const exit = d.geoFetch.current?.();
+    return exit ? { exit } : {};
+  };
   const probes = new Map<string, { blocked: boolean; note: string; at: number }>();
 
   /** Whether `url` is refused from this network (cached per key, e.g. per show). */
@@ -143,7 +147,7 @@ export function geoRelay(d: GeoRelayDeps) {
         });
       } catch (err) {
         const why = (err as Error).message;
-        d.onRelay?.({ ok: false, error: why });
+        d.onRelay?.({ ok: false, error: why, ...exitNow() });
         d.log('relay through the geo proxy failed', { playId, host: new URL(url).host, error: why });
         return fail(`geo proxy failed: ${why}`, 502);
       }
@@ -152,6 +156,8 @@ export function geoRelay(d: GeoRelayDeps) {
       if ((r.status === 401 || r.status === 403) && !rotated && d.geoFetch.rotate) {
         rotated = true;
         await r.body?.cancel();
+        // The exit that refused is counted against itself (the dashboard's per-exit table), then the next is tried.
+        d.onRelay?.({ ok: false, error: `upstream answered HTTP ${r.status}`, ...exitNow() });
         const exit = d.geoFetch.rotate();
         d.log('relay refused through this exit; trying the next one', {
           playId,
@@ -176,8 +182,12 @@ export function geoRelay(d: GeoRelayDeps) {
     const upstreamOk = r.ok || r.status === 206;
     d.onRelay?.(
       upstreamOk
-        ? { ok: true }
-        : { ok: false, error: `upstream answered HTTP ${r.status} (is the proxy's exit in Israel?)` },
+        ? { ok: true, ...exitNow() }
+        : {
+            ok: false,
+            error: `upstream answered HTTP ${r.status} (is the proxy's exit in Israel?)`,
+            ...exitNow(),
+          },
     );
     if (!upstreamOk) note.error = `upstream HTTP ${r.status}`;
     const type = r.headers.get('content-type') ?? '';

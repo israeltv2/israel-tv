@@ -10,3 +10,5 @@ spikes
 **/test
 CLAUDE.md
 deploy/resolver-data
+apps/dashboard/dist
+dashboard-screens
