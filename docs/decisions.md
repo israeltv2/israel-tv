@@ -203,3 +203,38 @@ through the queue; `writeSite` never cleans a folder it did not create, and the 
 folder that holds the database or log; no backoff sleep after the last retry; a Kaltura API failure no
 longer fails Reshet shows; Kan shows can be refreshed one at a time; Kan numbering warnings are recorded;
 status timestamps alone no longer trigger a deploy.
+
+### Simplify pass (2026-11-06)
+
+Four cleanup reviews (reuse, simplification, efficiency, altitude) over the whole codebase. Applied: shared
+helpers instead of copies (Mako playlist URL, enabled sources, Kan options, run status, relay host check),
+dead code removed (including change tracking that serialised every show twice per run and was never read),
+`buildStatus` driven by a per-source table instead of scattered special cases, publish reads shows and
+numbering once instead of two queries per show, `count(*)` instead of parsing shows to count them, bulk
+warning inserts, linear episode numbering, a resolver cache of parsed episodes per show. Skipped: a shared
+HTTP helper between the addon and the resolver (would couple the two packages), a generic run wrapper,
+incremental rendering of only changed shows (a design change, not a cleanup).
+
+### Intuitiveness review, round 2 (2026-11-06)
+
+Same three personas, fresh export after the round 1 fixes. Verdicts: inside Israel and outside Israel —
+"a stranger could succeed from the README alone"; public Cloudflare — "about 80% of the way".
+
+Fixed from round 2:
+
+- CLI: option typos and other user errors are one line (stack traces only with `ISRAEL_TV_DEBUG`); an
+  unknown `--source` is an error instead of a silent no-op; Ctrl-C logs "stopped" and exits cleanly;
+  `status` and `serve` do not need every service's secrets; `serve` renders the current data first.
+- Proxy: a wrong login is reported as such (undici hides a refused CONNECT as "Request was cancelled", so a
+  failed relay asks the proxy directly what it answered); host-not-found, refused, timeout, TLS and
+  "use http:// for this proxy" are explained in words; credentials written into a proxy URL are moved out of
+  it and never printed; relay failures show under `geo` on the admin `/status`; startup logs the proxies;
+  the relayed stream is labelled "דרך ישראל · via Israel".
+- Cloudflare: the publish failure on `/status` carries Cloudflare's reason (wrangler's colour codes
+  stripped); the Docker image is writable for wrangler as the `node` user; startup prints where the
+  public addon will be; README: choosing the workers.dev subdomain, free-plan limits, a public / home /
+  admin table, and the complete list of what friends cannot play.
+- The manifest claims IMDb/TMDB ids only when some show is matched (otherwise apps would query the addon
+  for every title).
+- Docs: `--no-initial-run` in the quick start, the pnpm "awaiting approval" notice, proxy URL scheme, the
+  operations command table matches `help`, clearer service-file placeholders.

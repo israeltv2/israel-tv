@@ -271,6 +271,35 @@ export class PublishError extends Error {
   override name = 'PublishError';
 }
 
+/** Terminal colour codes (wrangler prints them even with NO_COLOR). */
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+
+/** wrangler's own error line, e.g. "Authentication failed (status: 400) [code: 9106]", first; then a hint. */
+function publishError(
+  out: string,
+  code: number | null,
+  p: { apiTokenEnv: string; accountIdEnv: string },
+): PublishError {
+  const lines = out
+    .replace(ANSI, '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const at = lines.findIndex((l) => /^✘|\[ERROR\]/.test(l));
+  const head = at >= 0 ? (lines[at] ?? '').replace(/^✘\s*/, '').replace(/^\[ERROR\]\s*/, '') : undefined;
+  // The line after the error usually carries the cause ("Authentication failed (status: 400) …").
+  const next = at >= 0 ? lines[at + 1] : undefined;
+  const reason = head
+    ? `${head}${next && /^[A-Za-z]/.test(next) ? ` ${next}` : ''}`
+    : (lines.at(-1) ?? `wrangler exited with ${code}`);
+  return new PublishError(
+    `Cloudflare deploy failed: ${reason}\n` +
+      `Check ${p.apiTokenEnv} and ${p.accountIdEnv} in .env, that the token may edit Workers scripts, and that ` +
+      `your workers.dev subdomain exists (README, "Reachable from anywhere").\n` +
+      `wrangler said:\n${lines.slice(-12).join('\n')}`,
+  );
+}
+
 export interface DeployResult {
   ms: number;
   detail: string;
@@ -305,11 +334,7 @@ async function deployCloudflare(
       out += d;
     });
     child.on('error', reject);
-    child.on('close', (code) =>
-      code === 0
-        ? resolve(out)
-        : reject(new Error(`wrangler deploy failed (exit ${code}):\n${out.slice(-2000)}`)),
-    );
+    child.on('close', (code) => (code === 0 ? resolve(out) : reject(publishError(out, code, p))));
   });
   const url = /https:\/\/[^\s]+\.workers\.dev/.exec(output)?.[0];
   const uploaded = /Uploaded (\d+) files?/.exec(output)?.[0] ?? 'no asset changes';

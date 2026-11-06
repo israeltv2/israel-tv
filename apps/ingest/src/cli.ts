@@ -6,10 +6,10 @@ import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
 import { listen, startDaemon } from './daemon.ts';
 import { crawlKan, kanCrawlOptions } from './kan.ts';
-import { checkLive } from './live.ts';
+import { checkLive, liveRender } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { createLogger } from './log.ts';
-import { PublishError, publishSite } from './publish.ts';
+import { PublishError, publishSite, renderFromStore, writeSite } from './publish.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -31,8 +31,13 @@ const HELP = `israel-tv <command>
 
 Config: israel-tv.config.json in the current folder (or ISRAEL_TV_CONFIG). Secrets: .env.`;
 
-async function main(argv: string[]): Promise<number> {
-  const { positionals, values } = parseArgs({
+/** A problem the user can fix; printed without a stack trace. */
+class UserError extends Error {
+  override name = 'UserError';
+}
+
+function parseCli(argv: string[]) {
+  return parseArgs({
     args: argv,
     allowPositionals: true,
     options: {
@@ -43,15 +48,36 @@ async function main(argv: string[]): Promise<number> {
       port: { type: 'string' },
     },
   });
+}
+
+async function main(argv: string[]): Promise<number> {
+  let parsed: ReturnType<typeof parseCli>;
+  try {
+    parsed = parseCli(argv);
+  } catch (err) {
+    throw new UserError(
+      `${(err as Error).message}. Run \`pnpm israel-tv help\` for the commands and options.`,
+    );
+  }
+  const { positionals, values } = parsed;
   const [cmd = 'help', arg] = positionals;
   if (cmd === 'help' || values.help) {
     console.log(HELP);
     return 0;
   }
-  const { config } = loadConfig();
+  // Commands that only read local state do not need the secrets of every configured service.
+  const { config } = loadConfig(process.env, { needSecrets: !['status', 'serve'].includes(cmd) });
   const store = Store.open(config.store.path);
   store.closeStaleRuns();
   const adapters = createAdapters(config);
+  if (values.source !== undefined) {
+    const known = [...Object.keys(adapters), ...(config.sources.live ? ['live'] : [])];
+    if (!known.includes(values.source)) {
+      throw new UserError(
+        `unknown or disabled source "${values.source}" (enabled: ${known.join(', ') || 'none'})`,
+      );
+    }
+  }
   const pick = (only?: string) =>
     Object.entries(adapters)
       .filter(([s]) => !only || s === only)
@@ -59,7 +85,7 @@ async function main(argv: string[]): Promise<number> {
   const log = (l: string) => console.log(`${new Date().toISOString().slice(11, 19)}Z ${l}`);
   const limit = values.limit === undefined ? undefined : Number(values.limit);
   if (limit !== undefined && !(Number.isInteger(limit) && limit > 0))
-    throw new Error('--limit must be a positive whole number');
+    throw new UserError('--limit must be a positive whole number');
   const opts = {
     minShareOfPrevious: config.scraping.minShareOfPrevious,
     log,
@@ -84,13 +110,13 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case 'show': {
-        if (!arg) throw new Error('show needs a series id or source:key');
+        if (!arg) throw new UserError('show needs a series id or source:key');
         let source: Source;
         let key: string;
         const parsed = parseSeriesId(arg);
         if (parsed) {
           const row = store.getShow(arg);
-          if (!row) throw new Error(`unknown series ${arg}`);
+          if (!row) throw new UserError(`unknown series ${arg}`);
           source = parsed.source;
           key = row.show.key;
         } else {
@@ -99,7 +125,10 @@ async function main(argv: string[]): Promise<number> {
           key = arg.slice(i + 1);
         }
         const make = adapters[source];
-        if (!make) throw new Error(`source ${source} is not enabled`);
+        if (!make)
+          throw new UserError(
+            `source ${source} is not enabled (Kan shows refresh through the running service: POST /refresh/<id>)`,
+          );
         const title = store.getShow(store.findSeriesId(source, key) ?? '')?.title ?? key;
         const r = await runOne(store, make(), { key, title }, opts);
         return r.status === 'ok' ? 0 : 1;
@@ -116,7 +145,7 @@ async function main(argv: string[]): Promise<number> {
             initialRun: !values['no-initial-run'],
           },
         );
-        await new Promise(() => {});
+        await stopSignal(log);
         return 0;
       }
       case 'resolver': {
@@ -128,11 +157,13 @@ async function main(argv: string[]): Promise<number> {
           'resolver.port',
         );
         log(`resolver: http://${config.resolver.host}:${config.resolver.port}/manifest.json`);
-        await new Promise(() => {});
+        await stopSignal(log);
         return 0;
       }
       case 'serve': {
         const p = config.publisher;
+        // Serve what the database holds now (a run may have finished since the last publish).
+        writeSite(p.dir, renderFromStore(store, config, config.sources.live ? liveRender() : []));
         const port = values.port ? Number(values.port) : p.type === 'local' ? p.port : 7700;
         const host = p.type === 'local' ? p.host : '127.0.0.1';
         await listen(
@@ -142,7 +173,7 @@ async function main(argv: string[]): Promise<number> {
           values.port ? '--port' : 'publisher.port',
         );
         log(`serving ${p.dir} on http://${host}:${port}/manifest.json`);
-        await new Promise(() => {});
+        await stopSignal(log);
         return 0;
       }
       case 'kan': {
@@ -172,15 +203,15 @@ async function main(argv: string[]): Promise<number> {
               `${p.server}: ${r.ok ? `exits in ${country}` : `HTTP ${r.status}`}${good ? ' ✓' : ' ✗ (needs an Israeli exit)'}`,
             );
           } catch (err) {
-            const cause = (err as { cause?: { code?: string } }).cause?.code;
-            console.log(`${p.server}: ✗ ${cause ?? (err as Error).message}`);
+            // The geo fetch already explains the failure as "<proxy>: <why>".
+            console.log(`${p.server}: ✗ ${(err as Error).message.replace(`${p.server}: `, '')}`);
           }
         }
         return ok > 0 ? 0 : 1;
       }
       case 'match': {
         const key = tmdbApiKey(config);
-        if (!key) throw new Error('add "tmdb": {} to israel-tv.config.json and TMDB_API_KEY to .env');
+        if (!key) throw new UserError('add "tmdb": {} to israel-tv.config.json and TMDB_API_KEY to .env');
         await matchShows(store, key, { log });
         return 0;
       }
@@ -205,15 +236,25 @@ async function main(argv: string[]): Promise<number> {
   }
 }
 
+/** Resolve on Ctrl-C or a service manager's stop, after logging it. */
+function stopSignal(log: (line: string) => void): Promise<void> {
+  return new Promise((resolve) => {
+    const stop = (sig: string) => {
+      log(`stopped (${sig})`);
+      resolve();
+    };
+    process.once('SIGINT', () => stop('SIGINT'));
+    process.once('SIGTERM', () => stop('SIGTERM'));
+  });
+}
+
 main(process.argv.slice(2)).then(
   (code) => process.exit(code),
   (err) => {
-    // Problems the user can fix are printed plainly; anything else with its stack (or set ISRAEL_TV_DEBUG).
-    const plain =
-      err instanceof ConfigError || err instanceof PublishError || (err as Error).name === 'UserError';
-    console.error(
-      plain && !process.env.ISRAEL_TV_DEBUG ? `error: ${(err as Error).message}` : (err as Error).stack,
-    );
+    // Problems the user can fix are printed plainly; set ISRAEL_TV_DEBUG=1 for stack traces.
+    const known = err instanceof ConfigError || err instanceof PublishError || err instanceof UserError;
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(known || !process.env.ISRAEL_TV_DEBUG ? `error: ${msg}` : (err as Error).stack);
     process.exit(1);
   },
 );

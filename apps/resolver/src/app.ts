@@ -50,6 +50,8 @@ export interface ResolverDeps {
   secret?: Buffer;
   /** One-line problem reports (e.g. the geo proxy failing). */
   log?: (line: string) => void;
+  /** Outcome of each relay through the geo proxy (for /status). */
+  onRelay?: (r: { ok: boolean; error?: string }) => void;
 }
 
 const sign = (secret: Buffer, s: string) =>
@@ -137,7 +139,7 @@ export function createResolverApp(deps: ResolverDeps) {
       const geoSource = source !== undefined && GEO_LIMITED.has(source);
       if (ep && deps.geoFetch && (geoSource || ep.availableAbroad === false)) {
         const direct = ep.streams.find((s) => s.kind === 'direct' || s.kind === 'resolver');
-        if (direct) streams.push(relayStream(origin, direct.url, 'דרך ישראל'));
+        if (direct) streams.push(relayStream(origin, direct.url, 'דרך ישראל · via Israel'));
       }
     } else {
       const ch = channels.find((x) => x.id === id);
@@ -150,7 +152,8 @@ export function createResolverApp(deps: ResolverDeps) {
           });
         });
         if (ch.geo && deps.geoFetch) {
-          for (const l of ch.direct) streams.push(relayStream(origin, l.url, `${l.title} · דרך ישראל`));
+          for (const l of ch.direct)
+            streams.push(relayStream(origin, l.url, `${l.title} · דרך ישראל · via Israel`));
         }
       }
     }
@@ -259,12 +262,10 @@ export function createResolverApp(deps: ResolverDeps) {
           redirect: 'manual',
         });
       } catch (err) {
-        const cause = (err as { cause?: { code?: string; message?: string } }).cause;
-        const why = cause?.code ?? cause?.message ?? (err as Error).message;
-        deps.log?.(
-          `relay: the geo proxy did not answer for ${new URL(url).host} (${why}); check geo.urls and the proxy login`,
-        );
-        return c.text(`geo proxy failed (${why}); see the resolver log`, 502);
+        const why = (err as Error).message;
+        deps.onRelay?.({ ok: false, error: why });
+        deps.log?.(`relay through the geo proxy failed for ${new URL(url).host}: ${why}`);
+        return c.text(`geo proxy failed: ${why}`, 502);
       }
       const location = r.status >= 300 && r.status < 400 ? r.headers.get('location') : null;
       if (!location) break;
@@ -276,6 +277,7 @@ export function createResolverApp(deps: ResolverDeps) {
       r = undefined;
     }
     if (!r) return c.text('too many redirects', 502);
+    deps.onRelay?.({ ok: true });
     const type = r.headers.get('content-type') ?? '';
     const isPlaylist = /mpegurl/i.test(type) || /\.m3u8(\?|$)/.test(url);
     if (isPlaylist && r.ok) {

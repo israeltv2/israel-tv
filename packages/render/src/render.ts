@@ -161,7 +161,9 @@ function describe(sources: string[]): string {
   return `Israeli TV: ${list}.${notes.length ? ` ${notes.join('; ')}.` : ''}`;
 }
 
-export function buildManifest(input: RenderInput, catalogIds: Set<string>): Manifest {
+export function buildManifest(input: RenderInput, catalogIds: Set<string>, externalIds = true): Manifest {
+  // Claim IMDb/TMDB ids only when some show is matched: otherwise apps would ask us about every title.
+  const streamPrefixes = externalIds ? ['iltv_', 'tt', 'tmdb:'] : ['iltv_'];
   return {
     id: 'community.israel-tv',
     version: input.version,
@@ -170,10 +172,10 @@ export function buildManifest(input: RenderInput, catalogIds: Set<string>): Mani
     resources: [
       'catalog',
       { name: 'meta', types: ['series', 'tv'], idPrefixes: ['iltv_'] },
-      { name: 'stream', types: ['series', 'tv'], idPrefixes: ['iltv_', 'tt', 'tmdb:'] },
+      { name: 'stream', types: ['series', 'tv'], idPrefixes: streamPrefixes },
     ],
     types: ['series', 'tv'],
-    idPrefixes: ['iltv_', 'tt', 'tmdb:'],
+    idPrefixes: streamPrefixes,
     catalogs: CATALOGS.filter((c) => catalogIds.has(c.id)).map((c) => ({
       type: c.type,
       id: c.id,
@@ -256,7 +258,10 @@ export function renderSite(input: RenderInput): SiteFiles {
     }
   }
 
-  files.set(sitePaths.manifest, json(buildManifest(input, new Set(rows.keys()))));
+  files.set(
+    sitePaths.manifest,
+    json(buildManifest(input, new Set(rows.keys()), Object.keys(extIds).length > 0)),
+  );
   files.set(sitePaths.search, json(search));
   files.set(sitePaths.extIds, json(extIds));
   files.set(sitePaths.status, json(input.status));

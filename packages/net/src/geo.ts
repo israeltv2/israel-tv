@@ -18,10 +18,15 @@ export function proxyEndpoints(
   const password = geo.passwordEnv ? env[geo.passwordEnv] : undefined;
   return geo.urls.map((u) => {
     const url = new URL(u);
+    // Credentials written into the URL are taken out of it, so `server` is always safe to print.
+    const user = username ?? (url.username ? decodeURIComponent(url.username) : undefined);
+    const pass = password ?? (url.password ? decodeURIComponent(url.password) : undefined);
+    url.username = '';
+    url.password = '';
     return {
       server: url.toString().replace(/\/$/, ''),
-      ...(username ? { username } : {}),
-      ...(password ? { password } : {}),
+      ...(user ? { username: user } : {}),
+      ...(pass ? { password: pass } : {}),
     };
   });
 }
@@ -32,4 +37,30 @@ export function proxyUrlWithAuth(p: ProxyEndpoint): string {
   if (p.username) url.username = encodeURIComponent(p.username);
   if (p.password) url.password = encodeURIComponent(p.password);
   return url.toString();
+}
+
+/** A proxy/network failure in plain words, with what to check. */
+export function explainNetError(err: unknown): string {
+  const e = err as {
+    message?: string;
+    code?: string;
+    cause?: { code?: string; message?: string; statusCode?: number };
+  };
+  // Only symbolic codes (ENOTFOUND, …); DOMException-style numeric codes say nothing useful.
+  const raw = e.cause?.code ?? e.code;
+  const code = typeof raw === 'string' ? raw : '';
+  const text = `${e.message ?? ''} ${e.cause?.message ?? ''}`;
+  if (/\b407\b/.test(text) || e.cause?.statusCode === 407)
+    return 'the proxy rejected the login (407): check the username and password variables in .env';
+  if (code === 'ENOTFOUND') return 'proxy host not found: check the host name in geo.urls';
+  if (code === 'ECONNREFUSED') return 'nothing is listening on that proxy port: check the port in geo.urls';
+  if (/TIMEOUT/i.test(code) || /timed? ?out/i.test(text)) return 'the proxy did not answer in time';
+  if (/WRONG_VERSION_NUMBER|wrong version number/i.test(`${code} ${text}`))
+    return 'this proxy speaks plain HTTP: write the URL with http:// instead of https://';
+  if (/certificate|CERT_|self.signed/i.test(`${code} ${text}`))
+    return "the proxy's TLS certificate does not match its address: check the host name (or use http:// if the provider says so)";
+  const detail = code || e.cause?.message || e.message;
+  return detail && !/^Request was cancelled|^fetch failed$/.test(detail)
+    ? detail
+    : 'the proxy refused or dropped the connection: check geo.urls, the login, and that the provider allows this server';
 }

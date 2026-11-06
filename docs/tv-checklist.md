@@ -23,10 +23,10 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 
 - [ ] **Mako** episode (e.g. ארץ נהדרת, latest season): the stream "Israel TV · Mako" from the resolver
   plays, and seeking works.
-- [ ] **Reshet** episode: plays directly inside Israel. Outside Israel, the "דרך ישראל" stream from the
+- [ ] **Reshet** episode: plays directly inside Israel. Outside Israel, the "דרך ישראל · via Israel" stream from the
   resolver plays (needs the geo proxy configured).
 - [ ] **Kan** episode (after the crawl has filled some): "ישראל בלבד" plays inside Israel; outside, the
-  "דרך ישראל" stream plays.
+  "דרך ישראל · via Israel" stream plays.
 - [ ] **Live:** כאן 11, רשת 13, עכשיו 14, i24, ערוץ הכנסת play from the addon; קשת 12 and ערוץ 24 play
   through the resolver.
 - [ ] Watch half an episode, stop, reopen: the app offers to resume at the same point (ids are stable).

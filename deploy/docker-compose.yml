@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
     ports:
       - "7700:7700" # addon (local publisher only; drop this line with the Cloudflare publisher)
-      - "7701:7701" # resolver
+      - "7701:7701" # resolver (keep it off the internet: no login; plays Mako and relays through your proxy)
       # Admin (/status, refresh) is bound to this host only: behind Docker's port mapping every client
       # looks like a private address, so the "local network only" check cannot tell them apart.
       - "127.0.0.1:7702:7702"

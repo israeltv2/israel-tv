@@ -8,7 +8,10 @@ export const DEFAULT_CONFIG_FILE = 'israel-tv.config.json';
  * Load `israel-tv.config.json` (or the file in ISRAEL_TV_CONFIG). A missing file means "all defaults",
  * which is a working setup inside Israel. Relative paths in the config are resolved from its folder.
  */
-export function loadConfig(env: Record<string, string | undefined> = process.env): {
+export function loadConfig(
+  env: Record<string, string | undefined> = process.env,
+  opts: { needSecrets?: boolean } = {},
+): {
   config: Config;
   file: string | undefined;
 } {
@@ -29,7 +32,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const envFile = resolve(found ? resolve(found, '..') : process.cwd(), '.env');
   if (env === process.env && existsSync(envFile)) process.loadEnvFile(envFile);
   const config = parseConfig(raw, found ?? DEFAULT_CONFIG_FILE);
-  checkSecrets(config, env, envFile);
+  if (opts.needSecrets !== false) checkSecrets(config, env, envFile);
   const base = found ? resolve(found, '..') : process.cwd();
   config.store.path = resolve(base, config.store.path);
   config.publisher.dir = resolve(base, config.publisher.dir);
