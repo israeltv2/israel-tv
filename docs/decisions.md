@@ -1177,8 +1177,9 @@ Measured on the live catalog against another addon's output for the same shows:
   later. Done before going public, while there are almost no viewers: watch progress on those 21 shows restarts.
 - **Episode titles** no longer start with the season's year ("2024 · …"); named seasons keep their label, since
   their numbers (101+) say nothing.
-- **releaseInfo** is the first-aired year, `2024–2026` for a show that ended, `2024–` while it runs (an episode in
-  the last 180 days); it was the latest year for every show. Kan episodes now keep their page's publication day as
+- **releaseInfo** is the first to last episode year (`2024–2026`), or one year when they are the same; it was the
+  latest year for every show. An open range (`2024–`) for running shows was tried and dropped the same day: on the
+  owner's iPhone it showed as a lone, broken-looking line, worst in right-to-left. Kan episodes now keep their page's publication day as
   the air date; those read earlier get it when a slice has pages to spare (no retries, no warnings).
 - **Genres** where sources give them: Mako's show page schema, Reshet's Kaltura `Genre` tags (older template); Kan
   gives none. Cleaned (no repeats, at most 5). Each row offers its genres as a filter (`genre` extra; the Worker

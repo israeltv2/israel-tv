@@ -70,8 +70,6 @@ export interface RenderInput {
   sources?: string[];
   /** Images served as they are: `logo.png`, `background.png`, `logos/<channel id>.png`. */
   assets?: Map<string, Uint8Array>;
-  /** The time "running" shows are judged at (default now). */
-  now?: number;
 }
 
 /** Genres offered as a filter on a row: those of its shows, most common first. */
@@ -90,28 +88,26 @@ function sortKey(s: RenderShow): string {
   return `${s.latestAirDate ?? '0000-00-00'}|${s.latestEpisodeSeenAt ?? ''}`;
 }
 
-/** A show with an episode this recently is still running ("2024–"). */
-const RUNNING_DAYS = 180;
-
-/** First-aired year, then a range: "2024–2026" for an ended show, "2024–" for a running one. */
-export function releaseInfo(s: RenderShow, now: number): string | undefined {
+/**
+ * First to last episode year ("2024–2026"), or one year when they are the same. Never open-ended: a lone "2024–"
+ * reads as broken in apps, especially right-to-left.
+ */
+export function releaseInfo(s: RenderShow): string | undefined {
   const dates = s.show.seasons
     .flatMap((x) => x.episodes.map((e) => e.airDate))
-    .filter((d): d is string => !!d);
-  if (dates.length === 0) return undefined;
-  const sorted = [...dates].sort();
-  const first = (sorted[0] ?? '').slice(0, 4);
-  const lastDate = sorted.at(-1) ?? '';
-  const last = lastDate.slice(0, 4);
-  if (now - Date.parse(lastDate) < RUNNING_DAYS * 86_400_000) return `${first}–`;
+    .filter((d): d is string => !!d)
+    .sort();
+  const first = dates[0]?.slice(0, 4);
+  const last = dates.at(-1)?.slice(0, 4);
+  if (!first || !last) return undefined;
   return first === last ? first : `${first}–${last}`;
 }
 
-function preview(s: RenderShow, now: number): MetaPreview {
+function preview(s: RenderShow): MetaPreview {
   const p: MetaPreview = { id: s.seriesId, type: 'series', name: s.title, posterShape: SHAPE };
   if (s.show.poster) p.poster = s.show.poster;
   if (s.show.description) p.description = s.show.description;
-  const year = releaseInfo(s, now);
+  const year = releaseInfo(s);
   if (year) p.releaseInfo = year;
   if (s.show.genres?.length) p.genres = s.show.genres;
   if (s.imdbId) p.imdb_id = s.imdbId;
@@ -150,8 +146,8 @@ function videosFor(s: RenderShow): Video[] {
   return videos.sort((x, y) => (x.season ?? 0) - (y.season ?? 0) || (x.episode ?? 0) - (y.episode ?? 0));
 }
 
-function metaFor(s: RenderShow, now: number): Meta {
-  const m: Meta = { ...preview(s, now), videos: videosFor(s) };
+function metaFor(s: RenderShow): Meta {
+  const m: Meta = { ...preview(s), videos: videosFor(s) };
   if (s.show.background) m.background = s.show.background;
   if (s.show.pageUrl) m.links = [{ name: 'Source', category: 'Website', url: s.show.pageUrl }];
   return m;
@@ -286,12 +282,11 @@ export function renderSite(input: RenderInput): SiteFiles {
   const extIds: ExtIds = {};
   const rows = new Map<string, MetaPreview[]>();
 
-  const now = input.now ?? Date.now();
   const listed = input.shows.filter((s) => s.state === 'listed' && s.episodes.length > 0);
   listed.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
   for (const s of listed) {
     const row = rows.get(s.catalog) ?? [];
-    row.push(preview(s, now));
+    row.push(preview(s));
     rows.set(s.catalog, row);
     search.push([
       s.seriesId,
@@ -314,7 +309,7 @@ export function renderSite(input: RenderInput): SiteFiles {
   // Meta and streams for every show ever published (delisted ones too, so watch history still opens).
   for (const s of input.shows) {
     if (s.episodes.length === 0) continue;
-    files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s, now) }));
+    files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s) }));
     for (const [season, streams] of seasonStreamFiles(s)) {
       files.set(sitePaths.seasonStreams(s.seriesId, season), json(streams));
     }
