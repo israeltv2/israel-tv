@@ -333,6 +333,25 @@ export class Store {
       .filter((r): r is ShowRow => r !== undefined);
   }
 
+  /** Our series for an IMDb (`tt…`) or TMDB (`tmdb:…`) id, with its numbered seasons. */
+  externalSeries(id: string): { series: string; seasons: number[] } | undefined {
+    const row = id.startsWith('tmdb:')
+      ? this.db
+          .select({ id: t.shows.seriesId })
+          .from(t.shows)
+          .where(eq(t.shows.tmdbId, Number(id.slice(5))))
+          .get()
+      : this.db.select({ id: t.shows.seriesId }).from(t.shows).where(eq(t.shows.imdbId, id)).get();
+    if (!row) return undefined;
+    const seasons = this.db
+      .select({ number: t.seasons.number })
+      .from(t.seasons)
+      .where(and(eq(t.seasons.seriesId, row.id), inArray(t.seasons.kind, ['numbered', 'single'])))
+      .all()
+      .map((x) => x.number);
+    return { series: row.id, seasons };
+  }
+
   /** Source key of the episode published as season/episode of a series. */
   episodeKey(seriesId: string, season: number, episode: number): string | undefined {
     return this.db

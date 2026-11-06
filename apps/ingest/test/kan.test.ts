@@ -121,3 +121,21 @@ test('a refreshed show is read first; a failed first read does not make its back
   expect(failed.length).toBeGreaterThan(0);
   expect(failed.every((s) => !s.checkedAt)).toBe(true);
 });
+
+test('a browser that cannot load pages at all makes the slice back off without marking pages broken', async () => {
+  const store = Store.open(':memory:');
+  const throwing = {
+    urls: [] as string[],
+    async load(): Promise<never> {
+      throw new Error('net::ERR_TUNNEL_CONNECTION_FAILED');
+    },
+    async close() {},
+  };
+  const r = await crawlKan(store, { ...opts(loader(routes), 5), loader: throwing as never });
+  expect(r.failed).toBe(true);
+  const state = store.getState<{ backoffUntil?: string; shows: Record<string, { failedAt?: string }> }>(
+    'kan:crawl',
+  );
+  expect(state?.backoffUntil).toBeDefined();
+  expect(Object.values(state?.shows ?? {}).some((s) => s.failedAt)).toBe(false);
+});

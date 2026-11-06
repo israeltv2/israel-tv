@@ -41,6 +41,8 @@ const isRelayHost = (hostname: string) => RELAY_HOSTS.some((re) => re.test(hostn
 export interface ResolverDeps {
   /** Episode data for a published video id, from the home database. */
   episode(series: string, season: number, episode: number): ScrapedEpisode | undefined;
+  /** Our series for an IMDb (`tt…`) or TMDB (`tmdb:…`) id, with the seasons that share TMDB's numbering. */
+  external?(id: string): { series: string; seasons: number[] } | undefined;
   /** Plain fetch (Mako; no proxy needed). */
   fetch: (
     url: string,
@@ -112,7 +114,7 @@ export function createResolverApp(deps: ResolverDeps) {
         {
           name: 'stream',
           types: ['series', 'tv'],
-          idPrefixes: ['iltv_mako_', 'iltv_reshet_', 'iltv_kan_', 'iltv_live_'],
+          idPrefixes: ['iltv_mako_', 'iltv_reshet_', 'iltv_kan_', 'iltv_live_', 'tt', 'tmdb:'],
         },
       ],
       types: ['series', 'tv'],
@@ -126,12 +128,18 @@ export function createResolverApp(deps: ResolverDeps) {
     const id = decodeURIComponent(c.req.param('file')).replace(/\.json$/, '');
     const origin = base(c);
     const streams: Stream[] = [];
-    const v = parseVideoId(id);
+    // Shows opened from other catalogs (tt123:2:5 or tmdb:123:2:5) map onto ours, numbered seasons only.
+    const ext = /^(tt\d+|tmdb:\d+):(\d+):(\d+)$/.exec(id);
+    const mapped = ext?.[1] ? deps.external?.(ext[1]) : undefined;
+    const v =
+      mapped && mapped.seasons.includes(Number(ext?.[2]))
+        ? { series: mapped.series, season: Number(ext?.[2]), episode: Number(ext?.[3]) }
+        : parseVideoId(id);
     if (v) {
       const ep = deps.episode(v.series, v.season, v.episode);
       if (ep && v.series.startsWith('iltv_mako_') && ep.play?.vcmid) {
         streams.push({
-          url: `${origin}/play/mako/${encodeURIComponent(id)}.m3u8`,
+          url: `${origin}/play/mako/${encodeURIComponent(`${v.series}:${v.season}:${v.episode}`)}.m3u8`,
           name: 'Israel TV',
           title: 'Mako',
         });
