@@ -3,6 +3,15 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.2.2](https://github.com/israeltv2/israel-tv/compare/v0.2.1...v0.2.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* right-to-left embedding instead of a mark (Nuvio lays lines out left to right); status and lastAirDate for the year line ([#107](https://github.com/israeltv2/israel-tv/issues/107)) ([add8713](https://github.com/israeltv2/israel-tv/commit/add871388260d4817b04ee74abd95933ef2634c5))
+* right-to-left mark on Hebrew lines with Latin letters or digits; filler endings dropped from episode titles ([#104](https://github.com/israeltv2/israel-tv/issues/104)) ([5cb2114](https://github.com/israeltv2/israel-tv/commit/5cb21140253e8aabaa52c2a1bc2935d2c927f75b))
+* year line in the usual form — 2024–present while running, 2021–2024 or one year once ended ([#108](https://github.com/israeltv2/israel-tv/issues/108)) ([4d13576](https://github.com/israeltv2/israel-tv/commit/4d135766b232e88b8def24fe1086ecb46a867df5))
+
 ## [0.2.1](https://github.com/israeltv2/israel-tv/compare/v0.2.0...v0.2.1) (2026-11-06)
 
 
