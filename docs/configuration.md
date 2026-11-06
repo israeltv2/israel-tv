@@ -66,45 +66,59 @@ Kan VOD is on. `pnpm israel-tv check-proxy` tests it.
 
 `cloudflare`:
 
-| Option         | Default                 |                                                                                |
-| -------------- | ----------------------- | ------------------------------------------------------------------------------ |
-| `workerName`   | `israel-tv`             | Served at `https://<workerName>.<your-subdomain>.workers.dev`.                 |
-| `accountIdEnv` | `CLOUDFLARE_ACCOUNT_ID` | `.env` variable with the account id.                                           |
-| `apiTokenEnv`  | `CLOUDFLARE_API_TOKEN`  | `.env` variable with an API token allowed to edit Workers scripts.             |
-| `dir`          | `./data/site`           | Build folder uploaded on each publish.                                         |
-| `publicUrl`    | —                       | Optional, for your own reference.                                              |
-| `requestLogs`  | `true`                  | Log each catalog, meta and stream request for the usage dashboard (see below). |
+| Option         | Default                 |                                                                    |
+| -------------- | ----------------------- | ------------------------------------------------------------------ |
+| `workerName`   | `israel-tv`             | Served at `https://<workerName>.<your-subdomain>.workers.dev`.     |
+| `accountIdEnv` | `CLOUDFLARE_ACCOUNT_ID` | `.env` variable with the account id.                               |
+| `apiTokenEnv`  | `CLOUDFLARE_API_TOKEN`  | `.env` variable with an API token allowed to edit Workers scripts. |
+| `dir`          | `./data/site`           | Build folder uploaded on each publish.                             |
+| `publicUrl`    | —                       | Optional, for your own reference.                                  |
 
-With `requestLogs` on, the Worker answers every request itself (instead of Cloudflare serving the static files
-directly) and logs one line per request: route, id, status, time, and a salted daily hash of the client's
-address — never the address. Those requests then count toward the free plan's 100,000 Worker requests a day
-(plenty for a household and friends; past it, Cloudflare answers errors until midnight UTC). The daemon pulls
-the lines from Workers Logs every 10 minutes with the same API token. Set it to `false` to keep catalogs and
-metadata as plain static files with no request log.
+The Worker runs only for search, streams, paging past the end, `/status`, and the three kinds of files that carry
+image URLs (the manifest, the live row and live channel pages); catalogs and metadata are free static files
+(not counted). For each request it answers it writes one JSON line to Workers Logs (no addresses), and for each
+stream request one Workers Analytics Engine data point; the home daemon reads the daily counts back with the
+same API token (Analytics Engine needs the token to also have "Account Analytics: Read"; without it the counts
+come from Workers Logs).
 
 ## `resolver`
 
-| Option         | Default           |                                                                                                                |
-| -------------- | ----------------- | -------------------------------------------------------------------------------------------------------------- |
-| `enabled`      | `true`            | The second addon that plays Mako and relays geo-blocked video. Run it on the network of the device that plays. |
-| `host`, `port` | `0.0.0.0`, `7701` |                                                                                                                |
+| Option             | Default           |                                                                                                                              |
+| ------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`          | `true`            | The second addon that plays Mako and relays geo-blocked video. Run it on the network of the device that plays.               |
+| `host`, `port`     | `0.0.0.0`, `7701` |                                                                                                                              |
+| `makoAuth.enabled` | `true`            | Mako playback (a fresh ticket and the ~1 KB playlist per play; video comes from Mako's CDN).                                 |
+| `geoRelay.enabled` | `true`            | Geo-blocked Reshet/Kan video through the `geo` proxy, only when refused from this network. The only part that carries video. |
 
 ## `admin`
 
-`host`, `port` (default `0.0.0.0`, `7702`). Serves `/status` (JSON), `/usage` (the usage dashboard; JSON at
-`/usage.json`), `/events.json` (event queries, see [operations](operations.md#investigating-a-failed-play)),
-`POST /refresh/<series-id>` (re-read one show now), `POST /run/full`, `POST /run/airing`. Answers only requests
-from private network addresses.
+`host`, `port` (default `0.0.0.0`, `7702`), `tokenEnv` (default `ISRAEL_TV_ADMIN_TOKEN`). Serves `/status`
+(JSON), `/usage` (the usage dashboard; JSON at `/usage.json`), `/events.json` (event queries, see
+[operations](operations.md#investigating-a-failed-play)), `POST /refresh/<series-id>` (re-read one show now),
+`POST /run/full`, `POST /run/airing`. Answers only requests from private network addresses that carry the admin
+token (the `.env` variable named by `tokenEnv`; when it is not set, a token is generated on first start and
+`israel-tv admin-url` prints the link). Everything else gets 404. Never expose it outside your network.
+
+## `events`
+
+`path` (default `./data/events.sqlite`): usage and diagnostics events, kept apart from the catalog database.
+`maxMB` (default 200): above it, raw events are cut to the last week and `/status` warns. See
+[operations](operations.md#usage-dashboard-and-events).
+
+## `backup`
+
+`keepDays` (default 7, `0` = off) and `dir` (default `./data/backups`): a nightly copy of the catalog database.
 
 ## `schedule`
 
-| Option             | Default                               |                                                |
-| ------------------ | ------------------------------------- | ---------------------------------------------- |
-| `timezone`         | `Asia/Jerusalem`                      | For all patterns below (cron syntax).          |
-| `fullRun`          | `30 3 * * *`                          | Every show of every source, all seasons.       |
-| `airingChecks`     | `["5 * * * *", "*/15 19-23,0 * * *"]` | Current season of shows with a recent episode. |
-| `kanCrawl`         | `*/10 * * * *`                        | One Kan crawl slice.                           |
-| `airingWindowDays` | `14`                                  | "Recent" for the two lines above.              |
+| Option             | Default                               |                                                                                                                |
+| ------------------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `timezone`         | `Asia/Jerusalem`                      | For all patterns below (cron syntax).                                                                          |
+| `fullRun`          | `30 3 * * *`                          | Every show of every source, all seasons.                                                                       |
+| `airingChecks`     | `["5 * * * *", "*/15 19-23,0 * * *"]` | Current season of shows with a recent episode.                                                                 |
+| `kanCrawl`         | `*/10 * * * *`                        | One Kan crawl slice.                                                                                           |
+| `daily`            | `10 5 * * *`                          | Housekeeping: catalog backup, usage rollups and pruning, the public addon's daily counts, the playback canary. |
+| `airingWindowDays` | `14`                                  | "Recent" for the two lines above.                                                                              |
 
 On start, if there was no full run in the last 24 hours, one starts immediately.
 
@@ -124,5 +138,7 @@ from another catalog (e.g. Cinemeta) also gets streams.
 
 ## `log`
 
-`{ "file": "./israel-tv.log", "maxMB": 20 }`: write the service log to a file (trimmed to its newest half
-when it passes `maxMB`). Without `file`, the log goes to standard output.
+`{ "file": "./data/israel-tv.log", "maxMB": 20, "keep": 10, "level": "info" }`: JSON log lines (pino) in rotated
+files next to `file` (a new file each day or at `maxMB`, keeping `keep` files; `current.log` points at the
+newest). Without `file`, the log goes to standard output (readable lines on a terminal, JSON otherwise). Secret
+values from `.env` never appear in it.

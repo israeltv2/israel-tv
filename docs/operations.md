@@ -43,64 +43,111 @@ numbering conflicts, renumberings at the source, thin results and dead season li
 
 ## Usage dashboard and events
 
-`http://<host>:7702/usage` (local network) shows unique clients today and per day for the last week (public
-addon and home resolver apart), what is playing now, stream requests, plays and failures by source and by
-show, the public addon's requests by route, and the latest failures with their reasons.
+The admin page `http://<host>:7702/usage` is for the owner only: it answers on the local network only, and also
+needs the admin token (`ISRAEL_TV_ADMIN_TOKEN` in `.env`; without it, one is generated on first start).
+`pnpm israel-tv admin-url` prints the link with the token; open it once in a browser and the token moves into a
+cookie. Anyone without it gets a plain 404. Scripts send `Authorization: Bearer <token>`.
 
-Behind it is one event per thing that happened, kept 30 days in the database and also written to the log as
-`event {json}`:
+The page has two clearly separate views:
 
-| `kind`    | Recorded by   | What                                                                                                      |
-| --------- | ------------- | --------------------------------------------------------------------------------------------------------- |
-| `request` | public Worker | A catalog, meta, stream, search or status request: route, id, status, time.                               |
-| `stream`  | resolver      | A stream request: the video id and how many streams were offered.                                         |
-| `play`    | resolver      | A play start (Mako): outcome, status, upstream statuses in order, time to the playlist.                   |
-| `ticket`  | resolver      | A Mako entitlement (ticket) fetch: outcome, status, time.                                                 |
-| `relay`   | resolver      | A relay session through the geo proxy, when it ends: segments, bytes, errors, time to the first playlist. |
-| `ingest`  | ingest        | A finished run (full, airing, show, Kan crawl slice, publish, match): status, time, error.                |
+- **This home (resolver):** what the resolver on this network saw — plays (Mako play starts and relayed plays),
+  unique clients per day, top shows, failures by reason, and what is playing now. It cannot see other people's
+  resolvers, catalog browsing, or plays that go straight from the public addon to a broadcaster.
+- **Public addon (all users, anonymous):** stream requests to the public addon from everyone who installed it,
+  counted by Cloudflare and read back once a day. It cannot see catalog browsing (static files) or what is
+  actually watched.
 
-The stream request hands out play and relay URLs carrying a correlation id (`?c=…`), so the `stream`, `ticket`,
-`play` and `relay` events of one play share their `corr`. Worker requests carry Cloudflare's ray id instead.
-No address is stored anywhere: `client` is an HMAC of the address keyed with a secret salt (kept in the
-database, and uploaded to the Worker as a secret) and the UTC day, so it counts a viewer once a day and cannot
-be turned back into an address or followed across days.
+Plus health: the daily playback canary, ingest per source, and the usage data itself (size, growth per day,
+events per day, how long the page took to build). `pnpm usage` prints the same figures as JSON.
+
+### Where usage data lives
+
+`data/events.sqlite` (`events.path`), apart from the catalog database so its writes never get in the way of
+ingest. WAL mode; events are written in batches. Two tables:
+
+**`events`** — one row per meaningful action, never per video segment. Indexes on `ts`, `(kind, ts)`, `show_id`,
+`play_id`. Kept 30 days.
+
+| Column       | What                                                                                   |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `ts`         | ISO time                                                                               |
+| `kind`       | see below                                                                              |
+| `component`  | `resolver`, `mako-auth`, `geo-relay`, `ingest`, `canary`                               |
+| `outcome`    | `ok` or `error`                                                                        |
+| `play_id`    | ties the events of one play together (the resolver's play and relay URLs carry `?p=…`) |
+| `source`     | `mako`, `reshet`, `kan`, `live`; for `run`, the run's scope                            |
+| `show_id`    | series id (`iltv_…`) or live channel id                                                |
+| `episode_id` | video id (`series:season:episode`)                                                     |
+| `client`     | salted daily hash of the client's address (never the address)                          |
+| `status`     | HTTP status answered, or for a failure the upstream status that caused it              |
+| `latency_ms` | time taken (for a play: time to the first playlist)                                    |
+| `detail`     | JSON: upstream statuses, reason, stage, bytes, segments, duration, run counts          |
+
+| `kind`           | Recorded by          | When                                                                               |
+| ---------------- | -------------------- | ---------------------------------------------------------------------------------- |
+| `stream_request` | resolver             | It answered a stream request: what it offered and why (`detail.offered`, `notes`). |
+| `play_start`     | mako-auth            | A Mako play got its master playlist (latency = time to it; `detail.upstream`).     |
+| `ticket_fetch`   | mako-auth            | A Mako entitlement (ticket) fetch.                                                 |
+| `relay_session`  | geo-relay            | One relayed play, written when it ends: duration, bytes, segments, errors.         |
+| `failure`        | mako-auth, geo-relay | A play that failed: `detail.stage` (`play`, `relay`), upstream statuses, reason.   |
+| `run`            | ingest               | A finished run: full, airing, show, Kan crawl slice, publish, match.               |
+| `canary`         | canary               | The daily playback check of one title (see below).                                 |
+
+**`daily_usage`** — per day, origin (`home` or `public`), source and show (`''` = all), the number of plays,
+unique clients, failures and minutes watched (known only for relayed plays). Kept a year. Home rows are rolled
+up nightly from the events; public rows come from Cloudflare (Workers Analytics Engine when the API token may
+read it, otherwise the same counts from Workers Logs).
+
+Every night (`schedule.daily`) the daemon also: backs up the catalog database (below), rolls up yesterday,
+deletes events older than 30 days and rollups older than a year, VACUUMs once a week, and checks the size cap
+(`events.maxMB`, default 200): above it, raw events are cut to the last week and `/status` warns.
+
+### Logs
+
+JSON lines (pino), one per thing, with `component` and the ids of what it is about (`playId`, `showId`,
+`episodeId`, `source`). With `log.file` set they go to rotated files next to it (a new file daily or at
+`log.maxMB`, keeping `log.keep`; `current.log` points at the newest); otherwise to the terminal. Secrets never
+reach a line: values of every token, password and key from `.env` are replaced with `[redacted]` wherever they
+appear.
 
 ## Investigating a failed play
 
-1. **Find it.** The latest failures, newest first:
+1. **Find it.** The latest failures, newest first (on the machine, or through the admin page):
 
    ```bash
-   curl -s 'http://<host>:7702/events.json?outcome=error&since=2h' | jq -c '.[] | {at, kind, source, video, status, upstream, reason, corr}'
-   # on the machine itself, without the service: pnpm israel-tv events --errors --since 2h
+   pnpm logs --errors --since 2h
+   curl -s -H "Authorization: Bearer $ISRAEL_TV_ADMIN_TOKEN" 'http://<host>:7702/events.json?outcome=error&since=2h'
    ```
 
-   For one show: add `&series=iltv_mako_12`; for one kind: `&kind=play`.
+   For one show add `--show iltv_mako_12` (`&show=…`); for one kind `--kind failure` (`&kind=…`).
 
-2. **Follow the play.** Everything that happened under its correlation id, in order:
+2. **Follow the play.** Everything that happened under its play id, in order:
 
    ```bash
-   pnpm israel-tv events --corr <corr>
+   pnpm logs --play <playId>
+   grep "<playId>" <folder of log.file>/current.log   # the log lines around it (with log.file set)
    ```
 
-   A healthy Mako play is `stream` (1+ streams) → `ticket` (ok) → `play` (ok, upstream
-   `playlist 200, ticket 200, master 200`). A relayed Reshet or Kan play is `stream` → `relay` (segments > 0).
+   A healthy Mako play is `stream_request` (offered 1 stream) → `ticket_fetch` (ok) → `play_start` (upstream
+   `playlist 200, ticket 200, master 200`). A relayed Reshet or Kan play is `stream_request` (notes: `direct
+   refused here … relayed`) → `relay_session` (segments > 0).
 
-3. **Read the upstream statuses.**
-   - `play` failing with `master 403`: Akamai refused the session token. The master must be fetched with the
-     player's User-Agent (the resolver forwards it); a player that changes its User-Agent between the master and
-     the segments gets 403 on the segments, which the resolver never sees.
-   - `ticket` failing (`Mako entitlement HTTP …` or no ticket): Mako's entitlement service; try the same
-     episode in a browser on mako.co.il.
-   - `playlist 404`, or `unknown episode`: the episode is gone at Mako, or the database is older than the app's
-     catalog — re-read the show: `curl -X POST http://<host>:7702/refresh/<series-id>`.
-   - `stream` with `no stream for this id here`: the resolver has no stream for this id (e.g. a Reshet episode
-     with no geo proxy configured — the public addon offers its direct stream).
-   - `relay` with errors and `segments: 0`: the geo proxy. `pnpm israel-tv check-proxy`, and `geo` in `/status`.
-     `upstream HTTP 403` through the proxy usually means its exit is not in Israel.
+3. **Read the upstream statuses** in the `failure` event's `detail`:
+   - `master 403`: Akamai refused the session token. The master must be fetched with the player's User-Agent
+     (the resolver forwards it); a player that changes its User-Agent between the master and the segments gets
+     403 on the segments, which the resolver never sees.
+   - `ticket …` failing: Mako's entitlement service; try the episode on mako.co.il.
+   - `playlist 404` or `unknown episode`: gone at Mako, or the catalog is older than the app's view — re-read
+     the show: `curl -X POST -H "Authorization: Bearer …" http://<host>:7702/refresh/<series-id>`.
+   - `stream_request` with `no stream for this id here`: the resolver has nothing for this id (the public addon
+     may). `none needed` means the direct stream plays from here, so the resolver deliberately adds nothing.
+   - `relay` failures, or `relay_session` with errors and no segments: the geo proxy — `pnpm israel-tv
+     check-proxy`, and `geo` in `/status`. `upstream HTTP 403` through the proxy usually means its exit is not in
+     Israel.
 
-4. **Public addon side.** `kind=request` events show what the app asked the public addon and what it got:
-   `curl -s 'http://<host>:7702/events.json?kind=request&series=<series-id>&since=1h'`. They arrive up to 10
-   minutes late (pulled from Workers Logs).
+4. **Public addon side.** Its requests are in Cloudflare's Workers Logs for a few days (dashboard → Workers →
+   the worker → Logs; one JSON line per request it answered, with `route`, `series`, `status`, `ms`). The
+   daily counts are on the usage page.
 
 5. **Reproduce.** Fetch the stream list, then the play URL, a variant playlist and a segment with one
    User-Agent; a working play gives 200, 200, 206:
@@ -110,6 +157,11 @@ be turned back into an address or followed across days.
    ```
 
 ## Backups and moving
+
+Every night the daemon copies the catalog database (`data/israel-tv.sqlite`, the one that holds every id and
+episode number) to `data/backups/israel-tv-YYYY-MM-DD.sqlite` and keeps the last 7 days (`backup.keepDays`,
+`backup.dir`); older copies it made are removed, nothing else is. To go back to a copy: stop the service,
+replace `data/israel-tv.sqlite` with it (and delete `israel-tv.sqlite-wal` / `-shm`), start again.
 
 Back up `data/israel-tv.sqlite` (the ids and numbers live there). The addon also serves `/registry.json`
 (the id registry) as an off-machine copy. Rendered files are disposable: `publish` recreates them.

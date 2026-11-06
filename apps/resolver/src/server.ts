@@ -30,19 +30,18 @@ export function episodeLookup(storePath: string) {
 
 export function resolverApp(
   config: Config,
-  env: NodeJS.ProcessEnv = process.env,
-  log: (l: string) => void = console.log,
-  onRelay?: (r: { ok: boolean; error?: string }) => void,
-  extra: Pick<ResolverDeps, 'onEvent' | 'sessions' | 'salt' | 'clientAddress'> = {},
+  opts: Pick<ResolverDeps, 'log' | 'onRelay' | 'onEvent' | 'sessions' | 'salt' | 'clientAddress'> & {
+    env?: NodeJS.ProcessEnv;
+  } = {},
 ) {
+  const { env = process.env, ...extra } = opts;
   const proxies = proxyEndpoints(config.geo, env);
   const logo = brandImage(config.branding.dir, 'resolver-logo');
   const background = brandImage(config.branding.dir, 'background');
   return createResolverApp({
     ...extra,
+    modules: { makoAuth: config.resolver.makoAuth.enabled, geoRelay: config.resolver.geoRelay.enabled },
     branding: { ...(logo ? { logo } : {}), ...(background ? { background } : {}) },
-    log,
-    ...(onRelay ? { onRelay } : {}),
     episode: episodeLookup(config.store.path),
     external: externalLookup(config.store.path),
     fetch: (url, init) => fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }),

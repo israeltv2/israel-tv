@@ -37,6 +37,8 @@ export function loadConfig(
   config.store.path = resolve(base, config.store.path);
   config.publisher.dir = resolve(base, config.publisher.dir);
   config.branding.dir = resolve(base, config.branding.dir);
+  config.events.path = resolve(base, config.events.path);
+  config.backup.dir = resolve(base, config.backup.dir);
   if (config.log.file) config.log.file = resolve(base, config.log.file);
   // The publish folder is emptied of stale files on every publish: it must not hold the database or log.
   const inside = (p: string) => p === config.publisher.dir || p.startsWith(config.publisher.dir + sep);

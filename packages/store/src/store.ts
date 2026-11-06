@@ -1,18 +1,15 @@
 // SQLite store (node:sqlite + Drizzle). The single writer is the ingest daemon; the resolver opens the same
 // file read-only.
-import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import {
   type Assignments,
-  EVENT_RETENTION_DAYS,
   seriesId as makeSeriesId,
   type ScrapedShow,
   ScrapedShow as ScrapedShowSchema,
   type Source,
-  type UsageEvent,
 } from '@israel-tv/core';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-sqlite';
@@ -50,28 +47,10 @@ export type RunKind = (typeof t.runs.$inferSelect)['kind'];
 export type RunStatus = (typeof t.runs.$inferSelect)['status'];
 export type RunRow = typeof t.runs.$inferSelect;
 export type WarningRow = typeof t.warnings.$inferSelect;
-export type EventRow = typeof t.events.$inferSelect;
-export interface Usage {
-  /** Unique clients today (UTC day), per origin (worker = public addon, resolver = home). */
-  clientsToday: { day: string; origin: string; n: number }[];
-  /** Unique clients per day for the last 7 days (hashes change daily, so days cannot be merged). */
-  clientsByDay: { day: string; origin: string; n: number }[];
-  bySource: { source: string | null; streams: number; plays: number; failures: number }[];
-  byShow: {
-    source: string | null;
-    series: string | null;
-    title: string | null;
-    streams: number;
-    plays: number;
-    failures: number;
-  }[];
-  /** Public Worker requests by route (7 days). */
-  requests: { route: string | null; n: number; errors: number }[];
-  failures: EventRow[];
-}
-
 export class Store {
   readonly db;
+  /** Called when a run finishes (the daemon records it as a usage/diagnostics event). */
+  onRunFinished?: (run: RunRow) => void;
   readonly path: string;
 
   private constructor(path: string, readOnly: boolean) {
@@ -95,6 +74,11 @@ export class Store {
 
   static openReadOnly(path: string): Store {
     return new Store(path, true);
+  }
+
+  /** A consistent copy of the whole database at `file` (which must not exist). */
+  backupTo(file: string): void {
+    this.db.$client.prepare('VACUUM INTO ?').run(file);
   }
 
   close(): void {
@@ -442,139 +426,8 @@ export class Store {
       .set({ ...result, error: result.error?.slice(0, 1000) ?? null, finishedAt: now() })
       .where(eq(t.runs.id, id))
       .run();
-    // Every finished run is also a usage/diagnostics event, next to plays and requests.
     const run = this.db.select().from(t.runs).where(eq(t.runs.id, id)).get();
-    if (run) {
-      this.addEvents([
-        {
-          at: run.finishedAt ?? now(),
-          kind: 'ingest',
-          origin: 'ingest',
-          corr: `run:${id}`,
-          route: run.kind,
-          source: run.scope,
-          outcome: run.status === 'failed' ? 'error' : 'ok',
-          ms: Date.parse(run.finishedAt ?? now()) - Date.parse(run.startedAt),
-          reason: `${run.status}${run.error ? `: ${run.error.slice(0, 300)}` : ''}`,
-        },
-      ]);
-    }
-  }
-
-  // ---- usage and diagnostics events ------------------------------------------------------------------
-
-  /** Record events; ones pulled from elsewhere carry `ext` and are recorded once. */
-  addEvents(list: (UsageEvent & { ext?: string })[]): void {
-    if (list.length === 0) return;
-    const rows = list.map((e) => ({
-      at: e.at,
-      kind: e.kind,
-      origin: e.origin,
-      outcome: e.outcome,
-      corr: e.corr ?? null,
-      client: e.client ?? null,
-      source: e.source ?? null,
-      series: e.series ?? null,
-      video: e.video ?? null,
-      route: e.route ?? null,
-      status: e.status ?? null,
-      upstream: e.upstream?.slice(0, 300) ?? null,
-      ms: e.ms === undefined ? null : Math.round(e.ms),
-      bytes: e.bytes ?? null,
-      segments: e.segments ?? null,
-      reason: e.reason?.slice(0, 500) ?? null,
-      ext: e.ext ?? null,
-    }));
-    for (let i = 0; i < rows.length; i += 200)
-      this.db
-        .insert(t.events)
-        .values(rows.slice(i, i + 200))
-        .onConflictDoNothing()
-        .run();
-  }
-
-  /** Events, newest first. */
-  events(
-    f: {
-      corr?: string;
-      kind?: string;
-      outcome?: 'ok' | 'error';
-      since?: string;
-      series?: string;
-      limit?: number;
-    } = {},
-  ): EventRow[] {
-    const where = [
-      f.corr ? eq(t.events.corr, f.corr) : undefined,
-      f.kind ? eq(t.events.kind, f.kind) : undefined,
-      f.outcome ? eq(t.events.outcome, f.outcome) : undefined,
-      f.series ? eq(t.events.series, f.series) : undefined,
-      f.since ? sql`${t.events.at} >= ${f.since}` : undefined,
-    ].filter((x) => x !== undefined);
-    return this.db
-      .select()
-      .from(t.events)
-      .where(where.length ? and(...where) : undefined)
-      .orderBy(desc(t.events.at), desc(t.events.id))
-      .limit(f.limit ?? 100)
-      .all();
-  }
-
-  /** Aggregates for the usage dashboard. */
-  usage(nowMs = Date.now()): Usage {
-    const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-    const since7 = new Date(nowMs - 7 * 86_400_000).toISOString();
-    const raw = <T extends Record<string, unknown>>(q: ReturnType<typeof sql>) => this.db.all<T>(q);
-    const clientsByDay = raw<{ day: string; origin: string; n: number }>(
-      sql`select substr(at, 1, 10) as day, origin, count(distinct client) as n from ${t.events}
-          where client is not null and at >= ${since7} group by day, origin order by day desc`,
-    );
-    const today = day(nowMs);
-    const byShow = raw<{
-      source: string | null;
-      series: string | null;
-      title: string | null;
-      streams: number;
-      plays: number;
-      failures: number;
-    }>(
-      sql`select e.source, e.series, s.title,
-            sum(case when e.kind = 'stream' or (e.kind = 'request' and e.route = 'stream') then 1 else 0 end) as streams,
-            sum(case when e.kind in ('play', 'relay') then 1 else 0 end) as plays,
-            sum(case when e.outcome = 'error' then 1 else 0 end) as failures
-          from ${t.events} e left join ${t.shows} s on s.seriesId = e.series
-          where e.at >= ${since7} and e.kind != 'ingest' and e.series is not null
-          group by e.source, e.series order by plays desc, streams desc limit 30`,
-    );
-    const bySource = raw<{ source: string | null; streams: number; plays: number; failures: number }>(
-      sql`select source,
-            sum(case when kind = 'stream' or (kind = 'request' and route = 'stream') then 1 else 0 end) as streams,
-            sum(case when kind in ('play', 'relay') then 1 else 0 end) as plays,
-            sum(case when outcome = 'error' then 1 else 0 end) as failures
-          from ${t.events} where at >= ${since7} and kind != 'ingest' group by source order by plays desc`,
-    );
-    const requests = raw<{ route: string | null; n: number; errors: number }>(
-      sql`select route, count(*) as n, sum(case when outcome = 'error' then 1 else 0 end) as errors
-          from ${t.events} where origin = 'worker' and at >= ${since7} group by route order by n desc`,
-    );
-    const failures = this.events({ outcome: 'error', since: since7, limit: 50 });
-    return {
-      clientsToday: clientsByDay.filter((r) => r.day === today),
-      clientsByDay,
-      bySource,
-      byShow,
-      requests,
-      failures,
-    };
-  }
-
-  /** The secret salt for client hashes (created once, kept in this database only). */
-  clientSalt(): string {
-    const have = this.getState<string>('client-salt');
-    if (have) return have;
-    const salt = randomBytes(32).toString('hex');
-    this.setState('client-salt', salt);
-    return salt;
+    if (run) this.onRunFinished?.(run);
   }
 
   recentRuns(limit = 20): RunRow[] {
@@ -669,8 +522,6 @@ export class Store {
       .where(sql`${t.warnings.createdAt} < ${before} or ${t.warnings.runId} in (${oldRuns})`)
       .run();
     this.db.delete(t.runs).where(sql`${t.runs.id} in (${oldRuns})`).run();
-    const eventsBefore = new Date(Date.now() - EVENT_RETENTION_DAYS * 86_400_000).toISOString();
-    this.db.delete(t.events).where(sql`${t.events.at} < ${eventsBefore}`).run();
   }
 
   /** When a show's stored data last changed (cheap; for caches). */

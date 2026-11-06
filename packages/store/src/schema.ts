@@ -119,30 +119,3 @@ export const kv = sqliteTable('kv', {
   value: text().notNull(),
   updatedAt: text().notNull(),
 });
-
-/** Usage and diagnostics events (see @israel-tv/core events.ts), kept EVENT_RETENTION_DAYS. */
-export const events = sqliteTable(
-  'events',
-  {
-    id: integer().primaryKey({ autoIncrement: true }),
-    at: text().notNull(),
-    kind: text().notNull(),
-    origin: text().notNull(),
-    outcome: text().notNull(),
-    corr: text(),
-    client: text(),
-    source: text(),
-    series: text(),
-    video: text(),
-    route: text(),
-    status: integer(),
-    upstream: text(),
-    ms: integer(),
-    bytes: integer(),
-    segments: integer(),
-    reason: text(),
-    /** De-duplication key for events pulled from elsewhere (Workers Logs). */
-    ext: text(),
-  },
-  (t) => [index('events_at').on(t.at), index('events_corr').on(t.corr), uniqueIndex('events_ext').on(t.ext)],
-);

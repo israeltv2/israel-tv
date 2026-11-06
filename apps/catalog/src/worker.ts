@@ -1,7 +1,8 @@
-// Cloudflare Worker for the public addon. Static files (manifest, catalogs, meta, stream files) come from the
-// assets binding; the Worker answers search, streams, paging past the end and /status, and (with request logs
-// on) logs one JSON event per request: route, id, status, time and a salted daily hash of the client — never
-// the address itself. The home daemon pulls these events from Workers Logs for its usage dashboard.
+// Cloudflare Worker for the public addon. Static files (catalogs, meta, stream files) are served by Cloudflare
+// without running it; it answers search, streams, paging past the end and /status, and fills the addon's own
+// address into the files that carry image URLs. For each request it answers it logs one JSON line (route, id,
+// status, time, and a salted daily hash of the client — never the address) to Workers Logs, and for each
+// stream request writes one Analytics Engine data point; the home daemon reads the daily counts back.
 import { createAddonApp } from '@israel-tv/addon';
 import { clientHash, parseSeriesId, withOrigin } from '@israel-tv/core';
 
@@ -9,6 +10,8 @@ interface Env {
   ASSETS: Fetcher;
   /** Secret salt for client hashes (uploaded by `israel-tv publish`). */
   CLIENT_SALT?: string;
+  /** Analytics Engine dataset for stream-request counts. */
+  USAGE?: AnalyticsEngineDataset;
 }
 
 let app: ReturnType<typeof createAddonApp> | undefined;
@@ -53,18 +56,28 @@ export default {
     ctx.waitUntil(
       (async () => {
         const url = new URL(request.url);
+        const what = describeRequest(url);
+        const client = salt && address ? await clientHash(salt, address) : undefined;
+        const outcome = res.status < 400 ? 'ok' : 'error';
+        const ms = Date.now() - t0;
         console.log(
           JSON.stringify({
             ev: EVENT_MARK,
             kind: 'request',
-            ...describeRequest(url),
+            ...what,
             status: res.status,
-            outcome: res.status < 400 ? 'ok' : 'error',
-            ms: Date.now() - t0,
-            corr: request.headers.get('cf-ray') ?? undefined,
-            client: salt && address ? await clientHash(salt, address) : undefined,
+            outcome,
+            ms,
+            ray: request.headers.get('cf-ray') ?? undefined,
+            client,
           }),
         );
+        if (what.route === 'stream')
+          env.USAGE?.writeDataPoint({
+            blobs: [what.source ?? '', what.series ?? '', what.video ?? '', client ?? '', outcome],
+            doubles: [1, ms],
+            indexes: [what.source ?? 'none'],
+          });
       })(),
     );
     return res;

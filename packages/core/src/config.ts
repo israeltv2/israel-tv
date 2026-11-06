@@ -72,12 +72,6 @@ const PublisherCloudflare = z.strictObject({
   dir: z.string().default('./data/site'),
   /** Public base URL once deployed (used in /status links). Optional. */
   publicUrl: z.url().optional(),
-  /**
-   * Log every catalog, meta and stream request (no addresses: a salted daily hash) for the usage dashboard.
-   * The Worker then answers those requests itself, so they count toward the free plan's 100,000 Worker
-   * requests a day (catalogs and metadata are otherwise free static files).
-   */
-  requestLogs: z.boolean().default(true),
 });
 
 export const ConfigSchema = z.strictObject({
@@ -113,10 +107,36 @@ export const ConfigSchema = z.strictObject({
       enabled: z.boolean().default(true),
       host: z.string().default('0.0.0.0'),
       port: port.default(7701),
+      /** Mako playback: a fresh ticket and the ~1 KB master playlist per play (video comes from Mako's CDN). */
+      makoAuth: z.strictObject({ enabled: z.boolean().default(true) }).prefault({}),
+      /** Geo-blocked Reshet/Kan video through the geo proxy, only when refused from here (needs `geo`). */
+      geoRelay: z.strictObject({ enabled: z.boolean().default(true) }).prefault({}),
     })
     .prefault({}),
-  /** Admin endpoints (/status, /refresh/<id>). Keep on the local network. */
-  admin: z.strictObject({ host: z.string().default('0.0.0.0'), port: port.default(7702) }).prefault({}),
+  /**
+   * Admin endpoints and the usage dashboard (/status, /usage, /refresh/<id>). Local network only, and they also
+   * need a token: from this .env variable, or (when it is not set) one generated on first start and shown by
+   * `israel-tv admin-url`.
+   */
+  admin: z
+    .strictObject({
+      host: z.string().default('0.0.0.0'),
+      port: port.default(7702),
+      tokenEnv: envName.default('ISRAEL_TV_ADMIN_TOKEN'),
+    })
+    .prefault({}),
+  /** Usage and diagnostics events (kept apart from the catalog database). */
+  events: z
+    .strictObject({
+      path: z.string().default('./data/events.sqlite'),
+      /** Size cap: above it, raw events are cut to the last week and /status warns. */
+      maxMB: z.number().positive().default(200),
+    })
+    .prefault({}),
+  /** Nightly copy of the catalog database (the one that holds ids and numbering), kept this many days. */
+  backup: z
+    .strictObject({ keepDays: z.number().int().min(0).default(7), dir: z.string().default('./data/backups') })
+    .prefault({}),
   schedule: z
     .strictObject({
       timezone: z.string().default('Asia/Jerusalem'),
@@ -126,6 +146,11 @@ export const ConfigSchema = z.strictObject({
       airingChecks: z.array(z.string()).default(['5 * * * *', '*/15 19-23,0 * * *']),
       /** Kan crawl slices (each reads a few pages; see scraping.browserPagesPerRun). */
       kanCrawl: z.string().default('*/10 * * * *'),
+      /**
+       * Daily housekeeping: back up the catalog database, roll up and prune usage events, pull the public
+       * addon's daily usage, and run the playback canary.
+       */
+      daily: z.string().default('10 5 * * *'),
       /** A show counts as airing when it had an episode in this many days. */
       airingWindowDays: z.number().int().positive().default(14),
     })
@@ -142,7 +167,15 @@ export const ConfigSchema = z.strictObject({
     })
     .prefault({}),
   /** Optional log file for `start` (stdout is used otherwise). Trimmed to its newest half above maxMB. */
-  log: z.strictObject({ file: z.string().optional(), maxMB: z.number().positive().default(20) }).prefault({}),
+  /** JSON logs (pino). With `file`, rotated by size and day, keeping `keep` files. */
+  log: z
+    .strictObject({
+      file: z.string().optional(),
+      maxMB: z.number().positive().default(20),
+      keep: z.number().int().positive().default(10),
+      level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+    })
+    .prefault({}),
   /** Optional: match shows to TMDB/IMDb so they also play when opened from other catalogs. */
   tmdb: z.strictObject({ apiKeyEnv: envName.default('TMDB_API_KEY') }).optional(),
 });

@@ -13,7 +13,9 @@
     "test": "pnpm -r --no-bail test",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "start": "node apps/ingest/src/cli.ts start",
-    "israel-tv": "node apps/ingest/src/cli.ts"
+    "israel-tv": "node apps/ingest/src/cli.ts",
+    "logs": "node apps/ingest/src/cli.ts events",
+    "usage": "node apps/ingest/src/cli.ts usage"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

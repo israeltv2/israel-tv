@@ -45,10 +45,11 @@ nothing needs approving.
 ```
 addon — install this in your app: http://192.168.1.20:7700/manifest.json
 resolver — install this too, at home: http://192.168.1.20:7701/manifest.json
-admin (local network only): http://192.168.1.20:7702/status
+admin and usage dashboard (local network, owner only): http://192.168.1.20:7702/usage — open it once with ?token=…
 ```
 
-Add **both** manifest URLs in your app (Stremio: Addons → paste URL; Nuvio: Settings → Addons → Add). The
+The admin page is yours only: `pnpm israel-tv admin-url` prints its link with your token (open it once; the
+browser keeps it). Add **both** manifest URLs in your app (Stremio: Addons → paste URL; Nuvio: Settings → Addons → Add). The
 first gives catalogs, metadata and the streams that need no token; the second plays Mako and relays
 geo-blocked video. (If the log shows only `127.0.0.1`, find the machine's address with
 `ipconfig getifaddr en0` on macOS or `hostname -I` on Linux.)
@@ -165,13 +166,27 @@ SQLite database and the rendered files) lives in `./data` by default.
 
 ## How it works
 
+Three parts, each with one job:
+
 ```
-sites ──(polite reads)──▶ ingest ──▶ SQLite (ids, numbering, last good data)
-                                         │
-                                         ▼
-                                 render Stremio JSON ──▶ local server  or  Cloudflare Worker + static files
-viewer's app ──▶ resolver (home) ──▶ Mako ticket / geo relay
+                    ┌────────────────────────── home ──────────────────────────┐
+broadcaster sites ──┼─▶ ingest ──▶ catalog DB ──▶ render ──┐                    │
+                    │      │                               │ publish            │
+                    │      └──▶ events DB ◀── resolver     │                    │
+                    │             (usage)     ├ mako-auth  │                    │
+                    │                         └ geo-relay ─┼──▶ geo proxy ──────┼─▶ Reshet / Kan CDN
+                    └──────────────────────────────▲───────┼────────────────────┘
+                                                   │       ▼
+viewer's app ──── streams that need home work ─────┘    catalog (public Worker or local server)
+       └───────── catalogs, metadata, search, plain streams ──────────┘
+       └───────── video ──▶ broadcasters' CDNs (Mako, Reshet, Kan, live) directly
 ```
+
+| Part         | Runs                                    | Does                                                                                                                                                                                                                                                                                     | Never                                 |
+| ------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| **ingest**   | at home (one process with the resolver) | Reads the broadcasters' sites slowly, owns the catalog database (ids, numbering, last good data), renders and publishes the catalog.                                                                                                                                                     | serves viewers                        |
+| **catalog**  | Cloudflare Worker, or the local server  | Show rows, show pages, search, and the stream links that need nothing at play time.                                                                                                                                                                                                      | knows about any household or resolver |
+| **resolver** | at home, its own addon                  | Play-time work only, in two modules: **mako-auth** (a fresh Mako ticket and the ~1 KB playlist per play; video still comes from Mako's CDN) and **geo-relay** (geo-blocked titles through the configured proxy, only when refused from this network — the only part that carries video). | serves catalogs                       |
 
 - **Ids never change.** Every show gets a permanent id the first time it is seen, and every episode a
   permanent season/episode number. Apps key watch progress on these, so they are never reused or
@@ -190,14 +205,14 @@ More: [docs/configuration.md](docs/configuration.md), [docs/operations.md](docs/
 
 ## Privacy
 
-Israel TV keeps a record of how it is used so problems can be found and fixed: which shows and episodes were
+Israel TV keeps a record of how it is used so problems can be found and fixed: what the home resolver was
 asked for and played, what failed and why, and how many different devices used it each day. It never stores
 an IP address: a device is counted by a salted hash of its address that changes every day, so it cannot be
-turned back into an address or followed from one day to the next. Records are kept 30 days, in your own
-database (the public addon's request records pass through your Cloudflare account's Workers Logs, kept there a
-few days). You can see it all on the admin page at `/usage`, and turn the public addon's request records off
-with `"requestLogs": false` (see [configuration](docs/configuration.md#publisher--where-the-addon-is-served)).
-If you share your addon with friends, tell them this.
+turned back into an address or followed from one day to the next. These records stay in your own database
+(`data/events.sqlite`): 30 days in detail, a year as daily totals. The public addon only counts stream requests
+(with the same kind of hash), through your own Cloudflare account (Workers Logs keeps its lines a few days;
+Analytics Engine keeps the counts); catalog browsing is not counted at all. You can see it all on the admin page
+at `/usage` (yours only: it needs the admin token). If you share your addon with friends, tell them this.
 
 ## Development
 
