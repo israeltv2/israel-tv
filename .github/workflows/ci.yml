@@ -10,13 +10,11 @@ permissions:
   contents: read
 jobs:
   check:
-    # Every role must run on Windows, macOS and Linux. Pull requests check Linux and Windows; macOS runners are
-    # not assigned to this private repository (queued, then cancelled), so macOS runs as its own job on main
-    # without blocking (and is the development and deployment platform besides). Back in this matrix when public.
+    # Every role must run on Windows, macOS and Linux: all three check every pull request (required checks).
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -82,21 +80,6 @@ jobs:
           $still = Get-NetTCPConnection -LocalPort 7701 -State Listen -ErrorAction SilentlyContinue
           if ($still) { throw "port 7701 still in use after stopping the task (pid $($still.OwningProcess))" }
           powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolver -Remove
-  macos:
-    if: github.event_name == 'push'
-    runs-on: macos-latest
-    continue-on-error: true
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm test:strict
   audit:
     # Known vulnerabilities in dependencies: reported on every pull request, never fixed by a bot.
     runs-on: ubuntu-latest
@@ -109,3 +92,29 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: pnpm audit --prod --audit-level=high
+  report:
+    # A dispatched run (on release-please's pull request, see release.yml) also reports its results as commit
+    # statuses under the same names: the branch rules count those on a pull request, dispatched check runs not.
+    if: always() && github.event_name == 'workflow_dispatch'
+    needs: [check, windows-task, audit]
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHECK: ${{ needs.check.result }}
+      WINDOWS_TASK: ${{ needs.windows-task.result }}
+      AUDIT: ${{ needs.audit.result }}
+      STATUSES: repos/${{ github.repository }}/statuses/${{ github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - run: |
+          post() {
+            state=failure; [ "$2" = success ] && state=success
+            gh api -X POST "$STATUSES" -f state="$state" -f context="$1" -f target_url="$RUN_URL" \
+              -f description="$2 (run for the release pull request)" > /dev/null
+            echo "$1: $state"
+          }
+          for os in ubuntu-latest windows-latest macos-latest; do post "check ($os)" "$CHECK"; done
+          post windows-task "$WINDOWS_TASK"
+          post audit "$AUDIT"
