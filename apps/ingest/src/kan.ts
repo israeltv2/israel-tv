@@ -262,6 +262,8 @@ export async function crawlKan(
           { code: 'source-note', message: `Kan ${key}: show page lists no episodes` },
         ]);
       }
+      // A good read of the show page clears an earlier failure (e.g. one empty page during a Kan deploy).
+      else if (id && (page.episodes.length > 0 || page.featured)) store.markShowChecked(id);
       // Single-video show: the video is on the show page itself.
       if (page.episodes.length === 0 && page.featured) {
         newEpisodes += saveEpisodes(store, key, s, [

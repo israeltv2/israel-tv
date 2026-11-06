@@ -134,8 +134,10 @@ async function main(argv: string[]): Promise<number> {
           throw new UserError(
             `source ${source} is not enabled (Kan shows refresh through the running service: POST /refresh/<id>)`,
           );
-        const title = store.getShow(store.findSeriesId(source, key) ?? '')?.title ?? key;
-        const r = await runOne(store, make(), { key, title }, opts);
+        const known = store.getShow(store.findSeriesId(source, key) ?? '');
+        const title = known?.title ?? key;
+        const poster = known?.show.poster;
+        const r = await runOne(store, make(), { key, title, ...(poster ? { poster } : {}) }, opts);
         return r.status === 'ok' ? 0 : 1;
       }
       case 'publish': {

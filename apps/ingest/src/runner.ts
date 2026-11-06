@@ -132,6 +132,13 @@ export async function ingestShow(
     throw new Error(why);
   }
   const fetched = new Set(scraped.seasons.filter((s) => s.episodes.length > 0).map((s) => s.key));
+  // Same for a full read in which every listed season came back empty (e.g. the episode markup changed):
+  // in an airing check that can be a new season with nothing yet, in a full read it cannot.
+  if (prev && !currentSeasonOnly && fetched.size === 0 && episodeCount(prev.show) > 0) {
+    const why = 'every season read empty (layout change?)';
+    store.markShowFailed(knownId as string, `kept last good data: ${why}`);
+    throw new Error(why);
+  }
   const show = cleanShow(dedupeEpisodes(mergePartial(prev?.show, scraped, fetched)));
   if (!prev && episodeCount(show) === 0) {
     if (scraped.notes?.length) {
