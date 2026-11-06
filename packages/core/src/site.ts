@@ -7,7 +7,9 @@ export const CATALOG_PAGE_SIZE = 100;
 export const sitePaths = {
   manifest: 'manifest.json',
   catalog: (type: string, id: string, skip = 0) =>
-    skip === 0 ? `catalog/${type}/${id}.json` : `catalog/${type}/${id}/skip=${skip}.json`,
+    // Later pages are stored as skip-N (not skip=N: some static hosts redirect '=' to '%3D'); the addon
+    // app maps Stremio's `/skip=N.json` URL onto them.
+    skip === 0 ? `catalog/${type}/${id}.json` : `catalog/${type}/${id}/skip-${skip}.json`,
   meta: (type: string, id: string) => `meta/${type}/${id}.json`,
   seasonStreams: (seriesId: string, season: number) => `streams/${seriesId}/${season}.json`,
   liveStreams: (id: string) => `streams/${id}.json`,

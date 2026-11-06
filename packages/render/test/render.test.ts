@@ -65,7 +65,7 @@ test('catalog is newest first and paged by 100', () => {
   );
   const files = renderSite({ ...base, shows });
   const page1 = read(files, 'catalog/series/iltv_keshet12.json').metas;
-  const page2 = read(files, 'catalog/series/iltv_keshet12/skip=100.json').metas;
+  const page2 = read(files, 'catalog/series/iltv_keshet12/skip-100.json').metas;
   expect(page1.length).toBe(100);
   expect(page2.length).toBe(50);
   expect(page1[0].releaseInfo).toBe('2026');
