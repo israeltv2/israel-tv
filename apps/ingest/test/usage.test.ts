@@ -62,7 +62,7 @@ test('the deployed Worker runs first only with request logs on, and never keeps 
   expect(on.observability).toEqual({ enabled: true, logs: { enabled: true, invocation_logs: false } });
   expect(on.main.endsWith('/catalog/src/worker.ts')).toBe(true);
   const off = workerConfig(cf(false).publisher as never, dir) as { assets: Record<string, unknown> };
-  expect(off.assets.run_worker_first).toBeUndefined();
+  expect(off.assets.run_worker_first).toEqual(['/manifest.json', '/catalog/tv/*', '/meta/tv/*']);
 });
 
 test('the usage page escapes everything it shows', () => {

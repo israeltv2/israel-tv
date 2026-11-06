@@ -3,7 +3,7 @@
 // on) logs one JSON event per request: route, id, status, time and a salted daily hash of the client — never
 // the address itself. The home daemon pulls these events from Workers Logs for its usage dashboard.
 import { createAddonApp } from '@israel-tv/addon';
-import { clientHash, parseSeriesId } from '@israel-tv/core';
+import { clientHash, parseSeriesId, withOrigin } from '@israel-tv/core';
 
 interface Env {
   ASSETS: Fetcher;
@@ -44,6 +44,10 @@ export default {
     // Static files first (as Cloudflare does when the Worker does not run first), then the app.
     let res = await env.ASSETS.fetch(request);
     if (res.status === 404) res = await app.fetch(request, env, ctx);
+    // Static JSON files carry image URLs relative to this addon's address (the app does this for its own).
+    else if (/json/.test(res.headers.get('content-type') ?? '')) {
+      res = new Response(withOrigin(await res.text(), new URL(request.url).origin), res);
+    }
     const salt = env.CLIENT_SALT;
     const address = request.headers.get('cf-connecting-ip');
     ctx.waitUntil(

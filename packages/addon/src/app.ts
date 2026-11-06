@@ -8,6 +8,7 @@ import {
   type SeasonStreams,
   type Stream,
   sitePaths,
+  withOrigin,
 } from '@israel-tv/core';
 import { Hono } from 'hono';
 
@@ -50,6 +51,11 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
 
   app.use('*', async (c, next) => {
     await next();
+    // Image URLs in rendered files are relative to wherever this addon is served from.
+    if (/json/.test(c.res.headers.get('content-type') ?? '')) {
+      const body = await c.res.text();
+      c.res = new Response(withOrigin(body, new URL(c.req.url).origin), c.res);
+    }
     c.header('Access-Control-Allow-Origin', '*');
     c.header('Access-Control-Allow-Headers', '*');
   });

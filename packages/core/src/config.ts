@@ -83,6 +83,11 @@ const PublisherCloudflare = z.strictObject({
 export const ConfigSchema = z.strictObject({
   /** Home database (SQLite file). Holds the id registry, numbering and last good data. */
   store: z.strictObject({ path: z.string().default('./data/israel-tv.sqlite') }).prefault({}),
+  /**
+   * Your own addon images: `logo.png` (square, ~256 px), `resolver-logo.png` (same) and `background.jpg` or
+   * `background.png` (1920×1080). Any that are missing come from the bundled ones.
+   */
+  branding: z.strictObject({ dir: z.string().default('./branding') }).prefault({}),
   sources: z
     .strictObject({
       mako: z.boolean().default(true),

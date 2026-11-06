@@ -8,8 +8,12 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 
 - [ ] Add `<addon>` in the app (Nuvio: Settings → Addons → Add addon; Stremio: Addons → search box → paste).
 - [ ] Add `<resolver>` the same way, on a device at home.
-- [ ] Home screen / Discover shows the rows **קשת 12**, **רשת 13**, **שידור חי** (and **כאן 11**, **כאן
-      חינוכית: ילדים ונוער** once the Kan crawl has found episodes).
+- [ ] Home screen / Discover shows the rows **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער**
+  (a "⏳ still loading" item until the Kan crawl has found its first show) and **שידור חי**.
+- [ ] Both addons show their logo in the app's addon list; live channel tiles show the channel logos.
+- [ ] Rows look stale? Nuvio caches catalog rows for hours: pull to refresh, or reopen the app later. The order
+  of rows between addons (this addon's rows vs. others) is set in Nuvio's settings (home screen / catalog
+  order), not by the addon.
 
 ## Catalogs and metadata
 
@@ -23,8 +27,9 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 
 - [ ] **Mako** episode (e.g. ארץ נהדרת, latest season): the stream "Israel TV · Mako" from the resolver
   plays, and seeking works.
-- [ ] **Reshet** episode: plays directly inside Israel. Outside Israel, the "דרך ישראל · via Israel" stream from the
-  resolver plays (needs the geo proxy configured).
+- [ ] **Reshet** episode: plays directly inside Israel (one stream, from the addon; the resolver adds none at
+  home). Outside Israel, the "דרך ישראל · via Israel" stream from the resolver plays (needs the geo proxy
+  configured). If a start feels slow, look up the play on the admin page `/usage` (time to the first playlist).
 - [ ] **Kan** episode (after the crawl has filled some): "ישראל בלבד" plays inside Israel; outside, the
   "דרך ישראל · via Israel" stream plays.
 - [ ] **Live:** כאן 11, רשת 13, עכשיו 14, i24, ערוץ הכנסת play from the addon; קשת 12 and ערוץ 24 play

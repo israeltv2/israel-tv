@@ -67,6 +67,8 @@ export interface ResolverDeps {
   sessions?: PlaySessions;
   /** Secret salt for client hashes; random per process when not given. */
   salt?: string;
+  /** The resolver's logo and the background for its manifest. */
+  branding?: { logo?: { body: Uint8Array; type: string }; background?: { body: Uint8Array; type: string } };
   /** The client's address for a request (default: the connecting socket's). */
   clientAddress?: (c: Context) => string | undefined;
 }
@@ -131,8 +133,22 @@ export function createResolverApp(deps: ResolverDeps) {
       ],
       types: ['series', 'tv'],
       catalogs: [],
+      ...(deps.branding?.logo ? { logo: `${base(c)}/logo.png` } : {}),
+      ...(deps.branding?.background ? { background: `${base(c)}/background.jpg` } : {}),
     }),
   );
+  for (const [path, img] of [
+    ['/logo.png', deps.branding?.logo],
+    ['/background.jpg', deps.branding?.background],
+  ] as const) {
+    if (img)
+      app.get(path, (c) =>
+        c.body(new Uint8Array(img.body), 200, {
+          'content-type': img.type,
+          'cache-control': 'public, max-age=86400',
+        }),
+      );
+  }
 
   // ---- usage and diagnostics -----------------------------------------------------------------------
 
@@ -158,6 +174,8 @@ export function createResolverApp(deps: ResolverDeps) {
     const streams: Stream[] = [];
     let info: SessionInfo = {};
     let note: string | undefined;
+    /** Nothing offered on purpose: the direct stream (from the public addon) plays from here. */
+    let directPlays = false;
     // Shows opened from other catalogs (tt123:2:5 or tmdb:123:2:5) map onto ours, numbered seasons only.
     const ext = /^(tt\d+|tmdb:\d+):(\d+):(\d+)$/.exec(id);
     const mapped = ext?.[1] ? deps.external?.(ext[1]) : undefined;
@@ -186,6 +204,7 @@ export function createResolverApp(deps: ResolverDeps) {
           const probe = await blockedHere(v.series, direct.url);
           note = probe.note;
           if (probe.blocked) streams.push(relayStream(origin, direct.url, 'דרך ישראל · via Israel', corr));
+          else directPlays = true;
         }
       }
     } else {
@@ -203,6 +222,7 @@ export function createResolverApp(deps: ResolverDeps) {
           for (const l of ch.direct) {
             const probe = await blockedHere(`${ch.id}|${l.url}`, l.url);
             note = probe.note;
+            if (!probe.blocked) directPlays = true;
             if (probe.blocked)
               streams.push(relayStream(origin, l.url, `${l.title} · דרך ישראל · via Israel`, corr));
           }
@@ -218,8 +238,15 @@ export function createResolverApp(deps: ResolverDeps) {
       ...info,
       ...(info.video ? {} : { video: id }),
       status: 200,
-      outcome: streams.length > 0 ? 'ok' : 'error',
-      reason: [streams.length > 0 ? `${streams.length} streams` : 'no stream for this id here', note]
+      outcome: streams.length > 0 || directPlays ? 'ok' : 'error',
+      reason: [
+        streams.length > 0
+          ? `${streams.length} streams`
+          : directPlays
+            ? 'none needed'
+            : 'no stream for this id here',
+        note,
+      ]
         .filter(Boolean)
         .join('; '),
     });

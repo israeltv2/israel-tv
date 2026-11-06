@@ -17,6 +17,7 @@ import {
   sitePaths,
 } from '@israel-tv/core';
 import { type LiveChannelRender, type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
+import { brandImage } from '@israel-tv/resolver';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { liveRender } from './live.ts';
 import { emptyShowsKey, episodeCount } from './runner.ts';
@@ -183,8 +184,17 @@ export function renderFromStore(store: Store, config: Config, live: LiveChannelR
     tmdbId: r.tmdbId,
     imdbId: r.imdbId,
   }));
+  const assets = new Map<string, Uint8Array>();
+  for (const [path, name] of [
+    [sitePaths.logo, 'logo'],
+    [sitePaths.background, 'background'],
+  ] as const) {
+    const img = brandImage(config.branding.dir, name);
+    if (img) assets.set(path, img.body);
+  }
   return renderSite({
     version: VERSION,
+    assets,
     sources: activeSources(config),
     shows,
     live,
@@ -265,7 +275,7 @@ export function writeSite(
       const old = readFileSync(p);
       same =
         path === sitePaths.status || path === sitePaths.statusPage
-          ? comparable(old.toString()) === comparable(content)
+          ? comparable(old.toString()) === comparable(String(content))
           : old.equals(Buffer.from(content));
     } catch {}
     if (!same) {
@@ -368,7 +378,13 @@ export function workerConfig(
     ...base,
     name: p.workerName,
     main: join(catalogDir, base.main),
-    assets: { ...base.assets, directory: p.dir, ...(p.requestLogs ? { run_worker_first: true } : {}) },
+    assets: {
+      ...base.assets,
+      directory: p.dir,
+      // With request logs the Worker answers everything; without, only the files that carry image URLs
+      // relative to the addon's address (the manifest and the live row), which it fills in.
+      run_worker_first: p.requestLogs ? true : ['/manifest.json', '/catalog/tv/*', '/meta/tv/*'],
+    },
     observability: { enabled: true, logs: { enabled: true, invocation_logs: false } },
   };
 }

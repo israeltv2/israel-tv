@@ -18,7 +18,21 @@ export const sitePaths = {
   status: 'status.json',
   statusPage: 'status.html',
   registry: 'registry.json',
+  logo: 'logo.png',
+  background: 'background.jpg',
+  channelLogo: (id: string) => `logos/${id}.png`,
 } as const;
+
+/**
+ * Stands for the addon's own address in rendered files (image URLs must be absolute, and the address is only
+ * known when a request comes in): the server replaces it with the request's origin when serving JSON.
+ */
+export const ORIGIN_TOKEN = '{{israel-tv-origin}}';
+
+/** Replace the origin token in a served JSON body. */
+export function withOrigin(body: string, origin: string): string {
+  return body.includes(ORIGIN_TOKEN) ? body.replaceAll(ORIGIN_TOKEN, origin) : body;
+}
 
 /** search.json rows: [id, type, catalogId, display name, normalized name, poster]. */
 export type SearchRow = [
