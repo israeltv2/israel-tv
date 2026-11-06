@@ -1,0 +1,17 @@
+{
+  "name": "@israel-tv/catalog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@israel-tv/addon": "workspace:*",
+    "hono": "4.13.16"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261106.1",
+    "wrangler": "4.158.0"
+  }
+}

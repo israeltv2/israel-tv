@@ -1,0 +1,21 @@
+{
+  "name": "@israel-tv/ingest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@israel-tv/core": "workspace:*",
+    "@israel-tv/mako": "workspace:*",
+    "@israel-tv/net": "workspace:*",
+    "@israel-tv/store": "workspace:*",
+    "zod": "4.6.7",
+    "@israel-tv/addon": "workspace:*",
+    "@israel-tv/render": "workspace:*",
+    "@hono/node-server": "2.1.6",
+    "hono": "4.13.16"
+  }
+}

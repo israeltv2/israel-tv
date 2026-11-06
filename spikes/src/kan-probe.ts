@@ -1,15 +1,16 @@
 // Spike 1a follow-up: wait out the challenge on one Kan URL and save a screenshot + lobby links.
-// Run: node --env-file=../.env src/kan-probe.ts <url> [server] [waitSeconds]
+// Run: node --env-file=../.env src/kan-probe.ts <url> [proxy-index] [waitSeconds]
 import { chromium } from 'playwright-core';
-import { nordProxy } from './nord.ts';
+import { pickProxy } from './proxy.ts';
 
-const [url = 'https://www.kan.org.il/lobby/kan-box/', server = 'il100', wait = '60'] = process.argv.slice(2);
+const [url = 'https://www.kan.org.il/lobby/kan-box/', proxyArg = '0', wait = '60'] = process.argv.slice(2);
+const proxyIndex = Number(proxyArg);
 const out = process.env.SPIKE_OUT ?? '.';
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: false,
   args: ['--window-position=-2400,-2400', '--window-size=1280,900'],
-  proxy: nordProxy(server),
+  proxy: pickProxy(proxyIndex),
 });
 const page = await (await browser.newContext({ locale: 'he-IL', timezoneId: 'Asia/Jerusalem' })).newPage();
 const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 });

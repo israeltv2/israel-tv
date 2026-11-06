@@ -1,0 +1,10 @@
+// Deployed by `israel-tv publish` with the Cloudflare publisher. The name and the assets directory are
+// passed on the command line from israel-tv.config.json; nothing here is account-specific.
+{
+  "name": "israel-tv",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "assets": { "directory": "../../data/site", "binding": "ASSETS", "not_found_handling": "none" },
+  "observability": { "enabled": true }
+}

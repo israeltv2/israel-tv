@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "playwright-core": "1.65.0",
-    "hono": "4.13.16",
-    "wrangler": "4.158.0"
+    "@israel-tv/core": "workspace:*",
+    "@israel-tv/net": "workspace:*"
   }
 }
