@@ -102,7 +102,7 @@ export function buildStatus(
       notes,
     });
   }
-  const lastPublish = store.lastRun('publish', 'cloudflare');
+  const lastPublish = store.lastRun('publish', 'cloudflare') ?? store.lastRun('publish', 'local');
   const publishNote =
     lastPublish?.status === 'failed'
       ? `last publish failed (${lastPublish.startedAt}): ${(lastPublish.error ?? '').split('\n')[0]}`
@@ -217,8 +217,7 @@ function* walk(dir: string): Generator<string> {
 const MARKER = '.israel-tv-site';
 
 /** Status files carry a timestamp; compare them without it so a quiet run changes nothing. */
-const comparable = (content: string) =>
-  content.replace(/"generatedAt":"[^"]*"/, '').replace(/<p>Generated [^<]*<\/p>/, '');
+const comparable = (content: string) => content.replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z/g, '');
 
 /**
  * Write the site to `dir`, touching only files whose content changed, and delete files no longer
@@ -317,11 +316,24 @@ async function deployCloudflare(
   const t0 = Date.now();
   const cwd = join(REPO_ROOT, 'apps/catalog');
   const wrangler = join(cwd, 'node_modules/.bin/wrangler');
+  const token = env[p.apiTokenEnv];
+  const account = env[p.accountIdEnv];
+  // Without the configured token wrangler would fall back to any login stored on this machine and deploy to
+  // that (possibly unrelated) account. Refuse instead, and give wrangler a home of its own so it never sees
+  // a stored login.
+  if (!token || !account) {
+    throw new PublishError(
+      `Cloudflare deploy refused: ${p.apiTokenEnv} and ${p.accountIdEnv} must be set (see .env.example)`,
+    );
+  }
+  const wranglerHome = join(dirname(p.dir), '.wrangler-home');
+  mkdirSync(wranglerHome, { recursive: true });
   const childEnv: NodeJS.ProcessEnv = {
     PATH: env.PATH,
-    HOME: env.HOME,
-    CLOUDFLARE_ACCOUNT_ID: env[p.accountIdEnv],
-    CLOUDFLARE_API_TOKEN: env[p.apiTokenEnv],
+    HOME: wranglerHome,
+    XDG_CONFIG_HOME: join(wranglerHome, 'config'),
+    CLOUDFLARE_ACCOUNT_ID: account,
+    CLOUDFLARE_API_TOKEN: token,
     WRANGLER_SEND_METRICS: 'false',
     NO_COLOR: '1',
     FORCE_COLOR: '0',
@@ -361,8 +373,22 @@ export async function publishSite(
 ): Promise<boolean> {
   const t0 = Date.now();
   const kind = config.publisher.type;
-  const files = renderFromStore(store, config, config.sources.live ? liveRender() : []);
-  const w = writeSite(config.publisher.dir, files);
+  let w: ReturnType<typeof writeSite>;
+  try {
+    w = writeSite(
+      config.publisher.dir,
+      renderFromStore(store, config, config.sources.live ? liveRender() : []),
+    );
+  } catch (err) {
+    // Render/write problems (disk full, permissions) are publish failures too, visible on /status.
+    const runId = store.startRun('publish', kind);
+    store.finishRun(runId, {
+      status: 'failed',
+      error: `writing ${config.publisher.dir} failed: ${(err as Error).message}`,
+    });
+    log(`publish failed: writing ${config.publisher.dir}: ${(err as Error).message}`);
+    return false;
+  }
   const retry = store.lastRun('publish', kind)?.status === 'failed';
   if (w.changed.length === 0 && w.deleted === 0 && !retry) {
     log('publish: nothing changed');

@@ -38,7 +38,16 @@ export function resolverApp(
     log,
     ...(onRelay ? { onRelay } : {}),
     episode: episodeLookup(config.store.path),
+    external: externalLookup(config.store.path),
     fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) }),
     ...(proxies.length > 0 ? { geoFetch: createGeoFetch(proxies) } : {}),
   });
+}
+
+export function externalLookup(storePath: string) {
+  let store: Store | undefined;
+  return (id: string) => {
+    store ??= Store.openReadOnly(storePath);
+    return store.externalSeries(id);
+  };
 }

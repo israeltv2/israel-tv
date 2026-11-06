@@ -174,11 +174,19 @@ export async function crawlKan(
   const load = async (url: string) => {
     if (pages > 0) await sleep(opts.pageIntervalMs);
     pages++;
-    loader ??= await createChromeLoader(
-      opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
-      opts.proxy,
-    );
-    const r = await loader.load(url);
+    let r: Awaited<ReturnType<PageLoader['load']>>;
+    try {
+      loader ??= await createChromeLoader(
+        opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
+        opts.proxy,
+      );
+      r = await loader.load(url);
+    } catch (err) {
+      // The browser could not load the page at all (proxy refused or down, browser missing): that is the
+      // slice failing, not this page — back off instead of marking pages as broken.
+      blocked++;
+      throw new Error(`${url}: ${(err as Error).message.split('\n')[0]}`);
+    }
     if (r.challenged || r.status === 403 || r.status === 407) {
       blocked++;
       throw new Error(`${url}: ${r.challenged ? 'Cloudflare challenge did not clear' : `HTTP ${r.status}`}`);

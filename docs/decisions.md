@@ -309,3 +309,18 @@ the daemon (reproduced; now the next scheduled slice takes it); a known show who
 in a full read was saved as a success (now a failed read, as for "no seasons"); a Kan show's "page lists no
 episodes" error never cleared (a later good read clears it); a single-show refresh dropped the show's
 poster (now kept).
+
+### Code review, round 6 (2026-11-06)
+
+During this round a reviewer's scratch test called the publish step without the project's Cloudflare token.
+wrangler then fell back to a login stored on the development machine and created a worker in a different
+Cloudflare account. That worker was deleted minutes later (it had not existed before). The publish step now
+refuses to deploy unless the configured token and account id are set, and runs wrangler with a home folder
+of its own, so a login stored on the machine can never be used.
+
+Findings, all fixed: a browser that cannot load pages at all (proxy refusing the tunnel, browser missing)
+was treated as broken pages instead of a block — it now makes the slice back off; Mako shows matched to
+IMDb/TMDB got no streams when opened from other catalogs — the resolver now answers `tt…`/`tmdb:…` ids for
+matched shows (numbered seasons only); publish render/write failures (disk full, permissions) did not show
+on `/status` — they are recorded as failed publishes for both publishers; status timestamps alone caused a
+deploy after every quiet airing check — files are compared without timestamps.

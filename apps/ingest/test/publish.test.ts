@@ -22,7 +22,7 @@ test('stale files are removed; status timestamps alone are not a change', () => 
     new Map([
       ['a.json', '1'],
       ['b.json', '2'],
-      ['status.json', status('t1')],
+      ['status.json', status('2026-11-06T05:00:00.000Z')],
     ]),
   );
   expect(first.changed.sort()).toEqual(['.assetsignore', '_headers', 'a.json', 'b.json', 'status.json']);
@@ -30,9 +30,16 @@ test('stale files are removed; status timestamps alone are not a change', () => 
     d,
     new Map([
       ['a.json', '1'],
-      ['status.json', status('t2')],
+      ['status.json', status('2026-11-06T06:00:00.123Z')],
     ]),
   );
   expect(second).toMatchObject({ changed: [], deleted: 1 });
   mkdirSync(join(d, 'x'));
+});
+
+test('a Cloudflare deploy without the configured token is refused (never falls back to a stored login)', async () => {
+  const { deploy } = await import('../src/publish.ts');
+  const { parseConfig } = await import('@israel-tv/core');
+  const config = parseConfig({ publisher: { type: 'cloudflare', dir: join(dir(), 'site') } });
+  await expect(deploy(config, { PATH: process.env.PATH })).rejects.toThrow(/deploy refused/);
 });

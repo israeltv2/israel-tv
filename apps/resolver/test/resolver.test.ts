@@ -214,3 +214,15 @@ test('an upstream refusal through the proxy is reported as a failed relay', asyn
   await app.request(new URL(s.streams[0].url).pathname);
   expect(outcomes[0]).toMatchObject({ ok: false, error: expect.stringMatching(/HTTP 403/) });
 });
+
+test('a Mako show opened from Cinemeta (IMDb id) plays through the resolver, numbered seasons only', async () => {
+  const app = createResolverApp({
+    episode,
+    fetch: makoNet([]),
+    external: (id) => (id === 'tt0385411' ? { series: 'iltv_mako_1', seasons: [2] } : undefined),
+  });
+  const ok = await (await app.request('http://h/stream/series/tt0385411:2:3.json')).json();
+  expect(ok.streams[0].url).toBe('http://h/play/mako/iltv_mako_1%3A2%3A3.m3u8');
+  const named = await (await app.request('http://h/stream/series/tt0385411:101:1.json')).json();
+  expect(named.streams).toEqual([]);
+});
