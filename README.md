@@ -146,6 +146,21 @@ What friends who install your public addon get:
 So a public instance with only Mako enabled gives friends the live channels and a Keshet 12 row they cannot
 play; enable Reshet (and Kan) if you want them to have episodes to watch.
 
+### Mako away from home
+
+The home resolver answers only on your network, and Mako plays only through it. To watch Mako elsewhere (on a
+phone, at a friend's), you can open a narrow second door to it through a tunnel you run, such as Cloudflare
+Tunnel pointing a hostname of yours at the machine:
+
+- set `resolver.remote` (`enabled`, `publicUrl` = the tunnel's address) and a long random
+  `ISRAEL_TV_REMOTE_TOKEN` in `.env` (`openssl rand -base64 32`);
+- point the tunnel at `127.0.0.1:7703` (and nothing else: never the admin port);
+- install the link `pnpm israel-tv remote-url` prints (it contains the token; keep it private).
+
+Only Mako's routes are there — its manifest, stream requests and the small playlist per play; video comes from
+Mako's CDN to the player, never through your home or the tunnel. Every other path, and any request without the
+token, gets an empty 404, and each client is rate-limited. Change the token to revoke all installs.
+
 ## Kan VOD
 
 Kan's site lets a browser see one page per session before it asks for a human check, and each episode's

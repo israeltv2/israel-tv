@@ -111,6 +111,22 @@ export const ConfigSchema = z.strictObject({
       makoAuth: z.strictObject({ enabled: z.boolean().default(true) }).prefault({}),
       /** Geo-blocked Reshet/Kan video through the geo proxy, only when refused from here (needs `geo`). */
       geoRelay: z.strictObject({ enabled: z.boolean().default(true) }).prefault({}),
+      /**
+       * Mako playback away from home, through a tunnel you run (e.g. Cloudflare Tunnel) to this port: Mako routes
+       * only, behind a secret path token, never any video relay. See docs/configuration.md.
+       */
+      remote: z
+        .strictObject({
+          enabled: z.boolean().default(false),
+          host: z.string().default('127.0.0.1'),
+          port: port.default(7703),
+          /** The public address the tunnel serves (the token is added to it in the manifest URL). */
+          publicUrl: z.url().optional(),
+          tokenEnv: envName.default('ISRAEL_TV_REMOTE_TOKEN'),
+          playsPerMinute: z.number().int().positive().default(30),
+          requestsPerMinute: z.number().int().positive().default(240),
+        })
+        .prefault({}),
     })
     .prefault({}),
   /**

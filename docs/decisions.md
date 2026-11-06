@@ -687,3 +687,19 @@ one) and continues each source's id counter after its highest id. Tested both wa
 the registry, restore into an empty store, ingest again in a different order: identical registry; a new show
 gets the next id) and a live drill on 2026-11-06 (783 series, 1,665 seasons, 36,580 episode numbers restored;
 a fresh read of 9 real shows put all 3,527 of their episodes under the published numbers, none differed).
+
+### Mako away from home (remote resolver)
+
+Measured first (2026-11-06): a Mako play started through the home resolver (ticket and master fetched from the
+home address), then its variant playlist and a segment fetched from other addresses (an Israeli and a Dutch
+proxy exit): 200 and 206 both times. Akamai binds the session to the User-Agent, not to the address, so a resolver
+reachable from outside works.
+
+Design: a separate listener (`resolver.remote`, on 127.0.0.1 for a tunnel connector on the same machine) in
+front of a resolver with only mako-auth (geo-relay off). Every path must start with a secret token of 32+
+characters (from `.env`, compared in constant time; rotating it revokes every install); only the manifest, Mako
+and live stream requests and the Mako play playlists exist behind it; anything else, including any other method,
+answers an empty 404. Per-client limits use the address the tunnel passes (`cf-connecting-ip`, only hashed).
+The token is in `.env`, so it is scrubbed from every log line like the other secrets, and the startup log
+names the address without it. No video can pass through the tunnel (no relay route), and the admin port is a
+different listener that the tunnel is never pointed at.

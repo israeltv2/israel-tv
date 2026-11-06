@@ -4,6 +4,7 @@ import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
 import { createResolverApp, type ResolverDeps } from './app.ts';
 import { brandImage } from './branding.ts';
+import { createRemoteResolverApp } from './remote.ts';
 
 export function episodeLookup(storePath: string) {
   let store: Store | undefined;
@@ -55,4 +56,34 @@ export function externalLookup(storePath: string) {
     store ??= Store.openReadOnly(storePath);
     return store.externalSeries(id);
   };
+}
+
+/** The remote (Mako-only) resolver for the tunnel, or a reason it cannot run. */
+export function remoteResolverApp(
+  config: Config,
+  opts: Pick<ResolverDeps, 'log' | 'onEvent' | 'sessions' | 'salt'> & { env?: NodeJS.ProcessEnv } = {},
+): ReturnType<typeof createRemoteResolverApp> | { error: string } {
+  const r = config.resolver.remote;
+  const { env = process.env, ...extra } = opts;
+  const token = env[r.tokenEnv];
+  if (!r.publicUrl) return { error: 'resolver.remote.publicUrl is not set' };
+  if (!token || token.length < 32)
+    return { error: `${r.tokenEnv} must be set in .env (32 characters or more)` };
+  const logo = brandImage(config.branding.dir, 'resolver-logo');
+  const background = brandImage(config.branding.dir, 'background');
+  return createRemoteResolverApp(
+    {
+      token,
+      publicUrl: r.publicUrl,
+      playsPerMinute: r.playsPerMinute,
+      requestsPerMinute: r.requestsPerMinute,
+    },
+    {
+      ...extra,
+      branding: { ...(logo ? { logo } : {}), ...(background ? { background } : {}) },
+      episode: episodeLookup(config.store.path),
+      external: externalLookup(config.store.path),
+      fetch: (url, init) => fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }),
+    },
+  );
 }

@@ -43,6 +43,7 @@ const HELP = `israel-tv <command>
   usage                              The usage dashboard's figures as JSON (pnpm usage)
   admin-url                          The admin page's address with its token (open it once in a browser)
   restore <registry.json file or URL> Rebuild ids and numbering into an empty database (see docs/operations.md)
+  remote-url                         The away-from-home (Mako) resolver's manifest URL, with its token
   help                               This text
 
 Config: israel-tv.config.json in the current folder (or ISRAEL_TV_CONFIG). Secrets: .env.`;
@@ -90,7 +91,7 @@ async function main(argv: string[]): Promise<number> {
   }
   // Commands that only read local state do not need the secrets of every configured service.
   const { config } = loadConfig(process.env, {
-    needSecrets: !['status', 'serve', 'events', 'usage', 'admin-url', 'restore'].includes(cmd),
+    needSecrets: !['status', 'serve', 'events', 'usage', 'admin-url', 'restore', 'remote-url'].includes(cmd),
   });
   const store = Store.open(config.store.path);
   store.closeStaleRuns();
@@ -317,6 +318,16 @@ async function main(argv: string[]): Promise<number> {
         console.log(
           `restored ${n.series} series, ${n.seasons} seasons, ${n.episodes} episode numbers into ${config.store.path}. Next: \`pnpm israel-tv full\` (or start the service) reads every show again under its old ids.`,
         );
+        return 0;
+      }
+      case 'remote-url': {
+        const r = config.resolver.remote;
+        const token = process.env[r.tokenEnv];
+        if (!r.enabled || !r.publicUrl || !token)
+          throw new UserError(
+            'the remote resolver is not set up (resolver.remote in the config, and its token in .env)',
+          );
+        console.log(`${r.publicUrl.replace(/\/+$/, '')}/${token}/manifest.json`);
         return 0;
       }
       case 'admin-url': {
