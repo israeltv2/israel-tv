@@ -27,16 +27,14 @@ export interface PageLoader {
 }
 
 /**
- * Runs in the page: fetch an image with the page's session (Kan's artwork is behind the same check as its
- * pages), scale it down on a canvas, and hand back a JPEG as base64.
+ * Runs in a blank tab: scale an image (given as a data: URL, so the canvas is never tainted) down on a canvas and
+ * hand back a JPEG as base64.
  */
 async function fetchResized(arg: {
   src: string;
   width: number;
 }): Promise<{ status: number; b64?: string; error?: string }> {
-  // Browser APIs (this runs inside the page), typed here without pulling the DOM types into Node code. It runs in
-  // a tab showing the image itself, so the image is same-site and the canvas it is drawn on can be read back
-  // (Kan refuses its images to a script's fetch).
+  // Browser APIs (this runs inside the page), typed here without pulling the DOM types into Node code.
   const g = globalThis as unknown as {
     Image: new () => { src: string; decode(): Promise<void>; naturalWidth: number; naturalHeight: number };
     OffscreenCanvas: new (
@@ -113,19 +111,29 @@ export async function createChromeLoader(
         const challenged = isChallenge(html);
         const src = !challenged && opts.image ? opts.image(html) : undefined;
         if (!src) return { status: res?.status() ?? 0, html, challenged };
-        // The image is opened in its own tab of this session: there it is the document itself (same site as the
-        // tab, whichever site the show page was on), so the canvas it is drawn on can be read back.
+        // The show page loads the image the way it would show it (an image request, from that page, in this
+        // session: Kan refuses its images to a script's fetch and to opening them as a page). Its bytes are taken
+        // from the browser's answer and scaled down in a blank tab from a data: URL, so a canvas is never tainted
+        // by an image from another site (kankids).
         allowImage = new URL(src, page.url()).toString();
-        const imagePage = await context.newPage();
-        const answer = await imagePage
-          .goto(allowImage, { waitUntil: 'load', timeout: 30_000 })
-          .catch(() => null);
+        const want = allowImage;
+        const response = page.waitForResponse((r) => r.url() === want, { timeout: 30_000 }).catch(() => null);
+        await page.evaluate((u) => {
+          const img = new (globalThis as unknown as { Image: new () => { src: string } }).Image();
+          img.src = u;
+        }, want);
+        const answer = await response;
         const answered = answer?.status() ?? 0;
-        const got =
-          answered === 200
-            ? await imagePage.evaluate(fetchResized, { src: allowImage, width: opts.imageWidth ?? 960 })
-            : { status: answered };
-        if (answered !== 200) got.status = answered;
+        let got: { status: number; b64?: string; error?: string } = { status: answered };
+        if (answer && answered === 200) {
+          const body = await answer.body();
+          const type = (answer.headers()['content-type'] ?? 'image/jpeg').split(';')[0];
+          const blank = await context.newPage();
+          got = await blank.evaluate(fetchResized, {
+            src: `data:${type};base64,${body.toString('base64')}`,
+            width: opts.imageWidth ?? 960,
+          });
+        }
         return {
           status: res?.status() ?? 0,
           html,
