@@ -143,5 +143,13 @@ test('each Kaltura access profile is checked once', async () => {
 });
 
 test('a show page without VOD (empty article grid) reads as no seasons, not an error', () => {
-  expect(parseShowPage(html('show-empty-show-time'))).toEqual({ template: 'no-vod', seasons: [] });
+  expect(parseShowPage(html('show-empty-show-time'))).toMatchObject({ template: 'no-vod', seasons: [] });
+});
+
+test('a promotional page with no video on it is a show without VOD', () => {
+  expect(parseShowPage(html('show-promo-free-hour'))).toMatchObject({
+    template: 'no-vod',
+    seasons: [],
+    note: expect.stringMatching(/no episode list/),
+  });
 });
