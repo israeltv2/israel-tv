@@ -24,8 +24,9 @@ pnpm check           # typecheck, lint, boundaries, hygiene, address check, test
 pnpm format          # fixes formatting and what the linter can fix
 ```
 
-CI also runs `pnpm test:strict` (the tests, failing on any deprecated Node API) and `pnpm smoke`, and checks the pull
-request title. Run it locally with `pnpm start --no-initial-run` (or `pnpm smoke` to start the roles that need no account and fetch
+`pnpm install` also sets up git hooks (lefthook): staged files are formatted before each commit, and the type and
+boundary checks run before each push. CI also runs `pnpm test:strict` (the tests, failing on any deprecated Node API) `pnpm smoke`, the dashboard in a browser (`pnpm e2e:dashboard`) and the Workers' size
+budget (`pnpm budget:workers`), and checks the pull request title. Run it locally with `pnpm start --no-initial-run` (or `pnpm smoke` to start the roles that need no account and fetch
 their manifests). `pnpm israel-tv help` lists the commands.
 
 ## Project structure

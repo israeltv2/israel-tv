@@ -16,7 +16,7 @@ import type {
   Trace,
 } from '@israel-tv/admin-contract';
 import { ADMIN_API } from '@israel-tv/admin-contract';
-import { apiWorkerName, type Freshness, roleOf, staleSince } from '@israel-tv/core';
+import { apiWorkerName, type Freshness, LIVE_CHANNELS, roleOf, staleSince } from '@israel-tv/core';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { csrfFor } from './admin-auth.ts';
@@ -259,7 +259,9 @@ export function live(d: Daemon, now = Date.now()): Live {
   return {
     at: new Date(now).toISOString(),
     sessions: d.sessions.active().map((s) => {
-      const title = s.showId ? d.store.getShow(s.showId)?.title : undefined;
+      const title = s.showId
+        ? (d.store.getShow(s.showId)?.title ?? LIVE_CHANNELS.find((c) => c.id === s.showId)?.name)
+        : undefined;
       return {
         kind: s.kind,
         playId: s.playId,

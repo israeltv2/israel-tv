@@ -5,7 +5,7 @@
 // stream request; the home daemon reads the daily counts back. Deployed from code releases only
 // (`israel-tv deploy-api`), never by a catalog publish.
 import { createAddonApp } from '@israel-tv/addon';
-import { clientHash, parseSeriesId } from '@israel-tv/core';
+import { clientHash, parseSeriesId } from '@israel-tv/core/edge';
 import {
   ENVELOPE_PATH,
   NEED_HEADER,

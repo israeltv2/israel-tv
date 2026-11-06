@@ -1140,3 +1140,14 @@ address, missing/wrong CSRF, `Origin: null`, cross-site, bad `/events.json` and 
 headers, its modules, types stripped, no path escape; the stream's first frame; the size budget; and `pnpm
 e2e:dashboard` in CI — a sandbox instance in Chrome, every section at phone and desktop size in light and dark, failing
 on any page error, failed request or sideways scrolling, screenshots kept as CI artifacts.
+
+### Tooling round 4
+
+- **Worker size budget in CI** (`pnpm budget:workers`: wrangler's dry-run bundle, nothing uploaded): it found the API
+  Worker at 146 KB gzip, 95% of it zod — the Worker imported two helpers from core's main entry, which also exports the
+  config schemas. A schema-free entry, `@israel-tv/core/edge`, now serves the Workers and the addon app: the API Worker
+  is 21 KB gzip (budget 40), the router 1.2 KB (budget 4). A boundary rule keeps the schemas out of the Worker side.
+- **Git hooks** with lefthook (installed by `pnpm install`): staged files formatted before a commit; type and boundary
+  checks before a push. Commit messages are not checked locally: the squash-merge title is the commit that counts, and
+  CI checks it.
+- **The dashboard's own budget** (45 KB JS gzip, measured 36) and its browser check run in CI (round 4 above).
