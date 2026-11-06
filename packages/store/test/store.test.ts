@@ -110,3 +110,45 @@ test('the catalog database and its backups are readable by their owner only', as
   expect(statSync(join(dir, 'backup.sqlite')).mode & 0o077).toBe(0);
   store.close();
 });
+
+test('year seasons stored with the year as their number move to position numbers, with their episodes', () => {
+  const store = Store.open(':memory:');
+  const c = store.db.$client;
+  const at = '2026-11-06T00:00:00Z';
+  const id = store.seriesIdFor('mako', '/show');
+  const other = store.seriesIdFor('mako', '/mixed');
+  const season = c.prepare(
+    'INSERT INTO seasons (seriesId, key, number, kind, createdAt) VALUES (?, ?, ?, ?, ?)',
+  );
+  const episode = c.prepare(
+    'INSERT INTO episodes (seriesId, key, season, episode, createdAt) VALUES (?, ?, ?, ?, ?)',
+  );
+  season.run(id, 'y26', 2026, 'year', at);
+  season.run(id, 'y24', 2024, 'year', at);
+  episode.run(id, 'a', 2024, 1, at);
+  episode.run(id, 'b', 2026, 1, at);
+  season.run(other, 's1', 1, 'numbered', at);
+  season.run(other, 's2', 2, 'numbered', at);
+  season.run(other, 'vip', 101, 'named', at);
+  season.run(other, 'y20', 2020, 'year', at);
+  episode.run(other, 'c', 2020, 4, at);
+  expect(store.renumberYearSeasons()).toBe(3);
+  const a = store.assignments(id);
+  expect(a.seasons.map((s) => [s.key, s.number]).sort()).toEqual([
+    ['y24', 1],
+    ['y26', 2],
+  ]);
+  expect(a.episodes.map((e) => [e.key, e.season, e.episode]).sort()).toEqual([
+    ['a', 1, 1],
+    ['b', 2, 1],
+  ]);
+  const m = store.assignments(other);
+  expect(m.seasons.map((s) => [s.key, s.number]).sort()).toEqual([
+    ['s1', 1],
+    ['s2', 2],
+    ['vip', 101],
+    ['y20', 3],
+  ]);
+  expect(m.episodes).toEqual([{ key: 'c', season: 3, episode: 4 }]);
+  expect(store.renumberYearSeasons()).toBe(0); // once
+});

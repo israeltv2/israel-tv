@@ -197,3 +197,8 @@ test('the Israel-only access profile is labelled even when the check passes (ing
     ['b', false],
   ]);
 });
+
+test('genres come from the episodes’ Kaltura tags (older template)', () => {
+  expect(parseShowPage(html('show-kitchen-nightmares')).genres).toEqual(['תוכניות אוכל']);
+  expect(parseShowPage(html('show-the-voice')).genres).toBeUndefined();
+});

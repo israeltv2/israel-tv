@@ -59,12 +59,37 @@ test('mixed numbered and named seasons never collapse into season 1 (Masterchef 
   ]);
 });
 
-test('year seasons use the year from the title, not the page url (Uvda shape)', () => {
+test('year seasons are numbered by position, oldest = 1, by the year in the title (not the page url)', () => {
+  // Listed newest first, and with misleading page urls (the Uvda shape).
   const r = assignNumbers(
-    show([season('uvda-swords_of_iron', 'עונה 2024'), season('uvda-2024', 'עונה 2025')]),
+    show([season('uvda-2024', 'עונה 2025'), season('uvda-swords_of_iron', 'עונה 2024')]),
     EMPTY,
   );
-  expect(r.seasons.map((s) => s.number)).toEqual([2024, 2025]);
+  expect(r.seasons.map((s) => [s.key, s.number, s.kind])).toEqual([
+    ['uvda-2024', 2, 'year'],
+    ['uvda-swords_of_iron', 1, 'year'],
+  ]);
+});
+
+test('a new year season takes the next number; stored numbers never move', () => {
+  const first = assignNumbers(show([season('y24', '2024'), season('y26', '2026')]), EMPTY);
+  const later = assignNumbers(
+    show([season('y24', '2024'), season('y25', '2025'), season('y26', '2026')]),
+    first,
+  );
+  expect(later.seasons.map((s) => [s.key, s.number])).toEqual([
+    ['y24', 1],
+    ['y26', 2],
+    ['y25', 3],
+  ]);
+});
+
+test('year seasons come after real season numbers; named seasons stay from 101', () => {
+  const r = assignNumbers(
+    show([season('s1', 'עונה 1'), season('s2', 'עונה 2'), season('y', '2020'), season('vip', 'VIP')]),
+    EMPTY,
+  );
+  expect(r.seasons.map((s) => s.number)).toEqual([1, 2, 3, 101]);
 });
 
 test('single-season show without a title is season 1', () => {

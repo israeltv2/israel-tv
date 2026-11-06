@@ -131,6 +131,8 @@ export interface KanEpisode {
   seriesName?: string;
   poster?: string;
   description?: string;
+  /** The day Kan published the episode (its page's datePublished, Israel's date): the air date we use. */
+  published?: string;
 }
 
 /** The first VOD player config on the page with an HLS URL, or undefined. */
@@ -149,6 +151,7 @@ export function parseEpisodePage(html: string, origin: string = KAN_ORIGIN): Kan
     if (!hls) continue;
     const poster = c.data.poster ? new URL(c.data.poster, origin).toString() : undefined;
     const description = meta(html, 'og:description') ?? meta(html, 'description');
+    const published = /"(?:datePublished|uploadDate)"\s*:\s*"(\d{4}-\d{2}-\d{2})/.exec(html)?.[1];
     return {
       id: c.data.id,
       title: (c.data.meta?.title ?? '').trim(),
@@ -157,6 +160,7 @@ export function parseEpisodePage(html: string, origin: string = KAN_ORIGIN): Kan
       ...(c.data.meta?.seriesName ? { seriesName: c.data.meta.seriesName.trim() } : {}),
       ...(poster ? { poster } : {}),
       ...(description ? { description } : {}),
+      ...(published ? { published } : {}),
     };
   }
   return undefined;

@@ -45,7 +45,7 @@ export function withOrigin(body: string, origin: string): string {
   return body.includes(ORIGIN_TOKEN) ? body.replaceAll(ORIGIN_TOKEN, origin) : body;
 }
 
-/** search.json rows: [id, type, catalogId, display name, normalized name, poster]. */
+/** search.json rows: [id, type, catalogId, display name, normalized name, poster, genres?] (in row order). */
 export type SearchRow = [
   id: string,
   type: string,
@@ -53,6 +53,7 @@ export type SearchRow = [
   name: string,
   key: string,
   poster: string,
+  genres?: string[],
 ];
 
 /** streams/<series>/<season>.json: episode number → streams. */

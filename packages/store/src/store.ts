@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   type Assignments,
   seriesId as makeSeriesId,
+  NAMED_SEASON_BASE,
   parseSeriesId,
   type ScrapedShow,
   ScrapedShow as ScrapedShowSchema,
@@ -71,7 +72,53 @@ export class Store {
   static open(path: string): Store {
     const s = new Store(path, false);
     migrate(s.db, { migrationsFolder: MIGRATIONS });
+    s.renumbered = s.renumberYearSeasons();
     return s;
+  }
+
+  /** Year seasons moved to position numbers when this database was opened (see renumberYearSeasons). */
+  renumbered = 0;
+
+  /**
+   * Year-titled seasons ("2024") were once numbered with the year itself. They are numbered by position now,
+   * oldest = 1, after the show's real season numbers; this moves any still stored the old way (once, or again
+   * after restoring older data), with their episodes. Returns how many seasons moved.
+   */
+  renumberYearSeasons(): number {
+    const c = this.db.$client;
+    const old = c
+      .prepare(
+        "SELECT seriesId, key, number FROM seasons WHERE kind = 'year' AND number >= 1900 ORDER BY seriesId, number",
+      )
+      .all() as { seriesId: string; key: string; number: number }[];
+    if (old.length === 0) return 0;
+    const top = c.prepare(
+      "SELECT COALESCE(MAX(number), 0) AS n FROM seasons WHERE seriesId = ? AND number < ? AND NOT (kind = 'year' AND number >= 1900)",
+    );
+    const moveSeason = c.prepare('UPDATE seasons SET number = ? WHERE seriesId = ? AND key = ?');
+    const moveEpisodes = c.prepare('UPDATE episodes SET season = ? WHERE seriesId = ? AND season = ?');
+    const flipSeasons = c.prepare('UPDATE seasons SET number = -number WHERE seriesId = ? AND number < 0');
+    const flipEpisodes = c.prepare('UPDATE episodes SET season = -season WHERE seriesId = ? AND season < 0');
+    c.exec('BEGIN IMMEDIATE');
+    try {
+      const series = [...new Set(old.map((r) => r.seriesId))];
+      for (const id of series) {
+        let next = Number((top.get(id, NAMED_SEASON_BASE) as { n: number }).n) + 1;
+        // Through negative numbers, so no step collides with a number still in use.
+        for (const r of old.filter((x) => x.seriesId === id)) {
+          moveSeason.run(-next, id, r.key);
+          moveEpisodes.run(-next, id, r.number);
+          next++;
+        }
+        flipSeasons.run(id);
+        flipEpisodes.run(id);
+      }
+      c.exec('COMMIT');
+    } catch (err) {
+      c.exec('ROLLBACK');
+      throw err;
+    }
+    return old.length;
   }
 
   /**

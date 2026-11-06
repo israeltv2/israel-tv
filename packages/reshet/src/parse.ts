@@ -4,7 +4,7 @@
 //   live on /allshows/series/<id>/season/<position>/.
 // Video is on Kaltura (partner 2748741); episodes are keyed by the Kaltura entry id, which is the same in
 // both templates.
-import { parseDottedDate, parseEpisodeHint, type ScrapedEpisode } from '@israel-tv/core';
+import { cleanGenres, parseDottedDate, parseEpisodeHint, type ScrapedEpisode } from '@israel-tv/core';
 import { z } from 'zod';
 
 export const RESHET_ORIGIN = 'https://13tv.co.il';
@@ -93,6 +93,13 @@ const OldEpisode = z.looseObject({
   mediaFiles: z.array(z.looseObject({ duration: z.number().nullish() })).nullish(),
   images: z.array(z.looseObject({ url: z.string() })).nullish(),
   metas: z.looseObject({ EpisodeNumber: z.number().nullish(), SeasonNumber: z.number().nullish() }).nullish(),
+  tags: z
+    .looseObject({
+      Genre: z
+        .looseObject({ objects: z.array(z.looseObject({ value: z.string().nullish() })).nullish() })
+        .nullish(),
+    })
+    .nullish(),
 });
 const Program = z.looseObject({
   seriesId: z.coerce.string(),
@@ -132,6 +139,8 @@ export interface ParsedShowPage {
   note?: string;
   seriesId?: string;
   seasons: ParsedSeason[];
+  /** The show's genres, from its episodes' Kaltura tags (older template only). */
+  genres?: string[];
 }
 
 const img = (o: z.infer<typeof ImageObj>) => o?.d ?? o?.m ?? undefined;
@@ -230,7 +239,10 @@ export function parseShowPage(html: string): ParsedShowPage {
         position: s.position,
         ...(s.position === current ? { episodes: oldSeason(p.episodes ?? []) } : {}),
       }));
-    return { template: 'program', seriesId: p.seriesId, seasons };
+    const genres = cleanGenres(
+      (p.episodes ?? []).flatMap((e) => e.tags?.Genre?.objects?.map((o) => o.value) ?? []),
+    );
+    return { template: 'program', seriesId: p.seriesId, seasons, ...(genres.length ? { genres } : {}) };
   }
   // Pages with only article/clip grids (no episode list) are shows without VOD. They are noted, not failed;
   // a page with no grids at all is still treated as a layout change.

@@ -30,6 +30,8 @@ export interface MetaPreview {
   description?: string;
   releaseInfo?: string;
   genres?: string[];
+  /** The show's IMDb id, when matched: lets Trakt and other addons recognise it. */
+  imdb_id?: string;
 }
 
 export interface Video {

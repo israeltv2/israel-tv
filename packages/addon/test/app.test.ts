@@ -7,7 +7,16 @@ const files: Record<string, unknown> = {
   'meta/series/iltv_mako_1.json': { meta: { id: 'iltv_mako_1' } },
   'catalog/series/iltv_reshet13/skip-100.json': { metas: [{ id: 'iltv_reshet_101' }] },
   'search.json': [
-    ['iltv_mako_1', 'series', 'iltv_keshet12', 'מאסטר שף', 'מאסטר שפ', 'https://img/p.jpg'],
+    [
+      'iltv_mako_1',
+      'series',
+      'iltv_keshet12',
+      'מאסטר שף',
+      'מאסטר שפ',
+      'https://img/p.jpg',
+      ['בישול', 'ריאליטי'],
+    ],
+    ['iltv_mako_2', 'series', 'iltv_keshet12', 'עובדה', 'עובדה', '', ['תעודה']],
     ['iltv_reshet_1', 'series', 'iltv_reshet13', 'מאסטר שף ילדים', 'מאסטר שפ ילדימ', ''],
   ],
   'streams/iltv_reshet_1/2.json': { '5': [{ url: 'https://cdn/x.m3u8' }] },
@@ -39,7 +48,8 @@ test('search is per catalog and Hebrew-normalized (final letters)', async () => 
         type: 'series',
         name: 'מאסטר שף',
         poster: 'https://img/p.jpg',
-        posterShape: 'landscape',
+        posterShape: 'poster',
+        genres: ['בישול', 'ריאליטי'],
       },
     ],
   });
@@ -102,4 +112,19 @@ test('a row that has not been updated for too long says so first, even with the 
   });
   const app3 = createAddonApp({ read: async (p) => files[p] });
   expect((await (await app3.request('/catalog/series/iltv_keshet12.json')).json()).metas).toHaveLength(1);
+});
+
+test('a genre filter lists the shows of that genre in the row, in order, a page at a time', async () => {
+  expect((await get(`/catalog/series/iltv_keshet12/genre=${encodeURIComponent('תעודה')}.json`)).body).toEqual(
+    {
+      metas: [{ id: 'iltv_mako_2', type: 'series', name: 'עובדה', posterShape: 'poster', genres: ['תעודה'] }],
+    },
+  );
+  const both = await get(`/catalog/series/iltv_keshet12/genre=${encodeURIComponent('בישול')}&skip=100.json`);
+  expect(both.body).toEqual({ metas: [] });
+  expect((await get(`/catalog/series/iltv_reshet13/genre=${encodeURIComponent('בישול')}.json`)).body).toEqual(
+    {
+      metas: [],
+    },
+  );
 });

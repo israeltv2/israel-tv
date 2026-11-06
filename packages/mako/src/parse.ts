@@ -1,5 +1,11 @@
 // Pure parsing: Mako responses → the common show model. No network here (tested on recorded fixtures).
-import { parseDottedDate, parseEpisodeHint, type ScrapedEpisode, type ScrapedSeason } from '@israel-tv/core';
+import {
+  cleanGenres,
+  parseDottedDate,
+  parseEpisodeHint,
+  type ScrapedEpisode,
+  type ScrapedSeason,
+} from '@israel-tv/core';
 import { z } from 'zod';
 import { IndexResponse, ShowPage, VodSlot } from './schema.ts';
 
@@ -75,12 +81,19 @@ export function seasonRefs(page: ShowPage): SeasonRef[] {
   return [{ key: tabUrl ?? page.pageUrl.replace(/\/+$/, ''), title: '', current: true }];
 }
 
-export function showArtwork(page: ShowPage): { description?: string; background?: string } {
+export function showArtwork(page: ShowPage): {
+  description?: string;
+  background?: string;
+  genres?: string[];
+} {
   const description = page.hero?.description?.trim() || page.seo?.description?.trim();
   const background = page.hero?.pics?.[0]?.picUrl ?? page.seo?.image;
+  const g = page.seo?.schema?.genre;
+  const genres = cleanGenres(typeof g === 'string' ? [g] : g);
   return {
     ...(description ? { description } : {}),
     ...(background ? { background } : {}),
+    ...(genres.length ? { genres } : {}),
   };
 }
 

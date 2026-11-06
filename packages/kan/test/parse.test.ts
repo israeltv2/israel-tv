@@ -84,3 +84,8 @@ test('browsers tried for Kan: the configured one only; else Chrome, Edge, then a
     { executablePath: '/usr/bin/chromium' },
   ]);
 });
+
+test('an episode page gives its publication day', () => {
+  const html = readFileSync(new URL('./fixtures/episode-1006639.html', import.meta.url), 'utf8');
+  expect(parseEpisodePage(html)?.published).toBe('2026-03-04');
+});

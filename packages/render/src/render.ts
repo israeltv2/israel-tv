@@ -66,7 +66,12 @@ export interface RenderInput {
   sources?: string[];
   /** Images served as they are: `logo.png`, `background.png`, `logos/<channel id>.png`. */
   assets?: Map<string, Uint8Array>;
+  /** The time "running" shows are judged at (default now). */
+  now?: number;
 }
+
+/** Genres offered as a filter on a row: those of its shows, most common first. */
+export const MAX_GENRE_OPTIONS = 30;
 
 /** Rendered files: text (JSON, HTML) or binary (images). */
 export type SiteFiles = Map<string, string | Uint8Array>;
@@ -81,16 +86,37 @@ function sortKey(s: RenderShow): string {
   return `${s.latestAirDate ?? '0000-00-00'}|${s.latestEpisodeSeenAt ?? ''}`;
 }
 
-function preview(s: RenderShow): MetaPreview {
+/** A show with an episode this recently is still running ("2024–"). */
+const RUNNING_DAYS = 180;
+
+/** First-aired year, then a range: "2024–2026" for an ended show, "2024–" for a running one. */
+export function releaseInfo(s: RenderShow, now: number): string | undefined {
+  const dates = s.show.seasons
+    .flatMap((x) => x.episodes.map((e) => e.airDate))
+    .filter((d): d is string => !!d);
+  if (dates.length === 0) return undefined;
+  const sorted = [...dates].sort();
+  const first = (sorted[0] ?? '').slice(0, 4);
+  const lastDate = sorted.at(-1) ?? '';
+  const last = lastDate.slice(0, 4);
+  if (now - Date.parse(lastDate) < RUNNING_DAYS * 86_400_000) return `${first}–`;
+  return first === last ? first : `${first}–${last}`;
+}
+
+function preview(s: RenderShow, now: number): MetaPreview {
   const p: MetaPreview = { id: s.seriesId, type: 'series', name: s.title, posterShape: SHAPE };
   if (s.show.poster) p.poster = s.show.poster;
   if (s.show.description) p.description = s.show.description;
-  if (s.latestAirDate) p.releaseInfo = s.latestAirDate.slice(0, 4);
+  const year = releaseInfo(s, now);
+  if (year) p.releaseInfo = year;
+  if (s.show.genres?.length) p.genres = s.show.genres;
+  if (s.imdbId) p.imdb_id = s.imdbId;
   return p;
 }
 
+/** Named seasons ("VIP 5", numbered from 101) say which they are in episode titles; numbered and year ones not. */
 function seasonLabel(a: SeasonAssignment | undefined, title: string): string | undefined {
-  if (!a || a.kind === 'numbered' || a.kind === 'single') return undefined;
+  if (a?.kind !== 'named') return undefined;
   return title || String(a.number);
 }
 
@@ -120,10 +146,9 @@ function videosFor(s: RenderShow): Video[] {
   return videos.sort((x, y) => (x.season ?? 0) - (y.season ?? 0) || (x.episode ?? 0) - (y.episode ?? 0));
 }
 
-function metaFor(s: RenderShow): Meta {
-  const m: Meta = { ...preview(s), videos: videosFor(s) };
+function metaFor(s: RenderShow, now: number): Meta {
+  const m: Meta = { ...preview(s, now), videos: videosFor(s) };
   if (s.show.background) m.background = s.show.background;
-  if (s.show.genres?.length) m.genres = s.show.genres;
   if (s.show.pageUrl) m.links = [{ name: 'Source', category: 'Website', url: s.show.pageUrl }];
   return m;
 }
@@ -183,25 +208,33 @@ function seasonStreamFiles(s: RenderShow): Map<number, SeasonStreams> {
 }
 
 const SOURCE_NAMES: Record<string, string> = {
-  mako: 'Keshet 12 (Mako)',
+  mako: 'Keshet 12',
   reshet: 'Reshet 13',
-  kan: 'Kan 11 and Kan Educational',
-  live: 'live channels',
+  kan: 'Kan',
 };
 
-function describe(sources: string[]): string {
-  const names = sources.map((s) => SOURCE_NAMES[s]).filter(Boolean);
-  const list =
-    names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : (names[0] ?? 'Israeli TV');
+/** The manifest's description, for viewers: what is in it, and the two things that limit playing. */
+export function describe(sources: string[]): string {
+  const names = sources.map((s) => SOURCE_NAMES[s]).filter((n): n is string => !!n);
+  const live = sources.includes('live');
+  if (names.length === 0) return live ? 'Israeli live TV channels.' : 'Israeli TV.';
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
   const notes: string[] = [];
-  if (sources.includes('mako'))
-    notes.push('Keshet 12 (Mako) plays only with your own Israel TV home helper (see the project page)');
-  if (sources.some((s) => GEO_LIMITED.has(s as Source)))
-    notes.push(
-      'Reshet and Kan episodes play only from Israel (or through the home helper with an Israeli connection)',
-    );
-  if (names.length === 0) return 'Israeli TV.';
-  return `Israeli TV: ${list}.${notes.length ? ` ${notes.join('; ')}.` : ''}`;
+  if (sources.includes('mako')) notes.push('Keshet 12 needs your own home helper');
+  if (sources.some((s) => GEO_LIMITED.has(s as Source))) notes.push('some shows play only in Israel');
+  const what = `Israeli TV shows${live ? ' and live channels' : ''} from ${list}.`;
+  return notes.length ? `${what} ${notes.join('; ').replace(/^./, (c) => c.toUpperCase())}.` : what;
+}
+
+function genreOptions(input: RenderInput, catalog: string): string[] {
+  const n = new Map<string, number>();
+  for (const s of input.shows)
+    if (s.catalog === catalog && s.state === 'listed' && s.episodes.length > 0)
+      for (const g of s.show.genres ?? []) n.set(g, (n.get(g) ?? 0) + 1);
+  return [...n]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'he'))
+    .slice(0, MAX_GENRE_OPTIONS)
+    .map(([g]) => g);
 }
 
 export function buildManifest(input: RenderInput, catalogIds: Set<string>, externalIds = true): Manifest {
@@ -223,12 +256,19 @@ export function buildManifest(input: RenderInput, catalogIds: Set<string>, exter
     ...(input.assets?.has(sitePaths.background)
       ? { background: `${ORIGIN_TOKEN}/${sitePaths.background}` }
       : {}),
-    catalogs: CATALOGS.filter((c) => catalogIds.has(c.id)).map((c) => ({
-      type: c.type,
-      id: c.id,
-      name: c.name,
-      extra: [{ name: 'search' }, { name: 'skip' }],
-    })),
+    catalogs: CATALOGS.filter((c) => catalogIds.has(c.id)).map((c) => {
+      const genres = genreOptions(input, c.id);
+      return {
+        type: c.type,
+        id: c.id,
+        name: c.name,
+        extra: [
+          { name: 'search' },
+          { name: 'skip' },
+          ...(genres.length ? [{ name: 'genre', options: genres }] : []),
+        ],
+      };
+    }),
   };
 }
 
@@ -238,13 +278,22 @@ export function renderSite(input: RenderInput): SiteFiles {
   const extIds: ExtIds = {};
   const rows = new Map<string, MetaPreview[]>();
 
+  const now = input.now ?? Date.now();
   const listed = input.shows.filter((s) => s.state === 'listed' && s.episodes.length > 0);
   listed.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
   for (const s of listed) {
     const row = rows.get(s.catalog) ?? [];
-    row.push(preview(s));
+    row.push(preview(s, now));
     rows.set(s.catalog, row);
-    search.push([s.seriesId, 'series', s.catalog, s.title, normalizeForSearch(s.title), s.show.poster ?? '']);
+    search.push([
+      s.seriesId,
+      'series',
+      s.catalog,
+      s.title,
+      normalizeForSearch(s.title),
+      s.show.poster ?? '',
+      ...(s.show.genres?.length ? [s.show.genres] : []),
+    ] as SearchRow);
   }
 
   const counts = new Map<string, number>();
@@ -257,16 +306,15 @@ export function renderSite(input: RenderInput): SiteFiles {
   // Meta and streams for every show ever published (delisted ones too, so watch history still opens).
   for (const s of input.shows) {
     if (s.episodes.length === 0) continue;
-    files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s) }));
+    files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s, now) }));
     for (const [season, streams] of seasonStreamFiles(s)) {
       files.set(sitePaths.seasonStreams(s.seriesId, season), json(streams));
     }
     for (const [season, play] of seasonPlayFiles(s)) {
       files.set(sitePaths.seasonPlay(s.seriesId, season), json(play));
     }
-    const numbered = s.seasons
-      .filter((a) => a.kind === 'numbered' || a.kind === 'single')
-      .map((a) => a.number);
+    // Year seasons are numbered 1, 2, … by position, as TMDB numbers them; named ones (101+) never match.
+    const numbered = s.seasons.filter((a) => a.kind !== 'named').map((a) => a.number);
     if (numbered.length > 0) {
       // An id held by two series is ambiguous: publish neither.
       if (s.imdbId && !shared.has(s.imdbId)) extIds[s.imdbId] = { id: s.seriesId, seasons: numbered };

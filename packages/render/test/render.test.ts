@@ -92,7 +92,7 @@ test('only direct streams are published, one file per season', () => {
   expect(files.has('streams/iltv_mako_1/101.json')).toBe(false);
 });
 
-test('external ids map only numbered seasons', () => {
+test('external ids map numbered seasons, not named ones', () => {
   const files = renderSite({
     ...base,
     shows: [show('iltv_reshet_1', '2026-11-05', { imdbId: 'tt123', tmdbId: 9 })],
@@ -189,4 +189,84 @@ test('contract: fields added within a version are ignored by a resolver, not ref
       .success,
   ).toBe(true);
   expect(ExtIdsSchema.safeParse({ tt1: { id: 'iltv_mako_1', seasons: [1], title: 'x' } }).success).toBe(true);
+});
+
+/** A show with one year season per given year, numbered by position (as numbering does), episodes on those dates. */
+function yearShow(dates: string[], extra: Partial<RenderShow> = {}): RenderShow {
+  const years = [...new Set(dates.map((d) => d.slice(0, 4)))].sort();
+  return show('iltv_mako_54', dates.at(-1) ?? '', {
+    show: {
+      source: 'mako',
+      key: '/babyboom',
+      title: 'בייבי בום',
+      catalog: 'iltv_keshet12',
+      genres: ['תעודה'],
+      seasons: years.map((y) => ({
+        key: `y${y}`,
+        title: `עונה ${y}`,
+        episodes: dates
+          .filter((d) => d.startsWith(y))
+          .map((d, i) => ({ key: `${d}-${i}`, title: 'הלידה הדרמטית', airDate: d, streams: [] })),
+      })),
+    },
+    seasons: years.map((y, i) => ({ key: `y${y}`, number: i + 1, kind: 'year' as const })),
+    episodes: years.flatMap((y, i) =>
+      dates
+        .filter((d) => d.startsWith(y))
+        .map((d, j) => ({ key: `${d}-${j}`, season: i + 1, episode: j + 1 })),
+    ),
+    ...extra,
+  });
+}
+
+test('year seasons: numbers 1, 2 in ids, no year in episode titles, mapped for other addons', () => {
+  const files = renderSite({
+    ...base,
+    shows: [yearShow(['2024-03-01', '2026-01-10'], { imdbId: 'tt5', tmdbId: 7 })],
+  });
+  const meta = read(files, 'meta/series/iltv_mako_54.json').meta;
+  expect(meta.videos.map((v: { id: string; title: string }) => [v.id, v.title])).toEqual([
+    ['iltv_mako_54:1:1', 'הלידה הדרמטית'],
+    ['iltv_mako_54:2:1', 'הלידה הדרמטית'],
+  ]);
+  expect(read(files, 'ext-ids.json').tt5).toEqual({ id: 'iltv_mako_54', seasons: [1, 2] });
+});
+
+test('releaseInfo is the first-aired year, a range when ended, open when still running', () => {
+  const now = Date.parse('2026-11-06T00:00:00Z');
+  const info = (dates: string[]) =>
+    read(renderSite({ ...base, now, shows: [yearShow(dates)] }), 'catalog/series/iltv_keshet12.json').metas[0]
+      .releaseInfo;
+  expect(info(['2024-03-01', '2026-10-20'])).toBe('2024–');
+  expect(info(['2024-03-01', '2025-02-01'])).toBe('2024–2025');
+  expect(info(['2023-03-01', '2023-05-01'])).toBe('2023');
+  expect(info(['2026-09-01'])).toBe('2026–');
+});
+
+test('genres and the IMDb id are published; each row offers its genres as a filter', () => {
+  const files = renderSite({ ...base, shows: [yearShow(['2024-03-01'], { imdbId: 'tt5' })] });
+  const preview = read(files, 'catalog/series/iltv_keshet12.json').metas[0];
+  expect(preview).toMatchObject({ genres: ['תעודה'], imdb_id: 'tt5', posterShape: 'poster' });
+  expect(read(files, 'meta/series/iltv_mako_54.json').meta).toMatchObject({
+    genres: ['תעודה'],
+    imdb_id: 'tt5',
+  });
+  const row = read(files, 'manifest.json').catalogs.find((c: { id: string }) => c.id === 'iltv_keshet12');
+  expect(row.extra).toContainEqual({ name: 'genre', options: ['תעודה'] });
+  expect(read(files, 'search.json')[0][6]).toEqual(['תעודה']);
+});
+
+test('the manifest carries the version it is given and a short description in plain words', () => {
+  const files = renderSite({
+    ...base,
+    version: '0.2.0',
+    sources: ['mako', 'reshet', 'kan', 'live'],
+    shows: [],
+  });
+  const m = read(files, 'manifest.json');
+  expect(m.version).toBe('0.2.0');
+  expect(m.description).toBe(
+    'Israeli TV shows and live channels from Keshet 12, Reshet 13 and Kan. Keshet 12 needs your own home helper; some shows play only in Israel.',
+  );
+  expect(m.description.length).toBeLessThan(160);
 });

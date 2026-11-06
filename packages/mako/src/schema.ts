@@ -37,7 +37,13 @@ const MenuTab = z.looseObject({
 export const ShowPage = z.looseObject({
   channelId: z.string(),
   pageUrl: z.string(),
-  seo: z.looseObject({ description: z.string().optional(), image: z.string().optional() }).nullish(),
+  seo: z
+    .looseObject({
+      description: z.string().optional(),
+      image: z.string().optional(),
+      schema: z.looseObject({ genre: z.union([z.array(z.string()), z.string()]).nullish() }).nullish(),
+    })
+    .nullish(),
   hero: z
     .looseObject({
       description: z.string().nullish(),

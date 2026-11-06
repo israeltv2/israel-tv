@@ -33,6 +33,8 @@ const CACHE = {
   none: 'no-store',
 };
 
+/** Shows per page of a genre filter. */
+const GENRE_PAGE = 100;
 const MAX_SEARCH = 100;
 
 export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
@@ -95,33 +97,36 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     const [id = '', extraRaw = ''] = rest.split('/');
     const extra = new URLSearchParams(extraRaw);
     const search = extra.get('search')?.trim();
+    const genre = extra.get('genre')?.trim();
     const skip = Math.max(0, Number(extra.get('skip') ?? 0) || 0);
     const headers = { 'cache-control': CACHE.list };
+    const asPreview = ([hid, htype, , name, , poster, genres]: SearchRow) => ({
+      id: hid,
+      type: htype,
+      name,
+      ...(poster ? { poster } : {}),
+      posterShape: htype === 'tv' ? 'square' : 'poster',
+      ...(genres?.length ? { genres } : {}),
+    });
+    // A genre filter: the row's shows of that genre, in the row's order, a page at a time.
+    if (genre && !search) {
+      const index = (await readJson<SearchRow[]>(sitePaths.search, true)) ?? [];
+      const hits = index.filter((row) => row[2] === id && row[6]?.includes(genre));
+      return c.json({ metas: hits.slice(skip, skip + GENRE_PAGE).map(asPreview) }, 200, headers);
+    }
     if (search) {
       const index = (await readJson<SearchRow[]>(sitePaths.search, true)) ?? [];
       const q = normalizeForSearch(search);
       const hits: SearchRow[] = [];
       if (q) {
         for (const row of index) {
-          if (row[2] === id && row[4].includes(q)) {
+          if (row[2] === id && row[4].includes(q) && (!genre || row[6]?.includes(genre))) {
             hits.push(row);
             if (hits.length >= MAX_SEARCH) break;
           }
         }
       }
-      return c.json(
-        {
-          metas: hits.map(([hid, htype, , name, , poster]) => ({
-            id: hid,
-            type: htype,
-            name,
-            ...(poster ? { poster } : {}),
-            posterShape: htype === 'tv' ? 'square' : 'landscape',
-          })),
-        },
-        200,
-        headers,
-      );
+      return c.json({ metas: hits.map(asPreview) }, 200, headers);
     }
     const page = await reader.read(sitePaths.catalog(type, id, skip));
     // A row that has not been updated for too long says so first (works without the home machine).

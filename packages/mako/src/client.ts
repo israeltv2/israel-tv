@@ -55,6 +55,7 @@ export async function fetchShow(
     ...(art.description ? { description: art.description } : {}),
     ...(entry.poster ? { poster: entry.poster } : {}),
     ...(art.background ? { background: art.background } : {}),
+    ...(art.genres ? { genres: art.genres } : {}),
     seasons: seasonsFrom(refs, byKey),
     pageUrl: `${MAKO_ORIGIN}${entry.key}`,
     ...(notes.length ? { notes } : {}),
