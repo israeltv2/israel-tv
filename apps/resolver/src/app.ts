@@ -1,0 +1,260 @@
+// Private stream resolver: a second Stremio addon that runs on the viewer's own network.
+//
+// - Mako (VOD and live): Mako tickets are short-lived and Akamai binds the session token to the
+//   User-Agent that fetched the master playlist. So the resolver hands out its own /play URL; each time
+//   the player opens it, the resolver gets a fresh ticket, fetches the master with the player's
+//   User-Agent and returns it with absolute variant URLs. Video then flows player ↔ CDN directly.
+// - Geo-blocked items (Reshet abroad, Kan): when a geo proxy is configured, the resolver fetches the
+//   playlist through it. Only URLs the resolver signed itself, on allowed hosts, are relayed.
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import {
+  LIVE_CHANNELS,
+  type LiveChannel,
+  parseVideoId,
+  type ScrapedEpisode,
+  type Stream,
+} from '@israel-tv/core';
+import type { GeoFetch } from '@israel-tv/net';
+import { Hono } from 'hono';
+
+const HLS = 'application/vnd.apple.mpegurl';
+const MAKO_ENTITLEMENT = 'https://mass.mako.co.il/ClicksStatistics/entitlementsServicesV2.jsp';
+const MAKO_LIVE_HOST = 'https://mako-streaming.akamaized.net';
+const MAKO_PLAYLIST = 'https://www.mako.co.il/AjaxPage';
+
+/** Hosts the relay may fetch through the geo proxy. */
+export const RELAY_HOSTS = [/(^|\.)cdn-redge\.media$/, /(^|\.)kan\.org\.il$/, /^cdnapisec\.kaltura\.com$/];
+
+export interface ResolverDeps {
+  /** Episode data for a published video id, from the home database. */
+  episode(series: string, season: number, episode: number): ScrapedEpisode | undefined;
+  /** Plain fetch (Mako; no proxy needed). */
+  fetch: (url: string, init?: { headers?: Record<string, string> }) => Promise<Response>;
+  /** Fetch through the geo adapter; undefined when no geo proxy is configured. */
+  geoFetch?: GeoFetch;
+  channels?: readonly LiveChannel[];
+  /** Secret for signing relay URLs; random per process by default. */
+  secret?: Buffer;
+}
+
+const sign = (secret: Buffer, s: string) =>
+  createHmac('sha256', secret).update(s).digest('base64url').slice(0, 22);
+
+function verify(secret: Buffer, s: string, sig: string): boolean {
+  const a = Buffer.from(sign(secret, s));
+  const b = Buffer.from(sig);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Make every URI in a playlist absolute (relative to where the playlist was fetched). */
+export function absolutize(
+  playlist: string,
+  base: string,
+  rewrite: (abs: string) => string = (u) => u,
+): string {
+  return playlist
+    .split('\n')
+    .map((line) => {
+      const l = line.trim();
+      if (l === '') return line;
+      if (l.startsWith('#')) {
+        return line.replace(
+          /URI="([^"]+)"/g,
+          (_, u: string) => `URI="${rewrite(new URL(u, base).toString())}"`,
+        );
+      }
+      return rewrite(new URL(l, base).toString());
+    })
+    .join('\n');
+}
+
+export function createResolverApp(deps: ResolverDeps) {
+  const secret = deps.secret ?? randomBytes(32);
+  const channels = deps.channels ?? LIVE_CHANNELS;
+  const app = new Hono();
+
+  app.use('*', async (c, next) => {
+    await next();
+    c.header('Access-Control-Allow-Origin', '*');
+  });
+
+  const base = (c: { req: { url: string } }) => new URL(c.req.url).origin;
+
+  app.get('/', (c) => c.redirect('/manifest.json'));
+  app.get('/manifest.json', (c) =>
+    c.json({
+      id: 'community.israel-tv.resolver',
+      version: '1.0.0',
+      name: 'Israel TV · home resolver',
+      description:
+        'Plays Mako (Keshet 12) episodes and live channels, and relays geo-blocked Reshet/Kan video through your configured proxy. Runs on your home network.',
+      resources: [
+        {
+          name: 'stream',
+          types: ['series', 'tv'],
+          idPrefixes: ['iltv_mako_', 'iltv_reshet_', 'iltv_kan_', 'iltv_live_'],
+        },
+      ],
+      types: ['series', 'tv'],
+      catalogs: [],
+    }),
+  );
+
+  // ---- streams --------------------------------------------------------------------------------------
+
+  app.get('/stream/:type/:file', (c) => {
+    const id = decodeURIComponent(c.req.param('file')).replace(/\.json$/, '');
+    const origin = base(c);
+    const streams: Stream[] = [];
+    const v = parseVideoId(id);
+    if (v) {
+      const ep = deps.episode(v.series, v.season, v.episode);
+      if (ep && v.series.startsWith('iltv_mako_') && ep.play?.vcmid) {
+        streams.push({
+          url: `${origin}/play/mako/${encodeURIComponent(id)}.m3u8`,
+          name: 'Israel TV',
+          title: 'Mako',
+        });
+      }
+      if (ep && deps.geoFetch && ep.availableAbroad === false) {
+        const direct = ep.streams.find((s) => s.kind === 'direct' || s.kind === 'resolver');
+        if (direct) streams.push(relayStream(origin, direct.url, 'דרך ישראל'));
+      }
+    } else {
+      const ch = channels.find((x) => x.id === id);
+      if (ch) {
+        (ch.mako ?? []).forEach((m, i) => {
+          streams.push({
+            url: `${origin}/play/mako-live/${ch.id}/${i}.m3u8`,
+            name: 'Israel TV',
+            title: m.title,
+          });
+        });
+        if (ch.geo && deps.geoFetch) {
+          for (const l of ch.direct) streams.push(relayStream(origin, l.url, `${l.title} · דרך ישראל`));
+        }
+      }
+    }
+    return c.json({ streams }, 200, { 'cache-control': 'no-store' });
+  });
+
+  function relayUrl(origin: string, url: string): string {
+    const u = Buffer.from(url).toString('base64url');
+    const ext =
+      /\.m3u8(\?|$)/.test(new URL(url).pathname) || /playManifest|playlist|manifest/i.test(url)
+        ? 'm3u8'
+        : 'ts';
+    return `${origin}/relay/${sign(secret, u)}/${u}.${ext}`;
+  }
+
+  function relayStream(origin: string, url: string, title: string): Stream {
+    return { url: relayUrl(origin, url), name: 'Israel TV', title };
+  }
+
+  // ---- Mako -----------------------------------------------------------------------------------------
+
+  async function makoTicketedMaster(mediaUrl: string, cdn: string): Promise<string> {
+    const u = `${MAKO_ENTITLEMENT}?et=gt&lp=${encodeURIComponent(mediaUrl)}&rv=${encodeURIComponent(cdn)}`;
+    const r = await deps.fetch(u);
+    if (!r.ok) throw new Error(`Mako entitlement HTTP ${r.status}`);
+    const j = (await r.json()) as { tickets?: { ticket?: string; url?: string }[] };
+    const t = j.tickets?.[0];
+    if (!t?.ticket) throw new Error('Mako entitlement returned no ticket');
+    return `${t.url ?? mediaUrl}?${decodeURIComponent(t.ticket)}`;
+  }
+
+  async function makoMasterFor(mediaUrl: string, cdn: string, userAgent: string): Promise<Response> {
+    const master = await makoTicketedMaster(mediaUrl, cdn);
+    const r = await deps.fetch(master, {
+      headers: { 'user-agent': userAgent, referer: 'https://www.mako.co.il/' },
+    });
+    if (!r.ok) return new Response(`Mako master HTTP ${r.status}`, { status: r.status });
+    const body = absolutize(await r.text(), r.url || master);
+    return new Response(body, { headers: { 'content-type': HLS, 'cache-control': 'no-store' } });
+  }
+
+  const playerUA = (c: { req: { header(n: string): string | undefined } }) =>
+    c.req.header('user-agent') ?? 'Mozilla/5.0 (Linux; Android) ExoPlayer';
+
+  app.get('/play/mako/:file', async (c) => {
+    const id = decodeURIComponent(c.req.param('file')).replace(/\.m3u8$/, '');
+    const v = parseVideoId(id);
+    const ep = v ? deps.episode(v.series, v.season, v.episode) : undefined;
+    const play = ep?.play;
+    if (!play?.vcmid || !play.channelId) return c.text('unknown episode', 404);
+    try {
+      const q = new URLSearchParams({
+        jspName: 'playlist.jsp',
+        vcmid: play.vcmid,
+        videoChannelId: play.channelId,
+        galleryChannelId: play.galleryChannelId ?? play.vcmid,
+        isGallery: 'false',
+        consumer: 'web_html5',
+        encryption: 'no',
+      });
+      const pr = await deps.fetch(`${MAKO_PLAYLIST}?${q}`);
+      if (!pr.ok) return c.text(`Mako playlist HTTP ${pr.status}`, 502);
+      const media = ((await pr.json()) as { media?: { url: string; cdn?: string }[] }).media ?? [];
+      const pick = media.find((m) => m.cdn === 'AKAMAI') ?? media[0];
+      if (!pick) return c.text('Mako returned no media', 502);
+      return await makoMasterFor(pick.url, pick.cdn ?? 'AKAMAI', playerUA(c));
+    } catch (err) {
+      return c.text((err as Error).message, 502);
+    }
+  });
+
+  app.get('/play/mako-live/:channel/:file', async (c) => {
+    const ch = channels.find((x) => x.id === c.req.param('channel'));
+    const m = ch?.mako?.[Number(c.req.param('file').replace(/\.m3u8$/, ''))];
+    if (!m) return c.text('unknown channel', 404);
+    try {
+      return await makoMasterFor(`${m.host ?? MAKO_LIVE_HOST}${m.path}`, m.cdn ?? 'AKAMAI', playerUA(c));
+    } catch (err) {
+      return c.text((err as Error).message, 502);
+    }
+  });
+
+  // ---- relay through the geo proxy -----------------------------------------------------------------
+
+  app.get('/relay/:sig/:file', async (c) => {
+    const geo = deps.geoFetch;
+    if (!geo) return c.text('no geo proxy configured', 404);
+    const sig = c.req.param('sig');
+    const enc = c.req.param('file').replace(/\.(m3u8|ts|bin)$/, '');
+    if (!verify(secret, enc, sig)) return c.text('bad signature', 403);
+    const target = Buffer.from(enc, 'base64url').toString();
+    let host: string;
+    try {
+      host = new URL(target).hostname;
+    } catch {
+      return c.text('bad url', 400);
+    }
+    if (!RELAY_HOSTS.some((re) => re.test(host))) return c.text('host not allowed', 403);
+    const range = c.req.header('range');
+    const r = await geo(target, {
+      headers: { 'user-agent': playerUA(c), ...(range ? { range } : {}) },
+      signal: AbortSignal.timeout(30_000),
+    });
+    const type = r.headers.get('content-type') ?? '';
+    const isPlaylist = /mpegurl/i.test(type) || /\.m3u8(\?|$)/.test(r.url || target);
+    if (isPlaylist && r.ok) {
+      const text = await r.text();
+      // Relay nested playlists and segments too only for hosts on the list; others (signed CDN links that
+      // are not geo-gated) go to the player directly.
+      const origin = base(c);
+      const body = absolutize(text, r.url || target, (abs) =>
+        RELAY_HOSTS.some((re) => re.test(new URL(abs).hostname)) ? relayUrl(origin, abs) : abs,
+      );
+      return c.body(body, 200, { 'content-type': HLS, 'cache-control': 'no-store' });
+    }
+    const headers: Record<string, string> = { 'cache-control': 'no-store' };
+    for (const h of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
+      const v = r.headers.get(h);
+      if (v) headers[h] = v;
+    }
+    return new Response(r.body, { status: r.status, headers });
+  });
+
+  app.notFound((c) => c.json({ error: 'not found' }, 404));
+  return app;
+}

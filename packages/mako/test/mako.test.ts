@@ -128,3 +128,20 @@ test('index fetch goes to the responsive endpoint', async () => {
   expect((await fetchIndex(f)).length).toBe(663);
   expect(f.urls[0]).toBe('https://www.mako.co.il/mako-vod-index?platform=responsive');
 });
+
+test('a dead season link is skipped with a note instead of failing the show', async () => {
+  const f = fixtureFetcher({ '/mako-vod-keshet/masterchef': 'show-masterchef' });
+  const g = {
+    ...f,
+    async json<T>(url: string): Promise<T> {
+      if (new URL(url).pathname === '/mako-vod-keshet/masterchef') return f.json<T>(url);
+      const { HttpError } = await import('@israel-tv/net');
+      throw new HttpError(url, 404);
+    },
+  };
+  const show = await fetchShow(g, { key: '/mako-vod-keshet/masterchef', title: 'מאסטר שף' });
+  expect(show.notes?.length).toBe(4);
+  expect(show.seasons.find((s) => s.episodes.length > 0)?.key).toBe(
+    '/mako-vod-keshet/masterchef-dream_team_2',
+  );
+});

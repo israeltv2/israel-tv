@@ -82,11 +82,9 @@ export async function ingestShow(
     if (knownId && prev) store.markShowFailed(knownId, (err as Error).message);
     throw err;
   }
-  const fetched = new Set(
-    currentSeasonOnly && prev
-      ? scraped.seasons.filter((s) => s.episodes.length > 0).map((s) => s.key)
-      : scraped.seasons.map((s) => s.key),
-  );
+  // A season that comes back empty (not fetched in an airing check, or a dead page) keeps its last good
+  // episodes: a published episode never disappears because of one bad read.
+  const fetched = new Set(scraped.seasons.filter((s) => s.episodes.length > 0).map((s) => s.key));
   const show = mergePartial(prev?.show, scraped, fetched);
   if (!prev && episodeCount(show) === 0) return { kind: 'empty' };
   const thin = thinReason(prev?.show, show);
@@ -96,6 +94,13 @@ export async function ingestShow(
     throw new Error(thin);
   }
   const seriesId = knownId ?? store.seriesIdFor(adapter.source, entry.key);
+  if (scraped.notes?.length) {
+    store.addWarnings(
+      runId,
+      seriesId,
+      scraped.notes.map((message) => ({ code: 'source-note', message: `${entry.title}: ${message}` })),
+    );
+  }
   const numbering = assignNumbers(show, store.assignments(seriesId));
   if (numbering.warnings.length) store.addWarnings(runId, seriesId, numbering.warnings);
   const newEpisodes = store.saveShow(seriesId, show, numbering.added, latestAirDate(show));

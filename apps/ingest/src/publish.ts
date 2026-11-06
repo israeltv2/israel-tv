@@ -47,14 +47,14 @@ export function buildStatus(store: Store, sources: Source[], now = Date.now()): 
       health = 'error';
       notes.push('no successful full run in 36 hours');
     }
-    if (shows.length === 0 && full) {
+    if (source !== 'live' && shows.length === 0 && full) {
       health = 'error';
       notes.push('no shows');
     }
     out.push({
       source,
       health,
-      shows: shows.length,
+      shows: source === 'live' ? (full?.showsOk ?? 0) : shows.length,
       episodes,
       ...(full
         ? {

@@ -8,3 +8,5 @@ coverage/
 *.log
 .DS_Store
 spikes/worker/.wrangler/
+israel-tv.config.json
+data/

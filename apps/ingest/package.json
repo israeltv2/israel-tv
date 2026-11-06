@@ -16,6 +16,9 @@
     "@israel-tv/addon": "workspace:*",
     "@israel-tv/render": "workspace:*",
     "@hono/node-server": "2.1.6",
-    "hono": "4.13.16"
+    "hono": "4.13.16",
+    "@israel-tv/reshet": "workspace:*",
+    "@israel-tv/resolver": "workspace:*",
+    "croner": "11.0.0"
   }
 }
