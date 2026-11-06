@@ -635,3 +635,15 @@ URLs; a source whose artwork starts being refused abroad would be added the same
 
 File budget: the site is about 1,240 files; Kan artwork adds one per show (about 90 for Kan 11 and Kids/Teens),
 far below Cloudflare's 20,000 files per Worker.
+
+### Staleness is shown by the catalog itself
+
+Every publish includes `freshness.json`: when the catalog was rendered and each source's last good read, both
+rounded down to 6 hours (so the file does not change, and force an upload, on every run, while a quiet catalog
+is still re-uploaded at least every 6 hours). The public addon compares them with the time of each request:
+when the catalog has not been published for more than 36 hours, or a row's source has had no good read for more
+than twice its daily cadence, that row's first page starts with "⚠ הקטלוג לא עודכן מאז …" (catalog not
+updated since …), and the item's own page explains it. Because the Worker computes this, it works when the home
+machine is down and cannot publish. At home, `/status` also flags a catalog not published for 36 hours (on top
+of the existing per-source 36-hour check and its "⚠" item). Cost: catalog row requests now run the Worker (they
+count toward the free plan's 100,000 a day; a household browses a few hundred); metadata stays static files.

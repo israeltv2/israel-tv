@@ -9,12 +9,14 @@ import {
   CATALOGS,
   type Config,
   enabledSources,
+  freshnessStamp,
   type Health,
   HOUR_MS,
   LIVE_CHANNELS,
   ORIGIN_TOKEN,
   type PublisherConfig,
   type Source,
+  STALE_PUBLISH_HOURS,
   type StatusFile,
   sitePaths,
 } from '@israel-tv/core';
@@ -122,10 +124,13 @@ export function buildStatus(
       ? `last TMDB matching failed (${lastMatch.startedAt}): ${lastMatch.error ?? ''}`
       : undefined;
   const lastPublish = store.lastRun('publish', 'cloudflare') ?? store.lastRun('publish', 'local');
+  const lastGoodPublish = store.lastGoodRun('publish', 'cloudflare') ?? store.lastGoodRun('publish', 'local');
   const publishNote =
     lastPublish?.status === 'failed'
       ? `last publish failed (${lastPublish.startedAt}): ${(lastPublish.error ?? '').split('\n')[0]}`
-      : undefined;
+      : lastGoodPublish && now - Date.parse(lastGoodPublish.startedAt) > STALE_PUBLISH_HOURS * HOUR_MS
+        ? `the catalog has not been published since ${lastGoodPublish.startedAt}`
+        : undefined;
   const failingShows = all
     .filter((s) => s.lastError && s.state === 'listed')
     .map((s) => ({ id: s.seriesId, title: s.title, error: s.lastError ?? '', lastOkAt: s.lastOkAt }));
@@ -233,6 +238,18 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     live,
     status,
     registry,
+    freshness: {
+      publishedAt: freshnessStamp(),
+      sources: Object.fromEntries(
+        activeSources(config).map((src) => {
+          const good = store.lastGoodRun(src === 'kan' ? 'crawl' : 'full', src);
+          // Rounded down like publishedAt, so this file does not change (and force an upload) on every run.
+          const at = good ? freshnessStamp(Date.parse(good.finishedAt ?? good.startedAt)) : undefined;
+          return [src, { cadenceHours: 24, ...(at ? { lastGoodAt: at } : {}) }];
+        }),
+      ),
+      catalogs: Object.fromEntries(CATALOGS.map((c) => [c.id, c.source])),
+    },
     catalogWarnings: catalogWarnings(status),
   });
 }
@@ -420,7 +437,7 @@ export function workerConfig(
       directory: p.dir,
       // Static files are served without running the Worker (browsing is free and not counted), except the
       // ones that carry image URLs relative to the addon's address, which the Worker fills in.
-      run_worker_first: ['/manifest.json', '/catalog/tv/*', '/meta/tv/*'],
+      run_worker_first: ['/manifest.json', '/catalog/*', '/meta/tv/*'],
     },
     // The Worker logs its own events (no addresses); Cloudflare's invocation logs would keep request metadata.
     observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },

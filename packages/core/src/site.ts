@@ -18,6 +18,7 @@ export const sitePaths = {
   status: 'status.json',
   statusPage: 'status.html',
   registry: 'registry.json',
+  freshness: 'freshness.json',
   logo: 'logo.png',
   background: 'background.jpg',
   channelLogo: (id: string) => `logos/${id}.png`,

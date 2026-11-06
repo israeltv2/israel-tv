@@ -60,7 +60,7 @@ test('public usage: Analytics Engine when readable, else Workers Logs, into the 
   expect(await pullPublicUsage(events, cf(), '2026-11-05', {}, fakeFetch)).toBeUndefined();
 });
 
-test('the Worker runs only for files with image URLs, counts streams in Analytics Engine, keeps no invocation logs', () => {
+test('the Worker runs only for rows and files with image URLs, counts streams in Analytics Engine, keeps no invocation logs', () => {
   const dir = new URL('../../catalog', import.meta.url).pathname;
   const c = workerConfig(cf().publisher as never, dir) as {
     assets: Record<string, unknown>;
@@ -68,7 +68,7 @@ test('the Worker runs only for files with image URLs, counts streams in Analytic
     analytics_engine_datasets: unknown;
     main: string;
   };
-  expect(c.assets.run_worker_first).toEqual(['/manifest.json', '/catalog/tv/*', '/meta/tv/*']);
+  expect(c.assets.run_worker_first).toEqual(['/manifest.json', '/catalog/*', '/meta/tv/*']);
   expect(c.observability).toEqual({
     enabled: true,
     head_sampling_rate: 1,
