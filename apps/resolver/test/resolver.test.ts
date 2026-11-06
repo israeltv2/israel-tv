@@ -202,6 +202,6 @@ test('a failing geo proxy gives a 502 that says so, and one log line', async () 
   const s = await (await app.request('http://h/stream/series/iltv_reshet_1:1:1.json')).json();
   const r = await app.request(new URL(s.streams[0].url).pathname);
   expect(r.status).toBe(502);
-  expect(await r.text()).toMatch(/geo proxy failed \(ENOTFOUND\)/);
-  expect(lines[0]).toMatch(/relay: the geo proxy did not answer .*ENOTFOUND/);
+  expect(await r.text()).toMatch(/geo proxy failed: /);
+  expect(lines[0]).toMatch(/relay through the geo proxy failed for cdnapisec\.kaltura\.com/);
 });

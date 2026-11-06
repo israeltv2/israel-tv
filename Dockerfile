@@ -2,8 +2,8 @@
 FROM node:24-bookworm-slim
 WORKDIR /app
 RUN corepack enable
-COPY . .
-RUN CI=true pnpm install --prod --frozen-lockfile && mkdir -p /data && chown node:node /data
+COPY --chown=node:node . .
+RUN CI=true pnpm install --prod --frozen-lockfile && mkdir -p /data && chown -R node:node /data /app
 USER node
 ENV ISRAEL_TV_CONFIG=/data/israel-tv.config.json
 EXPOSE 7700 7701 7702

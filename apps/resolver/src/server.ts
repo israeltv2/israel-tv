@@ -31,10 +31,12 @@ export function resolverApp(
   config: Config,
   env: NodeJS.ProcessEnv = process.env,
   log: (l: string) => void = console.log,
+  onRelay?: (r: { ok: boolean; error?: string }) => void,
 ) {
   const proxies = proxyEndpoints(config.geo, env);
   return createResolverApp({
     log,
+    ...(onRelay ? { onRelay } : {}),
     episode: episodeLookup(config.store.path),
     fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) }),
     ...(proxies.length > 0 ? { geoFetch: createGeoFetch(proxies) } : {}),

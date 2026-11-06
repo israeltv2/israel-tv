@@ -182,8 +182,24 @@ export class Daemon {
     return { running: this.running ?? null, queued: this.queue.map((j) => j.name), next: this.nextRuns() };
   }
 
+  /** Last outcome of relaying through the geo proxy (resolver), for /status. */
+  geo: { proxies: string[]; lastOkAt?: string; lastErrorAt?: string; lastError?: string } = { proxies: [] };
+
+  noteRelay(r: { ok: boolean; error?: string }): void {
+    const at = new Date().toISOString();
+    if (r.ok) this.geo.lastOkAt = at;
+    else {
+      this.geo.lastErrorAt = at;
+      if (r.error) this.geo.lastError = r.error;
+    }
+  }
+
   status() {
-    return { ...buildStatus(this.store, this.sources), daemon: { ...this.state(), revision: REVISION } };
+    return {
+      ...buildStatus(this.store, this.sources),
+      ...(this.geo.proxies.length ? { geo: this.geo } : {}),
+      daemon: { ...this.state(), revision: REVISION },
+    };
   }
 
   stop(): void {
@@ -234,7 +250,7 @@ export function listen(
       reject(
         new Error(
           err.code === 'EADDRINUSE'
-            ? `port ${port} is already in use (${option} in israel-tv.config.json). Is israel-tv already running?`
+            ? `port ${port} is already in use (${option}). Is israel-tv already running?`
             : `cannot listen on ${host}:${port} (${option}): ${err.message}`,
         ),
       );
@@ -275,7 +291,7 @@ export async function startDaemon(
   }
   if (config.resolver.enabled) {
     await listen(
-      resolverApp(config).fetch as never,
+      resolverApp(config, process.env, log, (r) => d.noteRelay(r)).fetch as never,
       config.resolver.host,
       config.resolver.port,
       'resolver.port',
@@ -291,6 +307,14 @@ export async function startDaemon(
     log(
       `resolver — install this too, at home: ${urls(config.resolver.host, config.resolver.port, '/manifest.json')}`,
     );
+  }
+  d.geo.proxies = proxyEndpoints(config.geo).map((p) => p.server);
+  if (d.geo.proxies.length)
+    log(`geo proxy: ${d.geo.proxies.join(', ')} (check with: pnpm israel-tv check-proxy)`);
+  if (config.publisher.type === 'cloudflare') {
+    const base =
+      config.publisher.publicUrl ?? `https://${config.publisher.workerName}.<your-subdomain>.workers.dev`;
+    log(`addon (public): ${base}/manifest.json — the exact URL is logged after each successful publish`);
   }
   d.schedule();
   // Live channels are checked right away (as a job, not holding startup), so /status reflects them.

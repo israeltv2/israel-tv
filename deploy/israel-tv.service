@@ -1,14 +1,15 @@
 # systemd unit (Linux). Setup, as root:
 #   useradd --system --create-home --home-dir /var/lib/israeltv israeltv
-#   git clone <repo> /opt/israel-tv && cd /opt/israel-tv
+#   git clone https://github.com/israeltv2/israel-tv.git /opt/israel-tv && cd /opt/israel-tv
 #   corepack enable || npm i -g pnpm@12.15.0
 #   pnpm install --prod --frozen-lockfile
 #   cp israel-tv.config.example.json israel-tv.config.json   # edit; for Kan on a server without a
 #                                                            # display set "browser": { "type": "none" }
 #   cp .env.example .env && chmod 600 .env                   # fill in only what the config uses
-#   chown -R israeltv: /opt/israel-tv
+#   chown -R israeltv: /opt/israel-tv     # (to update later: sudo -u israeltv git pull, then pnpm install --prod)
 #   cp deploy/israel-tv.service /etc/systemd/system/ && systemctl enable --now israel-tv
-# Node must be 24.11 or newer. If `which node` is not /usr/bin/node, change ExecStart and PATH below
+# Node must be 24.11 or newer (distribution packages are often older: install it from nodejs.org or
+# NodeSource). If `which node` is not /usr/bin/node, change ExecStart and PATH below
 # (publishing to Cloudflare runs wrangler, which needs node on PATH).
 [Unit]
 Description=Israel TV (ingest, addon, resolver)

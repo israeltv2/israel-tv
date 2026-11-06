@@ -37,7 +37,8 @@ pnpm start
 ```
 
 No `corepack`? (Some Node installs, e.g. through Volta, leave it out.) Use `npm i -g pnpm@12.15.0`
-instead. Node must be 24.11 or newer (`node -v`).
+instead. Node must be 24.11 or newer (`node -v`). If `pnpm install` mentions "awaiting approval", ignore it:
+nothing needs approving.
 
 `pnpm start` prints the addresses to use, for example:
 
@@ -55,7 +56,8 @@ geo-blocked video. (If the log shows only `127.0.0.1`, find the machine's addres
 The first start reads Mako and Reshet right away (about 30 minutes; one request per second, so the sites
 are not hammered), then every night, and for shows that are airing every hour (every 15 minutes in the
 evening). It also starts the Kan crawl, which opens Chrome in an off-screen window every ten minutes; if you
-don't want that, set `"browser": { "type": "none" }` (see [Kan VOD](#kan-vod)).
+don't want that, set `"browser": { "type": "none" }` (see [Kan VOD](#kan-vod)). To try it out without the
+first half-hour read, use `pnpm start --no-initial-run`. Stop it with Ctrl-C.
 
 No config file is needed for this. To change anything, copy
 [`israel-tv.config.example.json`](israel-tv.config.example.json) to `israel-tv.config.json` and edit it;
@@ -84,26 +86,30 @@ GEO_PROXY_USERNAME=your-proxy-user
 GEO_PROXY_PASSWORD=your-proxy-password
 ```
 
-Then `pnpm israel-tv check-proxy` should say `exits in IL ✓`. Several URLs can be listed; the next one is
-tried when one fails. Any proxy with an Israeli exit works (for example, NordVPN's HTTPS proxies take its
-"service credentials"). Keep to one connection at a time with VPN providers' proxies: some lock an account
-for a while after many sessions in a short time.
+Use the scheme your provider gives: most proxies on ports 3128 or 8080 are `http://`; `https://` is for
+proxies that speak TLS. Then `pnpm israel-tv check-proxy` should say `exits in IL ✓`; if not, it says why
+(wrong login, unknown host, wrong scheme…). Several URLs can be listed; the next one is tried when one fails.
+
+Any HTTP(S) or SOCKS5 proxy with an Israeli exit works: a proxy service, or the proxy endpoints some VPN
+providers offer (NordVPN's take its "service credentials", for example). Some providers lock an account for
+a while after many connections in a short time; Israel TV keeps its own use slow for that reason.
 
 What the proxy is used for:
 
-- **By the resolver:** for every Reshet and Kan episode (and Kan live), the resolver adds a "דרך ישראל"
-  stream that fetches the video through the proxy. Keep the resolver enabled and installed in your app,
-  or the proxy does nothing for playback.
+- **By the resolver:** for every Reshet and Kan episode (and Kan live), the resolver adds a stream named
+  "דרך ישראל · via Israel" that fetches the video through the proxy. Pick that one when you are abroad. Keep
+  the resolver enabled and installed in your app, or the proxy does nothing for playback.
 - **By the Kan crawl:** Kan's web pages, if Kan VOD is on.
 
 Everything else (reading Mako and Reshet, Mako playback, most live channels) goes out directly. If the proxy
-fails, the "דרך ישראל" stream answers 502 and the resolver's log says why.
+fails, that stream answers 502, the log says why, and the admin `/status` shows it under `geo`.
 
 ## Reachable from anywhere: Cloudflare
 
-1. Create a free Cloudflare account and open **Workers & Pages** once. That gives you a
-   `<subdomain>.workers.dev` subdomain (shown on that page; you can change it under _Account settings_).
-   The **Account ID** is in the right-hand column of the same page.
+1. Create a free Cloudflare account and open **Workers & Pages**. Choose your `<subdomain>.workers.dev`
+   subdomain when asked (publishing fails until one exists; it can be changed later under _Account
+   settings_). The **Account ID** is in the right-hand column of the same page. The free plan allows
+   100,000 Worker requests a day; catalogs and metadata are static files and do not count.
 2. Create an API token (_My Profile → API Tokens → Create Token_) from the **Edit Cloudflare Workers**
    template, limited to your account. Put the token and the account id in `.env` as
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
@@ -112,10 +118,14 @@ fails, the "דרך ישראל" stream answers 502 and the resolver's log says wh
 After each run the changed files are uploaded (`wrangler deploy`; static files are free and unlimited, the
 Worker only answers search, streams, paging and `/status`). `pnpm israel-tv publish` does it by hand and
 prints the URL to install: `https://israel-tv.<subdomain>.workers.dev/manifest.json` (a brand-new
-workers.dev name can take a minute to resolve). To preview what it serves before publishing:
-`pnpm israel-tv serve` (then `http://127.0.0.1:7700/manifest.json`).
+workers.dev name can take a minute to resolve). To preview what it serves: `pnpm israel-tv serve` (it renders the current data first; then open
+`http://127.0.0.1:7700/manifest.json`).
 
-A failed upload is retried after the next run and shows on `/status`.
+A failed upload is retried after the next run and shows on `/status` with Cloudflare's reason.
+
+| Public (anyone with the URL)                                                                      | Your home network only | This machine / LAN admin                 |
+| ------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------------------------- |
+| The addon: catalogs, metadata, search, token-free streams, `/status`, `/registry.json` (show ids) | The resolver (`:7701`) | Admin (`:7702`: status details, refresh) |
 
 ### Sharing with friends
 
@@ -125,9 +135,13 @@ What friends who install your public addon get:
 - Live channels that need no token: Kan 11, Kan Educational, Makan 33, Reshet 13, 14, i24 (4 languages),
   Knesset, ynet, Calcala 10. Kan's channels can be geo-blocked outside Israel.
 - Reshet and Kan episodes: only for friends inside Israel.
-- **Not** Mako episodes or the Keshet 12 / 24 live channels: those need a resolver, and the resolver needs
-  the database of the instance that collected the data. Don't expose your resolver to the internet (it has
-  no login and would relay through your proxy). Friends who want Mako run their own instance.
+- **Not** Mako episodes, or the Keshet 12, 24, Eretz Nehederet and Savri Maranan live channels: those need
+  a resolver, and the resolver needs the database of the instance that collected the data. Don't expose your
+  resolver to the internet (it has no login and would relay through your proxy). Friends who want Mako run
+  their own instance.
+
+So a public instance with only Mako enabled gives friends the live channels and a Keshet 12 row they cannot
+play; enable Reshet (and Kan) if you want them to have episodes to watch.
 
 ## Kan VOD
 
