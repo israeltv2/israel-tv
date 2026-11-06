@@ -395,3 +395,11 @@ stored was out of order.)
 One finding, fixed: pages given up on after the round 13 retries were put back at the head of the queue on
 every show re-read with a fresh retry count, so a few dead episode pages could hold back new episodes for days.
 Given-up pages now stay given up (persisted, never re-queued).
+
+### Code review, round 15 (2026-11-06)
+
+One finding, fixed: a few hours of Kan server errors (5xx, rate limiting) counted as tries against the
+episode page at the head of each show's queue, so after three tries it was given up and, since round 14,
+never read again — dropping a real episode. Server-side errors now make the slice back off like a challenge,
+without charging any page a try; only failures about the page itself (404, no player on the page) count, and
+those are retried 12 hours apart, so giving up takes at least a day.
