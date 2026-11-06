@@ -10,3 +10,4 @@ coverage/
 spikes/worker/.wrangler/
 israel-tv.config.json
 data/
+.revision

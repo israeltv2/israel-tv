@@ -93,6 +93,8 @@ export const ConfigSchema = z.strictObject({
       minShareOfPrevious: z.number().min(0).max(1).default(0.8),
     })
     .prefault({}),
+  /** Optional log file for `start` (stdout is used otherwise). Trimmed to its newest half above maxMB. */
+  log: z.strictObject({ file: z.string().optional(), maxMB: z.number().positive().default(20) }).prefault({}),
   /** Optional: match shows to TMDB/IMDb so they also play when opened from other catalogs. */
   tmdb: z.strictObject({ apiKeyEnv: envName.default('TMDB_API_KEY') }).optional(),
 });

@@ -187,13 +187,13 @@ importers:
       hono:
         specifier: 4.13.16
         version: 4.13.16
+      wrangler:
+        specifier: 4.158.0
+        version: 4.158.0(@cloudflare/workers-types@5.20261106.1)(@types/node@26.6.6)
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20261106.1
         version: 5.20261106.1
-      wrangler:
-        specifier: 4.158.0
-        version: 4.158.0(@cloudflare/workers-types@5.20261106.1)(@types/node@26.6.6)
 
   apps/ingest:
     dependencies:

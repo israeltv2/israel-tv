@@ -33,5 +33,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const base = found ? resolve(found, '..') : process.cwd();
   config.store.path = resolve(base, config.store.path);
   config.publisher.dir = resolve(base, config.publisher.dir);
+  if (config.log.file) config.log.file = resolve(base, config.log.file);
   return { config, file: found };
 }
