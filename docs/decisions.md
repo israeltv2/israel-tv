@@ -944,3 +944,19 @@ to the old single Worker for days before the split).
 **Publish batching:** airing checks and Kan slices request a publish; one is made at once if the last was at least
 `publisher.minIntervalMinutes` (30) ago, else one timer publishes everything gathered when the interval is up.
 The end of a full run, an owner's show refresh (Kan too) and start-up publish at once. Test with fake timers.
+
+**Migration and live checks (2026-11-06).** Release script order: `deploy-api` first (the API Worker was
+created with the existing "Workers Scripts: Edit" token — no new permission needed), then the service restart,
+whose first publish replaced the single Worker with the router (16:00:49 UTC). The public URL never went down: the
+old Worker served until the switch. Then, live:
+
+- Every route 200 through the router (manifest, rows, search, show pages, streams, `/status`, `/status?x=1`,
+  freshness, artwork, logos), also from a Netherlands exit; `israel-tv-api.<subdomain>.workers.dev` answers 404 (no
+  public URL). Workers tail shows one request event per viewer request, with the client hash, in one round.
+- The daily canary passes on all four sources through the home resolver.
+- Rollbacks, both Workers: `rollback api` to the previous version and forward again, `rollback data` one publish
+  back and forward again; the addon answered 200 throughout.
+- Rate limits: over one connection, 42 of 80 searches were refused (the per-instance window, as before the split).
+  Requests from many separate connections land on different Cloudflare servers, each with its own window, and
+  Cloudflare's shared limiter is approximate by design, so a burst spread over many connections is not stopped
+  quickly. Same as before the split; recorded as a known limit (the free daily cap still bounds the cost).
