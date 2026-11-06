@@ -27,6 +27,7 @@ import { scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
+import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster } from './posters.ts';
 import { emptyShowsKey, episodeCount } from './runner.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -193,29 +194,55 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   const seasonsBy = groupBy(registry.seasons, (x) => x.seriesId);
   const episodesBy = groupBy(registry.episodes, (x) => x.seriesId);
   const assets = new Map<string, Uint8Array>();
-  // Artwork that is refused outside Israel (Kan's) is served from our own copy.
+  // Artwork that is refused outside Israel (Kan's) is served from our own copy, and never linked to.
   const kanArt = config.sources.kan ? kanArtwork(store, kanArtworkDir(config)) : new Map<string, string>();
-  const ownArtwork = (r: (typeof rows)[number]) => {
+  const postersAt = posterDir(config);
+  const placeholder = `${ORIGIN_TOKEN}/${sitePaths.posterPlaceholder}`;
+  let placeholderUsed = false;
+  const reachable = (u: string | undefined) => (u && reachableAbroad(u) ? u : undefined);
+  const withArtwork = (r: (typeof rows)[number]) => {
     const file = r.show.source === 'kan' ? kanArt.get(r.show.key) : undefined;
-    if (!file) return r.show;
-    const path = sitePaths.artwork(r.seriesId);
-    assets.set(path, readFileSync(file));
-    const url = `${ORIGIN_TOKEN}/${path}`;
-    return {
+    const own = file ? `${ORIGIN_TOKEN}/${sitePaths.artwork(r.seriesId)}` : undefined;
+    if (file) assets.set(sitePaths.artwork(r.seriesId), readFileSync(file));
+    const show = {
       ...r.show,
-      poster: url,
-      background: url,
       seasons: r.show.seasons.map((s) => ({
         ...s,
-        episodes: s.episodes.map((e) => ({ ...e, thumbnail: url })),
+        episodes: s.episodes.map((e) => {
+          const { thumbnail, ...rest } = e;
+          const t = own ?? reachable(thumbnail);
+          return t ? { ...rest, thumbnail: t } : rest;
+        }),
       })),
     };
+    const background = own ?? reachable(r.show.background);
+    if (background) show.background = background;
+    else delete show.background;
+    // The poster: portrait, and reachable from anywhere.
+    let poster: string | undefined;
+    if (file) {
+      const body = localPoster(file, postersAt);
+      if (body === 'same') poster = own;
+      else if (body) {
+        assets.set(sitePaths.poster(r.seriesId), body);
+        poster = `${ORIGIN_TOKEN}/${sitePaths.poster(r.seriesId)}`;
+      }
+    } else if (r.show.poster) {
+      const p = remotePoster(store, postersAt, r.show.poster);
+      if ('url' in p) poster = p.url;
+      else if ('file' in p) {
+        assets.set(sitePaths.poster(r.seriesId), readFileSync(p.file));
+        poster = `${ORIGIN_TOKEN}/${sitePaths.poster(r.seriesId)}`;
+      }
+    }
+    if (!poster) placeholderUsed = true;
+    return { ...show, poster: poster ?? placeholder };
   };
   const shows: RenderShow[] = rows.map((r) => ({
     seriesId: r.seriesId,
     catalog: r.catalog,
     title: r.title,
-    show: ownArtwork(r),
+    show: withArtwork(r),
     seasons: (seasonsBy.get(r.seriesId) ?? []).map(({ key, number, kind }) => ({ key, number, kind })),
     episodes: (episodesBy.get(r.seriesId) ?? []).map(({ key, season, episode }) => ({
       key,
@@ -231,6 +258,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   for (const [path, name] of [
     [sitePaths.logo, 'logo'],
     [sitePaths.background, 'background'],
+    ...(placeholderUsed ? ([[sitePaths.posterPlaceholder, 'poster-placeholder']] as const) : []),
   ] as const) {
     const img = brandImage(config.branding.dir, name);
     if (img) assets.set(path, img.body);
@@ -735,6 +763,16 @@ export async function publishSite(
   const t0 = Date.now();
   const kind = config.publisher.type;
   let w: ReturnType<typeof writeSite>;
+  // Posters not measured yet are fetched once each, so the render knows their shape.
+  await measurePosters(
+    store,
+    posterDir(config),
+    store
+      .listShows()
+      .map((r) => r.show.poster)
+      .filter((u): u is string => !!u),
+    { warn: log },
+  );
   try {
     w = writeSite(config.publisher.dir, renderFromStore(store, config));
   } catch (err) {

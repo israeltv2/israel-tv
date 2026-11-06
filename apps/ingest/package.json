@@ -23,6 +23,7 @@
     "@israel-tv/store": "workspace:*",
     "croner": "catalog:",
     "hono": "catalog:",
+    "jpeg-js": "catalog:",
     "zod": "catalog:"
   },
   "license": "AGPL-3.0-only",

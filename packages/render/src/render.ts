@@ -71,7 +71,8 @@ export interface RenderInput {
 /** Rendered files: text (JSON, HTML) or binary (images). */
 export type SiteFiles = Map<string, string | Uint8Array>;
 
-const SHAPE = 'landscape' as const;
+/** Series posters are portrait: the publisher makes sure of it (apps/ingest/src/posters.ts). */
+const SHAPE = 'poster' as const;
 const json = (v: unknown) => JSON.stringify(v);
 
 export const STATUS_ID_PREFIX = 'iltv_status_';

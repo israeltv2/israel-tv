@@ -47,6 +47,6 @@ export function staleItem(catalog: string, type: string, since: string) {
     type,
     name,
     description: `${name}. New episodes may be missing until it is updated again (catalog not updated since ${since.slice(0, 16).replace('T', ' ')} UTC).`,
-    posterShape: type === 'tv' ? 'square' : 'landscape',
+    posterShape: type === 'tv' ? 'square' : 'poster',
   };
 }

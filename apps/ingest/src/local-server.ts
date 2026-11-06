@@ -12,7 +12,7 @@ export function localAddonApp(dir: string) {
   const images = new Hono();
   // Images (the addon's logo and background, channel logos) are served as they are.
   images.get(
-    '/:path{(logos/[a-z0-9_]+\\.png|art/[a-z0-9_]+\\.jpg|logo\\.png|background\\.jpg)}',
+    '/:path{(logos/[a-z0-9_]+\\.png|art/[a-z0-9_]+(-poster)?\\.jpg|art/placeholder-poster\\.jpg|logo\\.png|background\\.jpg)}',
     async (c) => {
       const p = normalize(join(root, c.req.param('path')));
       if (!inside(p)) return c.notFound();
