@@ -107,7 +107,10 @@ export async function ingestShow(
   const prev = knownId ? store.getShow(knownId) : undefined;
   let scraped: ScrapedShow;
   try {
-    scraped = await adapter.fetchShow(entry, { currentSeasonOnly: currentSeasonOnly && prev !== undefined });
+    scraped = await adapter.fetchShow(entry, {
+      currentSeasonOnly: currentSeasonOnly && prev !== undefined,
+      ...(prev ? { stored: prev.show } : {}),
+    });
   } catch (err) {
     if (knownId && prev) {
       store.markShowFailed(knownId, (err as Error).message);

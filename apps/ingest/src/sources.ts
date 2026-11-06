@@ -13,7 +13,11 @@ export interface ShowEntry {
 export interface SourceAdapter {
   readonly source: Source;
   listShows(): Promise<ShowEntry[]>;
-  fetchShow(entry: ShowEntry, opts: { currentSeasonOnly: boolean }): Promise<ScrapedShow>;
+  /** `stored`: the show as we have it, when we do (a source may need it to read the same way again). */
+  fetchShow(
+    entry: ShowEntry,
+    opts: { currentSeasonOnly: boolean; stored?: ScrapedShow },
+  ): Promise<ScrapedShow>;
   readonly requests: number;
 }
 
@@ -33,7 +37,12 @@ export function reshetAdapter(f: Fetcher): SourceAdapter {
   return {
     source: 'reshet',
     listShows: () => reshet.fetchIndex(f),
-    fetchShow: (entry, opts) => reshet.fetchShow(f, entry, { ...opts, profiles }),
+    // A daily show split into year seasons stays split, however many seasons one read sees.
+    fetchShow: async (entry, opts) =>
+      reshet.untitledSeasonsByYear(
+        await reshet.fetchShow(f, entry, { currentSeasonOnly: opts.currentSeasonOnly, profiles }),
+        reshet.splitKeys(opts.stored),
+      ),
     get requests() {
       return f.requests;
     },

@@ -1289,3 +1289,10 @@ junk names, duplicate ids or numbers, or unreachable posters. Fixed:
   shape, portrait and reachable from abroad; other artwork reachable; no season 101+, no two episodes with one
   number, ids matching numbers; no entities, tags, placeholders, SEO phrases or stray separators in names, titles and
   descriptions; year lines a year or a closed range; row items agreeing with their show pages. Nothing is fetched.
+- **Incident during the deploy, repaired the same day:** an airing check read two Reshet daily shows' pages as a single
+  untitled season, which the split then left whole (it only split untitled seasons among several), so in 11 shows'
+  stored data the episodes moved back into the untitled season; their numbers did not move (published output was
+  unchanged, so the numbering guard rightly stayed quiet), but the season took an empty number. Fix at the root: the
+  Reshet adapter now gets the stored show, and a season split before is split again whatever one read sees
+  (`splitKeys`); the split merges into existing year seasons. Recorded repair `reshet-split-repair-2026-11-06`
+  re-split the data and dropped the empty numbers; no episode moved. A test replays the incident.

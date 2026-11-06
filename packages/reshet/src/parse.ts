@@ -292,37 +292,79 @@ export function parseSeasonPage(html: string): ScrapedEpisode[] {
   return oldSeason(d.props.pageProps.program?.episodes ?? []);
 }
 
+/** Season keys a stored show already split by year (`<key>|2024`), so a later read splits them again. */
+export function splitKeys(stored: ScrapedShow | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const s of stored?.seasons ?? []) {
+    const m = /^(.*)\|\d{4}$/.exec(s.key);
+    if (m?.[1] && /^\d{4}$/.test(s.title)) out.add(m[1]);
+  }
+  return out;
+}
+
 /**
  * Reshet lists some daily shows as untitled seasons next to others (often an empty one), which would make them
- * "named" seasons from 101. Each untitled season among several becomes one season per air year ("2024"), so it is
+ * "named" seasons. Each untitled season among several becomes one season per air year ("2024"), so it is
  * numbered like any year season (by position, oldest = 1), with its episodes in air-date order and no printed
  * numbers (a daily show's "פרק N" counts within a year at most). Empty untitled seasons are dropped. A show whose
- * only season is untitled stays a single season.
+ * only season is untitled stays a single season — unless it was split before (`alreadySplit`, from the stored
+ * show): the decision never depends on how many seasons one read happened to see. Episodes join a year season of
+ * the same key already in the show instead of duplicating it.
  */
-export function untitledSeasonsByYear(show: ScrapedShow): ScrapedShow {
-  if (show.seasons.length <= 1 || !show.seasons.some((s) => s.title.trim() === '')) return show;
-  const seasons: ScrapedSeason[] = [];
+export function untitledSeasonsByYear(
+  show: ScrapedShow,
+  alreadySplit: ReadonlySet<string> = new Set(),
+): ScrapedShow {
+  const untitled = (s: ScrapedSeason) => s.title.trim() === '';
+  const eligible = (s: ScrapedSeason) => untitled(s) && (show.seasons.length > 1 || alreadySplit.has(s.key));
+  if (!show.seasons.some(eligible)) return show;
+  const byKey = new Map<string, ScrapedSeason>();
+  const order: string[] = [];
+  const put = (s: ScrapedSeason) => {
+    const had = byKey.get(s.key);
+    if (!had) {
+      byKey.set(s.key, { ...s, episodes: [...s.episodes] });
+      order.push(s.key);
+      return;
+    }
+    const seen = new Set(had.episodes.map((e) => e.key));
+    had.episodes.push(...s.episodes.filter((e) => !seen.has(e.key)));
+  };
   for (const s of show.seasons) {
-    if (s.title.trim() !== '') {
-      seasons.push(s);
+    if (!eligible(s)) {
+      put(s);
       continue;
     }
     const years = [
       ...new Set(s.episodes.map((e) => e.airDate?.slice(0, 4)).filter((y): y is string => !!y)),
     ].sort();
     const last = years.at(-1);
-    const byYear = new Map<string, ScrapedSeason['episodes']>();
     for (const e of s.episodes) {
       const y = e.airDate?.slice(0, 4) ?? last;
       if (!y) continue;
       const { numberHint: _, ...rest } = e;
-      byYear.set(y, [...(byYear.get(y) ?? []), rest]);
-    }
-    for (const y of [...byYear.keys()].sort()) {
-      const eps = (byYear.get(y) ?? []).map((e, i) => ({ e, i }));
-      eps.sort((a, b) => (a.e.airDate ?? '').localeCompare(b.e.airDate ?? '') || a.i - b.i);
-      seasons.push({ key: `${s.key}|${y}`, title: y, episodes: eps.map(({ e }) => e) });
+      put({ key: `${s.key}|${y}`, title: y, episodes: [rest] });
     }
   }
+  const seasons = order
+    .map((k) => byKey.get(k) as ScrapedSeason)
+    .map((s) =>
+      /^\d{4}$/.test(s.title) && /\|\d{4}$/.test(s.key)
+        ? {
+            ...s,
+            episodes: s.episodes
+              .map((e, i) => ({ e, i }))
+              .sort((a, b) => (a.e.airDate ?? '').localeCompare(b.e.airDate ?? '') || a.i - b.i)
+              .map(({ e }) => e),
+          }
+        : s,
+    )
+    .sort((a, b) => {
+      // Year seasons of one untitled season sit together, oldest first; everything else keeps the source order.
+      const ya = /^(.*)\|(\d{4})$/.exec(a.key);
+      const yb = /^(.*)\|(\d{4})$/.exec(b.key);
+      if (ya && yb && ya[1] === yb[1]) return (ya[2] ?? '').localeCompare(yb[2] ?? '');
+      return 0;
+    });
   return { ...show, seasons };
 }

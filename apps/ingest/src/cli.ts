@@ -38,7 +38,7 @@ import {
   workerVersions,
   writeSite,
 } from './publish.ts';
-import { renumberKanReshet, renumberNamedSeasons } from './renumber.ts';
+import { renumberKanReshet, renumberNamedSeasons, repairReshetSplit } from './renumber.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -158,6 +158,7 @@ async function main(argv: string[]): Promise<number> {
   // Recorded one-time renumbers (each runs once per database, after a backup).
   const renumber = renumberKanReshet(store, config.backup.dir);
   const named = renumberNamedSeasons(store, config.backup.dir);
+  const repair = repairReshetSplit(store);
   const renumberLine =
     [
       renumber
@@ -165,6 +166,9 @@ async function main(argv: string[]): Promise<number> {
         : '',
       named
         ? `one-time renumber ${named.id}: ${named.seasons} named seasons on ${named.shows} shows moved below 101 (${named.episodes} episodes, numbers within their season kept), ${named.emptyDropped} empty ones unnumbered; backup ${named.backup ?? 'none (nothing to move)'}`
+        : '',
+      repair
+        ? `one-time repair ${repair.id}: ${repair.shows} Reshet daily shows re-split by year, ${repair.dropped} empty season numbers dropped (no episode moved)`
         : '',
     ]
       .filter(Boolean)

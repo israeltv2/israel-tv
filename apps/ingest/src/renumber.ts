@@ -9,7 +9,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { type Assignments, assignNumbers, parseEpisodeHint, type ScrapedShow } from '@israel-tv/core';
-import { untitledSeasonsByYear } from '@israel-tv/reshet';
+import { splitKeys, untitledSeasonsByYear } from '@israel-tv/reshet';
 import type { Store } from '@israel-tv/store';
 import { sanctionNumbering } from './numbering-guard.ts';
 import { latestAirDate } from './runner.ts';
@@ -195,5 +195,43 @@ export function renumberNamedSeasons(store: Store, backupDir: string): NamedRenu
     sanctionNumbering(store);
   });
   store.finishRun(runId, { status: 'ok', showsOk: report.shows, requests: 0 });
+  return report;
+}
+
+// reshet-split-repair-2026-11-06: an airing check during the deploy read two-season daily shows as one untitled
+// season, which (then) was not split, so their episodes moved back into it in the stored data (numbers unchanged)
+// and it took an empty season number. Re-split those shows' data and drop that empty number. Moves no episode.
+export const RESHET_SPLIT_REPAIR = 'reshet-split-repair-2026-11-06';
+
+export function repairReshetSplit(store: Store): { id: string; shows: number; dropped: number } | undefined {
+  const done = store.getState<string[]>(MIGRATIONS_KEY) ?? [];
+  if (done.includes(RESHET_SPLIT_REPAIR)) return undefined;
+  const report = { id: RESHET_SPLIT_REPAIR, shows: 0, dropped: 0 };
+  store.transaction(() => {
+    for (const row of store.listShows({ source: 'reshet' })) {
+      const keys = splitKeys(row.show);
+      if (keys.size === 0) continue;
+      const show = untitledSeasonsByYear(row.show, keys);
+      const a = store.assignments(row.seriesId);
+      const withEpisodes = new Set(a.episodes.map((e) => e.season));
+      const stray = a.seasons.filter((s) => keys.has(s.key) && !withEpisodes.has(s.number));
+      const changed = JSON.stringify(show.seasons) !== JSON.stringify(row.show.seasons);
+      if (!changed && stray.length === 0) continue;
+      report.shows++;
+      report.dropped += stray.length;
+      if (stray.length)
+        store.replaceAssignments(row.seriesId, {
+          seasons: a.seasons.filter((s) => !stray.includes(s)),
+          episodes: a.episodes,
+        });
+      if (changed)
+        store.saveShow(row.seriesId, show, { seasons: [], episodes: [] }, latestAirDate(show), false);
+    }
+    store.setState(MIGRATIONS_KEY, [
+      ...(store.getState<string[]>(MIGRATIONS_KEY) ?? []),
+      RESHET_SPLIT_REPAIR,
+    ]);
+    store.setState(`${MIGRATIONS_KEY}:${RESHET_SPLIT_REPAIR}`, { ...report, at: new Date().toISOString() });
+  });
   return report;
 }
