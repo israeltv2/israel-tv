@@ -238,3 +238,12 @@ Fixed from round 2:
   for every title).
 - Docs: `--no-initial-run` in the quick start, the pnpm "awaiting approval" notice, proxy URL scheme, the
   operations command table matches `help`, clearer service-file placeholders.
+
+### A numbering bug caught on live data (2026-11-06)
+
+Within the first hour of the deployment, a check of the daily shows found the 2026 season of the morning
+news numbered backwards ("פותחים את שנת 2026", 01.01.26, was episode 212). On daily-show seasons Mako's
+`extraInfo` is a bare date (`05.11.26`), not `פרק N@date`, and the reader only took the date after `@`;
+without dates the season was numbered in list order, which is newest first. Fixed (with the real page as a
+fixture). Because no viewer had used the addon yet, Mako's episode numbers were reset once and assigned
+again from correctly dated data; series ids were kept. From here on numbers are permanent as designed.
