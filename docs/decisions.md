@@ -422,3 +422,12 @@ pauses 12 h, given up after three tries); if the next page also answers a server
 the slice backs off without charging anyone. A page that can never be compared (nothing else to read) is
 charged after three days of failing alone. Challenges, proxy refusals and a browser that cannot load pages
 still back off immediately. 404s and pages without a player count as that page's own problem at once.
+
+### Code review, round 18 (2026-11-06)
+
+Two findings on the round 17 rule, fixed: (1) a page answering a server error as the last page of a slice had
+nothing after it to be compared with, so it waited days for the "failing alone" fallback while `/status` stayed
+green; (2) a page of kan.org.il loading was taken as proof that kankids.org.il was up. The comparison is now per
+site, and a suspect still open at the end of a slice is settled by loading its site's lobby (loads → the page is
+charged; fails → the site is down, back off). That replaced the three-day fallback. Every try is now a warning,
+and a Kan run is `partial` while any show waits to retry an episode page.

@@ -262,10 +262,7 @@ test('an episode page given up on is not queued again when the show page is re-r
 
 type Crawl = {
   backoffUntil?: string;
-  shows: Record<
-    string,
-    { retry?: Record<string, { at: string }>; failed: string[]; suspectSince?: Record<string, string> }
-  >;
+  shows: Record<string, { retry?: Record<string, { at: string }>; failed: string[] }>;
 };
 const age = (store: Store) => {
   const st = store.getState<Crawl>('kan:crawl');
@@ -273,8 +270,6 @@ const age = (store: Store) => {
   delete st.backoffUntil;
   for (const s of Object.values(st.shows)) {
     for (const r of Object.values(s.retry ?? {})) r.at = '2000-01-01T00:00:00.000Z';
-    for (const k of Object.keys(s.suspectSince ?? {}))
-      if (s.suspectSince) s.suspectSince[k] = '2000-01-01T00:00:00.000Z';
   }
   store.setState('kan:crawl', st);
 };
@@ -335,4 +330,51 @@ test('a show page that always answers 500 is charged and skipped, not a reason t
     'kan:crawl',
   );
   expect(st?.shows[brokenShow]?.failedAt ?? st?.shows[brokenShow]?.checkedAt).toBeDefined();
+});
+
+test('an outage of kankids alone is not blamed on its pages while kan.org.il works', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  // Every kankids show page lists the Eurovision episodes (on kankids), and those episode pages answer 503.
+  const l = {
+    ...base,
+    async load(url: string) {
+      const u = new URL(url);
+      if (u.host === 'www.kankids.org.il' && /\/s1\/\d+\/$/.test(u.pathname))
+        return { status: 503, html: '', challenged: false };
+      if (u.host === 'www.kankids.org.il' && /\/p-\d+\/$/.test(u.pathname))
+        return { status: 200, html: fx('show-p-1006421'), challenged: false };
+      return base.load(url);
+    },
+  };
+  for (let i = 0; i < 60; i++) {
+    await crawlKan(store, opts(l as never, 10));
+    age(store);
+  }
+  const st = store.getState<Crawl>('kan:crawl');
+  const kids = Object.entries(st?.shows ?? {}).filter(([k]) => k.includes('kankids'));
+  expect(kids.length).toBeGreaterThan(0);
+  for (const [, s] of kids) {
+    expect(s.failed).toEqual([]);
+    expect(s.retry ?? {}).toEqual({});
+  }
+});
+
+test('a lone server error at the end of a slice is settled with the lobby, and shows on the run', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const l = {
+    ...base,
+    async load(url: string) {
+      return url.endsWith('/s1/1007199/') ? { status: 500, html: '', challenged: false } : base.load(url);
+    },
+  };
+  let charged = false;
+  for (let i = 0; i < 40 && !charged; i++) {
+    await crawlKan(store, opts(l as never, 10));
+    const st = store.getState<Crawl>('kan:crawl');
+    charged = Object.values(st?.shows ?? {}).some((s) => Object.keys(s.retry ?? {}).length > 0);
+  }
+  expect(charged).toBe(true);
+  expect(store.lastRun('crawl', 'kan')?.status).toBe('partial');
 });
