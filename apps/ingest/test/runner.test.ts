@@ -141,3 +141,11 @@ test('single-show run re-reads all seasons', async () => {
   expect(r.status).toBe('ok');
   expect(a.calls).toEqual([{ key: '/a', current: false }]);
 });
+
+test('a never-seen show whose page is gone is noted, not failed', async () => {
+  const store = Store.open(':memory:');
+  const gone = Object.assign(new Error('HTTP 404'), { status: 404 });
+  const r = await runFull(store, adapter(entries('/gone'), { '/gone': gone }), opts);
+  expect(r).toMatchObject({ status: 'ok', showsFailed: 0 });
+  expect(store.recentWarnings()[0]?.message).toMatch(/page is gone/);
+});
