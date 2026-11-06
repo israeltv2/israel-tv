@@ -60,13 +60,21 @@ Kan VOD is on. `pnpm israel-tv check-proxy` tests it.
 
 `cloudflare`:
 
-| Option         | Default                 |                                                                    |
-| -------------- | ----------------------- | ------------------------------------------------------------------ |
-| `workerName`   | `israel-tv`             | Served at `https://<workerName>.<your-subdomain>.workers.dev`.     |
-| `accountIdEnv` | `CLOUDFLARE_ACCOUNT_ID` | `.env` variable with the account id.                               |
-| `apiTokenEnv`  | `CLOUDFLARE_API_TOKEN`  | `.env` variable with an API token allowed to edit Workers scripts. |
-| `dir`          | `./data/site`           | Build folder uploaded on each publish.                             |
-| `publicUrl`    | —                       | Optional, for your own reference.                                  |
+| Option         | Default                 |                                                                                |
+| -------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `workerName`   | `israel-tv`             | Served at `https://<workerName>.<your-subdomain>.workers.dev`.                 |
+| `accountIdEnv` | `CLOUDFLARE_ACCOUNT_ID` | `.env` variable with the account id.                                           |
+| `apiTokenEnv`  | `CLOUDFLARE_API_TOKEN`  | `.env` variable with an API token allowed to edit Workers scripts.             |
+| `dir`          | `./data/site`           | Build folder uploaded on each publish.                                         |
+| `publicUrl`    | —                       | Optional, for your own reference.                                              |
+| `requestLogs`  | `true`                  | Log each catalog, meta and stream request for the usage dashboard (see below). |
+
+With `requestLogs` on, the Worker answers every request itself (instead of Cloudflare serving the static files
+directly) and logs one line per request: route, id, status, time, and a salted daily hash of the client's
+address — never the address. Those requests then count toward the free plan's 100,000 Worker requests a day
+(plenty for a household and friends; past it, Cloudflare answers errors until midnight UTC). The daemon pulls
+the lines from Workers Logs every 10 minutes with the same API token. Set it to `false` to keep catalogs and
+metadata as plain static files with no request log.
 
 ## `resolver`
 
@@ -77,8 +85,10 @@ Kan VOD is on. `pnpm israel-tv check-proxy` tests it.
 
 ## `admin`
 
-`host`, `port` (default `0.0.0.0`, `7702`). Serves `/status` (JSON), `POST /refresh/<series-id>` (re-read one
-show now), `POST /run/full`, `POST /run/airing`. Answers only requests from private network addresses.
+`host`, `port` (default `0.0.0.0`, `7702`). Serves `/status` (JSON), `/usage` (the usage dashboard; JSON at
+`/usage.json`), `/events.json` (event queries, see [operations](operations.md#investigating-a-failed-play)),
+`POST /refresh/<series-id>` (re-read one show now), `POST /run/full`, `POST /run/airing`. Answers only requests
+from private network addresses.
 
 ## `schedule`
 
