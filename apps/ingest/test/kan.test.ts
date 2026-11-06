@@ -463,3 +463,54 @@ test('a show that appears in a later lobby read is airing from the start', async
   const after = store.getState<Crawl & { shows: Record<string, { lastNewAt?: string }> }>('kan:crawl');
   expect(firstKey && after?.shows[firstKey]?.lastNewAt).toBeTruthy();
 });
+
+test('a Kan show keeps our own copy of its image, used for its poster, background and thumbnails', async () => {
+  const { mkdtempSync, readdirSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { ConfigSchema } = await import('@israel-tv/core');
+  const { renderFromStore } = await import('../src/publish.ts');
+  const { kanArtwork } = await import('../src/kan.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'art-'));
+  const store = Store.open(join(dir, 'israel-tv.sqlite'));
+  const base = loader(routes);
+  const withImage = {
+    ...base,
+    async load(url: string, o?: { image?: (html: string) => string | undefined }) {
+      const page = await base.load(url);
+      const src = o?.image?.(page.html);
+      return src ? { ...page, image: { url: src, status: 200, jpeg: new Uint8Array(4000).fill(7) } } : page;
+    },
+  };
+  const artworkDir = join(dir, 'artwork');
+  for (let i = 0; i < 30 && kanEpisodes(store).length < 9; i++)
+    await crawlKan(store, { ...opts(withImage, 10), artworkDir });
+  expect(readdirSync(artworkDir).length).toBeGreaterThan(0);
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-1006421/';
+  expect(kanArtwork(store, artworkDir).has(key)).toBe(true);
+  const config = ConfigSchema.parse({
+    store: { path: join(dir, 'israel-tv.sqlite') },
+    sources: { mako: false, reshet: false },
+  });
+  const files = renderFromStore(store, config);
+  const id = store.findSeriesId('kan', key) ?? '';
+  expect(files.get(`art/${id}.jpg`)).toBeInstanceOf(Uint8Array);
+  const meta = JSON.parse(String(files.get(`meta/series/${id}.json`))).meta;
+  expect(meta.poster).toBe(`{{israel-tv-origin}}/art/${id}.jpg`);
+  expect(meta.background).toBe(meta.poster);
+  expect(meta.videos.every((v: { thumbnail?: string }) => v.thumbnail === meta.poster)).toBe(true);
+});
+
+test('a show whose image has no copy yet is due, at most once a day', async () => {
+  const { showDue } = await import('../src/kan.ts');
+  const now = Date.parse('2026-11-06T12:00:00Z');
+  const fresh = { origin: 'o', catalog: 'c', pending: [], failed: [], checkedAt: '2026-11-06T11:00:00Z' };
+  expect(showDue({ ...fresh }, now, 14)).toBe(false);
+  expect(showDue({ ...fresh, image: 'https://x/i.jpg' }, now, 14)).toBe(true);
+  expect(showDue({ ...fresh, image: 'https://x/i.jpg', artTriedAt: '2026-11-06T10:00:00Z' }, now, 14)).toBe(
+    false,
+  );
+  expect(
+    showDue({ ...fresh, image: 'https://x/i.jpg', art: { from: 'https://x/i.jpg', file: 'f' } }, now, 14),
+  ).toBe(false);
+});

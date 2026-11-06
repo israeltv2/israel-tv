@@ -21,6 +21,8 @@ export const sitePaths = {
   logo: 'logo.png',
   background: 'background.jpg',
   channelLogo: (id: string) => `logos/${id}.png`,
+  /** Our copy of a show's artwork (sources whose images are refused outside Israel). */
+  artwork: (seriesId: string) => `art/${seriesId}.jpg`,
 } as const;
 
 /**

@@ -4,6 +4,9 @@
 // lobbies daily, show pages when due, then episode pages oldest first. The catalog fills over days and
 // then stays current with a few pages per day.
 
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import {
   assignNumbers,
@@ -18,6 +21,8 @@ import {
 } from '@israel-tv/core';
 import {
   createChromeLoader,
+  type LoadedPage,
+  type LoadOptions,
   type PageLoader,
   parseEpisodePage,
   parseLobby,
@@ -72,6 +77,10 @@ interface ShowState {
   fresh?: string[];
   /** When a show page that was never read successfully last failed (retried after a week). */
   failedAt?: string;
+  /** The show's image, saved as our own copy (Kan's artwork is refused outside Israel). */
+  art?: { from: string; file: string };
+  /** Last try at saving the show's image (retried at most daily). */
+  artTriedAt?: string;
   /** Episode pages that failed and will be tried again before reading past them. */
   retry?: Record<string, { n: number; at: string }>;
 }
@@ -127,10 +136,15 @@ export interface KanCrawlOptions {
   /** Test seam. */
   loader?: PageLoader;
   log?: (line: string) => void;
+  /** Where to keep our copies of show images (none: images are not copied). */
+  artworkDir?: string;
 }
 
 export function showDue(s: ShowState, now: number, windowDays: number): boolean {
   if (!s.checkedAt) return !s.failedAt || now - Date.parse(s.failedAt) > 7 * DAY_MS;
+  // A show whose current image has no saved copy is read again for it (at most once a day).
+  if (s.image && s.art?.from !== s.image && (!s.artTriedAt || now - Date.parse(s.artTriedAt) > DAY_MS))
+    return true;
   const age = now - Date.parse(s.checkedAt);
   const airing = s.lastNewAt !== undefined && now - Date.parse(s.lastNewAt) < windowDays * DAY_MS;
   return age > (airing ? 6 * HOUR_MS : 7 * DAY_MS);
@@ -221,7 +235,10 @@ export async function crawlKan(
     serverErrors.set(site, n);
     throw new KanLoadError(message, n >= 2 ? 'outage' : 'suspect');
   };
-  const load = async (url: string, kind: Kind = 'listing') => {
+  /** The image fetched along with the last page that asked for one. */
+  let lastImage: LoadedPage['image'];
+  const load = async (url: string, kind: Kind = 'listing', loadOpts?: LoadOptions) => {
+    lastImage = undefined;
     if (pages > 0) await sleep(opts.pageIntervalMs);
     pages++;
     let r: Awaited<ReturnType<PageLoader['load']>>;
@@ -235,7 +252,8 @@ export async function crawlKan(
       throw new KanLoadError(`browser did not start: ${firstLine(err)}`, 'outage');
     }
     try {
-      r = await loader.load(url);
+      r = await loader.load(url, loadOpts);
+      lastImage = r.image;
     } catch (err) {
       const message = `${url}: ${firstLine(err)}`;
       // The proxy or this machine's network is down, or the browser died: back off, charge nobody.
@@ -359,7 +377,14 @@ export async function crawlKan(
         }
       };
       try {
-        page = parseShowPage(await load(key), path);
+        page = parseShowPage(
+          await load(
+            key,
+            'listing',
+            opts.artworkDir ? { image: (html) => parseShowPage(html, path).image } : undefined,
+          ),
+          path,
+        );
       } catch (err) {
         rethrowOutage(err);
         attemptedShows.push(key);
@@ -368,6 +393,7 @@ export async function crawlKan(
         continue;
       }
       s.checkedAt = new Date().toISOString();
+      if (opts.artworkDir && lastImage) saveArtwork(s, key, lastImage, opts.artworkDir, warn);
       readShows.push(key);
       attemptedShows.push(key);
       if (page.title) s.title = page.title;
@@ -566,6 +592,45 @@ export function kanCrawlOptions(
     pagesPerRun: config.scraping.browserPagesPerRun,
     pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
     airingWindowDays: config.schedule.airingWindowDays,
+    artworkDir: kanArtworkDir(config),
     log,
   };
+}
+
+/** Where Kan show images are kept (next to the catalog database). */
+export function kanArtworkDir(config: Config): string {
+  return join(dirname(config.store.path), 'artwork');
+}
+
+/** The file name of a Kan show's saved image (from its page URL, which never changes). */
+export function kanArtworkFile(key: string): string {
+  return `kan-${createHash('sha256').update(key).digest('hex').slice(0, 16)}.jpg`;
+}
+
+/** Keep a copy of the show's image; a failure is noted and tried again the next day. */
+function saveArtwork(
+  s: ShowState,
+  key: string,
+  image: NonNullable<LoadedPage['image']>,
+  dir: string,
+  warn: (seriesId: string | null | undefined, message: string) => void,
+): void {
+  s.artTriedAt = new Date().toISOString();
+  if (!image.jpeg || image.jpeg.length < 1000) {
+    warn(null, `Kan ${key}: could not copy its image (${image.error ?? `HTTP ${image.status}`})`);
+    return;
+  }
+  mkdirSync(dir, { recursive: true });
+  const file = kanArtworkFile(key);
+  writeFileSync(join(dir, file), image.jpeg);
+  s.art = { from: image.url, file };
+}
+
+/** Saved images by Kan show page URL (for rendering). */
+export function kanArtwork(store: Store, dir: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [key, s] of Object.entries(store.getState<CrawlState>(STATE_KEY)?.shows ?? {})) {
+    if (s.art && existsSync(join(dir, s.art.file))) out.set(key, join(dir, s.art.file));
+  }
+  return out;
 }
