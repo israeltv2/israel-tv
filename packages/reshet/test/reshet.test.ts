@@ -238,3 +238,26 @@ test('untitled seasons among several become one season per air year, episodes by
   const single = { ...show, seasons: [show.seasons[1] as (typeof show.seasons)[number]] };
   expect(untitledSeasonsByYear(single)).toBe(single);
 });
+
+test('an episode whose Kaltura entry is gone keeps its place but offers no stream, and says so', async () => {
+  const f = pages({ '/all-shows/kitchen-nightmares-902985891/': 'show-kitchen-nightmares' });
+  let dropped = '';
+  const withOneGone = async (body: unknown) => {
+    const req = (body as Record<string, { action: string; filter?: { idIn: string } }>)['2'];
+    if (req?.action === 'list') {
+      const ids = (req.filter?.idIn ?? '').split(',');
+      dropped = ids[0] ?? '';
+      return [{ ks: 'x' }, { objects: ids.slice(1).map((id) => ({ id, accessControlId: 3387861 })) }];
+    }
+    return kaltura(body);
+  };
+  const show = await fetchShow(
+    f,
+    { key: '/all-shows/kitchen-nightmares-902985891/', title: 'x' },
+    { kaltura: withOneGone, currentSeasonOnly: true },
+  );
+  const eps = show.seasons.flatMap((s) => s.episodes);
+  expect(eps.find((e) => e.key === dropped)?.streams).toEqual([]);
+  expect(eps.filter((e) => e.key !== dropped).every((e) => e.streams.length === 1)).toBe(true);
+  expect(show.notes?.join(' ')).toMatch(/1 episodes no longer exist/);
+});

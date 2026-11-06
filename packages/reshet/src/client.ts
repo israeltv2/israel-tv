@@ -67,12 +67,22 @@ export async function fetchShow(
     } catch (err) {
       notes.push(`Kaltura lookup failed, episodes not labelled for geo-blocking: ${(err as Error).message}`);
     }
+    // An entry Kaltura no longer has (missing from the answer, which lists every existing one) plays nowhere:
+    // its episode stays (its number never moves) but offers no stream rather than one that fails.
+    const lookedUp = blocked.size > 0;
+    let gone = 0;
     for (const x of seasons) {
       for (const e of x.episodes) {
         const b = blocked.get(e.key);
         if (b !== undefined) e.availableAbroad = !b;
+        else if (lookedUp) {
+          e.streams = [];
+          gone++;
+        }
       }
     }
+    if (gone > 0)
+      notes.push(`${gone} episodes no longer exist on Reshet's video host: listed without a stream`);
   }
   const single = seasons.length === 1 && !/\d/.test(seasons[0]?.s.title ?? '');
   const out: ScrapedSeason[] = seasons.map((x) => ({

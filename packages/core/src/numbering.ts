@@ -9,7 +9,10 @@ import type { ScrapedSeason, ScrapedShow } from './model.ts';
 
 export type SeasonKind = 'numbered' | 'year' | 'named' | 'single';
 
-/** Named seasons ("VIP 5", "נבחרת החלומות") get numbers from here up, clear of real season numbers. */
+/**
+ * Until 2026-11-06 named seasons were numbered from here up (apps showed "Season 101"); now they take the lowest
+ * free number. Still the line between real season numbers and those old ones (year-season renumber, Store).
+ */
 export const NAMED_SEASON_BASE = 101;
 
 export interface SeasonAssignment {
@@ -40,11 +43,11 @@ export interface NumberingResult extends Assignments {
   warnings: NumberingWarning[];
 }
 
-/** Read a season title: "עונה 12" → 12 numbered; "עונה 2025" / "2025" → 2025 year; anything else named. */
+/** Read a season title: "עונה 12" → 12 numbered; "עונה 2025" / "עונת 2025" / "2025" → year; anything else named. */
 export function parseSeasonTitle(title: string): { kind: SeasonKind; number?: number } {
   const t = title.trim();
   if (t === '') return { kind: 'single' };
-  const m = /^(?:עונה\s*)?(\d{1,4})$/.exec(t);
+  const m = /^(?:עונ[הת]\s*)?(\d{1,4})$/.exec(t);
   if (!m) return { kind: 'named' };
   const n = Number(m[1]);
   if (n >= 1900 && n <= 2100) return { kind: 'year', number: n };
@@ -112,7 +115,8 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
 
   // Seasons: numbered titles take their own number; year titles ("2024") are numbered by position, oldest
   // first, after the show's real season numbers (so apps and TMDB see 1, 2, … like the broadcaster's order);
-  // named ones are allocated from NAMED_SEASON_BASE in source order.
+  // named ones take the lowest number no other season of the show uses, in source order. A season gets a number
+  // only once it has episodes (sources list empty duplicates).
   const single = show.seasons.length === 1 && show.seasons[0]?.title.trim() === '';
   const parsedOf = (season: ScrapedSeason) =>
     single ? { kind: 'single' as const, number: 1 } : parseSeasonTitle(season.title);
@@ -126,13 +130,14 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
   const yearNumber = new Map<string, number>();
   let nextYear = Math.max(0, ...[...usedSeasonNumbers, ...reserved].filter(regular)) + 1;
   for (const { key } of show.seasons
-    .filter((x) => !seasons.has(x.key) && parsedOf(x).kind === 'year')
+    .filter((x) => !seasons.has(x.key) && x.episodes.length > 0 && parsedOf(x).kind === 'year')
     .sort((a, b) => (parsedOf(a).number ?? 0) - (parsedOf(b).number ?? 0))) {
     yearNumber.set(key, nextYear);
     nextYear++;
   }
+  const taken = new Set([...usedSeasonNumbers, ...reserved, ...yearNumber.values()]);
   for (const season of show.seasons) {
-    if (seasons.has(season.key)) continue;
+    if (seasons.has(season.key) || season.episodes.length === 0) continue;
     const parsed = parsedOf(season);
     let kind: SeasonKind = parsed.kind === 'single' && !single ? 'named' : parsed.kind;
     let number = kind === 'year' ? yearNumber.get(season.key) : parsed.number;
@@ -144,7 +149,8 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
       number = undefined;
       kind = 'named';
     }
-    if (number === undefined) number = nextFree(usedSeasonNumbers, NAMED_SEASON_BASE);
+    if (number === undefined) number = nextFree(taken, 1);
+    taken.add(number);
     const a: SeasonAssignment = { key: season.key, number, kind };
     seasons.set(season.key, a);
     usedSeasonNumbers.add(number);

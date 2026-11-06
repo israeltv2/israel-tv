@@ -1265,3 +1265,27 @@ and recorded in the database so it never runs twice.
 - The publisher's numbering guard (apps/ingest/src/numbering-guard.ts) keeps every published episode's number and
   refuses to publish when one would move or vanish, saying which on `/status`. Only a recorded migration (with a
   backup and the owner's approval) re-takes that history.
+
+## Supervisor's full catalog audit: named seasons, descriptions, gone episodes, built-in audit (2026-11-06)
+
+A read-only audit of every live meta, every poster from outside Israel and sampled streams found no HTTP errors,
+junk names, duplicate ids or numbers, or unreachable posters. Fixed:
+
+- **Named seasons below 101** (recorded migration `named-seasons-lowest-free-2026-11-06`, approved before going
+  public): a named season takes the lowest number no other season of its show uses, in the show's list order (the
+  original brief's rule); apps showed "Season 101". 33 named seasons had episodes (24 Mako, 9 Reshet); only their
+  season numbers moved, episode numbers within each stayed. "עונת 2023"-style titles are year seasons now. A season
+  gets a number only once it has episodes: Reshet lists empty duplicates of its seasons, 340 of which had taken
+  numbers 101+ (no episodes, so nothing moved) and are unnumbered now. The frozen-rules test records the new rule.
+  First reads are always full reads (the runner reads only the current season of shows it already has), so new
+  shows get numbers in list order.
+- **Descriptions** without what sites add for search engines (`cleanDescription`, at ingest and when rendering):
+  WordPress placeholders (`%%excerpt%%`), a "חדשות 13 |" prefix, a trailing "| …, לצפייה ישירה" segment or
+  "לצפייה ישירה" ending; Reshet's generic channel blurb is dropped. Ordinary sentences stay.
+- **Reshet episodes whose video is gone** (a sampled "404 abroad" was "Entry not found" at Kaltura, 404 in Israel
+  too; the Israel-only label was right on the other 59 of 60 samples): an entry missing from Kaltura's answer gets no
+  stream (its number stays), with a note on `/status`.
+- **Built-in catalog audit** after every render (apps/ingest/src/catalog-audit.ts), published on `/status`: poster
+  shape, portrait and reachable from abroad; other artwork reachable; no season 101+, no two episodes with one
+  number, ids matching numbers; no entities, tags, placeholders, SEO phrases or stray separators in names, titles and
+  descriptions; year lines a year or a closed range; row items agreeing with their show pages. Nothing is fetched.
