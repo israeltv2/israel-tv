@@ -55,3 +55,10 @@ test('static headers: every path gets one Cache-Control value (rules add up on C
   for (const r of rules.filter((x) => x.path !== '/*' && sets(x)))
     expect(r.lines, r.path).toContain('! Cache-Control');
 });
+
+test('the manifest is cached for five minutes, so a new release shows up soon; other files keep their times', async () => {
+  const { HEADERS_FILE } = await import('../src/publish.ts');
+  const after = (path: string) => HEADERS_FILE.split(`${path}\n`)[1]?.split('\n/')[0] ?? '';
+  expect(after('/manifest.json')).toContain('max-age=300');
+  expect(after('/*')).toContain('max-age=600');
+});

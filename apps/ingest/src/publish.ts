@@ -345,7 +345,7 @@ export const HEADERS_FILE = `/*
   Cache-Control: public, max-age=600
 /manifest.json
   ! Cache-Control
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=300
 /streams/*
   ! Cache-Control
   Cache-Control: public, max-age=300
