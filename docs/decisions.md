@@ -410,3 +410,15 @@ One finding, a regression from round 15, fixed: a single Kan episode page answer
 the rest of the site works) made every slice back off and nothing behind it was ever read. Server errors on an
 episode page now back off for at most two slices in a row; from the third, they count as that page's own
 problem and take the round-13 path (show paused 12 h per try, given up after three), so the crawl moves on.
+
+### Code review, round 17, and one rule for Kan errors (2026-11-06)
+
+Rounds 13–17 each found an edge case in how the Kan crawler tells a broken page from an outage. Round 17's two
+(a show page always answering 5xx still stopped all of Kan; an outage of only episode pages for about a day still
+used up a page's tries) led to one rule replacing the per-case ones: **a page is charged a failure only when
+another page loads normally in the same slice.** A server error on one page makes it a suspect; if the next page
+loads, the suspect is charged (a show page: skipped for a week and shown as failing; an episode page: its show
+pauses 12 h, given up after three tries); if the next page also answers a server error, the site is down and
+the slice backs off without charging anyone. A page that can never be compared (nothing else to read) is
+charged after three days of failing alone. Challenges, proxy refusals and a browser that cannot load pages
+still back off immediately. 404s and pages without a player count as that page's own problem at once.
