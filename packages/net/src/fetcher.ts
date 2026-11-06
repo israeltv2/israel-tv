@@ -1,5 +1,6 @@
 // Polite HTTP client for source sites: one request at a time per host, a pause between requests,
 // retries with backoff, and loud failures when a site answers with a block page instead of data.
+import { setTimeout as sleep } from 'node:timers/promises';
 import { gotScraping } from 'got-scraping';
 import { type ProxyEndpoint, proxyUrlWithAuth } from './geo.ts';
 
@@ -39,7 +40,6 @@ export interface Fetcher {
   readonly requests: number;
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const BLOCK_MARKERS = [/radware/i, /captcha/i, /Just a moment/i, /רק רגע/, /cf-chl/i, /Access Denied/i];
 
 export function createFetcher(opts: FetcherOptions): Fetcher {

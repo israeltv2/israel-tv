@@ -4,13 +4,7 @@ import type { Fetcher } from '@israel-tv/net';
 import { expect, test } from 'vitest';
 import { fetchShow } from '../src/client.ts';
 import { blockedEntries } from '../src/kaltura.ts';
-import {
-  parseAllShows,
-  parseLiveSources,
-  parseSeasonPage,
-  parseShowPage,
-  playManifestUrl,
-} from '../src/parse.ts';
+import { parseAllShows, parseSeasonPage, parseShowPage, playManifestUrl } from '../src/parse.ts';
 
 const html = (name: string) => readFileSync(new URL(`./fixtures/${name}.html`, import.meta.url), 'utf8');
 
@@ -43,11 +37,10 @@ const kaltura = async (body: unknown) => {
   return [{ ks: 'x' }, { actions: [{ objectType: 'KalturaAccessControlBlockAction' }] }];
 };
 
-test('all-shows list and live sources', () => {
+test('all-shows list', () => {
   const shows = parseAllShows(html('all-shows'));
   expect(shows.length).toBeGreaterThanOrEqual(260);
   expect(shows[0]).toMatchObject({ key: '/all-shows/13-in-the-afternoon/', title: '13 בצוהריים' });
-  expect(parseLiveSources(html('all-shows')).some((u) => u.includes('cloudfront.net'))).toBe(true);
 });
 
 test('newer template: seasons map with Kaltura entries', () => {

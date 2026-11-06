@@ -1,13 +1,13 @@
 // israel-tv command line. Run `node apps/ingest/src/cli.ts help`.
 import { parseArgs } from 'node:util';
-import { ConfigError, parseSeriesId, type Source } from '@israel-tv/core';
+import { ConfigError, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
-import { startDaemon } from './daemon.ts';
-import { crawlKan } from './kan.ts';
+import { listen, startDaemon } from './daemon.ts';
+import { crawlKan, kanCrawlOptions } from './kan.ts';
 import { checkLive } from './live.ts';
-import { startLocalServer } from './local-server.ts';
+import { localAddonApp } from './local-server.ts';
 import { createLogger } from './log.ts';
 import { PublishError, publishSite } from './publish.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
@@ -120,8 +120,13 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case 'resolver': {
-        const { startResolver } = await import('@israel-tv/resolver');
-        startResolver(config);
+        const { resolverApp } = await import('@israel-tv/resolver');
+        await listen(
+          resolverApp(config).fetch as never,
+          config.resolver.host,
+          config.resolver.port,
+          'resolver.port',
+        );
         log(`resolver: http://${config.resolver.host}:${config.resolver.port}/manifest.json`);
         await new Promise(() => {});
         return 0;
@@ -130,7 +135,12 @@ async function main(argv: string[]): Promise<number> {
         const p = config.publisher;
         const port = values.port ? Number(values.port) : p.type === 'local' ? p.port : 7700;
         const host = p.type === 'local' ? p.host : '127.0.0.1';
-        startLocalServer(p.dir, host, port);
+        await listen(
+          localAddonApp(p.dir).fetch as never,
+          host,
+          port,
+          values.port ? '--port' : 'publisher.port',
+        );
         log(`serving ${p.dir} on http://${host}:${port}/manifest.json`);
         await new Promise(() => {});
         return 0;
@@ -138,12 +148,8 @@ async function main(argv: string[]): Promise<number> {
       case 'kan': {
         const proxy = proxyEndpoints(config.geo)[0];
         const r = await crawlKan(store, {
-          browser: config.browser,
-          ...(proxy ? { proxy } : {}),
-          pagesPerRun: limit ?? config.scraping.browserPagesPerRun,
-          pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
-          airingWindowDays: config.schedule.airingWindowDays,
-          log,
+          ...kanCrawlOptions(config, proxy, log),
+          ...(limit ? { pagesPerRun: limit } : {}),
         });
         return r.failed ? 1 : 0;
       }
@@ -173,7 +179,7 @@ async function main(argv: string[]): Promise<number> {
         return ok > 0 ? 0 : 1;
       }
       case 'match': {
-        const key = config.tmdb ? process.env[config.tmdb.apiKeyEnv] : undefined;
+        const key = tmdbApiKey(config);
         if (!key) throw new Error('add "tmdb": {} to israel-tv.config.json and TMDB_API_KEY to .env');
         await matchShows(store, key, { log });
         return 0;

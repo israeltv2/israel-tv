@@ -1,6 +1,6 @@
 // Ingest runs: full (whole index), airing (shows with a recent episode, current season only) and single show.
 // Rules: a failed or thin result never replaces the last good data; it is recorded and shown on /status.
-import { assignNumbers, type ScrapedShow, type Source } from '@israel-tv/core';
+import { assignNumbers, daysAgo, type ScrapedShow } from '@israel-tv/core';
 import type { Store } from '@israel-tv/store';
 import type { ShowEntry, SourceAdapter } from './sources.ts';
 
@@ -21,8 +21,6 @@ export interface RunSummary {
   requests: number;
   ms: number;
   error?: string;
-  /** Series ids whose data changed (to re-render). */
-  changed: string[];
 }
 
 /** A failure that means the site is refusing us (bot wall, rate limit), not a problem with one show. */
@@ -34,6 +32,11 @@ export function isBlock(err: unknown): boolean {
     e.status === 429 ||
     /blocked by|HTTP 403|HTTP 429|no __NEXT_DATA__/.test(e.message ?? '')
   );
+}
+
+/** ok when nothing failed, failed when nothing succeeded, partial otherwise. */
+export function runStatus(ok: number, failed: number): 'ok' | 'partial' | 'failed' {
+  return failed === 0 ? 'ok' : ok === 0 ? 'failed' : 'partial';
 }
 
 export function latestAirDate(show: ScrapedShow): string | undefined {
@@ -59,7 +62,7 @@ export function dedupeEpisodes(show: ScrapedShow): ScrapedShow {
   };
 }
 
-const episodeCount = (s: ScrapedShow) => s.seasons.reduce((n, x) => n + x.episodes.length, 0);
+export const episodeCount = (s: ScrapedShow) => s.seasons.reduce((n, x) => n + x.episodes.length, 0);
 
 /**
  * A partial (current-season-only) scrape keeps the previous episodes of seasons it did not fetch, and of
@@ -89,7 +92,7 @@ export function thinReason(prev: ScrapedShow | undefined, next: ScrapedShow): st
 }
 
 export type IngestResult =
-  | { kind: 'saved'; seriesId: string; newEpisodes: number; changed: boolean }
+  | { kind: 'saved'; seriesId: string; newEpisodes: number }
   /** The source lists the show but it has no episodes yet; nothing is published or allocated. */
   | { kind: 'empty' };
 
@@ -148,8 +151,7 @@ export async function ingestShow(
     latestAirDate(show),
     prev !== undefined,
   );
-  const changed = !prev || JSON.stringify(prev.show) !== JSON.stringify(show);
-  return { kind: 'saved', seriesId, newEpisodes, changed };
+  return { kind: 'saved', seriesId, newEpisodes };
 }
 
 async function runShows(
@@ -168,7 +170,6 @@ async function runShows(
   let newEpisodes = 0;
   let empty = 0;
   let consecutiveBlocks = 0;
-  const changed: string[] = [];
   const errors: string[] = [];
   const list = opts.limit ? entries.slice(0, opts.limit) : entries;
   for (const [i, entry] of list.entries()) {
@@ -181,7 +182,6 @@ async function runShows(
         continue;
       }
       newEpisodes += r.newEpisodes;
-      if (r.changed) changed.push(r.seriesId);
       if (r.newEpisodes > 0) log(`[${i + 1}/${list.length}] ${entry.title}: +${r.newEpisodes} episodes`);
     } catch (err) {
       showsFailed++;
@@ -199,7 +199,7 @@ async function runShows(
       }
     }
   }
-  const status = showsFailed === 0 ? 'ok' : showsOk === 0 ? 'failed' : 'partial';
+  const status = runStatus(showsOk, showsFailed);
   const summary: RunSummary = {
     runId,
     status,
@@ -208,7 +208,6 @@ async function runShows(
     newEpisodes,
     requests: adapter.requests,
     ms: Date.now() - t0,
-    changed,
     ...(errors.length
       ? { error: errors.slice(0, 5).join(' | ') + (errors.length > 5 ? ` | +${errors.length - 5} more` : '') }
       : {}),
@@ -232,39 +231,28 @@ export async function runFull(store: Store, adapter: SourceAdapter, opts: RunOpt
   const t0 = Date.now();
   // A run limited to a few shows (testing) is recorded apart, so it never counts as the source's full run.
   const runId = store.startRun('full', opts.limit ? `${adapter.source}:limited` : adapter.source);
+  const fail = (error: string): RunSummary => {
+    store.finishRun(runId, { status: 'failed', requests: adapter.requests, error });
+    return {
+      runId,
+      status: 'failed',
+      showsOk: 0,
+      showsFailed: 0,
+      newEpisodes: 0,
+      requests: adapter.requests,
+      ms: Date.now() - t0,
+      error,
+    };
+  };
   let entries: ShowEntry[];
   try {
     entries = await adapter.listShows();
   } catch (err) {
-    const error = `index failed: ${(err as Error).message}`;
-    store.finishRun(runId, { status: 'failed', requests: adapter.requests, error });
-    return {
-      runId,
-      status: 'failed',
-      showsOk: 0,
-      showsFailed: 0,
-      newEpisodes: 0,
-      requests: adapter.requests,
-      ms: Date.now() - t0,
-      error,
-      changed: [],
-    };
+    return fail(`index failed: ${(err as Error).message}`);
   }
-  const previouslyListed = store.listShows({ source: adapter.source, state: 'listed' }).length;
+  const previouslyListed = store.countShows(adapter.source, 'listed');
   if (!opts.limit && previouslyListed > 0 && entries.length < previouslyListed * opts.minShareOfPrevious) {
-    const error = `index lists ${entries.length} shows, previously ${previouslyListed}; kept last good data`;
-    store.finishRun(runId, { status: 'failed', requests: adapter.requests, error });
-    return {
-      runId,
-      status: 'failed',
-      showsOk: 0,
-      showsFailed: 0,
-      newEpisodes: 0,
-      requests: adapter.requests,
-      ms: Date.now() - t0,
-      error,
-      changed: [],
-    };
+    return fail(`index lists ${entries.length} shows, previously ${previouslyListed}; kept last good data`);
   }
   const summary = await runShows(store, adapter, 'full', entries, opts, false, runId, t0);
   if (!opts.limit && summary.status !== 'failed') {
@@ -282,7 +270,7 @@ export async function runAiring(
   opts: RunOptions,
 ): Promise<RunSummary> {
   const t0 = Date.now();
-  const since = new Date(Date.now() - windowDays * 86_400_000).toISOString().slice(0, 10);
+  const since = daysAgo(windowDays);
   const rows = store.airingShows(adapter.source, since);
   const runId = store.startRun('airing', adapter.source);
   const entries = rows.map((r) => ({
@@ -304,5 +292,3 @@ export async function runOne(
   const runId = store.startRun('show', `${adapter.source}:${entry.key}`);
   return runShows(store, adapter, 'show', [entry], opts, false, runId, t0);
 }
-
-export type { Source };

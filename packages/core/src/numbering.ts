@@ -117,12 +117,19 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
 
   // Episodes: keep stored numbers; new ones take the source's "פרק N" when free, otherwise the next free
   // number after the season's highest, in chronological order.
+  const usedBySeason = new Map<number, Set<number>>();
+  for (const e of episodes.values()) {
+    const set = usedBySeason.get(e.season) ?? new Set<number>();
+    set.add(e.episode);
+    usedBySeason.set(e.season, set);
+  }
   for (const season of show.seasons) {
     const seasonNumber = seasons.get(season.key)?.number;
     if (seasonNumber === undefined) continue;
-    const used = new Set(
-      [...episodes.values()].filter((e) => e.season === seasonNumber).map((e) => e.episode),
-    );
+    const used = usedBySeason.get(seasonNumber) ?? new Set<number>();
+    usedBySeason.set(seasonNumber, used);
+    let max = 0;
+    for (const n of used) if (n > max) max = n;
     for (const ep of season.episodes) {
       const stored = episodes.get(ep.key);
       if (stored && ep.numberHint !== undefined && stored.episode !== ep.numberHint) {
@@ -140,13 +147,15 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
         const a = { key: ep.key, season: seasonNumber, episode: ep.numberHint };
         episodes.set(ep.key, a);
         used.add(ep.numberHint);
+        if (ep.numberHint > max) max = ep.numberHint;
         added.episodes.push(a);
       } else {
         pending.push(ep);
       }
     }
     for (const ep of pending) {
-      const n = nextFree(used, used.size === 0 ? 1 : Math.max(...used) + 1);
+      const n = nextFree(used, max + 1);
+      max = n;
       if (ep.numberHint !== undefined) {
         warnings.push({
           code: 'episode-number-taken',

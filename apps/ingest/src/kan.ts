@@ -3,9 +3,14 @@
 // The crawl therefore runs in small slices with a page budget and keeps its progress in the store:
 // lobbies daily, show pages when due, then episode pages oldest first. The catalog fills over days and
 // then stays current with a few pages per day.
+
+import { setTimeout as sleep } from 'node:timers/promises';
 import {
   assignNumbers,
   type BrowserConfig,
+  type Config,
+  DAY_MS,
+  HOUR_MS,
   type ScrapedEpisode,
   type ScrapedSeason,
   type ScrapedShow,
@@ -73,8 +78,7 @@ interface CrawlState {
 }
 
 const STATE_KEY = 'kan:crawl';
-const HOUR = 3_600_000;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const HOUR = HOUR_MS;
 
 export interface KanCrawlOptions {
   browser: BrowserConfig;
@@ -103,7 +107,7 @@ async function defaultPlaysDirectly(url: string): Promise<boolean> {
 export function showDue(s: ShowState, now: number, windowDays: number): boolean {
   if (!s.checkedAt) return true;
   const age = now - Date.parse(s.checkedAt);
-  const airing = s.lastNewAt !== undefined && now - Date.parse(s.lastNewAt) < windowDays * 86_400_000;
+  const airing = s.lastNewAt !== undefined && now - Date.parse(s.lastNewAt) < windowDays * DAY_MS;
   return age > (airing ? 6 : 7 * 24) * HOUR;
 }
 
@@ -341,4 +345,25 @@ export function markKanShowDue(store: Store, key: string): boolean {
   delete state.backoffUntil;
   store.setState(STATE_KEY, state);
   return true;
+}
+
+/** Kan VOD runs only when the source is on and a browser is configured. */
+export function kanEnabled(config: Config): boolean {
+  return config.sources.kan && config.browser.type !== 'none';
+}
+
+/** Crawl options from the config (the CLI may override the page budget). */
+export function kanCrawlOptions(
+  config: Config,
+  proxy: ProxyEndpoint | undefined,
+  log: (line: string) => void,
+): KanCrawlOptions {
+  return {
+    browser: config.browser,
+    ...(proxy ? { proxy } : {}),
+    pagesPerRun: config.scraping.browserPagesPerRun,
+    pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
+    airingWindowDays: config.schedule.airingWindowDays,
+    log,
+  };
 }

@@ -8,19 +8,21 @@
 //   playlist through it. Only URLs the resolver signed itself, on allowed hosts, are relayed.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
+  GEO_LIMITED,
   LIVE_CHANNELS,
   type LiveChannel,
+  parseSeriesId,
   parseVideoId,
   type ScrapedEpisode,
   type Stream,
 } from '@israel-tv/core';
+import { makoPlaylistUrl, parsePlaylist } from '@israel-tv/mako';
 import type { GeoFetch } from '@israel-tv/net';
 import { Hono } from 'hono';
 
 const HLS = 'application/vnd.apple.mpegurl';
 const MAKO_ENTITLEMENT = 'https://mass.mako.co.il/ClicksStatistics/entitlementsServicesV2.jsp';
 const MAKO_LIVE_HOST = 'https://mako-streaming.akamaized.net';
-const MAKO_PLAYLIST = 'https://www.mako.co.il/AjaxPage';
 /** Where Mako's own responses may send the resolver (its CDNs); anything else is refused. */
 const MAKO_MEDIA_HOST = /(^|\.)(akamaized\.net|mako\.co\.il|cloudfront\.net)$/;
 
@@ -33,6 +35,8 @@ function makoUrl(u: string): string {
 
 /** Hosts the relay may fetch through the geo proxy. */
 export const RELAY_HOSTS = [/(^|\.)cdn-redge\.media$/, /(^|\.)kan\.org\.il$/, /^cdnapisec\.kaltura\.com$/];
+
+const isRelayHost = (hostname: string) => RELAY_HOSTS.some((re) => re.test(hostname));
 
 export interface ResolverDeps {
   /** Episode data for a published video id, from the home database. */
@@ -129,7 +133,8 @@ export function createResolverApp(deps: ResolverDeps) {
       }
       // Reshet and Kan video is geo-blocked outside Israel. With a geo proxy, offer the relayed stream for
       // every such episode: whether it is blocked depends on where the viewer is, not on where ingest ran.
-      const geoSource = v.series.startsWith('iltv_reshet_') || v.series.startsWith('iltv_kan_');
+      const source = parseSeriesId(v.series)?.source;
+      const geoSource = source !== undefined && GEO_LIMITED.has(source);
       if (ep && deps.geoFetch && (geoSource || ep.availableAbroad === false)) {
         const direct = ep.streams.find((s) => s.kind === 'direct' || s.kind === 'resolver');
         if (direct) streams.push(relayStream(origin, direct.url, 'דרך ישראל'));
@@ -197,18 +202,15 @@ export function createResolverApp(deps: ResolverDeps) {
     const play = ep?.play;
     if (!play?.vcmid || !play.channelId) return c.text('unknown episode', 404);
     try {
-      const q = new URLSearchParams({
-        jspName: 'playlist.jsp',
-        vcmid: play.vcmid,
-        videoChannelId: play.channelId,
-        galleryChannelId: play.galleryChannelId ?? play.vcmid,
-        isGallery: 'false',
-        consumer: 'web_html5',
-        encryption: 'no',
-      });
-      const pr = await deps.fetch(`${MAKO_PLAYLIST}?${q}`);
+      const pr = await deps.fetch(
+        makoPlaylistUrl({
+          vcmid: play.vcmid,
+          channelId: play.channelId,
+          ...(play.galleryChannelId ? { galleryChannelId: play.galleryChannelId } : {}),
+        }),
+      );
       if (!pr.ok) return c.text(`Mako playlist HTTP ${pr.status}`, 502);
-      const media = ((await pr.json()) as { media?: { url: string; cdn?: string }[] }).media ?? [];
+      const media = parsePlaylist(await pr.json());
       const pick = media.find((m) => m.cdn === 'AKAMAI') ?? media[0];
       if (!pick) return c.text('Mako returned no media', 502);
       return await makoMasterFor(makoUrl(pick.url), pick.cdn ?? 'AKAMAI', playerUA(c));
@@ -243,7 +245,7 @@ export function createResolverApp(deps: ResolverDeps) {
     } catch {
       return c.text('bad url', 400);
     }
-    if (!RELAY_HOSTS.some((re) => re.test(host))) return c.text('host not allowed', 403);
+    if (!isRelayHost(host)) return c.text('host not allowed', 403);
     const range = c.req.header('range');
     // Follow redirects by hand so every hop is checked: a hop to a host that is not geo-gated goes back
     // to the player as a plain redirect; nothing else is fetched through the proxy.
@@ -269,7 +271,7 @@ export function createResolverApp(deps: ResolverDeps) {
       await r.body?.cancel();
       const next = new URL(location, url);
       if (next.protocol !== 'https:' && next.protocol !== 'http:') return c.text('bad redirect', 502);
-      if (!RELAY_HOSTS.some((re) => re.test(next.hostname))) return c.redirect(next.toString(), 302);
+      if (!isRelayHost(next.hostname)) return c.redirect(next.toString(), 302);
       url = next.toString();
       r = undefined;
     }
@@ -282,7 +284,7 @@ export function createResolverApp(deps: ResolverDeps) {
       // are not geo-gated) go to the player directly.
       const origin = base(c);
       const body = absolutize(text, url, (abs) =>
-        RELAY_HOSTS.some((re) => re.test(new URL(abs).hostname)) ? relayUrl(origin, abs) : abs,
+        isRelayHost(new URL(abs).hostname) ? relayUrl(origin, abs) : abs,
       );
       return c.body(body, 200, { 'content-type': HLS, 'cache-control': 'no-store' });
     }

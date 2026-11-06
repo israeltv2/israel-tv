@@ -1,80 +1,97 @@
 // Publish: render the site from the store, write only changed files, then hand the folder to the
 // configured publisher (local: nothing more to do; cloudflare: wrangler deploy with an API token).
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Config, Health, PublisherConfig, Source, StatusFile } from '@israel-tv/core';
+import {
+  CATALOGS,
+  type Config,
+  enabledSources,
+  type Health,
+  HOUR_MS,
+  type PublisherConfig,
+  type Source,
+  type StatusFile,
+  sitePaths,
+} from '@israel-tv/core';
 import { type LiveChannelRender, type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
-import type { Store } from '@israel-tv/store';
+import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { liveRender } from './live.ts';
+import { episodeCount } from './runner.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const VERSION = '1.0.0';
 
-/** Catalog row for each source's warnings. */
-const SOURCE_CATALOGS: Record<Source, string[]> = {
-  mako: ['iltv_keshet12'],
-  reshet: ['iltv_reshet13'],
-  kan: ['iltv_kan11', 'iltv_kankids'],
-  live: ['iltv_live'],
+/** How each source is read, for judging its health. Kan is read in small crawl slices that may back off. */
+const READS: Record<Source, { kind: RunKind; failedIs: Health; lastGood: 'latest' | 'any' }> = {
+  mako: { kind: 'full', failedIs: 'error', lastGood: 'latest' },
+  reshet: { kind: 'full', failedIs: 'error', lastGood: 'latest' },
+  kan: { kind: 'crawl', failedIs: 'warn', lastGood: 'any' },
+  live: { kind: 'full', failedIs: 'error', lastGood: 'latest' },
 };
 
-const HOURS = 3_600_000;
-
-export function buildStatus(store: Store, sources: Source[], now = Date.now()): StatusFile {
-  const all = store.listShows();
+export function buildStatus(
+  store: Store,
+  sources: Source[],
+  now = Date.now(),
+  all: ShowRow[] = store.listShows(),
+): StatusFile {
   const out: StatusFile['sources'] = [];
   for (const source of sources) {
+    const read = READS[source];
     const shows = all.filter((s) => s.source === source && s.state === 'listed');
-    const episodes = shows.reduce((n, s) => n + s.show.seasons.reduce((m, x) => m + x.episodes.length, 0), 0);
-    // Kan is read in small crawl slices rather than full runs.
-    const full = source === 'kan' ? store.lastRun('crawl', 'kan') : store.lastRun('full', source);
+    const episodes = shows.reduce((n, s) => n + episodeCount(s.show), 0);
+    const last = store.lastRun(read.kind, source);
     const airing = store.lastRun('airing', source);
     const notes: string[] = [];
     let health: Health = 'ok';
-    const lastOkFull =
-      source === 'kan'
-        ? store.lastGoodRun('crawl', 'kan')
-        : full && full.status !== 'failed'
-          ? full
+    const lastGood =
+      read.lastGood === 'any'
+        ? store.lastGoodRun(read.kind, source)
+        : last && last.status !== 'failed'
+          ? last
           : undefined;
-    if (!full) {
+    if (!last) {
       health = 'warn';
-      notes.push('no full run yet');
-    } else if (full.status === 'failed') {
-      // A Kan slice that hit a challenge backs off and retries; only a long run of them is an error.
-      health = source === 'kan' ? 'warn' : 'error';
-      notes.push(`last full run failed: ${full.error ?? 'unknown error'}`);
-    } else if (full.status === 'partial') {
+      const limited = store.lastRun(read.kind, `${source}:limited`);
+      notes.push(
+        limited
+          ? 'only a limited test run (--limit) so far; the full run follows at schedule.fullRun'
+          : 'no full run yet',
+      );
+    } else if (last.status === 'failed') {
+      health = read.failedIs;
+      notes.push(`last full run failed: ${last.error ?? 'unknown error'}`);
+    } else if (last.status === 'partial') {
       health = 'warn';
-      notes.push(`last full run partial: ${full.showsFailed} shows failed`);
+      notes.push(`last full run partial: ${last.showsFailed} shows failed`);
     }
     // Time since the last good run; for a source that never had one, since its first attempt.
-    const ref =
-      lastOkFull ?? (full ? store.firstRun(source === 'kan' ? 'crawl' : 'full', source) : undefined);
-    if (full && ref && now - Date.parse(ref.startedAt) > 36 * HOURS) {
+    const ref = lastGood ?? (last ? store.firstRun(read.kind, source) : undefined);
+    if (last && ref && now - Date.parse(ref.startedAt) > 36 * HOUR_MS) {
       health = 'error';
       notes.push(
-        lastOkFull ? 'no successful run in 36 hours' : 'never succeeded, first tried over 36 hours ago',
+        lastGood ? 'no successful run in 36 hours' : 'never succeeded, first tried over 36 hours ago',
       );
     }
-    if (source !== 'live' && shows.length === 0 && full) {
+    if (source === 'live') {
+      if (last) notes.push(`${last.showsOk} channels answering (Mako channels are checked at play time)`);
+    } else if (shows.length === 0 && last) {
       health = 'error';
       notes.push('no shows');
     }
     out.push({
       source,
       health,
-      shows: source === 'live' ? (full?.showsOk ?? 0) : shows.length,
+      shows: source === 'live' ? (last?.showsOk ?? 0) : shows.length,
       episodes,
-      ...(full
+      ...(last
         ? {
             lastFullRun: {
-              at: full.startedAt,
-              status: full.status,
-              ...(full.error ? { error: full.error } : {}),
+              at: last.startedAt,
+              status: last.status,
+              ...(last.error ? { error: last.error } : {}),
             },
           }
         : {}),
@@ -117,7 +134,7 @@ export function catalogWarnings(status: StatusFile): Record<string, string> {
   for (const s of status.sources) {
     if (s.health !== 'error') continue;
     const day = s.lastFullRun?.at.slice(0, 10) ?? '';
-    for (const c of SOURCE_CATALOGS[s.source as Source] ?? []) {
+    for (const c of CATALOGS.filter((x) => x.source === s.source).map((x) => x.id)) {
       out[c] = `עדכון ${s.source} נכשל ${day} · ${s.notes[0] ?? ''}`.trim();
     }
   }
@@ -125,33 +142,48 @@ export function catalogWarnings(status: StatusFile): Record<string, string> {
 }
 
 export function renderFromStore(store: Store, config: Config, live: LiveChannelRender[]): SiteFiles {
-  const sources = (Object.keys(config.sources) as Source[]).filter((s) => config.sources[s]);
-  const status = buildStatus(store, sources);
-  const shows: RenderShow[] = store.listShows().map((r) => {
-    const a = store.assignments(r.seriesId);
-    return {
-      seriesId: r.seriesId,
-      catalog: r.catalog,
-      title: r.title,
-      show: r.show,
-      seasons: a.seasons,
-      episodes: a.episodes,
-      latestAirDate: r.latestAirDate,
-      latestEpisodeSeenAt: r.latestEpisodeSeenAt,
-      state: r.state,
-      tmdbId: r.tmdbId,
-      imdbId: r.imdbId,
-    };
-  });
+  const rows = store.listShows();
+  const status = buildStatus(store, enabledSources(config), Date.now(), rows);
+  const registry = store.registry();
+  const seasonsBy = groupBy(registry.seasons, (x) => x.seriesId);
+  const episodesBy = groupBy(registry.episodes, (x) => x.seriesId);
+  const shows: RenderShow[] = rows.map((r) => ({
+    seriesId: r.seriesId,
+    catalog: r.catalog,
+    title: r.title,
+    show: r.show,
+    seasons: (seasonsBy.get(r.seriesId) ?? []).map(({ key, number, kind }) => ({ key, number, kind })),
+    episodes: (episodesBy.get(r.seriesId) ?? []).map(({ key, season, episode }) => ({
+      key,
+      season,
+      episode,
+    })),
+    latestAirDate: r.latestAirDate,
+    latestEpisodeSeenAt: r.latestEpisodeSeenAt,
+    state: r.state,
+    tmdbId: r.tmdbId,
+    imdbId: r.imdbId,
+  }));
   return renderSite({
     version: VERSION,
-    sources,
+    sources: enabledSources(config),
     shows,
     live,
     status,
-    registry: store.registry(),
+    registry,
     catalogWarnings: catalogWarnings(status),
   });
+}
+
+function groupBy<T>(list: T[], key: (x: T) => string): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const x of list) {
+    const k = key(x);
+    const arr = m.get(k);
+    if (arr) arr.push(x);
+    else m.set(k, [x]);
+  }
+  return m;
 }
 
 const HEADERS_FILE = `/*
@@ -179,17 +211,11 @@ function* walk(dir: string): Generator<string> {
   }
 }
 
-const hash = (s: string | Buffer) => createHash('sha1').update(s).digest('hex');
-
 const MARKER = '.israel-tv-site';
 
 /** Status files carry a timestamp; compare them without it so a quiet run changes nothing. */
-const comparable = (path: string, content: string | Buffer) =>
-  path === 'status.json' || path === 'status.html'
-    ? String(content)
-        .replace(/"generatedAt":"[^"]*"/, '')
-        .replace(/<p>Generated [^<]*<\/p>/, '')
-    : content;
+const comparable = (content: string) =>
+  content.replace(/"generatedAt":"[^"]*"/, '').replace(/<p>Generated [^<]*<\/p>/, '');
 
 /**
  * Write the site to `dir`, touching only files whose content changed, and delete files no longer
@@ -218,7 +244,11 @@ export function writeSite(
     const p = join(dir, path);
     let same = false;
     try {
-      same = hash(comparable(path, readFileSync(p))) === hash(comparable(path, content));
+      const old = readFileSync(p);
+      same =
+        path === sitePaths.status || path === sitePaths.statusPage
+          ? comparable(old.toString()) === comparable(content)
+          : old.equals(Buffer.from(content));
     } catch {}
     if (!same) {
       mkdirSync(dirname(p), { recursive: true });

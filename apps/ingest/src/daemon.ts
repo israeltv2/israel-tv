@@ -4,13 +4,13 @@ import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { serve } from '@hono/node-server';
-import { type Config, parseSeriesId, type Source } from '@israel-tv/core';
+import { type Config, DAY_MS, enabledSources, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
 import { proxyEndpoints } from '@israel-tv/net';
 import { resolverApp } from '@israel-tv/resolver';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
-import { crawlKan, markKanShowDue } from './kan.ts';
+import { crawlKan, kanCrawlOptions, kanEnabled, markKanShowDue } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { buildStatus, publishSite } from './publish.ts';
@@ -66,7 +66,7 @@ export class Daemon {
     this.config = config;
     this.store = store;
     this.log = log;
-    this.sources = (Object.keys(config.sources) as Source[]).filter((s) => config.sources[s]);
+    this.sources = enabledSources(config);
   }
 
   private get runOpts(): RunOptions {
@@ -105,7 +105,7 @@ export class Daemon {
       const adapters = createAdapters(this.config);
       for (const make of Object.values(adapters)) await runFull(this.store, make(), this.runOpts);
       if (this.config.sources.live) await checkLive(this.store);
-      const key = this.config.tmdb ? process.env[this.config.tmdb.apiKeyEnv] : undefined;
+      const key = tmdbApiKey(this.config);
       if (key) await matchShows(this.store, key, { log: this.log });
       await this.publish();
     });
@@ -128,8 +128,7 @@ export class Daemon {
     if (!parsed || !row) return { error: `unknown series ${seriesId}` };
     if (parsed.source === 'kan') {
       // Kan is read by the crawler: make the show due and start a slice now.
-      if (!this.config.sources.kan || this.config.browser.type === 'none')
-        return { error: 'Kan is turned off in the config' };
+      if (!kanEnabled(this.config)) return { error: 'Kan is turned off in the config' };
       markKanShowDue(this.store, row.show.key);
       this.kanCrawl();
       return { queued: true, position: 0 };
@@ -150,18 +149,11 @@ export class Daemon {
    * queue (airing checks and refreshes). It only writes Kan shows; publishing goes through the queue.
    */
   kanCrawl(): void {
-    if (!this.config.sources.kan || this.config.browser.type === 'none' || this.kanRunning) return;
+    if (!kanEnabled(this.config) || this.kanRunning) return;
     this.kanRunning = true;
     const proxies = proxyEndpoints(this.config.geo);
     const proxy = proxies[this.kanSlices++ % Math.max(proxies.length, 1)];
-    crawlKan(this.store, {
-      browser: this.config.browser,
-      ...(proxy ? { proxy } : {}),
-      pagesPerRun: this.config.scraping.browserPagesPerRun,
-      pageIntervalMs: this.config.scraping.browserPageIntervalSec * 1000,
-      airingWindowDays: this.config.schedule.airingWindowDays,
-      log: this.log,
-    })
+    crawlKan(this.store, kanCrawlOptions(this.config, proxy, this.log))
       .then((r) => {
         if (r.newEpisodes > 0) this.enqueue('publish', () => this.publish());
       })
@@ -177,8 +169,7 @@ export class Daemon {
       this.crons.push(new Cron(pattern, { timezone: tz, protect: true }, fn));
     at(this.config.schedule.fullRun, () => this.fullRun());
     for (const p of this.config.schedule.airingChecks) at(p, () => this.airingRun());
-    if (this.config.sources.kan && this.config.browser.type !== 'none')
-      at(this.config.schedule.kanCrawl, () => this.kanCrawl());
+    if (kanEnabled(this.config)) at(this.config.schedule.kanCrawl, () => this.kanCrawl());
   }
 
   nextRuns(): Record<string, string | null> {
@@ -302,14 +293,13 @@ export async function startDaemon(
     );
   }
   d.schedule();
-  // Live channels are checked right away, so /status reflects them from the start.
-  if (config.sources.live) await checkLive(store);
+  // Live channels are checked right away (as a job, not holding startup), so /status reflects them.
+  if (config.sources.live) d.enqueue('live', async () => void (await checkLive(store)));
   // First start (or after a long stop): fill the catalog now instead of waiting for the night.
-  const firstSource = (Object.keys(config.sources) as Source[]).find(
-    (s) => config.sources[s] && s !== 'live' && s !== 'kan',
-  );
+  // Sources read by full runs (Mako, Reshet), in order.
+  const firstSource = Object.keys(createAdapters(config))[0] as Source | undefined;
   const last = firstSource ? store.lastRun('full', firstSource) : undefined;
-  const stale = firstSource && (!last || Date.now() - Date.parse(last.startedAt) > 24 * 3_600_000);
+  const stale = firstSource && (!last || Date.now() - Date.parse(last.startedAt) > DAY_MS);
   if (stale && opts.initialRun !== false) {
     log('no full run in the last 24 hours: starting one now (about half an hour; see /status)');
     d.fullRun();

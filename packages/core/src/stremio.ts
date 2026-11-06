@@ -61,13 +61,3 @@ export interface Stream {
     proxyHeaders?: Record<string, Record<string, string>>;
   };
 }
-
-export interface CatalogResponse {
-  metas: MetaPreview[];
-}
-export interface MetaResponse {
-  meta: Meta;
-}
-export interface StreamResponse {
-  streams: Stream[];
-}

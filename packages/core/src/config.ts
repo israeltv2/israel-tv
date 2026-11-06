@@ -2,6 +2,7 @@
 // are never written here, only the names of the environment variables (from `.env`) that hold them.
 
 import { z } from 'zod';
+import { SOURCES, type Source } from './ids.ts';
 
 const port = z.number().int().min(1).max(65535);
 
@@ -142,6 +143,19 @@ export type PublisherConfig = Config['publisher'];
 
 export class ConfigError extends Error {}
 
+/** Sources turned on in the config, in a fixed order. */
+export function enabledSources(config: Config): Source[] {
+  return SOURCES.filter((s) => config.sources[s]);
+}
+
+/** The TMDB API key when TMDB matching is configured and the key is set. */
+export function tmdbApiKey(
+  config: Config,
+  env: Record<string, string | undefined> = process.env,
+): string | undefined {
+  return config.tmdb ? env[config.tmdb.apiKeyEnv] : undefined;
+}
+
 /** Validate a parsed config object; errors name the option and say how to fix it. */
 export function parseConfig(raw: unknown, source = 'israel-tv.config.json'): Config {
   const r = ConfigSchema.safeParse(raw ?? {});
@@ -153,19 +167,6 @@ export function parseConfig(raw: unknown, source = 'israel-tv.config.json'): Con
   throw new ConfigError(
     `Invalid ${source}:\n${lines.join('\n')}\nSee docs/configuration.md for every option and its default.`,
   );
-}
-
-/** Look up the secrets a config needs; reports every missing variable at once. */
-export function requiredSecrets(config: Config): string[] {
-  const names: string[] = [];
-  if (config.geo.type !== 'none') {
-    if (config.geo.usernameEnv) names.push(config.geo.usernameEnv);
-    if (config.geo.passwordEnv) names.push(config.geo.passwordEnv);
-  }
-  if (config.publisher.type === 'cloudflare')
-    names.push(config.publisher.accountIdEnv, config.publisher.apiTokenEnv);
-  if (config.tmdb) names.push(config.tmdb.apiKeyEnv);
-  return names;
 }
 
 /** Which option needs each secret, for error messages. */

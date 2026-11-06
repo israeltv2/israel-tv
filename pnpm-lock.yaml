@@ -245,6 +245,9 @@ importers:
       '@israel-tv/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@israel-tv/mako':
+        specifier: workspace:*
+        version: link:../../packages/mako
       '@israel-tv/net':
         specifier: workspace:*
         version: link:../../packages/net

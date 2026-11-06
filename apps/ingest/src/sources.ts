@@ -15,7 +15,6 @@ export interface SourceAdapter {
   listShows(): Promise<ShowEntry[]>;
   fetchShow(entry: ShowEntry, opts: { currentSeasonOnly: boolean }): Promise<ScrapedShow>;
   readonly requests: number;
-  close?(): Promise<void>;
 }
 
 export function makoAdapter(f: Fetcher): SourceAdapter {
