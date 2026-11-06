@@ -308,11 +308,13 @@ test('when Akamai refuses a Mako master, the next CDN Mako lists is tried', asyn
         return Response.json({
           media: [
             { url: 'https://live.akamaized.net/k12/index.m3u8', cdn: 'AKAMAI' },
-            { url: 'https://d1.cloudfront.net/k12/master.m3u8', cdn: 'AWS' },
+            { url: 'https://d1.cloudfront.net/k12/master.m3u8?b-in-range=0-800', cdn: 'AWS' },
           ],
         });
-      if (url.includes('entitlement')) return Response.json({ tickets: [{ ticket: 'hdnea%3Dx' }] });
+      if (url.includes('entitlement')) return Response.json({ tickets: [{ ticket: 'hdnea%3Dx', url: '' }] });
       if (url.includes('akamaized')) return new Response('', { status: 403 });
+      if (url.includes('cloudfront') && !url.includes('?b-in-range=0-800&hdnea=x'))
+        return new Response('', { status: 400 });
       return new Response('#EXTM3U\nv.m3u8\n', { status: 200 });
     },
   });
