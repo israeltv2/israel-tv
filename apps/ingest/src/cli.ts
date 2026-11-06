@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ConfigError, parseSeriesId, roleOf, type Source, secretOwners, tmdbApiKey } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
-import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
-import { resolverApp, runResolverOnly } from '@israel-tv/resolver';
+import { proxyEndpoints } from '@israel-tv/net';
+import { checkProxy, printEvents, remoteUrl, resolverApp, runResolverOnly } from '@israel-tv/resolver';
 import { createLogger, loadConfig, registerSecretNames, stopSignal } from '@israel-tv/runtime';
 import { Store } from '@israel-tv/store';
 import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
@@ -23,7 +23,7 @@ import {
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
-import { buildDashboard, latestCanary, queryEvents } from './usage-page.ts';
+import { buildDashboard, latestCanary } from './usage-page.ts';
 
 const HELP = `israel-tv <command>
 
@@ -101,7 +101,13 @@ async function main(argv: string[]): Promise<number> {
     config.resolver.remote.tokenEnv,
   ]);
   // A resolver-only instance has no catalog database of its own: it plays from a published catalog.
-  if (roleOf(config) === 'resolver-only' && !['check-proxy', 'remote-url', 'events'].includes(cmd)) {
+  if (roleOf(config) === 'resolver-only') {
+    if (cmd === 'check-proxy') return checkProxy(config);
+    if (cmd === 'events') return printEvents(config, values);
+    if (cmd === 'remote-url') {
+      console.log(remoteUrl(config));
+      return 0;
+    }
     if (cmd !== 'start' && cmd !== 'resolver')
       throw new UserError(
         `\`${cmd}\` is for an instance that reads the sites (role "host" or "local-only"); this one is "resolver-only": use start, check-proxy, remote-url or events`,
@@ -238,31 +244,8 @@ async function main(argv: string[]): Promise<number> {
         });
         return r.failed ? 1 : 0;
       }
-      case 'check-proxy': {
-        const proxies = proxyEndpoints(config.geo);
-        if (proxies.length === 0) {
-          console.log('geo.type is "none": no proxy configured (right inside Israel).');
-          return 0;
-        }
-        let ok = 0;
-        for (const p of proxies) {
-          try {
-            const r = await createGeoFetch([p])('https://ipinfo.io/country', {
-              signal: AbortSignal.timeout(20_000),
-            });
-            const country = (await r.text()).trim();
-            const good = r.ok && country === 'IL';
-            if (good) ok++;
-            console.log(
-              `${p.server}: ${r.ok ? `exits in ${country}` : `HTTP ${r.status}`}${good ? ' ✓' : ' ✗ (needs an Israeli exit)'}`,
-            );
-          } catch (err) {
-            // The geo fetch already explains the failure as "<proxy>: <why>".
-            console.log(`${p.server}: ✗ ${(err as Error).message.replace(`${p.server}: `, '')}`);
-          }
-        }
-        return ok > 0 ? 0 : 1;
-      }
+      case 'check-proxy':
+        return checkProxy(config);
       case 'match': {
         const key = tmdbApiKey(config);
         if (!key) throw new UserError('add "tmdb": {} to israel-tv.config.json and TMDB_API_KEY to .env');
@@ -281,27 +264,8 @@ async function main(argv: string[]): Promise<number> {
           console.log(`warning ${w.seriesId ?? ''} ${w.code}: ${w.message}`);
         return 0;
       }
-      case 'events': {
-        const events = EventStore.openReadOnly(config.events.path);
-        try {
-          const rows = queryEvents(events, {
-            ...(values.play ? { playId: values.play } : {}),
-            ...(values.kind ? { kind: values.kind } : {}),
-            ...(values.errors ? { outcome: 'error' } : {}),
-            ...(values.since ? { since: values.since } : {}),
-            ...(values.show ? { show: values.show } : {}),
-            ...(values.limit ? { limit: values.limit } : {}),
-          });
-          for (const r of rows.reverse()) {
-            const { detail, ...rest } = r;
-            const line = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== null));
-            console.log(JSON.stringify(detail ? { ...line, detail: JSON.parse(detail) } : line));
-          }
-        } finally {
-          events.close();
-        }
-        return 0;
-      }
+      case 'events':
+        return printEvents(config, values);
       case 'usage': {
         const events = EventStore.openReadOnly(config.events.path);
         try {
@@ -338,16 +302,9 @@ async function main(argv: string[]): Promise<number> {
         );
         return 0;
       }
-      case 'remote-url': {
-        const r = config.resolver.remote;
-        const token = process.env[r.tokenEnv];
-        if (!r.enabled || !r.publicUrl || !token)
-          throw new UserError(
-            'the remote resolver is not set up (resolver.remote in the config, and its token in .env)',
-          );
-        console.log(`${r.publicUrl.replace(/\/+$/, '')}/${token}/manifest.json`);
+      case 'remote-url':
+        console.log(remoteUrl(config));
         return 0;
-      }
       case 'admin-url': {
         const token = adminToken(config, store);
         for (const a of lanAddresses(config.admin.host))

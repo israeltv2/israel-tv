@@ -1,5 +1,6 @@
 export * from './app.ts';
 export * from './branding.ts';
+export * from './commands.ts';
 export type { Log } from './context.ts';
 export * from './remote.ts';
 export * from './server.ts';

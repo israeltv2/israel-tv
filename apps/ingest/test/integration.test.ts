@@ -89,11 +89,10 @@ async function askStreams(addons: Addon[], type: string, id: string) {
 
 function addons(files: Map<string, string | Uint8Array>, where: 'home' | 'abroad') {
   const catalog = createAddonApp({ read: async (p) => (files.has(p) ? String(files.get(p)) : undefined) });
-  // The resolver reads the published catalog over HTTP, like a resolver-only install.
-  const catalogFetch = (async (url: string) => {
-    const path = url.slice(CATALOG.length + 1);
-    return files.has(path) ? new Response(String(files.get(path))) : new Response('', { status: 404 });
-  }) as unknown as typeof fetch;
+  // The resolver reads the catalog over HTTP, the way a resolver-only install reads a served catalog (here the
+  // catalog addon itself, as the local server serves it; the Worker serves the same files as static assets).
+  const catalogFetch = (async (url: string) =>
+    catalog.fetch(new Request(`http://h/${url.slice(CATALOG.length + 1)}`))) as unknown as typeof fetch;
   const upstream = async (url: string) => {
     if (url.includes('playlist.jsp'))
       return Response.json({ media: [{ url: 'https://x.akamaized.net/m.m3u8', cdn: 'AKAMAI' }] });

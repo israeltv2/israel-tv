@@ -31,14 +31,17 @@ looks like a wrong address. In the examples below, `$T` is that token (`T=…` i
 
 While `start` runs, prefer the admin endpoints (they queue work behind the running job, so only one process
 writes the database): `curl -X POST -H "Authorization: Bearer $T" http://<host>:7702/refresh/iltv_mako_12`.
-To find a show's series id: search its row, `curl -s 'https://<addon>/catalog/series/<row>/search=<title>.json'` →
+In these examples `<addon>` is the addon's base URL: its manifest URL without `/manifest.json` (e.g.
+`https://israel-tv.<subdomain>.workers.dev`, or `http://<host>:7700`). To find a show's series id: search its row,
+`curl -s '<addon>/catalog/series/<row>/search=<word>.json'` (one word of the title, or spaces as `%20`) →
 `metas[].id` (rows `iltv_keshet12`, `iltv_reshet13`, `iltv_kan11`, `iltv_kankids`), or `failingShows` in `/status`. Admin endpoints answer only
 private network addresses and refuse requests sent by web pages (cross-site), so use curl or a script. A Kan
 show's refresh makes it due for the next crawl slice and starts one.
 
-A **resolver-only** instance (role `resolver-only`) runs only the resolver: its commands are `start` (or
-`resolver`), `check-proxy`, `remote-url` and `events` (`pnpm logs …`); it has no admin page, `/status` or usage
-dashboard, and its events and logs are local. At start it logs `catalog check: …` about the catalog it plays from.
+A **resolver-only** instance (role `resolver-only`) runs only the resolver, with its own entry point:
+`pnpm resolver start`, `check-catalog`, `check-proxy`, `remote-url` and `events` (same options as `pnpm logs`).
+It has no admin page, `/status` or usage dashboard: its events and logs are local, and a proxy failure shows
+only there (`pnpm resolver events --errors`). At start it logs `catalog check: …` about the catalog it plays from.
 
 ## Status
 
@@ -123,8 +126,10 @@ deletes events older than 30 days and rollups older than a year, VACUUMs once a 
 
 JSON lines (pino), one per thing, with `component` and the ids of what it is about (`playId`, `showId`,
 `episodeId`, `source`). With `log.file` set they go to rotated files next to it (a new file daily or at
-`log.maxMB`, keeping `log.keep`; `current.log` points at the newest); otherwise to the terminal (under systemd:
-`journalctl -u israel-tv -f`; under Docker: `docker compose -f deploy/docker-compose.yml logs -f`). Secrets never
+`log.maxMB`, keeping `log.keep`; `current.log` points at the newest: `tail -f data/logs/current.log` with the
+example configs); otherwise to the terminal (under systemd: `journalctl -u israel-tv -f`, or `-u
+israel-tv-resolver`; under Docker: `docker compose -f deploy/docker-compose.yml logs -f`, or
+`docker-compose.resolver.yml`). Secrets never
 reach a line: the value of every secret the config names (proxy login, Cloudflare, TMDB, admin and remote
 tokens) and of anything in `.env` named like a token, password, key or secret is replaced with `[redacted]`
 wherever it appears.
@@ -145,7 +150,7 @@ per source, with the failing step (`pick`: no recent playable title; `stream`: n
 The public addon adds "⚠ הקטלוג לא עודכן מאז …" (catalog not updated since …) at the top of a row by itself,
 without the home machine: when nothing has been published for more than 36 hours (every row), or when the row's
 source has had no good full read (Kan: crawl slice) for more than 48 hours. Both times are rounded down to 6
-hours. Look at `https://<addon>/freshness.json` (what the addon compares), the admin `/status` (`publish`,
+hours. Look at `<addon>/freshness.json` (what the addon compares), the admin `/status` (`publish`,
 each source's `lastFullRun` and `notes`) and `pnpm israel-tv status`. A row without the ⚠ that still looks old in
 the app is usually the app's own cache (see docs/tv-checklist.md).
 
@@ -165,7 +170,7 @@ the app is usually the app's own cache (see docs/tv-checklist.md).
    ```bash
    pnpm logs --play <playId>
    curl -s -H "Authorization: Bearer $T" 'http://<host>:7702/events.json?playId=<playId>'
-   grep "<playId>" <folder of log.file>/current.log   # the log lines around it (with log.file set)
+   grep "<playId>" data/logs/current.log   # the log lines around it (the folder of log.file)
    ```
 
    A healthy Mako play is `stream_request` (offered 1 stream) → `ticket_fetch` (ok) → `play_start` (upstream
@@ -192,14 +197,14 @@ the app is usually the app's own cache (see docs/tv-checklist.md).
    the worker → Logs; one JSON line per request it answered, with `route`, `series`, `status`, `ms`). The
    daily counts are on the usage page.
 
-5. **Reproduce.** The video id is in the show's page: `curl -s https://<addon>/meta/series/<series-id>.json |
+5. **Reproduce.** The video id is in the show's page: `curl -s <addon>/meta/series/<series-id>.json |
    jq -r '.meta.videos[] | .id + "  " + .title'`. Then take the stream list — from the resolver for Mako or a
    relayed title, from the public addon for a direct one (Reshet and Kan in Israel) — and fetch the play URL, a
    variant playlist and a segment with one User-Agent; a working play gives 200, 200, 206:
 
    ```bash
    curl -s http://<host>:7701/stream/series/<video-id>.json | jq -r '.streams[].url'   # resolver
-   curl -s https://<addon>/stream/series/<video-id>.json | jq -r '.streams[].url'      # public addon
+   curl -s <addon>/stream/series/<video-id>.json | jq -r '.streams[].url'      # public addon
    UA='Mozilla/5.0 (Linux; Android 12) ExoPlayer'
    curl -s -A "$UA" '<stream url>'            # master: note the first non-# line (a variant)
    curl -s -A "$UA" '<variant url>'           # variant: note the first segment
@@ -246,6 +251,9 @@ episodes came back with exactly the published season and episode numbers, none d
 
 Pull, `pnpm install --prod`, restart the service: `launchctl kickstart -k gui/$(id -u)/org.israel-tv` (macOS),
 `systemctl restart israel-tv` (Linux), or `docker compose -f deploy/docker-compose.yml up -d --build` (Docker).
+Resolver-only: `pnpm install --prod --frozen-lockfile --filter "@israel-tv/resolver..."`, then
+`launchctl kickstart -k gui/$(id -u)/org.israel-tv.resolver`, `systemctl restart israel-tv-resolver`, or
+`docker compose -f deploy/docker-compose.resolver.yml up -d --build`.
 The same restart applies after changing the config or `.env`. Database migrations run on start. (`--prod` leaves out
 the development tools, so `pnpm check` needs a full `pnpm install`.) Deploy tooling may write the deployed
 git revision to a `.revision` file in the repo root; `/status` shows it (`dev` otherwise).

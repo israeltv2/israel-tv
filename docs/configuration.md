@@ -48,7 +48,7 @@ Only needed **outside Israel**.
 | `urls`                       | required | One or more proxy URLs, tried in order.                                                    |
 | `usernameEnv`, `passwordEnv` | optional | Names of the `.env` variables with the proxy login. Leave out for a proxy without a login. |
 
-What goes through it: the resolver's "דרך ישראל" streams, offered only when the direct stream is refused from your network (checked about every 6 hours per show). `pnpm israel-tv check-proxy` tests it.
+What goes through it: the resolver's "דרך ישראל" streams, offered only when the direct stream is refused from your network (checked about every 6 hours per show). `pnpm israel-tv check-proxy` (resolver-only: `pnpm resolver check-proxy`) tests it.
 
 ## `browser` — for Kan pages
 
@@ -104,7 +104,7 @@ come from Workers Logs).
 same machine), `publicUrl` (the tunnel's address), `tokenEnv` (default `ISRAEL_TV_REMOTE_TOKEN`: the secret
 path token, 32 characters or more, in `.env`), `playsPerMinute` (30) and `requestsPerMinute` (240) per client.
 Serves only Mako's routes under `/<token>/…` (no relay, nothing of the admin page); everything else answers an
-empty 404. `israel-tv remote-url` prints the manifest link.
+empty 404. `pnpm israel-tv remote-url` (resolver-only: `pnpm resolver remote-url`) prints the manifest link.
 
 ## `admin`
 

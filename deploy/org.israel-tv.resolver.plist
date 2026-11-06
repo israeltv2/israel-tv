@@ -2,10 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   launchd agent (macOS) for the resolver on its own (role resolver-only; install with
-  pnpm install --prod --filter "@israel-tv/resolver..."). Replace /path/to/israel-tv and /path/to/node-dir (the folder holding bin/node; with Volta, use the
-  folder of `volta which node`), then:
+  pnpm install --prod --filter "@israel-tv/resolver..."). Replace /path/to/israel-tv, and /path/to/node-dir with the folder ABOVE the bin folder that
+  holds node: if `command -v node` (or `volta which node`) prints /opt/homebrew/bin/node, it is /opt/homebrew.
+  Keep "log": { "file": ... } in the config (the examples have it): logs then go to rotated files there, and the file
+  below only catches a crash before logging starts. Then:
     cp deploy/org.israel-tv.resolver.plist ~/Library/LaunchAgents/
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.israel-tv.resolver.plist
+  It runs only while you are logged in: after a restart log in, or turn on automatic login (System Settings → Users
+  & Groups; not available with FileVault).
   Restart (after an update, or a change to the config or .env):
     launchctl kickstart -k gui/$(id -u)/org.israel-tv.resolver
 -->
@@ -24,7 +28,7 @@
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
     <key>ThrottleInterval</key><integer>10</integer>
-    <key>StandardOutPath</key><string>/path/to/israel-tv/data/israel-tv-resolver.log</string>
-    <key>StandardErrorPath</key><string>/path/to/israel-tv/data/israel-tv-resolver.log</string>
+    <key>StandardOutPath</key><string>/path/to/israel-tv/data/launchd-resolver.log</string>
+    <key>StandardErrorPath</key><string>/path/to/israel-tv/data/launchd-resolver.log</string>
 </dict>
 </plist>

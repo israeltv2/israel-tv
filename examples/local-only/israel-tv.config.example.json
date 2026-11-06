@@ -1,4 +1,9 @@
 {
   "role": "local-only",
-  "publisher": { "type": "local" }
+  "publisher": {
+    "type": "local"
+  },
+  "log": {
+    "file": "./data/logs/israel-tv.log"
+  }
 }

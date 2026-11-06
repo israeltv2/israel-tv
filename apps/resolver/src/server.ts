@@ -130,7 +130,21 @@ export function catalogLookup(
         log('catalog fetch failed', { path, status: r.status });
         return undefined;
       }
-      const parsed = schema.safeParse(await r.json());
+      // A catalog file is small (a season's play ids, the external-id map): anything huge is refused unread.
+      const declared = Number(r.headers.get('content-length') ?? 0);
+      const text = declared > MAX_CATALOG_FILE ? '' : await r.text();
+      if (declared > MAX_CATALOG_FILE || text.length > MAX_CATALOG_FILE) {
+        await r.body?.cancel().catch(() => {});
+        log('catalog file too large; ignored', { path });
+        return empty;
+      }
+      let body: unknown;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = undefined;
+      }
+      const parsed = schema.safeParse(body);
       if (!parsed.success) {
         log('catalog file does not match the resolver contract', {
           path,
@@ -255,6 +269,9 @@ export async function checkCatalog(
   }
   return `the catalog at ${base} lists no shows to check`;
 }
+
+/** The largest catalog file a resolver reads (bytes). */
+const MAX_CATALOG_FILE = 8 * 1024 * 1024;
 
 /** Why a catalog's contract cannot be used by this resolver, or undefined when it can. */
 export function contractProblem(c: Contract | undefined): string | undefined {

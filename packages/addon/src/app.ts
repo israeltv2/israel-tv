@@ -78,6 +78,15 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
   app.get('/status.json', file(sitePaths.status, CACHE.none));
   app.get('/registry.json', file(sitePaths.registry, CACHE.list));
   app.get('/freshness.json', file(sitePaths.freshness, CACHE.none));
+  // The catalog ↔ resolver contract (docs/contract.md): what a resolver pointed at this catalog reads.
+  app.get(`/${sitePaths.contract}`, file(sitePaths.contract, CACHE.list));
+  app.get(`/${sitePaths.extIds}`, file(sitePaths.extIds, CACHE.list));
+  app.get('/play/:series/:file', async (c) => {
+    const series = c.req.param('series');
+    const m = /^(\d+)\.json$/.exec(c.req.param('file'));
+    if (!m || !/^iltv_[a-z0-9]+_\d+$/.test(series)) return c.json({ error: 'not found' }, 404);
+    return file(sitePaths.seasonPlay(series, Number(m[1])), CACHE.list)(c);
+  });
 
   // /catalog/:type/:id.json and /catalog/:type/:id/:extra.json
   app.get('/catalog/:type/*', async (c) => {

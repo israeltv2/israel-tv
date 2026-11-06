@@ -1,29 +1,8 @@
 // The usage dashboard on the LAN admin page (owner only): this home's plays as the resolver sees them, the
 // public addon's counts as Cloudflare counts them, what each cannot see, and the health of ingest and of the
 // usage data itself. Server-rendered HTML from events.sqlite; no address is ever shown or stored.
-import type { DailyRow, EventRow, EventStore } from '@israel-tv/events';
+import { type DailyRow, type EventStore, queryEvents } from '@israel-tv/events';
 import type { ActiveSession } from '@israel-tv/resolver';
-
-const UNIT_MS = { m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
-
-/**
- * Events by filter, newest first — shared by `/events.json` and `israel-tv events`. `since` is an ISO time or
- * a span like `30m`, `2h`, `7d`.
- */
-export function queryEvents(events: EventStore, q: Record<string, string | undefined>): EventRow[] {
-  const span = q.since ? /^(\d+)([mhd])$/.exec(q.since) : null;
-  const since = span
-    ? new Date(Date.now() - Number(span[1]) * UNIT_MS[span[2] as 'm' | 'h' | 'd']).toISOString()
-    : q.since;
-  return events.events({
-    ...(q.playId ? { playId: q.playId } : {}),
-    ...(q.kind ? { kind: q.kind } : {}),
-    ...(q.outcome === 'ok' || q.outcome === 'error' ? { outcome: q.outcome } : {}),
-    ...(q.show ? { showId: q.show } : {}),
-    ...(since ? { since } : {}),
-    limit: Math.min(Number(q.limit) || 100, 1000),
-  });
-}
 
 /** The latest playback canary result per source (last 3 days). */
 export function latestCanary(events: EventStore): Dashboard['canary'] {
@@ -305,3 +284,5 @@ ${table(
 This page took ${esc(d.data.renderCpuMs)} ms of CPU to build.</p>
 </body></html>`;
 }
+
+export { queryEvents };
