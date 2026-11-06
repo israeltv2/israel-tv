@@ -444,6 +444,11 @@ export function workerConfig(
     // One data point per stream request, counted by Cloudflare (read back once a day; see public-usage.ts).
     // Analytics Engine must be enabled once on the account; until it is, the Worker deploys without it.
     ...(analytics ? { analytics_engine_datasets: [{ binding: 'USAGE', dataset: 'israel_tv_usage' }] } : {}),
+    // Per-client limits on search and streams (see apps/catalog/src/limit.ts for the numbers and the fallback).
+    ratelimits: [
+      { name: 'RATE_STREAM', namespace_id: '1001', simple: { limit: 120, period: 60 } },
+      { name: 'RATE_SEARCH', namespace_id: '1002', simple: { limit: 60, period: 60 } },
+    ],
   };
 }
 

@@ -5,6 +5,7 @@
 // stream request writes one Analytics Engine data point; the home daemon reads the daily counts back.
 import { createAddonApp } from '@israel-tv/addon';
 import { clientHash, parseSeriesId, withOrigin } from '@israel-tv/core';
+import { LIMITS, limitKind, memoryLimiter, type RateLimiter, tooMany } from './limit.ts';
 
 interface Env {
   ASSETS: Fetcher;
@@ -12,7 +13,12 @@ interface Env {
   CLIENT_SALT?: string;
   /** Analytics Engine dataset for stream-request counts. */
   USAGE?: AnalyticsEngineDataset;
+  /** Cloudflare rate-limiting bindings (per client, per minute). */
+  RATE_STREAM?: RateLimiter;
+  RATE_SEARCH?: RateLimiter;
 }
+
+const fallback = { stream: memoryLimiter(LIMITS.stream), search: memoryLimiter(LIMITS.search) };
 
 let app: ReturnType<typeof createAddonApp> | undefined;
 
@@ -45,6 +51,30 @@ export default {
       },
     });
     // Static files first (as Cloudflare does when the Worker does not run first), then the app.
+    // Search and stream requests are limited per client (salted daily hash of the address, never the address).
+    const url = new URL(request.url);
+    const kind = limitKind(url);
+    const salt = env.CLIENT_SALT;
+    const address = request.headers.get('cf-connecting-ip');
+    const client = salt && address ? await clientHash(salt, address) : undefined;
+    if (kind) {
+      const limiter = (kind === 'stream' ? env.RATE_STREAM : env.RATE_SEARCH) ?? fallback[kind];
+      const { success } = await limiter.limit({ key: client ?? address ?? 'unknown' });
+      if (!success) {
+        console.log(
+          JSON.stringify({
+            ev: EVENT_MARK,
+            kind: 'request',
+            route: kind,
+            status: 429,
+            outcome: 'error',
+            limited: true,
+            client,
+          }),
+        );
+        return tooMany(kind);
+      }
+    }
     // Catalog rows go through the app (it adds a warning to a row that has not been updated for too long);
     // other static files are served as they are, and the app answers whatever is not a file.
     const path = new URL(request.url).pathname;
@@ -56,13 +86,9 @@ export default {
     else if (/json/.test(res.headers.get('content-type') ?? '')) {
       res = new Response(withOrigin(await res.text(), new URL(request.url).origin), res);
     }
-    const salt = env.CLIENT_SALT;
-    const address = request.headers.get('cf-connecting-ip');
     ctx.waitUntil(
       (async () => {
-        const url = new URL(request.url);
         const what = describeRequest(url);
-        const client = salt && address ? await clientHash(salt, address) : undefined;
         const outcome = res.status < 400 ? 'ok' : 'error';
         const ms = Date.now() - t0;
         console.log(
