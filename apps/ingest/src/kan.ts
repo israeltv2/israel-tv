@@ -140,7 +140,7 @@ export function mergeEpisodes(
 export async function crawlKan(
   store: Store,
   opts: KanCrawlOptions,
-): Promise<{ pages: number; newEpisodes: number; note: string }> {
+): Promise<{ pages: number; newEpisodes: number; note: string; failed?: boolean }> {
   const log = opts.log ?? (() => {});
   const now = Date.now();
   const state = store.getState<CrawlState>(STATE_KEY) ?? { shows: {} };
@@ -151,16 +151,21 @@ export async function crawlKan(
     return { pages: 0, newEpisodes: 0, note: 'browser.type is none: Kan is off' };
 
   const runId = store.startRun('crawl', 'kan');
-  const loader = opts.loader ?? (await createChromeLoader(opts.browser, opts.proxy));
+  let loader: PageLoader | undefined = opts.loader;
   const playsDirectly = opts.playsDirectly ?? defaultPlaysDirectly;
   let pages = 0;
   let newEpisodes = 0;
   let blocked = 0;
   let note = '';
 
+  const origin = (url: string) => new URL(url).origin;
   const load = async (url: string) => {
     if (pages > 0) await sleep(opts.pageIntervalMs);
     pages++;
+    loader ??= await createChromeLoader(
+      opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
+      opts.proxy,
+    );
     const r = await loader.load(url);
     if (r.challenged || r.status === 403 || r.status === 407) {
       blocked++;
@@ -176,7 +181,7 @@ export async function crawlKan(
     if (!state.lobbiesAt || now - Date.parse(state.lobbiesAt) > 24 * HOUR) {
       const byUrl = new Map<string, string>();
       for (const l of KAN_LOBBIES) {
-        if (pages >= opts.pagesPerRun) break;
+        if (!byUrl.has(l.url) && pages >= opts.pagesPerRun) break;
         const html = byUrl.get(l.url) ?? (await load(l.url));
         byUrl.set(l.url, html);
         for (const path of parseLobby(html, l.origin, l.channelPath)) {
@@ -201,7 +206,7 @@ export async function crawlKan(
       const path = new URL(key).pathname;
       let page: ReturnType<typeof parseShowPage>;
       try {
-        page = parseShowPage(await load(key), path);
+        page = parseShowPage(await load(key), path, s.origin);
       } catch (err) {
         if (blocked > 0) throw err;
         // A broken show page is that show's problem only: note it and try again next week.
@@ -218,11 +223,13 @@ export async function crawlKan(
       const known = new Set(
         id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
       );
+      const seenBefore = new Set([...s.pending, ...s.failed]);
       s.failed = [];
       s.pending = page.episodes
         .map((e) => `${s.origin}${e.path}`)
         .filter((u) => !known.has(`kan:${/(\d+)\/$/.exec(u)?.[1]}`));
-      if (!firstRead && s.pending.length > 0) s.lastNewAt = s.checkedAt;
+      // "Airing" means the show page revealed links we had never seen, not an old backlog or retries.
+      if (!firstRead && s.pending.some((u) => !seenBefore.has(u))) s.lastNewAt = s.checkedAt;
       // Single-video show: the video is on the show page itself.
       if (page.episodes.length === 0 && page.featured) {
         newEpisodes += saveEpisodes(store, key, s, [
@@ -237,19 +244,30 @@ export async function crawlKan(
       .sort(([, a], [, b]) => (b.checkedAt ?? '').localeCompare(a.checkedAt ?? ''));
     for (const [key, s] of queue) {
       const batch: { episode: ScrapedEpisode; season: number | undefined }[] = [];
-      while (s.pending.length > 0 && pages < opts.pagesPerRun) {
-        const url = s.pending[0] as string;
-        try {
-          const e = parseEpisodePage(await load(url));
-          if (e) batch.push({ episode: toEpisode(e, await playsDirectly(e.hls)), season: e.seasonNumber });
-          else s.failed.push(url);
-        } catch (err) {
-          if (blocked > 0) throw err;
-          s.failed.push(url);
+      try {
+        while (s.pending.length > 0 && pages < opts.pagesPerRun) {
+          const url = s.pending[0] as string;
+          let problem: string | undefined;
+          try {
+            const e = parseEpisodePage(await load(url), origin(url));
+            if (e) batch.push({ episode: toEpisode(e, await playsDirectly(e.hls)), season: e.seasonNumber });
+            else problem = 'no video player config on the page (layout changed?)';
+          } catch (err) {
+            if (blocked > 0) throw err;
+            problem = (err as Error).message;
+          }
+          if (problem) {
+            s.failed.push(url);
+            store.addWarnings(runId, store.findSeriesId('kan', key) ?? null, [
+              { code: 'source-note', message: `Kan episode ${url}: ${problem}` },
+            ]);
+          }
+          s.pending.shift();
         }
-        s.pending.shift();
+      } finally {
+        // Episodes read before a block are kept, never re-read.
+        if (batch.length > 0) newEpisodes += saveEpisodes(store, key, s, batch);
       }
-      if (batch.length > 0) newEpisodes += saveEpisodes(store, key, s, batch);
       if (pages >= opts.pagesPerRun) break;
     }
     const pendingTotal = Object.values(state.shows).reduce((n, s) => n + s.pending.length, 0);
@@ -267,10 +285,10 @@ export async function crawlKan(
     });
   } finally {
     store.setState(STATE_KEY, state);
-    if (!opts.loader) await loader.close();
+    if (!opts.loader) await loader?.close();
   }
   log(`kan: ${note}`);
-  return { pages, newEpisodes, note };
+  return { pages, newEpisodes, note, ...(note.startsWith('stopped:') ? { failed: true } : {}) };
 }
 
 function saveEpisodes(

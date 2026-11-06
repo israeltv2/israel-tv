@@ -57,7 +57,7 @@ export interface KanShowPage {
 }
 
 /** Episode links of a show page: `<show>/<id>/` or `<show>/s<season>/<id>/`. */
-export function parseShowPage(html: string, showPath: string): KanShowPage {
+export function parseShowPage(html: string, showPath: string, origin: string = KAN_ORIGIN): KanShowPage {
   const esc = showPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(`href="(?:https://[^"/]+)?(${esc}(?:s[\\w-]+/)?(\\d+)/)"`, 'g');
   const seen = new Map<string, KanEpisodeLink>();
@@ -72,7 +72,7 @@ export function parseShowPage(html: string, showPath: string): KanShowPage {
   const desc = /class="info-description[^"]*"[^>]*>([\s\S]*?)<\/div>/.exec(html)?.[1];
   const description = desc ? stripTags(desc) : meta(html, 'og:description');
   const image = meta(html, 'og:image');
-  const featured = parseEpisodePage(html);
+  const featured = parseEpisodePage(html, origin);
   return {
     title: title.replace(/\s*\|\s*כאן.*$/, '').trim(),
     ...(description ? { description } : {}),
@@ -107,7 +107,7 @@ export interface KanEpisode {
 }
 
 /** The first VOD player config on the page with an HLS URL, or undefined. */
-export function parseEpisodePage(html: string): KanEpisode | undefined {
+export function parseEpisodePage(html: string, origin: string = KAN_ORIGIN): KanEpisode | undefined {
   const re = /<script type="application\/json" data-redge-config="[^"]*">([\s\S]*?)<\/script>/g;
   for (const m of html.matchAll(re)) {
     let raw: unknown;
@@ -120,7 +120,7 @@ export function parseEpisodePage(html: string): KanEpisode | undefined {
     if (!c.success || c.data.isLive) continue;
     const hls = c.data.file?.hls;
     if (!hls) continue;
-    const poster = c.data.poster ? new URL(c.data.poster, KAN_ORIGIN).toString() : undefined;
+    const poster = c.data.poster ? new URL(c.data.poster, origin).toString() : undefined;
     const description = meta(html, 'og:description') ?? meta(html, 'description');
     return {
       id: c.data.id,

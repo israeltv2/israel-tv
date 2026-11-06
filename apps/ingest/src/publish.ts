@@ -33,7 +33,12 @@ export function buildStatus(store: Store, sources: Source[], now = Date.now()): 
     const airing = store.lastRun('airing', source);
     const notes: string[] = [];
     let health: Health = 'ok';
-    const lastOkFull = full && full.status !== 'failed' ? full : undefined;
+    const lastOkFull =
+      source === 'kan'
+        ? store.lastGoodRun('crawl', 'kan')
+        : full && full.status !== 'failed'
+          ? full
+          : undefined;
     if (!full) {
       health = 'warn';
       notes.push('no full run yet');
@@ -45,9 +50,14 @@ export function buildStatus(store: Store, sources: Source[], now = Date.now()): 
       health = 'warn';
       notes.push(`last full run partial: ${full.showsFailed} shows failed`);
     }
-    if (lastOkFull && now - Date.parse(lastOkFull.startedAt) > 36 * HOURS) {
+    // Time since the last good run; for a source that never had one, since its first attempt.
+    const ref =
+      lastOkFull ?? (full ? store.firstRun(source === 'kan' ? 'crawl' : 'full', source) : undefined);
+    if (full && ref && now - Date.parse(ref.startedAt) > 36 * HOURS) {
       health = 'error';
-      notes.push('no successful full run in 36 hours');
+      notes.push(
+        lastOkFull ? 'no successful run in 36 hours' : 'never succeeded, first tried over 36 hours ago',
+      );
     }
     if (source !== 'live' && shows.length === 0 && full) {
       health = 'error';
