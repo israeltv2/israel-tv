@@ -285,7 +285,7 @@ export class PublishError extends Error {
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
 
 /** wrangler's own error line, e.g. "Authentication failed (status: 400) [code: 9106]", first; then a hint. */
-function publishError(
+export function publishError(
   out: string,
   code: number | null,
   p: { apiTokenEnv: string; accountIdEnv: string },
@@ -302,11 +302,17 @@ function publishError(
   const reason = head
     ? `${head}${next && /^[A-Za-z]/.test(next) ? ` ${next}` : ''}`
     : (lines.at(-1) ?? `wrangler exited with ${code}`);
+  // Cloudflare's own trouble (5xx, "no healthy upstream", timeouts) is not a setup problem: say so, it is retried.
+  const outage =
+    /no healthy upstream|malformed response|status: 5\d\d|\b5\d\d\b|timed? ?out|ETIMEDOUT|ECONNRESET|fetch failed/i.test(
+      reason,
+    );
+  const hint = outage
+    ? "This looks like a problem on Cloudflare's side; it is retried after the next run.\n"
+    : `Check ${p.apiTokenEnv} and ${p.accountIdEnv} in .env, that the token may edit Workers scripts, and that ` +
+      `your workers.dev subdomain exists (README, "Reachable from anywhere").\n`;
   return new PublishError(
-    `Cloudflare deploy failed: ${reason}\n` +
-      `Check ${p.apiTokenEnv} and ${p.accountIdEnv} in .env, that the token may edit Workers scripts, and that ` +
-      `your workers.dev subdomain exists (README, "Reachable from anywhere").\n` +
-      `wrangler said:\n${lines.slice(-12).join('\n')}`,
+    `Cloudflare deploy failed: ${reason}\n${hint}wrangler said:\n${lines.slice(-12).join('\n')}`,
   );
 }
 

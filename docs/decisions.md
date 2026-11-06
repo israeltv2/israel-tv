@@ -448,3 +448,31 @@ response) counted as a dead browser, so one such page stopped Kan for good. Now 
 start, or a proxy, network or browser-closed error, backs off at once; other load errors go through the suspect
 rule like a server error. (2) A show first seen in a lobby after the first lobby read (a premiere) was re-read only
 weekly, so its next episodes came up to a week late; such shows are now airing from the start (6-hour re-reads).
+
+### Code review, round 21 (2026-11-06)
+
+**No real findings.** One item noted below the bar and accepted: when a known Kan show's page fails while that
+show still has episode pages waiting, saving the next episode clears the show's "failing" mark; the warning and
+that slice's partial run remain, and the page is read again a week later (mostly relevant during the first fill).
+
+### Single-show refresh, verified on the live deployment (2026-11-06)
+
+No new Mako episode was due (Friday), so the refresh path was exercised on live data instead. On the deployment,
+the newest episode of one Mako show (a daily news show, S2026E212, aired 5 Nov) and one Reshet show (S1E94,
+aired 6 Nov) were removed from the store (both the show data and the stored number, as before they arrived; the
+database was backed up first) and the site was published; both were then gone from the public meta. Then
+`POST /refresh/<id>` on the LAN admin port:
+
+| Show   | Back in public meta (from the POST) | Number      | Play-check (master/variant/segment)                   |
+| ------ | ----------------------------------- | ----------- | ----------------------------------------------------- |
+| Mako   | 63 s                                | S2026E212 ✓ | 200/200/206 via the resolver                          |
+| Reshet | 31 s                                | S1E94 ✓     | 200/200/206 via the public addon and via the resolver |
+
+Both came back with their original numbers. The time is almost all the Cloudflare upload. During the test
+Cloudflare's API answered "no healthy upstream" for about 8 minutes; publishing failed visibly (`/status`:
+health error with Cloudflare's reason) and succeeded on retry. The hint printed with that failure blamed the
+token and account id; it now says when the problem is on Cloudflare's side.
+
+The natural test (a newly published episode appearing through the hourly airing run) is still pending: it needs
+a broadcaster to publish one. It shows on `/status` as the latest airing run's new episodes, and in the app as
+the show moving to the top of its row.
