@@ -369,3 +369,14 @@ page embeds a player before listing its episode pages would have had that video 
 episode shifted by one (a page video is now taken as a single-video show only after two reads at least a day
 apart, and an episode page carrying a video already stored from the show page is not stored again); a known
 Kan show whose page disappeared stayed healthy on `/status` (it is now marked failing, its data kept).
+
+### Code review, round 12, and a simplification (2026-11-06)
+
+Round 12 found two more defects, both in the logic that stored a video embedded in a Kan _show_ page as a
+"single-video show" (an endless re-read of a page whose video was already stored, and a premiere whose
+episodes are season 2 shifting that season's numbers). Each fix of that path had produced a new edge case
+(rounds 10–12), and the evidence for such shows was thin (the one recorded "single" page also links an episode
+page). Decision: **Kan episodes come only from episode pages**, keyed by their stable page id; a video
+embedded in a show page is never stored. A known show whose page lists no episode pages is a failed read.
+Possible gap: a Kan special published with no episode page of its own would not appear. No such episode had
+been stored (checked on the deployment database).

@@ -52,12 +52,10 @@ export interface KanShowPage {
   description?: string;
   image?: string;
   episodes: KanEpisodeLink[];
-  /** Player config embedded in the show page itself (single-video shows). */
-  featured?: KanEpisode;
 }
 
 /** Episode links of a show page: `<show>/<id>/` or `<show>/<season>/<id>/`. */
-export function parseShowPage(html: string, showPath: string, origin: string = KAN_ORIGIN): KanShowPage {
+export function parseShowPage(html: string, showPath: string): KanShowPage {
   const esc = showPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // The season part, when present, is one path segment: `s2/` on kan.org.il, `עונה-3/` on kankids.
   const re = new RegExp(`href="(?:https://[^"/]+)?(${esc}(?:[^"/]+/)?(\\d+)/)"`, 'g');
@@ -73,13 +71,11 @@ export function parseShowPage(html: string, showPath: string, origin: string = K
   const desc = /class="info-description[^"]*"[^>]*>([\s\S]*?)<\/div>/.exec(html)?.[1];
   const description = desc ? stripTags(desc) : meta(html, 'og:description');
   const image = meta(html, 'og:image');
-  const featured = parseEpisodePage(html, origin);
   return {
     title: title.replace(/\s*\|\s*כאן.*$/, '').trim(),
     ...(description ? { description } : {}),
     ...(image ? { image } : {}),
     episodes: [...seen.values()].sort((a, b) => a.id - b.id),
-    ...(featured ? { featured } : {}),
   };
 }
 
