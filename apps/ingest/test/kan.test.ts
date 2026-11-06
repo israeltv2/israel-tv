@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import type { PageLoader } from '@israel-tv/kan';
 import { Store } from '@israel-tv/store';
 import { expect, test } from 'vitest';
 import { crawlKan, type KanCrawlOptions } from '../src/kan.ts';
@@ -30,13 +31,17 @@ function loader(routes: Record<string, string>, challenged = new Set<string>()) 
   };
 }
 
-const opts = (l: ReturnType<typeof loader>, pagesPerRun: number): KanCrawlOptions => ({
+const opts = (l: PageLoader, pagesPerRun: number): KanCrawlOptions => ({
   browser: { type: 'chrome', headed: true },
   pagesPerRun,
   pageIntervalMs: 0,
   airingWindowDays: 14,
   loader: l,
 });
+
+/** Every stored Kan episode, in show and season order. */
+const kanEpisodes = (store: Store) =>
+  store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes));
 
 const routes = {
   '/lobby/kan11/': 'lobby-kan11',
@@ -50,12 +55,7 @@ test('crawl fills a show over several budgeted slices and never re-reads known e
   const l = loader(routes);
   const first = await crawlKan(store, opts(l, 3));
   expect(first.pages).toBe(3); // 2 lobbies + 1 show page
-  for (
-    let i = 0;
-    i < 80 &&
-    store.listShows({ source: 'kan' }).flatMap((s) => s.show.seasons.flatMap((x) => x.episodes)).length < 9;
-    i++
-  ) {
+  for (let i = 0; i < 80 && kanEpisodes(store).length < 9; i++) {
     await crawlKan(store, opts(l, 10));
   }
   const show = store.listShows({ source: 'kan' }).find((s) => s.title.includes('אירוויזיון'));
@@ -130,7 +130,7 @@ test('a browser that cannot load pages at all makes the slice back off without m
     },
     async close() {},
   };
-  const r = await crawlKan(store, { ...opts(loader(routes), 5), loader: throwing as never });
+  const r = await crawlKan(store, { ...opts(loader(routes), 5), loader: throwing });
   expect(r.failed).toBe(true);
   const state = store.getState<{ backoffUntil?: string; shows: Record<string, { failedAt?: string }> }>(
     'kan:crawl',
@@ -152,12 +152,7 @@ test('a refreshed show whose page fails without a block counts as attempted (no 
 test('a known show whose page lists no episodes is a failed read, even with a player on the page', async () => {
   const store = Store.open(':memory:');
   const l = loader(routes);
-  for (
-    let i = 0;
-    i < 60 &&
-    store.listShows({ source: 'kan' }).flatMap((s) => s.show.seasons.flatMap((x) => x.episodes)).length < 9;
-    i++
-  ) {
+  for (let i = 0; i < 60 && kanEpisodes(store).length < 9; i++) {
     await crawlKan(store, opts(l, 10));
   }
   const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
@@ -171,7 +166,7 @@ test('a known show whose page lists no episodes is a failed read, even with a pl
     },
   };
   await crawlKan(store, {
-    ...opts(l2 as never, 3),
+    ...opts(l2, 3),
     priority: ['https://www.kan.org.il/content/kan/kan-11/p-1006421/'],
   });
   expect(store.assignments(id).episodes.length).toBe(before);
@@ -181,8 +176,7 @@ test('a known show whose page lists no episodes is a failed read, even with a pl
 test('a known Kan show whose page disappears shows as failing', async () => {
   const store = Store.open(':memory:');
   const l = loader(routes);
-  const eps = () =>
-    store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes)).length;
+  const eps = () => kanEpisodes(store).length;
   for (let i = 0; i < 80 && eps() < 9; i++) await crawlKan(store, opts(l, 10));
   const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
   const gone = {
@@ -192,7 +186,7 @@ test('a known Kan show whose page disappears shows as failing', async () => {
     },
   };
   await crawlKan(store, {
-    ...opts(gone as never, 3),
+    ...opts(gone, 3),
     priority: ['https://www.kan.org.il/content/kan/kan-11/p-1006421/'],
   });
   expect(store.getShow(id)?.lastError).toMatch(/404/);
@@ -209,9 +203,8 @@ test('a Kan episode page that fails once does not get numbered after the later o
       return base.load(url);
     },
   };
-  const eps = () =>
-    store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes));
-  for (let i = 0; i < 30; i++) await crawlKan(store, opts(flaky as never, 10));
+  const eps = () => kanEpisodes(store);
+  for (let i = 0; i < 30; i++) await crawlKan(store, opts(flaky, 10));
   // Read up to the gap and stopped there.
   expect(eps().map((e) => e.key)).toEqual(['kan:1006639']);
   // Later (after the retry gap) the page works again: reading continues in order.
@@ -222,7 +215,7 @@ test('a Kan episode page that fails once does not get numbered after the later o
     for (const r of Object.values(s.retry ?? {})) r.at = '2000-01-01T00:00:00.000Z';
   if (state) store.setState('kan:crawl', state);
   fail = false;
-  for (let i = 0; i < 30 && eps().length < 9; i++) await crawlKan(store, opts(flaky as never, 10));
+  for (let i = 0; i < 30 && eps().length < 9; i++) await crawlKan(store, opts(flaky, 10));
   const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
   const byKey = new Map(store.assignments(id).episodes.map((e) => [e.key, e.episode]));
   expect(byKey.get('kan:1006639')).toBe(1);
@@ -248,14 +241,14 @@ test('an episode page given up on is not queued again when the show page is re-r
     if (st) store.setState('kan:crawl', st);
   };
   for (let i = 0; i < 40; i++) {
-    await crawlKan(store, opts(dead as never, 10));
+    await crawlKan(store, opts(dead, 10));
     age();
   }
-  const eps = store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes));
+  const eps = kanEpisodes(store);
   expect(eps.length).toBe(8); // all but the dead page
   // Re-read the show page: the dead page must not come back to block the queue.
   const key = 'https://www.kan.org.il/content/kan/kan-11/p-1006421/';
-  await crawlKan(store, { ...opts(dead as never, 3), priority: [key] });
+  await crawlKan(store, { ...opts(dead, 3), priority: [key] });
   const st = store.getState<{ shows: Record<string, { pending: string[] }> }>('kan:crawl');
   expect(st?.shows[key]?.pending).toEqual([]);
 });
@@ -283,8 +276,8 @@ test('server errors on two pages in a row back off without charging anything', a
       return /\/(s1\/\d+|p-\d+)\/$/.test(url) ? { status: 503, html: '', challenged: false } : base.load(url);
     },
   };
-  let r = await crawlKan(store, opts(down as never, 10));
-  for (let i = 0; i < 5 && !r.failed; i++) r = await crawlKan(store, opts(down as never, 10));
+  let r = await crawlKan(store, opts(down, 10));
+  for (let i = 0; i < 5 && !r.failed; i++) r = await crawlKan(store, opts(down, 10));
   expect(r.failed).toBe(true);
   const st = store.getState<Crawl>('kan:crawl');
   expect(st?.backoffUntil).toBeDefined();
@@ -301,7 +294,7 @@ test('one episode page that always answers 500 is given up in time; the rest are
     },
   };
   for (let i = 0; i < 80; i++) {
-    await crawlKan(store, opts(broken as never, 10));
+    await crawlKan(store, opts(broken, 10));
     age(store);
   }
   const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
@@ -322,9 +315,8 @@ test('a show page that always answers 500 is charged and skipped, not a reason t
       return url === brokenShow ? { status: 500, html: '', challenged: false } : base.load(url);
     },
   };
-  const eps = () =>
-    store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes)).length;
-  for (let i = 0; i < 60 && eps() < 9; i++) await crawlKan(store, opts(l as never, 10));
+  const eps = () => kanEpisodes(store).length;
+  for (let i = 0; i < 60 && eps() < 9; i++) await crawlKan(store, opts(l, 10));
   expect(eps()).toBe(9); // the Eurovision show was still read in full
   const st = store.getState<{ shows: Record<string, { failedAt?: string; checkedAt?: string }> }>(
     'kan:crawl',
@@ -348,7 +340,7 @@ test('an outage of kankids alone is not blamed on its pages while kan.org.il wor
     },
   };
   for (let i = 0; i < 60; i++) {
-    await crawlKan(store, opts(l as never, 10));
+    await crawlKan(store, opts(l, 10));
     age(store);
   }
   const st = store.getState<Crawl>('kan:crawl');
@@ -371,7 +363,7 @@ test('a lone server error at the end of a slice is settled with the lobby, and s
   };
   let charged = false;
   for (let i = 0; i < 40 && !charged; i++) {
-    await crawlKan(store, opts(l as never, 10));
+    await crawlKan(store, opts(l, 10));
     const st = store.getState<Crawl>('kan:crawl');
     charged = Object.values(st?.shows ?? {}).some((s) => Object.keys(s.retry ?? {}).length > 0);
   }
@@ -382,7 +374,7 @@ test('a lone server error at the end of a slice is settled with the lobby, and s
 test('an outage of episode pages alone, with the lobby up, never charges the waiting page', async () => {
   const store = Store.open(':memory:');
   const base = loader(routes);
-  for (let i = 0; i < 30; i++) await crawlKan(store, opts(base as never, 10)); // first fill
+  for (let i = 0; i < 30; i++) await crawlKan(store, opts(base, 10)); // first fill
   const key = 'https://www.kan.org.il/content/kan/kan-11/p-1006421/';
   const st = store.getState<Crawl & { shows: Record<string, { pending: string[] }> }>('kan:crawl');
   const show = st?.shows[key];
@@ -396,7 +388,7 @@ test('an outage of episode pages alone, with the lobby up, never charges the wai
     },
   };
   for (let i = 0; i < 20; i++) {
-    await crawlKan(store, opts(down as never, 10));
+    await crawlKan(store, opts(down, 10));
     age(store);
   }
   const after = store.getState<Crawl>('kan:crawl')?.shows[key];
@@ -413,9 +405,8 @@ test('a lobby that fails does not stop the crawl of known shows', async () => {
       return url.includes('lobby-kids') ? { status: 503, html: '', challenged: false } : base.load(url);
     },
   };
-  const eps = () =>
-    store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes)).length;
-  for (let i = 0; i < 30 && eps() < 9; i++) await crawlKan(store, opts(l as never, 10));
+  const eps = () => kanEpisodes(store).length;
+  for (let i = 0; i < 30 && eps() < 9; i++) await crawlKan(store, opts(l, 10));
   expect(eps()).toBe(9);
 });
 
@@ -430,7 +421,7 @@ test('one episode page that times out is treated like a server error, not a dead
     },
   };
   for (let i = 0; i < 80; i++) {
-    await crawlKan(store, opts(l as never, 10));
+    await crawlKan(store, opts(l, 10));
     age(store);
   }
   const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
@@ -449,8 +440,8 @@ test('a proxy error backs off without charging the page', async () => {
       return base.load(url);
     },
   };
-  let r = await crawlKan(store, opts(l as never, 10));
-  for (let i = 0; i < 5 && !r.failed; i++) r = await crawlKan(store, opts(l as never, 10));
+  let r = await crawlKan(store, opts(l, 10));
+  for (let i = 0; i < 5 && !r.failed; i++) r = await crawlKan(store, opts(l, 10));
   expect(r.failed).toBe(true);
   const st = store.getState<Crawl>('kan:crawl');
   expect(Object.values(st?.shows ?? {}).every((s) => !s.retry && s.failed.length === 0)).toBe(true);
@@ -458,7 +449,7 @@ test('a proxy error backs off without charging the page', async () => {
 
 test('a show that appears in a later lobby read is airing from the start', async () => {
   const store = Store.open(':memory:');
-  await crawlKan(store, opts(loader(routes) as never, 3));
+  await crawlKan(store, opts(loader(routes), 3));
   const st = store.getState<Crawl & { lobbiesAt?: string; shows: Record<string, { lastNewAt?: string }> }>(
     'kan:crawl',
   );
@@ -468,7 +459,7 @@ test('a show that appears in a later lobby read is airing from the start', async
   if (firstKey) delete st.shows[firstKey];
   st.lobbiesAt = '2000-01-01T00:00:00.000Z';
   store.setState('kan:crawl', st);
-  await crawlKan(store, opts(loader(routes) as never, 3));
+  await crawlKan(store, opts(loader(routes), 3));
   const after = store.getState<Crawl & { shows: Record<string, { lastNewAt?: string }> }>('kan:crawl');
   expect(firstKey && after?.shows[firstKey]?.lastNewAt).toBeTruthy();
 });

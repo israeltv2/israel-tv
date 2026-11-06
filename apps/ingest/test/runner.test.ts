@@ -1,6 +1,7 @@
 import type { ScrapedShow } from '@israel-tv/core';
 import { Store } from '@israel-tv/store';
 import { expect, test } from 'vitest';
+import { buildStatus } from '../src/publish.ts';
 import { runAiring, runFull, runOne } from '../src/runner.ts';
 import type { ShowEntry, SourceAdapter } from '../src/sources.ts';
 
@@ -64,6 +65,22 @@ test('full run saves shows, skips empty ones, and allocates ids only for real sh
   const r = await runFull(store, a, opts);
   expect(r).toMatchObject({ status: 'ok', showsOk: 3, showsFailed: 0, newEpisodes: 5 });
   expect(store.listShows().map((s) => s.seriesId)).toEqual(['iltv_mako_1', 'iltv_mako_2']);
+});
+
+test('a listed show without episodes is never dropped silently: warned, and named on /status', async () => {
+  const store = Store.open(':memory:');
+  const a = adapter(entries('/a', '/empty'), {
+    '/a': show('/a', [{ key: 's1', title: 'עונה 1', n: 3 }]),
+    '/empty': show('/empty', []),
+  });
+  await runFull(store, a, opts);
+  expect(store.recentWarnings(10).map((w) => w.message)).toContain(
+    '/empty: listed, but its page has no episodes',
+  );
+  const status = buildStatus(store, ['mako'], Date.now());
+  const mako = status.sources.find((x) => x.source === 'mako');
+  expect(mako?.health).toBe('ok');
+  expect(mako?.notes.join(' ')).toContain('1 shows listed by the site have no episodes on their page');
 });
 
 test('a failing show keeps its last good data and is marked', async () => {

@@ -256,6 +256,23 @@ export function renderSite(input: RenderInput): SiteFiles {
     files.set(sitePaths.meta(def.type, id), json({ meta: { ...item, videos: [] } }));
   }
 
+  // Every row of a running source is in the manifest, even before it has shows (Kan fills over days): an
+  // empty row says it is still loading instead of being left out.
+  const running = new Set(input.sources ?? CATALOGS.map((c) => c.source));
+  for (const def of CATALOGS) {
+    if (!running.has(def.source) || rows.get(def.id)?.length) continue;
+    const id = `${STATUS_ID_PREFIX}${def.id}`;
+    const text = 'עדיין בטעינה: התוכניות יופיעו כאן בקרוב';
+    const item: MetaPreview = {
+      id,
+      type: def.type,
+      name: `⏳ ${text}`,
+      description: `${text}\nפרטים: /status`,
+    };
+    rows.set(def.id, [item]);
+    files.set(sitePaths.meta(def.type, id), json({ meta: { ...item, videos: [] } }));
+  }
+
   for (const [catalog, metas] of rows) {
     const def = CATALOGS.find((c) => c.id === catalog);
     if (!def) continue;

@@ -476,3 +476,33 @@ token and account id; it now says when the problem is on Cloudflare's side.
 The natural test (a newly published episode appearing through the hourly airing run) is still pending: it needs
 a broadcaster to publish one. It shows on `/status` as the latest airing run's new episodes, and in the app as
 the show moving to the top of its row.
+
+### Supervisor review after the final report (2026-11-06)
+
+- **Kan Kids/Teens row.** The row (`iltv_kankids`, "כאן חינוכית: ילדים ונוער") existed but was left out of the
+  manifest while it had no shows: the Kan crawl reads Kan 11's shows first, and on the first day all 50
+  Kids/Teens shows were still unread. An empty row of a running source is now always in the manifest, with a
+  first item "⏳ עדיין בטעינה" (still loading) until its first show arrives, instead of being left out. A row of a
+  source that is off (or Kan without a browser) stays out.
+- **Reshet shows without episodes.** Reshet's index lists 270 shows (the 267 of an earlier export); 225 have
+  episodes and are in the catalog. The other 45 pages have no episode list: checked by hand on two of them
+  (empty `Base` and `PaginationArray` grids, no posts at all) — mostly foreign formats Reshet airs without VOD
+  rights. 16 of them were already noted; the other 29 were skipped with only a count in the log. Now every such
+  show gets a `source-note` warning, and each complete full read saves the list, which `/status` names per
+  source ("N shows listed by the site have no episodes on their page, so they are not in the catalog: …").
+  Health stays ok: it is the site's content, not a failure. The same applies to Mako.
+- **Cloudflare deploy path.** The only deploy path is `publish.ts` `deployCloudflare`: it refuses to run unless
+  the configured token and account id variables are set, and runs wrangler with an environment built from
+  scratch (PATH, the token, the account id) and a HOME of its own under the data folder, so no stored wrangler
+  login on the machine can be seen or used. No other script, package script or CI step calls wrangler. On the
+  deployment, that HOME holds no OAuth login. The stray Worker created on a personal account by an earlier
+  review test is deleted: its workers.dev URL answers 404.
+- **`/simplify` on the Kan crawler** (after rounds 13–20; four read-only reviewers: reuse, simplification,
+  efficiency, altitude). Applied, behaviour unchanged (all tests unchanged and green): `load()` now throws a
+  typed error saying what a failure means (`outage` / `suspect` / `page`) instead of a hidden `blocked` counter
+  every catch had to check first, and one `triage` helper handles show and episode pages; one `warn` helper for
+  the six warning sites; the episode key built with `kanEpisodeKey`; shared time constants; the series lookup
+  moved after the "is this show due" check (one query per known show per slice saved) and done once per show in
+  the episode loop; an explicit `stopped` flag instead of matching the note's wording; one batch item type;
+  stale comments fixed; tests typed against `PageLoader` (21 casts gone) with a shared episode helper.
+  Skipped: a shared `failing()` loader helper and one crawl-state type for the tests (readability only).
