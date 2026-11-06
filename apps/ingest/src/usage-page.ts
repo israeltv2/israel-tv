@@ -241,7 +241,7 @@ read back once a day (so today is not in yet). It cannot see catalog browsing (s
 watched or for how long (video goes from the broadcasters' servers to the player), or anything the home resolver
 answers. ${
     d.public.via
-      ? `Counted with ${esc(d.public.via === 'analytics-engine' ? 'Workers Analytics Engine' : 'Workers Logs')}${d.public.lastDay ? `; last day read ${esc(d.public.lastDay)}` : ''}.`
+      ? `Counted with Workers Analytics Engine${d.public.lastDay ? `; last day read ${esc(d.public.lastDay)}` : ''}.`
       : 'Not read yet.'
   }
 ${d.public.note ? `<span class="err">${esc(d.public.note)}</span>` : ''}</p>

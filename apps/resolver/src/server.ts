@@ -1,5 +1,8 @@
 // Resolver wiring: episode details (the home database on a full host, or a published catalog for a resolver that
 // runs on its own) + geo adapter from the config.
+
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import {
   type Config,
   type Contract,
@@ -12,35 +15,12 @@ import {
   SeasonPlaySchema,
   sitePaths,
 } from '@israel-tv/core';
+import { safeSitePath } from '@israel-tv/core/router-contract';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
-import { Store } from '@israel-tv/store';
 import type { z } from 'zod';
 import { createResolverApp, type ExternalHit, type ResolverDeps } from './app.ts';
 import { brandImage } from './branding.ts';
 import { createRemoteResolverApp } from './remote.ts';
-
-export function episodeLookup(storePath: string) {
-  let store: Store | undefined;
-  // Parsed episodes per show, reused until the show's data changes (Stremio asks for every episode opened).
-  const cache = new Map<string, { stamp: string; byKey: Map<string, ScrapedEpisode> }>();
-  return (series: string, season: number, episode: number): ScrapedEpisode | undefined => {
-    store ??= Store.openReadOnly(storePath);
-    const key = store.episodeKey(series, season, episode);
-    if (!key) return undefined;
-    const stamp = store.showStamp(series);
-    if (!stamp) return undefined;
-    let hit = cache.get(series);
-    if (hit?.stamp !== stamp) {
-      const byKey = new Map<string, ScrapedEpisode>();
-      for (const s of store.getShow(series)?.show.seasons ?? [])
-        for (const e of s.episodes) byKey.set(e.key, e);
-      hit = { stamp, byKey };
-      cache.set(series, hit);
-      if (cache.size > 200) cache.delete(cache.keys().next().value as string);
-    }
-    return hit.byKey.get(key);
-  };
-}
 
 export function resolverApp(
   config: Config,
@@ -60,14 +40,6 @@ export function resolverApp(
     fetch: (url, init) => fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }),
     ...(proxies.length > 0 ? { geoFetch: createGeoFetch(proxies) } : {}),
   });
-}
-
-export function externalLookup(storePath: string) {
-  let store: Store | undefined;
-  return (id: string) => {
-    store ??= Store.openReadOnly(storePath);
-    return store.externalSeries(id);
-  };
 }
 
 /** The remote (Mako-only) resolver for the tunnel, or a reason it cannot run. */
@@ -217,7 +189,27 @@ export function catalogLookup(
   };
 }
 
-/** Where the resolver gets episode details: a published catalog (resolver-only role) or the home database. */
+/** The local publish folder as a catalog the resolver reads over a fetch-like call. */
+const LOCAL_SITE = 'http://local-site';
+
+/** Reads files from the publish folder (only safe site paths), answering like a catalog server. */
+export function localSiteFetch(dir: string): typeof fetch {
+  return (async (input: string | URL | Request) => {
+    const path = decodeURIComponent(
+      new URL(String(input instanceof Request ? input.url : input)).pathname.slice(1),
+    );
+    if (!safeSitePath(path)) return new Response('', { status: 404 });
+    try {
+      return new Response(await readFile(join(dir, path)), {
+        headers: { 'content-type': 'application/json' },
+      });
+    } catch {
+      return new Response('', { status: 404 });
+    }
+  }) as typeof fetch;
+}
+
+/** Where the resolver gets episode details: the catalog's published contract files (see docs/contract.md). */
 export function lookups(
   config: Config,
   log?: (msg: string, fields?: Record<string, unknown>) => void,
@@ -228,7 +220,10 @@ export function lookups(
     const c = catalogLookup(config.resolver.catalogUrl, fetch, log);
     return { episode: c.episode, external: c.external };
   }
-  return { episode: episodeLookup(config.store.path), external: externalLookup(config.store.path) };
+  // A full instance reads the same contract files from its own publish folder, written before each deploy: the
+  // resolver never opens the catalog database.
+  const c = catalogLookup(LOCAL_SITE, localSiteFetch(config.publisher.dir), log);
+  return { episode: c.episode, external: c.external };
 }
 
 /**

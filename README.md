@@ -159,9 +159,8 @@ fails, that stream answers 502, the log says why, and the admin `/status` shows 
    template, limited to your account. Put the token and the account id in `.env` as
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Optional, for the public addon's usage counts: add the
    permission **Account → Account Analytics → Read** to the token, and switch on **Workers Analytics Engine**
-   once (dashboard → _Workers & Pages_ → _Analytics Engine_ → enable; free). Without them the counts come from
-   Workers Logs, which the template's permissions already read, and `/status` says so. Enabled it later? Restart
-   Israel TV: the next publish tries Analytics Engine again (otherwise it retries weekly).
+   once (dashboard → _Workers & Pages_ → _Analytics Engine_ → enable; free). Without them the public addon is not
+   counted and `/status` says so. Enabled it later? Run `pnpm israel-tv deploy-api`.
 3. In `israel-tv.config.json`: `"publisher": { "type": "cloudflare", "workerName": "israel-tv" }`. With it,
    the `:7700` addon on your machine stops: in your app, replace it with the `workers.dev` manifest URL (ids are
    the same, so watch progress stays).

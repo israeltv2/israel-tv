@@ -7,7 +7,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "playwright-core": "1.65.0",
+    "playwright-core": "catalog:",
     "@israel-tv/core": "workspace:*",
     "@israel-tv/net": "workspace:*"
   }

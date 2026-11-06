@@ -960,3 +960,45 @@ old Worker served until the switch. Then, live:
   Requests from many separate connections land on different Cloudflare servers, each with its own window, and
   Cloudflare's shared limiter is approximate by design, so a burst spread over many connections is not stopped
   quickly. Same as before the split; recorded as a known limit (the free daily cap still bounds the cost).
+
+### Analytics Engine on; Workers Logs no longer used for counting
+
+The owner enabled Analytics Engine on the account. `deploy-api` (which tries the binding every time) deployed the
+API Worker with it; stream requests showed up as data points within a minute, and the daily pull, run for the
+day on the home machine, read 3 rollup rows from it. The Workers Logs counting fallback is removed: a failed
+Analytics Engine read is now an error shown on `/status` and the dashboard. The API Worker still writes one
+Workers Logs line per request, for debugging.
+
+### Code structure and tooling
+
+- **The resolver never opens the catalog database**, on any role: a full instance's resolver reads the same
+  contract files (play files, `ext-ids.json`, `resolver-contract.json`) from its own publish folder, written
+  before each deploy, through the same lookup a resolver-only install uses over HTTP. `@israel-tv/store` is no
+  longer a resolver dependency. (New episodes reach the resolver when they are published, as they reach the
+  catalog.)
+- **Boundaries in CI** (`pnpm boundaries`, dependency-cruiser): no cycles; packages never import apps; the
+  resolver and catalog apps do not import other apps; the resolver imports neither ingest nor the catalog
+  database, renderer or scrapers; the Workers import no Node built-ins and no Node-only packages; the router
+  imports only the router contract; packages are used by name through their `exports`, never by path. TypeScript
+  7 has no JavaScript compiler API yet, so dependency-cruiser parses with swc (checked: 87 modules cruised, and
+  deliberate violations are caught).
+- **Hygiene in CI** (`pnpm hygiene`): knip (unused files, exports and dependencies: it found four unused
+  dependencies, removed; `wrangler`, `pino-roll` and `@swc/core` are used as a binary, a transport name and a
+  parser and are listed as such), publint `--strict` on every package (each now lists its `files`). Shared
+  dependency versions live in one pnpm catalog (`catalogMode: strict`).
+- **Biome stays the only linter and formatter**, stricter: unused imports, variables and parameters, floating
+  and misused promises, `import type`/`export type`, `node:` protocol, no non-null assertions, no `any`; CI runs
+  `biome ci --error-on-warnings`. It found one unhandled promise chain (made explicit) and a leftover type.
+- **Deprecations:** CI runs the tests with Node's pending deprecations on and a preload that fails the run on any
+  deprecated API (`pnpm test:strict`, `tools/fail-on-deprecation.mjs`), except a named allowlist — today one entry,
+  `process.binding()` inside `lodash.isequal`, which `got-scraping` pulls in through `ow`. Type-level deprecations
+  (typescript-eslint `no-deprecated`) need TypeScript's JavaScript API, which TypeScript 7 does not have yet:
+  measured gap, deferred until typescript-eslint supports TypeScript 7; no ESLint is added meanwhile.
+- **Imports rule:** other workspace packages only by name (`@israel-tv/<pkg>`, or a declared subpath such as
+  `@israel-tv/core/router-contract`); inside a package, relative imports (sources are one folder deep, so Node
+  subpath imports `#…` add nothing yet; they are the rule if a package grows nested folders). No tsconfig `paths`.
+- **`tsc --build` / project references:** not adopted. TypeScript 7 type-checks the whole workspace in seconds per
+  package; references would add config to keep in sync for no measured gain.
+- **CI:** the full suite on ubuntu-latest, macos-latest and windows-latest; lint, boundaries and hygiene once (on
+  Linux); `pnpm audit --prod` on every pull request, reporting only (no bots, no automatic updates; updates are
+  done on request with `pnpm up -i -r --latest`).

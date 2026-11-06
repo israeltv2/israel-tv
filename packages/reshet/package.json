@@ -13,7 +13,10 @@
   "dependencies": {
     "@israel-tv/core": "workspace:*",
     "@israel-tv/net": "workspace:*",
-    "zod": "4.6.7"
+    "zod": "catalog:"
   },
-  "license": "AGPL-3.0-only"
+  "license": "AGPL-3.0-only",
+  "files": [
+    "src"
+  ]
 }

@@ -13,3 +13,15 @@ minimumReleaseAgeExclude:
 allowBuilds:
   esbuild: true
   workerd: true
+  # swc ships prebuilt binaries; its postinstall only double-checks them.
+  "@swc/core": false
+
+# Versions shared by several packages, set once here (`"dep": "catalog:"` in each package.json).
+catalogMode: strict
+catalog:
+  croner: 11.0.0
+  drizzle-kit: 1.0.0-rc.5
+  drizzle-orm: 1.0.0-rc.5
+  hono: 4.13.16
+  playwright-core: 1.65.0
+  zod: 4.6.7

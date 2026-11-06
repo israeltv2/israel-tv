@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "@israel-tv/core": "workspace:*",
-    "hono": "4.13.16"
+    "hono": "catalog:"
   },
-  "license": "AGPL-3.0-only"
+  "license": "AGPL-3.0-only",
+  "files": [
+    "src"
+  ]
 }

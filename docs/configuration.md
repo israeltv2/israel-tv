@@ -97,8 +97,8 @@ Router requests count toward the free plan's 100,000 a day (one per row, search,
 call into the API Worker adds no request fee). Image URLs are written absolute at publish time (the address is
 `publicUrl`, or else the one the first deploy reported; on that very first publish only, the manifest and show
 pages also go through the API to get the address filled in). The home daemon reads the daily counts back with
-the same API token (Analytics Engine needs the token to also have "Account Analytics: Read"; without it the
-counts come from Workers Logs).
+the same API token from Analytics Engine (the token needs "Account Analytics: Read", and Analytics Engine
+must be enabled on the account; without them the public addon is not counted and `/status` says why).
 
 Publishing is batched: airing checks and Kan slices gather their changes into one deploy at most every
 `minIntervalMinutes`; the end of a full run and a show refresh you ask for publish at once.
