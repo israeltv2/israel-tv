@@ -1345,3 +1345,10 @@ spaces): "2024–present" while a show runs (an episode within the last year), "
 — the open "2024–" of IMDb and Cinemeta is left out, as it read as unfinished on the owner's phone. Nuvio shows any
 `releaseInfo` that is not a bare year as it is; for a bare year on a running series it would write "2026 -" itself.
 `status` and `lastAirDate` stay (Nuvio's "Status" row).
+
+## New versions reach apps quickly (2026-11-07)
+
+After the v0.2.2 deploy the owner's Nuvio still showed 0.2.1: the manifest was sent with `max-age=3600`, so
+Cloudflare's edge and apps could keep the old one for up to an hour, and when a full read was due at start the first
+publish waited behind it (about half an hour). Now the service publishes first thing at every start, before any
+read, and the manifest is cached for 300 s (catalogs and show pages keep 600 s, streams 300 s).

@@ -679,16 +679,16 @@ export async function startDaemon(
     const good = store.lastGoodRun('full', src);
     return !good || Date.now() - Date.parse(good.startedAt) > DAY_MS;
   });
+  // Publish first, whatever else is due: a new release's manifest (its version, its code's output) goes out now,
+  // not after a half-hour full run or the next batched publish.
+  d.enqueue('publish', () => d.publish());
   if (stale && opts.initialRun !== false) {
     log('no full run in the last 24 hours: starting one now (about half an hour; see /status)');
     d.fullRun();
-  } else {
-    if (stale)
-      log(
-        `no recent full run (a --limit test run does not count); skipped because of --no-initial-run. Next full run: ${d.nextRuns()[config.schedule.fullRun] ?? 'per schedule.fullRun'} (UTC; schedule is ${config.schedule.timezone})`,
-      );
-    d.enqueue('publish', () => d.publish());
-  }
+  } else if (stale)
+    log(
+      `no recent full run (a --limit test run does not count); skipped because of --no-initial-run. Next full run: ${d.nextRuns()[config.schedule.fullRun] ?? 'per schedule.fullRun'} (UTC; schedule is ${config.schedule.timezone})`,
+    );
   if (config.resolver.enabled) checkProxyAtStart(config, logger.for('geo-relay'), false); // the proxies are already listed above
   d.kanCrawl();
   return d;
