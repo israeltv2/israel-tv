@@ -1,0 +1,27 @@
+# systemd unit for the resolver on its own (role "resolver-only"). Setup, as root:
+#   useradd --system --create-home --home-dir /var/lib/israeltv israeltv
+#   git clone https://github.com/israeltv2/israel-tv.git /opt/israel-tv && cd /opt/israel-tv
+#   corepack enable || npm i -g pnpm@12.15.0
+#   pnpm install --prod --frozen-lockfile --filter "@israel-tv/resolver..."   # only what the resolver uses
+#   cp examples/resolver-only/israel-tv.config.example.json israel-tv.config.json   # set resolver.catalogUrl
+#   cp examples/resolver-only/.env.example .env && chmod 600 .env                 # only what the config uses
+#   chown -R israeltv: /opt/israel-tv
+#   cp deploy/israel-tv-resolver.service /etc/systemd/system/ && systemctl enable --now israel-tv-resolver
+# Check the catalog: cd /opt/israel-tv && sudo -u israeltv ISRAEL_TV_CONFIG=/opt/israel-tv/israel-tv.config.json node apps/resolver/src/cli.ts check-catalog
+# Logs: journalctl -u israel-tv-resolver -f. Restart after a change: systemctl restart israel-tv-resolver
+[Unit]
+Description=Israel TV resolver (resolver-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=israeltv
+WorkingDirectory=/opt/israel-tv
+Environment=ISRAEL_TV_CONFIG=/opt/israel-tv/israel-tv.config.json
+Environment=PATH=/usr/bin:/bin
+ExecStart=/usr/bin/node apps/resolver/src/cli.ts start
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

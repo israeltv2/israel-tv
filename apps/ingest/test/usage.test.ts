@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigSchema } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
+import { createLogger, scrub } from '@israel-tv/runtime';
 import { expect, test } from 'vitest';
-import { createLogger, scrub } from '../src/log.ts';
 import { pullPublicUsage } from '../src/public-usage.ts';
 import { workerConfig, workerFingerprint } from '../src/publish.ts';
 import { buildDashboard, renderUsagePage } from '../src/usage-page.ts';
@@ -138,7 +138,7 @@ test('a secret never reaches a log line, wherever it appears', async () => {
 });
 
 test('account ids count as secrets too', async () => {
-  const { secretValues } = await import('../src/log.ts');
+  const { secretValues } = await import('@israel-tv/runtime');
   expect(secretValues({ CLOUDFLARE_ACCOUNT_ID: 'a2b3c4d5e6f7', HOME: '/Users/x' })).toEqual(['a2b3c4d5e6f7']);
 });
 
@@ -213,7 +213,7 @@ test('with the public address known, image URLs are absolute and only catalog ro
 });
 
 test('each role says plainly what it needs and what does not belong', async () => {
-  const { checkRole } = await import('../src/config.ts');
+  const { checkRole } = await import('@israel-tv/runtime');
   const parse = (o: object) => ConfigSchema.parse(o);
   expect(() => checkRole(parse({ role: 'resolver-only' }))).toThrow(/resolver\.catalogUrl/);
   expect(() =>

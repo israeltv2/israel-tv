@@ -15,7 +15,8 @@
     "start": "node apps/ingest/src/cli.ts start",
     "israel-tv": "node apps/ingest/src/cli.ts",
     "logs": "node apps/ingest/src/cli.ts events",
-    "usage": "node apps/ingest/src/cli.ts usage"
+    "usage": "node apps/ingest/src/cli.ts usage",
+    "resolver": "node apps/resolver/src/cli.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

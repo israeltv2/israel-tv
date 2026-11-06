@@ -22,10 +22,10 @@ import {
 } from '@israel-tv/core';
 import { type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
 import { brandImage, channelLogo } from '@israel-tv/resolver';
+import { scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
-import { scrub, secretValues } from './log.ts';
 import { emptyShowsKey, episodeCount } from './runner.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  launchd agent (macOS). Replace /path/to/israel-tv and /path/to/node-dir (the folder holding bin/node; with Volta, use the
+  launchd agent (macOS) for a full instance (roles host, local-only). For the resolver on its own (resolver-only), use
+  org.israel-tv.resolver.plist instead. Replace /path/to/israel-tv and /path/to/node-dir (the folder holding bin/node; with Volta, use the
   folder of `volta which node`), then:
     cp deploy/org.israel-tv.plist ~/Library/LaunchAgents/
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.israel-tv.plist

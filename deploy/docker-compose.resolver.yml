@@ -1,0 +1,20 @@
+# The resolver on its own (role "resolver-only"), playing from someone's public Israel TV catalog. From the repo root:
+#   mkdir -p deploy/resolver-data && sudo chown -R 1000:1000 deploy/resolver-data   # the container runs as uid 1000
+#   cp examples/resolver-only/israel-tv.config.example.json deploy/resolver-data/israel-tv.config.json   # set catalogUrl;
+#     inside the container listen on all interfaces: add "host": "0.0.0.0" to "resolver" (and to "remote" if used)
+#   cp examples/resolver-only/.env.example deploy/resolver-data/.env   # only what your config uses; chmod 600
+#   docker compose -f deploy/docker-compose.resolver.yml up -d --build
+# In your app install http://<this machine's LAN IP>:7701/manifest.json next to the public catalog.
+# Check the catalog: docker compose -f deploy/docker-compose.resolver.yml exec israel-tv-resolver node apps/resolver/src/cli.ts check-catalog
+services:
+  israel-tv-resolver:
+    build:
+      context: ..
+      dockerfile: Dockerfile.resolver
+    restart: unless-stopped
+    ports:
+      - "7701:7701" # the resolver: keep it off the internet (no login; relays through your proxy)
+      # Mako away from home (resolver.remote): for a tunnel connector on this host only.
+      - "127.0.0.1:7703:7703"
+    volumes:
+      - ./resolver-data:/data
