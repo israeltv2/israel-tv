@@ -4,16 +4,16 @@ import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { serve } from '@hono/node-server';
-import { type Config, DAY_MS, enabledSources, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
+import { type Config, DAY_MS, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
 import { proxyEndpoints } from '@israel-tv/net';
 import { resolverApp } from '@israel-tv/resolver';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
-import { crawlKan, kanCrawlOptions, kanEnabled, markKanShowDue } from './kan.ts';
+import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
-import { buildStatus, publishSite } from './publish.ts';
+import { activeSources, buildStatus, publishSite } from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -28,6 +28,21 @@ const REVISION = (() => {
     return 'dev';
   }
 })();
+
+/** Host header that names this machine locally: an IP literal, localhost, or a .local/.lan/.home.arpa name. */
+export function isLocalHostHeader(host: string | undefined): boolean {
+  if (!host) return false;
+  const name = host
+    .replace(/:\d+$/, '')
+    .replace(/^\[|\]$/g, '')
+    .toLowerCase();
+  return (
+    isIP(name) !== 0 ||
+    name === 'localhost' ||
+    /\.(local|lan|home\.arpa|internal)$/.test(name) ||
+    !name.includes('.')
+  );
+}
 
 /** True for loopback, private (RFC 1918), CGNAT, link-local and unique-local addresses. */
 export function isLocalAddress(addr: string | undefined): boolean {
@@ -66,7 +81,7 @@ export class Daemon {
     this.config = config;
     this.store = store;
     this.log = log;
-    this.sources = enabledSources(config);
+    this.sources = activeSources(config);
   }
 
   private get runOpts(): RunOptions {
@@ -107,6 +122,7 @@ export class Daemon {
       if (this.config.sources.live) await checkLive(this.store);
       const key = tmdbApiKey(this.config);
       if (key) await matchShows(this.store, key, { log: this.log });
+      this.store.prune();
       await this.publish();
     });
   }
@@ -129,9 +145,12 @@ export class Daemon {
     if (parsed.source === 'kan') {
       // Kan is read by the crawler: make the show due and start a slice now.
       if (!kanEnabled(this.config)) return { error: 'Kan is turned off in the config' };
-      markKanShowDue(this.store, row.show.key);
+      if (!kanShowKnown(this.store, row.show.key))
+        return { error: `Kan show ${seriesId} is not in the crawler's list` };
+      // Kept in memory and handed to the next slice (a running slice would overwrite stored state).
+      this.kanRefresh.add(row.show.key);
       this.kanCrawl();
-      return { queued: true, position: 0 };
+      return { queued: true, position: this.kanRunning ? 1 : 0 };
     }
     const make = createAdapters(this.config)[parsed.source];
     if (!make) return { error: `source ${parsed.source} is not enabled` };
@@ -143,6 +162,7 @@ export class Daemon {
 
   private kanSlices = 0;
   private kanRunning = false;
+  private kanRefresh = new Set<string>();
 
   /**
    * One Kan crawl slice, in its own lane: its pauses between browser pages must not hold the shared
@@ -153,13 +173,17 @@ export class Daemon {
     this.kanRunning = true;
     const proxies = proxyEndpoints(this.config.geo);
     const proxy = proxies[this.kanSlices++ % Math.max(proxies.length, 1)];
-    crawlKan(this.store, kanCrawlOptions(this.config, proxy, this.log))
+    const priority = [...this.kanRefresh];
+    this.kanRefresh.clear();
+    crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
       .then((r) => {
         if (r.newEpisodes > 0) this.enqueue('publish', () => this.publish());
       })
       .catch((err) => this.log(`kan crawl failed: ${(err as Error).stack ?? err}`))
       .finally(() => {
         this.kanRunning = false;
+        // A refresh asked for during this slice gets its own slice right away.
+        if (this.kanRefresh.size > 0) this.kanCrawl();
       });
   }
 
@@ -212,6 +236,9 @@ export function adminApp(d: Daemon) {
   app.use('*', async (c, next) => {
     const addr = c.env?.incoming?.socket?.remoteAddress;
     if (!isLocalAddress(addr)) return c.text('admin endpoints are for the local network only', 403);
+    // DNS rebinding: a web page can point its own name at this address; accept only local host names.
+    if (!isLocalHostHeader(c.req.header('host')))
+      return c.text('use the IP address or a local host name', 403);
     // Browsers send Origin with cross-site requests; a web page must not be able to trigger runs here.
     // (curl and scripts send none.)
     const origin = c.req.header('origin');
@@ -316,6 +343,7 @@ export async function startDaemon(
       config.publisher.publicUrl ?? `https://${config.publisher.workerName}.<your-subdomain>.workers.dev`;
     log(`addon (public): ${base}/manifest.json — the exact URL is logged after each successful publish`);
   }
+  store.prune();
   d.schedule();
   // Live channels are checked right away (as a job, not holding startup), so /status reflects them.
   if (config.sources.live) d.enqueue('live', async () => void (await checkLive(store)));

@@ -205,3 +205,12 @@ test('a failing geo proxy gives a 502 that says so, and one log line', async () 
   expect(await r.text()).toMatch(/geo proxy failed: /);
   expect(lines[0]).toMatch(/relay through the geo proxy failed for cdnapisec\.kaltura\.com/);
 });
+
+test('an upstream refusal through the proxy is reported as a failed relay', async () => {
+  const outcomes: { ok: boolean; error?: string }[] = [];
+  const geoFetch = async () => new Response('denied', { status: 403 });
+  const app = createResolverApp({ episode, fetch: makoNet([]), geoFetch, onRelay: (r) => outcomes.push(r) });
+  const s = await (await app.request('http://h/stream/series/iltv_reshet_1:1:1.json')).json();
+  await app.request(new URL(s.streams[0].url).pathname);
+  expect(outcomes[0]).toMatchObject({ ok: false, error: expect.stringMatching(/HTTP 403/) });
+});

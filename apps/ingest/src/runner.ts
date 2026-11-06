@@ -124,6 +124,13 @@ export async function ingestShow(
   }
   // A season that comes back empty (not fetched in an airing check, or a dead page) keeps its last good
   // episodes: a published episode never disappears because of one bad read.
+  // A show we have that suddenly reads as having no seasons at all is a failed read (layout change, block
+  // page), not a show without VOD: keep its data and say so.
+  if (prev && scraped.seasons.length === 0) {
+    const why = `no seasons on the show page${scraped.notes?.length ? ` (${scraped.notes.join('; ')})` : ''}`;
+    store.markShowFailed(knownId as string, `kept last good data: ${why}`);
+    throw new Error(why);
+  }
   const fetched = new Set(scraped.seasons.filter((s) => s.episodes.length > 0).map((s) => s.key));
   const show = dedupeEpisodes(mergePartial(prev?.show, scraped, fetched));
   if (!prev && episodeCount(show) === 0) {

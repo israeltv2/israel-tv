@@ -75,7 +75,7 @@ export async function fetchShow(
   }
   const single = seasons.length === 1 && !/\d/.test(seasons[0]?.s.title ?? '');
   const out: ScrapedSeason[] = seasons.map((x) => ({
-    key: `${entry.key}|${x.s.title}`,
+    key: `${entry.key}|s${x.s.id}`,
     title: single ? '' : x.s.title,
     episodes: x.episodes,
   }));

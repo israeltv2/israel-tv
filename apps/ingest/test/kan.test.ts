@@ -102,3 +102,22 @@ test('episodes read before a block are kept and not re-read', async () => {
   const show = store.listShows({ source: 'kan' })[0];
   expect(show?.show.seasons.flatMap((s) => s.episodes).map((e) => e.key)).toEqual(['kan:1006639']);
 });
+
+test('a refreshed show is read first; a failed first read does not make its backlog "new"', async () => {
+  const store = Store.open(':memory:');
+  const l = loader(routes);
+  await crawlKan(store, opts(l, 2)); // lobbies only
+  l.urls.length = 0;
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-1006421/';
+  await crawlKan(store, { ...opts(l, 1), priority: [key] });
+  expect(l.urls).toEqual([key]);
+  // A show whose first read fails is retried later as a first read, not as a re-read.
+  const broken = loader({ ...routes });
+  await crawlKan(store, opts(broken, 3));
+  const state = store.getState<{ shows: Record<string, { checkedAt?: string; failedAt?: string }> }>(
+    'kan:crawl',
+  );
+  const failed = Object.values(state?.shows ?? {}).filter((s) => s.failedAt);
+  expect(failed.length).toBeGreaterThan(0);
+  expect(failed.every((s) => !s.checkedAt)).toBe(true);
+});

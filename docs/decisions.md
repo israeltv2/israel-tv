@@ -263,3 +263,27 @@ numbers newest = 1. Dates now come from the title first, and when all episodes s
 their upload date. Generally, printed episode numbers that run against the air dates are ignored and the
 season is numbered by date (warning `numbers-reversed`). As with Mako earlier the same day, Reshet's episode
 numbers were reset once before anyone used the addon.
+
+### Code review, round 3 (2026-11-06)
+
+A full-codebase review after the round 2 and simplify changes found 11 defects; all fixed:
+
+- A Reshet layout change would have read as "no VOD" and cleared the shows' errors — a known show that
+  suddenly reads as having no seasons is now a failed read (last good data kept, shown on `/status`).
+- `serve` (preview) wrote into the Cloudflare build folder, so a following `publish` saw nothing to deploy —
+  with Cloudflare it now renders into a separate `preview` folder.
+- Kan: a failed first read of a show page later made its whole backlog look "new"; a refresh requested
+  during a running slice was lost — first-read failures are tracked apart, and refreshes are kept in memory
+  and read first by the next slice.
+- Warnings repeated on every run (and `numbers-reversed` per run per season) — identical warnings for a
+  show are recorded once; warnings and runs older than 60 days are pruned.
+- The relay reported success to `/status` when the upstream refused (403) — it now reports the HTTP status.
+- `/status` said "never succeeded" after one failed night — the 36-hour check uses the last good run ever.
+- Kan with `browser.type: none` kept health at warn forever — Kan is listed only when it can run.
+- Admin was reachable through DNS rebinding — the Host header must be an IP, `localhost`, a dotless name or
+  a `.local`/`.lan`/`.home.arpa`/`.internal` name.
+- Proxy fail-over blamed every proxy after a timeout, probed the wrong port for http targets, and kept 407
+  connections open — fixed.
+- **Reshet season keys used the season title**, so a renamed season would have moved its new episodes to
+  season 101+ — keys now use Reshet's own season id (map key / position). Reshet's season and episode numbers
+  were reset once more (before any viewer used them) so all keys follow the new scheme.

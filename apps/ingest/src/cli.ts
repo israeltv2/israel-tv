@@ -1,4 +1,5 @@
 // israel-tv command line. Run `node apps/ingest/src/cli.ts help`.
+import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ConfigError, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
@@ -123,6 +124,8 @@ async function main(argv: string[]): Promise<number> {
           key = row.show.key;
         } else {
           const i = arg.indexOf(':');
+          if (i <= 0)
+            throw new UserError(`show takes a series id (e.g. iltv_mako_12) or source:key, got "${arg}"`);
           source = arg.slice(0, i) as Source;
           key = arg.slice(i + 1);
         }
@@ -164,17 +167,19 @@ async function main(argv: string[]): Promise<number> {
       }
       case 'serve': {
         const p = config.publisher;
-        // Serve what the database holds now (a run may have finished since the last publish).
-        writeSite(p.dir, renderFromStore(store, config, config.sources.live ? liveRender() : []));
+        // Serve what the database holds now (a run may have finished since the last publish). With Cloudflare,
+        // render into a separate preview folder so a later publish still sees what changed since the upload.
+        const dir = p.type === 'cloudflare' ? join(dirname(p.dir), 'preview') : p.dir;
+        writeSite(dir, renderFromStore(store, config, config.sources.live ? liveRender() : []));
         const port = values.port ? Number(values.port) : p.type === 'local' ? p.port : 7700;
         const host = p.type === 'local' ? p.host : '127.0.0.1';
         await listen(
-          localAddonApp(p.dir).fetch as never,
+          localAddonApp(dir).fetch as never,
           host,
           port,
           values.port ? '--port' : 'publisher.port',
         );
-        log(`serving ${p.dir} on http://${host}:${port}/manifest.json`);
+        log(`serving ${dir} on http://${host}:${port}/manifest.json`);
         await stopSignal(log);
         return 0;
       }
