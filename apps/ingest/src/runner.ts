@@ -32,6 +32,18 @@ export function latestAirDate(show: ScrapedShow): string | undefined {
   return max;
 }
 
+/** Sources sometimes list the same episode twice (same key); keep its first appearance only. */
+export function dedupeEpisodes(show: ScrapedShow): ScrapedShow {
+  const seen = new Set<string>();
+  return {
+    ...show,
+    seasons: show.seasons.map((s) => ({
+      ...s,
+      episodes: s.episodes.filter((e) => (seen.has(e.key) ? false : (seen.add(e.key), true))),
+    })),
+  };
+}
+
 const episodeCount = (s: ScrapedShow) => s.seasons.reduce((n, x) => n + x.episodes.length, 0);
 
 /**
@@ -95,7 +107,7 @@ export async function ingestShow(
   // A season that comes back empty (not fetched in an airing check, or a dead page) keeps its last good
   // episodes: a published episode never disappears because of one bad read.
   const fetched = new Set(scraped.seasons.filter((s) => s.episodes.length > 0).map((s) => s.key));
-  const show = mergePartial(prev?.show, scraped, fetched);
+  const show = dedupeEpisodes(mergePartial(prev?.show, scraped, fetched));
   if (!prev && episodeCount(show) === 0) return { kind: 'empty' };
   const thin = thinReason(prev?.show, show);
   if (thin) {
