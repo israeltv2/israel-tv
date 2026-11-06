@@ -36,9 +36,8 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1        
 powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolver   # helper
 ```
 
-Remove it with `-Remove` (and `-Resolver` for the helper). After an update or a settings change, restart it:
-`Stop-ScheduledTask "Israel TV"; Start-ScheduledTask "Israel TV"` (or `"Israel TV resolver"`). Logs: the config folder's
-`data\logs\current.log`.
+After an update or a settings change, restart it with the same script and `-Restart` (`-Stop` stops it, `-Remove`
+removes it; add `-Resolver` for the helper). Logs: the config folder's `data\logs\current.log`.
 
 So your TV can reach it: set your home network to Private (_Settings → Network & internet → your connection →
 Network profile type: Private_), and when Windows asks whether Node may use the network, allow private networks (if

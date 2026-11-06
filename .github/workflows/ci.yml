@@ -63,8 +63,8 @@ jobs:
           if (-not $ok) { Get-ChildItem $dir -Recurse | Out-String | Write-Host; throw 'the task did not serve the manifest' }
           Write-Host "served: $($m.name)"
           Get-ChildItem (Join-Path $dir 'data\logs') | Out-String | Write-Host
-          Stop-ScheduledTask 'Israel TV resolver'
-          Start-Sleep 5
+          powershell -ExecutionPolicy Bypass -File deploy\\windows\\install-task.ps1 -Resolver -Stop
+          Start-Sleep 3
           $still = Get-NetTCPConnection -LocalPort 7701 -State Listen -ErrorAction SilentlyContinue
           if ($still) { throw "port 7701 still in use after stopping the task (pid $($still.OwningProcess))" }
           powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolver -Remove

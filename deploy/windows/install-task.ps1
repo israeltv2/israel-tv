@@ -3,14 +3,33 @@
 #   powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1            # a full instance
 #   powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolver  # the resolver on its own
 # Remove it:   powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Remove [-Resolver]
-# Restart it (after an update or a config change):  schtasks /End /TN <name>  then  schtasks /Run /TN <name>
+# Restart it (after an update or a settings change):  ... install-task.ps1 -Restart [-Resolver]   (-Stop to stop it)
 # Logs: the config folder's data\logs\current.log (`pnpm israel-tv paths` shows the folder).
 # The config and .env live in the config folder (`pnpm israel-tv paths` shows it). The task runs while you are
 # logged in; Windows asks once whether node may accept connections on private networks: allow it.
-param([switch]$Resolver, [switch]$Remove)
+param([switch]$Resolver, [switch]$Remove, [switch]$Stop, [switch]$Restart)
 $ErrorActionPreference = 'Stop'
 $name = if ($Resolver) { 'Israel TV resolver' } else { 'Israel TV' }
+$marker = if ($Resolver) { 'israel-tv-task-resolver' } else { 'israel-tv-task-full' }
+$cliName = if ($Resolver) { 'apps\resolver\src\cli.ts' } else { 'apps\ingest\src\cli.ts' }
+
+# Windows does not stop a task's child processes with it: stop the task, then the loop and node it started (found by
+# their command lines).
+function Stop-IsraelTv {
+  Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+  Get-CimInstance Win32_Process |
+    Where-Object { $_.CommandLine -and ($_.CommandLine.Contains($marker) -or ($_.Name -eq 'node.exe' -and $_.CommandLine.Contains($cliName))) } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
+if ($Stop -or $Restart) {
+  Stop-IsraelTv
+  if ($Restart) { Start-Sleep -Seconds 2; Start-ScheduledTask -TaskName $name; Write-Host "Restarted '$name'." }
+  else { Write-Host "Stopped '$name'." }
+  exit 0
+}
 if ($Remove) {
+  Stop-IsraelTv
   Unregister-ScheduledTask -TaskName $name -Confirm:$false
   Write-Host "Removed the task '$name'."
   exit 0
@@ -20,13 +39,14 @@ $node = (Get-Command node -ErrorAction Stop).Source
 $cli = if ($Resolver) { 'apps\resolver\src\cli.ts' } else { 'apps\ingest\src\cli.ts' }
 # No window (conhost --headless), and a loop that starts it again 30 seconds after it stops for any reason
 # (Task Scheduler's own restart only covers a task that fails to launch). Logs go to the config folder's data\logs.
-$loop = "while (`$true) { & '$node' '$cli' start; Start-Sleep -Seconds 30 }"
+$loop = "`$task = '$marker'; while (`$true) { & '$node' '$cli' start; Start-Sleep -Seconds 30 }"
 $action = New-ScheduledTaskAction -Execute 'conhost.exe' `
   -Argument "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -Command `"$loop`"" -WorkingDirectory $repo
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 # Never stopped for running long; runs on battery too.
 $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
   -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+Stop-IsraelTv  # a copy installed before
 Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
 Start-ScheduledTask -TaskName $name
 Write-Host "Installed and started '$name' (no window). It starts again each time you sign in, and after a stop."
