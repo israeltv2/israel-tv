@@ -45,8 +45,13 @@ export default {
       },
     });
     // Static files first (as Cloudflare does when the Worker does not run first), then the app.
-    let res = await env.ASSETS.fetch(request);
-    if (res.status === 404) res = await app.fetch(request, env, ctx);
+    // Catalog rows go through the app (it adds a warning to a row that has not been updated for too long);
+    // other static files are served as they are, and the app answers whatever is not a file.
+    const path = new URL(request.url).pathname;
+    let res = path.startsWith('/catalog/')
+      ? await app.fetch(request, env, ctx)
+      : await env.ASSETS.fetch(request);
+    if (res.status === 404 && !path.startsWith('/catalog/')) res = await app.fetch(request, env, ctx);
     // Static JSON files carry image URLs relative to this addon's address (the app does this for its own).
     else if (/json/.test(res.headers.get('content-type') ?? '')) {
       res = new Response(withOrigin(await res.text(), new URL(request.url).origin), res);

@@ -68,3 +68,38 @@ test('streams by our id, by IMDb id (numbered seasons only) and live', async () 
     streams: [{ url: 'https://live/kan11.m3u8' }],
   });
 });
+test('a row that has not been updated for too long says so first, even with the home machine down', async () => {
+  const { createAddonApp } = await import('../src/app.ts');
+  const old = new Date(Date.now() - 40 * 3_600_000).toISOString();
+  const files: Record<string, string> = {
+    'catalog/series/iltv_keshet12.json': JSON.stringify({
+      metas: [{ id: 'iltv_mako_1', type: 'series', name: 'x' }],
+    }),
+    'freshness.json': JSON.stringify({ publishedAt: old, sources: {}, catalogs: { iltv_keshet12: 'mako' } }),
+  };
+  const app = createAddonApp({ read: async (p) => files[p] });
+  const row = await (await app.request('/catalog/series/iltv_keshet12.json')).json();
+  expect(row.metas[0].id).toBe('iltv_stale_iltv_keshet12');
+  expect(row.metas[0].name).toMatch(/^⚠ הקטלוג לא עודכן מאז/);
+  expect(row.metas[1].id).toBe('iltv_mako_1');
+  const meta = await (await app.request('/meta/series/iltv_stale_iltv_keshet12.json')).json();
+  expect(meta.meta.name).toMatch(/^⚠/);
+  // Fresh catalog, but the row's source has had no good read in two days: that row warns.
+  files['freshness.json'] = JSON.stringify({
+    publishedAt: new Date().toISOString(),
+    sources: { mako: { lastGoodAt: new Date(Date.now() - 50 * 3_600_000).toISOString(), cadenceHours: 24 } },
+    catalogs: { iltv_keshet12: 'mako' },
+  });
+  const app2 = createAddonApp({ read: async (p) => files[p] });
+  expect((await (await app2.request('/catalog/series/iltv_keshet12.json')).json()).metas[0].id).toMatch(
+    /^iltv_stale_/,
+  );
+  // Up to date: nothing added.
+  files['freshness.json'] = JSON.stringify({
+    publishedAt: new Date().toISOString(),
+    sources: { mako: { lastGoodAt: new Date().toISOString(), cadenceHours: 24 } },
+    catalogs: { iltv_keshet12: 'mako' },
+  });
+  const app3 = createAddonApp({ read: async (p) => files[p] });
+  expect((await (await app3.request('/catalog/series/iltv_keshet12.json')).json()).metas).toHaveLength(1);
+});

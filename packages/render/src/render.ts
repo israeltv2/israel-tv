@@ -4,6 +4,7 @@ import {
   CATALOGS,
   type EpisodeAssignment,
   type ExtIds,
+  type Freshness,
   GEO_LIMITED,
   type Manifest,
   type Meta,
@@ -53,6 +54,8 @@ export interface RenderInput {
   live: LiveChannelRender[];
   status: StatusFile;
   registry: unknown;
+  /** Published as `freshness.json` (see core freshness.ts). */
+  freshness?: Freshness;
   /** catalog id → warning shown as the first item of that row (failures are visible, not hidden). */
   catalogWarnings: Record<string, string>;
   name?: string;
@@ -301,5 +304,6 @@ export function renderSite(input: RenderInput): SiteFiles {
   files.set(sitePaths.status, json(input.status));
   files.set(sitePaths.statusPage, renderStatusHtml(input.status));
   files.set(sitePaths.registry, json(input.registry));
+  if (input.freshness) files.set(sitePaths.freshness, json(input.freshness));
   return files;
 }

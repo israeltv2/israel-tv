@@ -2,12 +2,16 @@
 // Cloudflare (static assets answer plain file paths first; this app handles the rest) and local (Node).
 import {
   type ExtIds,
+  type Freshness,
   normalizeForSearch,
   parseVideoId,
   type SearchRow,
   type SeasonStreams,
+  STALE_ID_PREFIX,
   type Stream,
   sitePaths,
+  staleItem,
+  staleSince,
   withOrigin,
 } from '@israel-tv/core';
 import { Hono } from 'hono';
@@ -110,6 +114,17 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
       );
     }
     const page = await reader.read(sitePaths.catalog(type, id, skip));
+    // A row that has not been updated for too long says so first (works without the home machine).
+    if (page && skip === 0) {
+      const fresh = await readJson<Freshness>(sitePaths.freshness, true);
+      const since = fresh ? staleSince(fresh, id) : undefined;
+      if (since) {
+        const list = JSON.parse(page) as { metas: unknown[] };
+        return c.json({ metas: [staleItem(id, type, since), ...list.metas] }, 200, {
+          'cache-control': CACHE.stream,
+        });
+      }
+    }
     // Past the last page (or an unknown catalog): an empty list, which tells the app to stop paging.
     return c.body(page ?? '{"metas":[]}', 200, {
       ...headers,
@@ -119,6 +134,20 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
 
   app.get('/meta/:type/:file', async (c) => {
     const id = decodeURIComponent(c.req.param('file')).replace(/\.json$/, '');
+    if (id.startsWith(STALE_ID_PREFIX)) {
+      const fresh = await readJson<Freshness>(sitePaths.freshness, true);
+      const catalog = id.slice(STALE_ID_PREFIX.length);
+      const since = fresh ? staleSince(fresh, catalog) : undefined;
+      return c.json(
+        {
+          meta: { ...staleItem(catalog, c.req.param('type'), since ?? new Date().toISOString()), videos: [] },
+        },
+        200,
+        {
+          'cache-control': CACHE.none,
+        },
+      );
+    }
     const text = await reader.read(sitePaths.meta(c.req.param('type'), id));
     if (text === undefined) return c.json({ meta: null }, 404);
     return c.body(text, 200, {
