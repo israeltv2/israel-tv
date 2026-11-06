@@ -40,6 +40,33 @@ export function parseLobby(html: string, origin: string, channelPath: string): s
   return [...out];
 }
 
+/**
+ * Each show's picture on a lobby card (`<a href="…/p-123/"><img src="/media/…">`), by show path. Kan's share images
+ * (og:image) are refused to everyone off its pages; the lobby's own posters are what its pages show. Preferred: the
+ * portrait poster (300×450); otherwise the card's first picture.
+ */
+export function parseLobbyPosters(html: string): Map<string, string> {
+  const card =
+    /<a[^>]*href="(?:https:\/\/[^"/]+)?(\/content\/[^"]+\/)"[^>]*>\s*(?:<[^>]*>\s*){0,3}?<img[^>]*src="(\/media\/[^"]+)"/g;
+  const found = new Map<string, string[]>();
+  for (const m of html.matchAll(card)) {
+    if (!m[1] || !m[2]) continue;
+    const list = found.get(m[1]) ?? [];
+    list.push(m[2].replace(/&amp;/g, '&'));
+    found.set(m[1], list);
+  }
+  const out = new Map<string, string>();
+  for (const [path, list] of found) {
+    const raster = list.filter((u) => !/\.svg(\?|$)/i.test(u));
+    const poster =
+      raster.find((u) => /width=300&height=450/.test(u)) ??
+      raster.find((u) => /poster|239/i.test(decodeURIComponent(u.split('?')[0] ?? ''))) ??
+      raster[0];
+    if (poster) out.set(path, poster);
+  }
+  return out;
+}
+
 export interface KanEpisodeLink {
   /** Path of the episode page. */
   path: string;

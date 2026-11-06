@@ -51,3 +51,16 @@ test('kids episode links with a Hebrew season segment are found', () => {
   const p = parseShowPage(html, '/content/kids/hinuchit-main/malon_hotel/');
   expect(p.episodes.map((e) => e.id)).toEqual([1000001, 1037174]);
 });
+
+test('lobby posters: the portrait poster on each show card, by show path', async () => {
+  const { parseLobbyPosters } = await import('../src/parse.ts');
+  const kan11 = parseLobbyPosters(html('lobby-kan11'));
+  expect(kan11.size).toBe(42);
+  expect(kan11.get('/content/kan/kan-11/p-1088672/')).toMatch(
+    /^\/media\/vbgnuad5\/.*width=300&height=450&v=/,
+  );
+  const kids = parseLobbyPosters(html('lobby-kids-teens'));
+  expect(kids.get('/content/kids/hinuchit-main/p-863865/')).toMatch(/poster_239_360/);
+  // No portrait poster on the card: its first picture.
+  expect(kids.get('/content/kids/ktantanim-main/p-1010382/')).toMatch(/200x200_character/);
+});

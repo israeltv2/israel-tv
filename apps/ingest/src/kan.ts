@@ -26,6 +26,7 @@ import {
   type PageLoader,
   parseEpisodePage,
   parseLobby,
+  parseLobbyPosters,
   parseShowPage,
 } from '@israel-tv/kan';
 import type { ProxyEndpoint } from '@israel-tv/net';
@@ -77,6 +78,8 @@ interface ShowState {
   fresh?: string[];
   /** When a show page that was never read successfully last failed (retried after a week). */
   failedAt?: string;
+  /** The show's poster on its lobby card (preferred over the show page's share image, which Kan refuses). */
+  lobbyPoster?: string;
   /** The show's image, saved as our own copy (Kan's artwork is refused outside Israel). */
   art?: { from: string; file: string };
   /** Last try at saving the show's image (retried at most daily). */
@@ -324,6 +327,7 @@ export async function crawlKan(
         }
         if (html === '') continue; // this lobby failed above
         const paths = parseLobby(html, l.origin, l.channelPath);
+        const posters = parseLobbyPosters(html);
         if (paths.length === 0) {
           // A lobby that loads but lists no shows is a layout change: say so and try again next slice.
           problems++;
@@ -341,6 +345,8 @@ export async function crawlKan(
             failed: [],
             ...(state.lobbiesAt ? { lastNewAt: new Date(now).toISOString() } : {}),
           };
+          const poster = posters.get(path);
+          if (poster) state.shows[key].lobbyPoster = new URL(poster, l.origin).toString();
         }
       }
       if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size)
@@ -381,7 +387,9 @@ export async function crawlKan(
           await load(
             key,
             'listing',
-            opts.artworkDir ? { image: (html) => parseShowPage(html, path).image } : undefined,
+            opts.artworkDir
+              ? { image: (html) => s.lobbyPoster ?? parseShowPage(html, path).image }
+              : undefined,
           ),
           path,
         );
@@ -398,7 +406,8 @@ export async function crawlKan(
       attemptedShows.push(key);
       if (page.title) s.title = page.title;
       if (page.description) s.description = page.description;
-      if (page.image) s.image = page.image;
+      const image = s.lobbyPoster ?? page.image;
+      if (image) s.image = image;
       const known = new Set(
         id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
       );
