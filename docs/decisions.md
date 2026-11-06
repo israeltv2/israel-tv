@@ -658,3 +658,12 @@ free plan; it counts across locations but is deliberately permissive while it sy
 stream requests in a minute from one address, only the last few got 429) and an in-memory one-minute window in
 each Worker instance, which stops a burst at once. Over the limit:
 HTTP 429 with `retry-after: 60` and a plain message. Catalog browsing and metadata are not limited (static files).
+
+### Daily playback canary
+
+Once a day the daemon plays one title per source end to end through the same path a viewer at home uses
+(resolver first, else the public addon's direct stream): master, variant, first segment. Titles are picked from
+the catalog — the newest episode of the most recently aired show whose last read was good — so a show that
+ends or a renumbering never breaks the canary. A segment answered 200 instead of 206 (a CDN that ignores
+`Range`) passes. Results are events, shown per source on `/status` and the dashboard; `POST /run/canary` runs it
+on demand.

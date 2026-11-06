@@ -110,6 +110,16 @@ JSON lines (pino), one per thing, with `component` and the ids of what it is abo
 reach a line: values of every token, password and key from `.env` are replaced with `[redacted]` wherever they
 appear.
 
+### Playback canary
+
+Once a day (`schedule.daily`) the daemon plays one title per source end to end, the way a viewer at home would:
+the newest episode of the most recently aired, healthy Mako, Reshet and Kan show, and one live channel. It asks
+the home resolver for the stream (Mako through mako-auth; Reshet and Kan direct or through geo-relay, as the
+title needs), then fetches the master playlist, a variant playlist and the first bytes of the first segment —
+200, 200, 206 is a pass. Each result is a `canary` event; `/status` (`canary`) and the dashboard show the latest
+per source, with the failing step (`stream`, `master`, `variant`, `segment`) and the statuses. Run it now with
+`curl -X POST -H "Authorization: Bearer …" http://<host>:7702/run/canary`.
+
 ## Investigating a failed play
 
 1. **Find it.** The latest failures, newest first (on the machine, or through the admin page):

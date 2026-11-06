@@ -20,6 +20,7 @@ import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
 import { backupCatalog } from './backup.ts';
+import { type CanaryResult, canaryEvent, runCanary } from './canary.ts';
 import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
@@ -29,7 +30,7 @@ import { activeSources, analyticsWanted, buildStatus, publishSite } from './publ
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
-import { buildDashboard, queryEvents, renderUsagePage } from './usage-page.ts';
+import { buildDashboard, type Dashboard, queryEvents, renderUsagePage } from './usage-page.ts';
 
 type Log = (msg: string, fields?: Record<string, unknown>) => void;
 
@@ -277,6 +278,7 @@ export class Daemon {
       }
       const m = this.events.maintain(now, this.config.events.maxMB * 1024 * 1024);
       this.log('usage events maintained', m);
+      await this.canary();
       const yesterday = new Date(now - 86_400_000).toISOString().slice(0, 10);
       try {
         const r = await pullPublicUsage(this.events, this.config, yesterday);
@@ -285,6 +287,43 @@ export class Daemon {
         this.log(`reading the public addon's usage failed: ${(err as Error).message}`);
       }
     });
+  }
+
+  /** Play one recent title per source end to end and record the results. */
+  async canary(): Promise<CanaryResult[]> {
+    const base = this.config.resolver.enabled ? `http://127.0.0.1:${this.config.resolver.port}` : undefined;
+    const results = await runCanary(this.store, this.sources, base);
+    for (const r of results) {
+      this.record(canaryEvent(r));
+      this.log(`canary ${r.source}: ${r.outcome === 'ok' ? 'pass' : `FAIL at ${r.step}`}`, {
+        showId: r.showId,
+        episodeId: r.episodeId,
+        statuses: r.statuses.join('/'),
+        via: r.via,
+        ...(r.detail ? { reason: r.detail } : {}),
+      });
+    }
+    return results;
+  }
+
+  /** The latest canary result per source (last 3 days). */
+  canaryStatus() {
+    const since = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    const latest = new Map<string, Dashboard['canary'][number]>();
+    for (const e of this.events.events({ kind: 'canary', since, limit: 100 })) {
+      if (!e.source || latest.has(e.source)) continue;
+      const d = e.detail
+        ? (JSON.parse(e.detail) as { step?: string; reason?: string; statuses?: string })
+        : {};
+      latest.set(e.source, {
+        source: e.source,
+        outcome: e.outcome,
+        at: e.ts,
+        ...(d.step ? { step: d.step } : {}),
+        detail: [d.statuses, d.reason, e.episodeId ?? e.showId].filter(Boolean).join(' · '),
+      });
+    }
+    return [...latest.values()];
   }
 
   dashboard() {
@@ -302,7 +341,7 @@ export class Daemon {
         notes: s.notes,
         ...(s.lastFullRun ? { lastFullRun: s.lastFullRun.at } : {}),
       })),
-      canary: [],
+      canary: this.canaryStatus(),
     });
   }
 
@@ -332,9 +371,11 @@ export class Daemon {
           ]
         : []),
     ];
+    const canary = this.canaryStatus();
     return {
       ...buildStatus(this.store, this.sources),
       ...(notes.length ? { notes } : {}),
+      ...(canary.length ? { canary } : {}),
       ...(this.geo.proxies.length ? { geo: this.geo } : {}),
       daemon: { ...this.state(), revision: REVISION },
     };
@@ -408,6 +449,7 @@ export function adminApp(d: Daemon, token: string) {
     d.fullRun();
     return c.json(d.state(), 202);
   });
+  app.post('/run/canary', async (c) => c.json(await d.canary()));
   app.post('/run/airing', (c) => {
     d.airingRun();
     return c.json(d.state(), 202);
