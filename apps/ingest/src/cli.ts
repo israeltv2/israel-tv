@@ -2,19 +2,27 @@
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ConfigError, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
+import { EventStore } from '@israel-tv/events';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
-import { listen, startDaemon } from './daemon.ts';
+import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
 import { crawlKan, kanCrawlOptions } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { createLogger } from './log.ts';
-import { PublishError, publishSite, renderFromStore, writeSite } from './publish.ts';
+import {
+  activeSources,
+  buildStatus,
+  PublishError,
+  publishSite,
+  renderFromStore,
+  writeSite,
+} from './publish.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
-import { queryEvents } from './usage-page.ts';
+import { buildDashboard, queryEvents } from './usage-page.ts';
 
 const HELP = `israel-tv <command>
 
@@ -29,8 +37,10 @@ const HELP = `israel-tv <command>
   check-proxy                        Check that the geo proxy works and exits in Israel
   match                              Look up TMDB/IMDb ids for shows (needs tmdb in the config)
   status                             Recent runs and warnings
-  events [--corr C] [--kind K] [--errors] [--since 2h] [--series S] [--limit N]
-                                     Usage and diagnostics events as JSON lines, oldest first (see docs/operations.md)
+  events [--play P] [--kind K] [--errors] [--since 2h] [--show S] [--limit N]
+                                     Usage and diagnostics events as JSON lines, oldest first (pnpm logs …)
+  usage                              The usage dashboard's figures as JSON (pnpm usage)
+  admin-url                          The admin page's address with its token (open it once in a browser)
   help                               This text
 
 Config: israel-tv.config.json in the current folder (or ISRAEL_TV_CONFIG). Secrets: .env.`;
@@ -50,11 +60,11 @@ function parseCli(argv: string[]) {
       help: { type: 'boolean', short: 'h' },
       'no-initial-run': { type: 'boolean' },
       port: { type: 'string' },
-      corr: { type: 'string' },
+      play: { type: 'string' },
       kind: { type: 'string' },
       errors: { type: 'boolean' },
       since: { type: 'string' },
-      series: { type: 'string' },
+      show: { type: 'string' },
     },
   });
 }
@@ -67,7 +77,7 @@ async function main(argv: string[]): Promise<number> {
     // Node's message adds a hint about positional arguments that does not apply here; keep the first sentence.
     const first = (err as Error).message.split('. ')[0];
     throw new UserError(
-      `${first}. Options: --source, --limit, --no-initial-run, --port (and for events: --corr, --kind, --errors, --since, --series). Run \`pnpm israel-tv help\` for more.`,
+      `${first}. Options: --source, --limit, --no-initial-run, --port (and for events: --play, --kind, --errors, --since, --show). Run \`pnpm israel-tv help\` for more.`,
     );
   }
   const { positionals, values } = parsed;
@@ -149,24 +159,28 @@ async function main(argv: string[]): Promise<number> {
         return r.status === 'ok' ? 0 : 1;
       }
       case 'publish': {
-        return (await publishSite(store, config, log)) ? 0 : 1;
+        const events = EventStore.open(config.events.path);
+        try {
+          return (await publishSite(store, config, log, events.clientSalt())) ? 0 : 1;
+        } finally {
+          events.close();
+        }
       }
       case 'start': {
-        await startDaemon(
-          config,
-          store,
-          config.log.file ? createLogger(config.log.file, config.log.maxMB) : log,
-          {
-            initialRun: !values['no-initial-run'],
-          },
-        );
-        await stopSignal(log);
+        const logger = createLogger(config.log);
+        const events = EventStore.open(config.events.path);
+        await startDaemon(config, store, events, logger, { initialRun: !values['no-initial-run'] });
+        await stopSignal(logger.log);
+        events.close();
+        logger.flush();
         return 0;
       }
       case 'resolver': {
         const { resolverApp } = await import('@israel-tv/resolver');
         await listen(
-          resolverApp(config).fetch as never,
+          resolverApp(config, {
+            log: (component) => createLogger({ ...config.log, file: undefined }).for(component),
+          }).fetch as never,
           config.resolver.host,
           config.resolver.port,
           'resolver.port',
@@ -245,16 +259,51 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case 'events': {
-        const rows = queryEvents(store, {
-          ...(values.corr ? { corr: values.corr } : {}),
-          ...(values.kind ? { kind: values.kind } : {}),
-          ...(values.errors ? { outcome: 'error' } : {}),
-          ...(values.since ? { since: values.since } : {}),
-          ...(values.series ? { series: values.series } : {}),
-          ...(values.limit ? { limit: values.limit } : {}),
-        });
-        for (const r of rows.reverse())
-          console.log(JSON.stringify(Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null))));
+        const events = EventStore.openReadOnly(config.events.path);
+        try {
+          const rows = queryEvents(events, {
+            ...(values.play ? { playId: values.play } : {}),
+            ...(values.kind ? { kind: values.kind } : {}),
+            ...(values.errors ? { outcome: 'error' } : {}),
+            ...(values.since ? { since: values.since } : {}),
+            ...(values.show ? { show: values.show } : {}),
+            ...(values.limit ? { limit: values.limit } : {}),
+          });
+          for (const r of rows.reverse()) {
+            const { detail, ...rest } = r;
+            const line = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== null));
+            console.log(JSON.stringify(detail ? { ...line, detail: JSON.parse(detail) } : line));
+          }
+        } finally {
+          events.close();
+        }
+        return 0;
+      }
+      case 'usage': {
+        const events = EventStore.openReadOnly(config.events.path);
+        try {
+          const status = buildStatus(store, activeSources(config));
+          const dash = buildDashboard(events, {
+            active: [],
+            title: (id) => store.getShow(id)?.title,
+            ingest: status.sources.map((s) => ({
+              source: s.source,
+              health: s.health,
+              notes: s.notes,
+              ...(s.lastFullRun ? { lastFullRun: s.lastFullRun.at } : {}),
+            })),
+            canary: [],
+          });
+          console.log(JSON.stringify(dash, null, 2));
+        } finally {
+          events.close();
+        }
+        return 0;
+      }
+      case 'admin-url': {
+        const token = adminToken(config, store);
+        for (const a of lanAddresses(config.admin.host))
+          console.log(`http://${a}:${config.admin.port}/usage?token=${encodeURIComponent(token)}`);
         return 0;
       }
       default:

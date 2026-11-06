@@ -1,46 +1,52 @@
-// Usage and diagnostics events, shared by the public Worker, the resolver and ingest.
+// Usage and diagnostics events, shared by the resolver, ingest and the public Worker.
 //
-// One event per thing that happened (a request, a play start, a Mako ticket, a relay session, an ingest run),
-// with a correlation id that ties a play together: the stream request hands out play/relay URLs carrying it.
-// No raw IP address is ever kept: a client is an HMAC of its address keyed with a secret salt and the day, so
-// the same viewer counts once per day and the hash cannot be turned back into an address (or linked across days)
-// without the salt.
+// One event per meaningful action, never per video segment. A play is followed across components by its
+// `playId`: the resolver's stream response hands out play/relay URLs carrying it. No IP address is ever kept:
+// a client is an HMAC of its address keyed with a secret salt and the day, so a viewer counts once a day and
+// the hash cannot be turned back into an address or followed across days.
 
-export type EventKind = 'request' | 'stream' | 'play' | 'ticket' | 'relay' | 'ingest';
-/** Where the event was recorded. */
-export type EventOrigin = 'worker' | 'resolver' | 'ingest';
+export type EventKind =
+  /** The resolver answered a stream request (what it offered, and why). */
+  | 'stream_request'
+  /** A play started: the player got its first playlist (latency = time to it). */
+  | 'play_start'
+  /** One relay session through the geo proxy, written when it ends (duration, bytes, segments, errors). */
+  | 'relay_session'
+  /** A Mako entitlement (ticket) fetch. */
+  | 'ticket_fetch'
+  /** Something a viewer asked for failed (stage, upstream statuses, reason). */
+  | 'failure'
+  /** An ingest run, publish or crawl slice finished. */
+  | 'run'
+  /** The daily playback canary checked one title end to end. */
+  | 'canary';
+
+/** Which part of the system recorded it. */
+export type Component = 'resolver' | 'mako-auth' | 'geo-relay' | 'ingest' | 'canary';
 
 export interface UsageEvent {
   /** ISO time. */
-  at: string;
+  ts: string;
   kind: EventKind;
-  origin: EventOrigin;
+  component: Component;
   outcome: 'ok' | 'error';
-  /** Ties the events of one play together (stream → play → relay); a Worker request's Cloudflare ray id. */
-  corr?: string;
-  /** Salted daily hash of the client's address. */
-  client?: string;
+  playId?: string;
   source?: string;
   /** Series id (iltv_…) or live channel id. */
-  series?: string;
-  /** Video id (series:season:episode) when there is one. */
-  video?: string;
-  /** Route or resource, e.g. `catalog`, `meta`, `stream`, `play/mako`, `relay`. */
-  route?: string;
-  /** HTTP status answered to the client. */
+  showId?: string;
+  /** Video id (series:season:episode). */
+  episodeId?: string;
+  /** Salted daily hash of the client's address. */
+  client?: string;
+  /** HTTP status answered (or, for a failure, the upstream status that caused it). */
   status?: number;
-  /** Upstream statuses in order, e.g. `playlist 200, ticket 200, master 403`. */
-  upstream?: string;
-  /** Duration in ms (for a play: time to the first playlist). */
-  ms?: number;
-  bytes?: number;
-  segments?: number;
-  /** Why it failed (or a short note). */
-  reason?: string;
+  latencyMs?: number;
+  detail?: Record<string, unknown>;
 }
 
-/** Events are kept this long. */
+/** Raw events are kept this long; daily rollups a year. */
 export const EVENT_RETENTION_DAYS = 30;
+export const ROLLUP_RETENTION_DAYS = 365;
 
 const enc = new TextEncoder();
 
@@ -57,8 +63,8 @@ export async function clientHash(salt: string, address: string, day = new Date()
   return [...sig.slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** A short random correlation id. */
-export function newCorrelationId(): string {
+/** A short random id for one play. */
+export function newPlayId(): string {
   const b = new Uint8Array(9);
   crypto.getRandomValues(b);
   return btoa(String.fromCharCode(...b))

@@ -394,11 +394,14 @@ export function workerConfig(
     assets: {
       ...base.assets,
       directory: p.dir,
-      // With request logs the Worker answers everything; without, only the files that carry image URLs
-      // relative to the addon's address (the manifest and the live row), which it fills in.
-      run_worker_first: p.requestLogs ? true : ['/manifest.json', '/catalog/tv/*', '/meta/tv/*'],
+      // Static files are served without running the Worker (browsing is free and not counted), except the
+      // ones that carry image URLs relative to the addon's address, which the Worker fills in.
+      run_worker_first: ['/manifest.json', '/catalog/tv/*', '/meta/tv/*'],
     },
-    observability: { enabled: true, logs: { enabled: true, invocation_logs: false } },
+    // The Worker logs its own events (no addresses); Cloudflare's invocation logs would keep request metadata.
+    observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },
+    // One data point per stream request, counted by Cloudflare (read back once a day; see public-usage.ts).
+    analytics_engine_datasets: [{ binding: 'USAGE', dataset: 'israel_tv_usage' }],
   };
 }
 
@@ -437,7 +440,7 @@ async function deployCloudflare(
   const args = ['deploy', '--config', configPath, '--name', p.workerName, '--assets', p.dir];
   // The client-hash salt goes up as a Worker secret, through a file only this user can read, removed after.
   const secretsPath = join(wranglerHome, 'secrets.json');
-  if (salt && p.requestLogs) {
+  if (salt) {
     writeFileSync(secretsPath, JSON.stringify({ CLIENT_SALT: salt }), { mode: 0o600 });
     args.push('--secrets-file', secretsPath);
   }
@@ -491,6 +494,8 @@ export async function publishSite(
   store: Store,
   config: Config,
   log: (line: string) => void,
+  /** Secret salt for the Worker's client hashes (from the events database). */
+  salt?: string,
 ): Promise<boolean> {
   const t0 = Date.now();
   const kind = config.publisher.type;
@@ -517,7 +522,7 @@ export async function publishSite(
   }
   const runId = store.startRun('publish', kind);
   try {
-    const d = await deploy(config, process.env, store.clientSalt());
+    const d = await deploy(config, process.env, salt);
     store.finishRun(runId, { status: 'ok' });
     if (worker) store.setState(WORKER_DEPLOYED, worker);
     log(

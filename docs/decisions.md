@@ -571,3 +571,51 @@ fill the tile, and the Knesset Channel's white logo on navy. Sources and licence
 
 The CC BY-SA files are credited here, which is the attribution they ask for; the tiles made from them are shared
 under the same licence.
+
+### Observability (owner's stack, as decided)
+
+- **Logs:** pino JSON lines with child loggers per component (`ingest`, `resolver`, `mako-auth`, `geo-relay`)
+  and the ids of what a line is about (`playId`, `showId`, `episodeId`, `source`); pino-roll rotates them daily
+  and by size, keeping a fixed number. Redaction is by key (`token`, `password`, `authorization`, …) and, since a
+  token can hide inside a URL or an error message, by value too: a pino hook replaces the value of every
+  token/password/key/secret from `.env` in every string of every line. A test writes a secret through the real
+  file transport and checks it never appears.
+- **Events:** `data/events.sqlite`, its own Drizzle schema and migrations, WAL, batched inserts (one transaction
+  per ~2 s or 200 events), never written per video segment. Kinds and schema in docs/operations.md. Nightly:
+  rollup into `daily_usage`, prune raw events after 30 days and rollups after a year, VACUUM weekly, size cap
+  (default 200 MB) with a /status warning. The catalog database lost its `events` table (round 2's first version
+  put events there; nothing in it was needed).
+- **Public Worker:** Workers Logs (one JSON line per request it answers, `head_sampling_rate` 1, Cloudflare's
+  invocation logs off because they keep request metadata) and Workers Analytics Engine (one data point per
+  stream request). Catalog browsing is static files and is not counted (accepted by the owner). This also ends
+  round 2's first approach (the Worker answering every request so browsing could be logged).
+- **One measured deviation:** reading Analytics Engine back needs an API token with "Account Analytics: Read".
+  The publishing token does not have it (the SQL API answers "Authorization error"; checked 2026-11-06), and a
+  new credential is the owner's call. Until the token gets that permission, the daily public counts come from
+  the same Worker's Workers Logs through the observability query API (one aggregate query per level per day:
+  count and unique clients by source and show — Cloudflare still does the counting). The daily job tries
+  Analytics Engine first and the dashboard says which one answered and why.
+
+### Separation of concerns: ingest, catalog, resolver (mako-auth, geo-relay)
+
+The README has the diagram and table. The resolver's two jobs are now separate modules (`mako-auth.ts`,
+`geo-relay.ts`) with their own config switch (`resolver.makoAuth`, `resolver.geoRelay`), their own log component
+and their own event component; `app.ts` only answers the manifest and stream requests by asking each module.
+The resolver serves no catalogs. **geo-relay stays in the same process as mako-auth** (the default the owner
+suggested): it needs no different privileges, both read the same catalog database read-only, a second process
+would add a second addon URL to install and a second port to keep reachable, and the separation the owner wants
+(scope, config, logs, metrics) is there without it. If the relay ever needs isolating (e.g. a lot of video
+traffic), the module can be served on its own port without code changes beyond the wiring.
+
+### Admin page: owner only
+
+LAN-only as before, and a token on top (`ISRAEL_TV_ADMIN_TOKEN`; generated and kept in the catalog database
+when not set, printed by `israel-tv admin-url`). Anything without it, including the dashboard, gets a plain
+404 — guests on the home Wi-Fi see nothing. A browser opens the link once; the token moves into an HttpOnly,
+SameSite=Strict cookie and is removed from the address bar. The admin port is never routed through a tunnel.
+
+### Nightly catalog backup
+
+One rotating copy: every night `VACUUM INTO data/backups/israel-tv-YYYY-MM-DD.sqlite`, keeping 7 days; only
+files with that name pattern in that folder are ever removed. (The one-off `before-*` copies made during round 1
+were deleted on the deployment with the owner's approval.)

@@ -1,5 +1,6 @@
 // The long-running process: scheduled runs, one job at a time (single writer), publish after each run,
 // LAN-only admin endpoints, the local publisher and the private resolver.
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
@@ -12,22 +13,25 @@ import {
   tmdbApiKey,
   type UsageEvent,
 } from '@israel-tv/core';
+import type { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
 import { PlaySessions, resolverApp } from '@israel-tv/resolver';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
+import { backupCatalog } from './backup.ts';
 import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
+import type { Logger } from './log.ts';
+import { pullPublicUsage } from './public-usage.ts';
 import { activeSources, buildStatus, publishSite } from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
-import { queryEvents, renderUsagePage } from './usage-page.ts';
-import { pullWorkerEvents } from './worker-events.ts';
+import { buildDashboard, queryEvents, renderUsagePage } from './usage-page.ts';
 
-type Log = (line: string) => void;
+type Log = (msg: string, fields?: Record<string, unknown>) => void;
 
 /** Git revision of this install, written by deploy tooling into `.revision` at the repo root (optional). */
 const REVISION = (() => {
@@ -85,8 +89,13 @@ export class Daemon {
   private readonly config: Config;
   private readonly store: Store;
   private readonly log: Log;
+  readonly events: EventStore;
+  readonly logger: Logger;
 
-  constructor(config: Config, store: Store, log: Log) {
+  constructor(config: Config, store: Store, events: EventStore, logger: Logger) {
+    const log = logger.log;
+    this.events = events;
+    this.logger = logger;
     this.config = config;
     this.store = store;
     this.log = log;
@@ -123,7 +132,7 @@ export class Daemon {
   }
 
   async publish(): Promise<void> {
-    await publishSite(this.store, this.config, this.log);
+    await publishSite(this.store, this.config, this.log, this.events.clientSalt());
   }
 
   fullRun(): void {
@@ -223,6 +232,7 @@ export class Daemon {
     at(this.config.schedule.fullRun, () => this.fullRun());
     for (const p of this.config.schedule.airingChecks) at(p, () => this.airingRun());
     if (kanEnabled(this.config)) at(this.config.schedule.kanCrawl, () => this.kanCrawl());
+    at(this.config.schedule.daily, () => this.daily());
   }
 
   nextRuns(): Record<string, string | null> {
@@ -241,39 +251,63 @@ export class Daemon {
   /** Play and relay sessions of the resolver (what is playing now). */
   readonly sessions = new PlaySessions((e) => this.record(e));
 
-  /** Record a usage/diagnostics event: in the database (for the dashboard and queries) and the log. */
+  /** Record a usage/diagnostics event: in events.sqlite (for the dashboard and queries) and the log. */
   record(e: UsageEvent): void {
     try {
-      this.store.addEvents([e]);
+      this.events.record(e);
     } catch (err) {
       this.log(`could not record an event: ${(err as Error).message}`);
     }
-    this.log(`event ${JSON.stringify(e)}`);
+    const { ts: _ts, component, kind, ...fields } = e;
+    this.logger.for(component)(kind, fields);
   }
 
-  /** Pull the public Worker's request events (Workers Logs) into the database. */
-  async pullWorkerEvents(): Promise<void> {
-    try {
-      await pullWorkerEvents(this.store, this.config);
-    } catch (err) {
-      this.log(`pulling the Worker's request events failed: ${(err as Error).message}`);
-    }
-  }
-
-  usage() {
-    return { ...this.store.usage(), active: this.sessions.active() };
-  }
-
-  usagePage(): string {
-    const titles = new Map<string, string>();
-    return renderUsagePage(this.store.usage(), this.sessions.active(), (series) => {
-      if (!titles.has(series)) titles.set(series, this.store.getShow(series)?.title ?? '');
-      return titles.get(series) || undefined;
+  /**
+   * Daily housekeeping: back up the catalog database (keeping a week), roll up and prune usage events,
+   * read the public addon's counts for yesterday, and run the playback canary.
+   */
+  daily(): void {
+    this.enqueue('daily', async () => {
+      const now = Date.now();
+      try {
+        const b = backupCatalog(this.store, this.config.backup, now);
+        this.log('catalog backup', b);
+      } catch (err) {
+        this.log(`catalog backup failed: ${(err as Error).message}`);
+      }
+      const m = this.events.maintain(now, this.config.events.maxMB * 1024 * 1024);
+      this.log('usage events maintained', m);
+      const yesterday = new Date(now - 86_400_000).toISOString().slice(0, 10);
+      try {
+        const r = await pullPublicUsage(this.events, this.config, yesterday);
+        if (r) this.log('public addon usage read', { ...r });
+      } catch (err) {
+        this.log(`reading the public addon's usage failed: ${(err as Error).message}`);
+      }
     });
   }
 
-  events(q: Record<string, string | undefined>) {
-    return queryEvents(this.store, q);
+  dashboard() {
+    const titles = new Map<string, string>();
+    const status = this.status();
+    return buildDashboard(this.events, {
+      active: this.sessions.active(),
+      title: (id) => {
+        if (!titles.has(id)) titles.set(id, this.store.getShow(id)?.title ?? '');
+        return titles.get(id) || undefined;
+      },
+      ingest: status.sources.map((s) => ({
+        source: s.source,
+        health: s.health,
+        notes: s.notes,
+        ...(s.lastFullRun ? { lastFullRun: s.lastFullRun.at } : {}),
+      })),
+      canary: [],
+    });
+  }
+
+  queryEvents(q: Record<string, string | undefined>) {
+    return queryEvents(this.events, q);
   }
 
   noteRelay(r: { ok: boolean; error?: string }): void {
@@ -298,7 +332,27 @@ export class Daemon {
   }
 }
 
-export function adminApp(d: Daemon) {
+const ADMIN_COOKIE = 'iltv_admin';
+
+/** Constant-time comparison of two secrets. */
+export function sameSecret(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** The admin token: from the configured .env variable, else one generated once and kept in the database. */
+export function adminToken(config: Config, store: Store, env: NodeJS.ProcessEnv = process.env): string {
+  const fromEnv = env[config.admin.tokenEnv];
+  if (fromEnv) return fromEnv;
+  const kept = store.getState<string>('admin-token');
+  if (kept) return kept;
+  const made = randomBytes(24).toString('base64url');
+  store.setState('admin-token', made);
+  return made;
+}
+
+export function adminApp(d: Daemon, token: string) {
   const app = new Hono<{ Bindings: { incoming: { socket: { remoteAddress?: string } } } }>();
   app.use('*', async (c, next) => {
     const addr = c.env?.incoming?.socket?.remoteAddress;
@@ -311,14 +365,27 @@ export function adminApp(d: Daemon) {
     const origin = c.req.header('origin');
     if (origin && new URL(origin).host !== c.req.header('host'))
       return c.text('cross-site request refused', 403);
+    // Owner only: a token as well (guests on the same Wi-Fi get a plain 404). A browser opens a page once with
+    // ?token=…, which is moved into a cookie and taken out of the address bar.
+    const bearer = /^Bearer (.+)$/.exec(c.req.header('authorization') ?? '')?.[1];
+    const cookie = /(?:^|;\s*)iltv_admin=([^;]+)/.exec(c.req.header('cookie') ?? '')?.[1];
+    const query = c.req.query('token');
+    const given = bearer ?? query ?? cookie;
+    if (!given || !sameSecret(given, token)) return c.json({ error: 'not found' }, 404);
+    if (query && c.req.method === 'GET') {
+      const url = new URL(c.req.url);
+      url.searchParams.delete('token');
+      c.header('set-cookie', `${ADMIN_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`);
+      return c.redirect(`${url.pathname}${url.search}`, 303);
+    }
     await next();
   });
   app.get('/', (c) => c.redirect('/status'));
   app.get('/status', (c) => c.json(d.status()));
-  app.get('/usage', (c) => c.html(d.usagePage()));
-  app.get('/usage.json', (c) => c.json(d.usage()));
+  app.get('/usage', (c) => c.html(renderUsagePage(d.dashboard())));
+  app.get('/usage.json', (c) => c.json(d.dashboard()));
   // For agents and scripts: /events.json?corr=…&kind=play&outcome=error&since=2h&series=…&limit=100
-  app.get('/events.json', (c) => c.json(d.events(c.req.query())));
+  app.get('/events.json', (c) => c.json(d.queryEvents(c.req.query())));
   const refresh = (c: import('hono').Context) => {
     const r = d.refresh(c.req.param('id') ?? '');
     return 'error' in r ? c.json(r, 404) : c.json(r, 202);
@@ -370,15 +437,37 @@ export function lanAddresses(host: string): string[] {
 export async function startDaemon(
   config: Config,
   store: Store,
-  log: Log,
+  events: EventStore,
+  logger: Logger,
   opts: { initialRun?: boolean } = {},
 ): Promise<Daemon> {
-  const d = new Daemon(config, store, log);
+  const log = logger.log;
+  const d = new Daemon(config, store, events, logger);
+  // Every finished run (full, airing, show, crawl slice, publish, match) is also an event.
+  store.onRunFinished = (run) =>
+    d.record({
+      ts: run.finishedAt ?? new Date().toISOString(),
+      kind: 'run',
+      component: 'ingest',
+      outcome: run.status === 'failed' ? 'error' : 'ok',
+      source: run.scope,
+      latencyMs: Date.parse(run.finishedAt ?? new Date().toISOString()) - Date.parse(run.startedAt),
+      detail: {
+        run: run.kind,
+        status: run.status,
+        showsOk: run.showsOk,
+        showsFailed: run.showsFailed,
+        newEpisodes: run.newEpisodes,
+        requests: run.requests,
+        ...(run.error ? { error: run.error.slice(0, 300) } : {}),
+      },
+    });
+  const token = adminToken(config, store);
   const urls = (host: string, port: number, path: string) =>
     lanAddresses(host)
       .map((a) => `http://${a}:${port}${path}`)
       .join('  ');
-  await listen(adminApp(d).fetch as never, config.admin.host, config.admin.port, 'admin.port');
+  await listen(adminApp(d, token).fetch as never, config.admin.host, config.admin.port, 'admin.port');
   if (config.publisher.type === 'local') {
     await listen(
       localAddonApp(config.publisher.dir).fetch as never,
@@ -389,17 +478,21 @@ export async function startDaemon(
   }
   if (config.resolver.enabled) {
     await listen(
-      resolverApp(config, process.env, log, (r) => d.noteRelay(r), {
+      resolverApp(config, {
+        log: (component) => logger.for(component),
+        onRelay: (r) => d.noteRelay(r),
         onEvent: (e) => d.record(e),
         sessions: d.sessions,
-        salt: store.clientSalt(),
+        salt: events.clientSalt(),
       }).fetch as never,
       config.resolver.host,
       config.resolver.port,
       'resolver.port',
     );
   }
-  log(`admin (local network only): ${urls(config.admin.host, config.admin.port, '/status')}`);
+  log(
+    `admin and usage dashboard (local network, owner only): ${urls(config.admin.host, config.admin.port, '/usage')} — open it once with ?token=… (\`israel-tv admin-url\` prints the link)`,
+  );
   if (config.publisher.type === 'local') {
     log(
       `addon — install this in your app: ${urls(config.publisher.host, config.publisher.port, '/manifest.json')}`,
@@ -420,12 +513,8 @@ export async function startDaemon(
   }
   store.prune();
   d.schedule();
-  // Relay sessions end after a quiet minute or two; the public Worker's events are pulled every 10 minutes.
+  // Relay sessions end after a quiet minute or two.
   setInterval(() => d.sessions.flush(), 30_000).unref();
-  if (config.publisher.type === 'cloudflare' && config.publisher.requestLogs) {
-    setInterval(() => void d.pullWorkerEvents(), 10 * 60_000).unref();
-    void d.pullWorkerEvents();
-  }
   // Live channels are checked right away (as a job, not holding startup), so /status reflects them.
   if (config.sources.live) d.enqueue('live', async () => void (await checkLive(store)));
   // First start (or after a long stop): fill the catalog now instead of waiting for the night.

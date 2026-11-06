@@ -1,90 +1,133 @@
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ConfigSchema } from '@israel-tv/core';
-import { Store } from '@israel-tv/store';
+import { EventStore } from '@israel-tv/events';
 import { expect, test } from 'vitest';
-import { workerConfig } from '../src/publish.ts';
-import { renderUsagePage } from '../src/usage-page.ts';
-import { pullWorkerEvents, toUsageEvent } from '../src/worker-events.ts';
+import { createLogger, scrub } from '../src/log.ts';
+import { pullPublicUsage } from '../src/public-usage.ts';
+import { workerConfig, workerFingerprint } from '../src/publish.ts';
+import { buildDashboard, renderUsagePage } from '../src/usage-page.ts';
 
-const cf = (requestLogs = true) =>
-  ConfigSchema.parse({ publisher: { type: 'cloudflare', workerName: 'w', dir: '/tmp/site', requestLogs } });
+const cf = () => ConfigSchema.parse({ publisher: { type: 'cloudflare', workerName: 'w', dir: '/tmp/site' } });
+const env = { CLOUDFLARE_API_TOKEN: 'tok', CLOUDFLARE_ACCOUNT_ID: 'acc' };
 
-test('Workers Logs events: only our own request lines are taken, recorded once', async () => {
-  const store = Store.open(':memory:');
-  const now = Date.parse('2026-11-06T12:00:00Z');
-  const ours = {
-    ev: 'iltv',
-    kind: 'request',
-    route: 'meta',
-    series: 'iltv_mako_1',
-    status: 200,
-    outcome: 'ok',
-    ms: 4,
-    corr: 'ray1',
-    client: 'abc',
-  };
-  const events = [
-    { timestamp: now - 60_000, source: ours },
-    { timestamp: now - 50_000, source: { level: 'info', message: 'GET /' } },
-  ];
-  const calls: unknown[] = [];
-  const fakeFetch = (async (_url: string, init: { body: string }) => {
-    calls.push(JSON.parse(init.body));
-    return Response.json({ success: true, result: { events: { events } } });
-  }) as unknown as typeof fetch;
-  const env = { CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_ACCOUNT_ID: 'a' };
-  expect(await pullWorkerEvents(store, cf(), env, fakeFetch, now)).toBe(2);
-  await pullWorkerEvents(store, cf(), env, fakeFetch, now + 600_000);
-  const got = store.events({ kind: 'request' });
-  expect(got).toHaveLength(1);
-  expect(got[0]).toMatchObject({
-    origin: 'worker',
-    route: 'meta',
-    series: 'iltv_mako_1',
-    client: 'abc',
-    status: 200,
+test('public usage: Analytics Engine when readable, else Workers Logs, into the daily rollups', async () => {
+  const events = EventStore.open(':memory:');
+  const calls: string[] = [];
+  const agg = (groups: Record<string, string>, plays: number, clients: number) => ({
+    groups: Object.entries(groups).map(([key, value]) => ({ key, value })),
+    value: plays,
+    clients,
   });
-  expect(calls[0]).toMatchObject({ parameters: { filters: [{ key: '$metadata.service', value: 'w' }] } });
-  expect(toUsageEvent({ timestamp: 1, source: { ev: 'other' } })).toBeUndefined();
-  // Off when request logs are off, or without credentials.
-  expect(await pullWorkerEvents(store, cf(false), env, fakeFetch, now)).toBe(0);
-  expect(await pullWorkerEvents(store, cf(), {}, fakeFetch, now)).toBe(0);
+  const fakeFetch = (async (url: string, init: { body: string }) => {
+    calls.push(url);
+    if (url.endsWith('/analytics_engine/sql')) return new Response('Authorization error', { status: 403 });
+    const q = JSON.parse(init.body) as {
+      parameters: { groupBys: { value: string }[]; filters: { key: string }[] };
+    };
+    const keys = q.parameters.groupBys.map((g) => g.value).join(',');
+    const errorsOnly = q.parameters.filters.some((f) => f.key === 'outcome');
+    const rows =
+      keys === 'source,series'
+        ? [agg({ source: 'mako', series: 'iltv_mako_1' }, errorsOnly ? 1 : 5, 2)]
+        : keys === 'source'
+          ? [agg({ source: 'mako' }, 5, 2)]
+          : [agg({}, 5, 2)];
+    return Response.json({
+      success: true,
+      result: {
+        calculations: [
+          { alias: 'plays', aggregates: rows.map((r) => ({ groups: r.groups, value: r.value })) },
+          { alias: 'clients', aggregates: rows.map((r) => ({ groups: r.groups, value: r.clients })) },
+        ],
+      },
+    });
+  }) as unknown as typeof fetch;
+  const r = await pullPublicUsage(events, cf(), '2026-11-05', env, fakeFetch);
+  expect(r).toMatchObject({ via: 'workers-logs', rows: 3 });
+  expect(r?.note).toContain('Account Analytics: Read');
+  const rows = events.daily('2026-11-05', 'public');
+  expect(rows.find((x) => x.showId === 'iltv_mako_1')).toMatchObject({
+    plays: 5,
+    uniqueClients: 2,
+    failures: 1,
+  });
+  expect(rows.find((x) => x.source === '' && x.showId === '')).toMatchObject({ plays: 5, uniqueClients: 2 });
+  expect(calls[0]).toContain('/analytics_engine/sql');
+  // Local publisher, or no credentials: nothing to read.
+  expect(await pullPublicUsage(events, ConfigSchema.parse({}), '2026-11-05', env, fakeFetch)).toBeUndefined();
+  expect(await pullPublicUsage(events, cf(), '2026-11-05', {}, fakeFetch)).toBeUndefined();
 });
 
-test('the deployed Worker runs first only with request logs on, and never keeps invocation logs', () => {
+test('the Worker runs only for files with image URLs, counts streams in Analytics Engine, keeps no invocation logs', () => {
   const dir = new URL('../../catalog', import.meta.url).pathname;
-  const on = workerConfig(cf().publisher as never, dir) as {
+  const c = workerConfig(cf().publisher as never, dir) as {
     assets: Record<string, unknown>;
     observability: unknown;
+    analytics_engine_datasets: unknown;
     main: string;
   };
-  expect(on.assets.run_worker_first).toBe(true);
-  expect(on.assets.directory).toBe('/tmp/site');
-  expect(on.observability).toEqual({ enabled: true, logs: { enabled: true, invocation_logs: false } });
-  expect(on.main.endsWith('/catalog/src/worker.ts')).toBe(true);
-  const off = workerConfig(cf(false).publisher as never, dir) as { assets: Record<string, unknown> };
-  expect(off.assets.run_worker_first).toEqual(['/manifest.json', '/catalog/tv/*', '/meta/tv/*']);
+  expect(c.assets.run_worker_first).toEqual(['/manifest.json', '/catalog/tv/*', '/meta/tv/*']);
+  expect(c.observability).toEqual({
+    enabled: true,
+    head_sampling_rate: 1,
+    logs: { enabled: true, invocation_logs: false },
+  });
+  expect(c.analytics_engine_datasets).toEqual([{ binding: 'USAGE', dataset: 'israel_tv_usage' }]);
+  expect(c.main.endsWith('/catalog/src/worker.ts')).toBe(true);
+  expect(workerFingerprint(cf().publisher as never)).toBe(workerFingerprint(cf().publisher as never));
 });
 
-test('the usage page escapes everything it shows', () => {
-  const html = renderUsagePage(
-    {
-      clientsToday: [],
-      clientsByDay: [],
-      bySource: [],
-      byShow: [{ source: 'mako', series: 'iltv_mako_1', title: null, streams: 1, plays: 1, failures: 0 }],
-      requests: [],
-      failures: [],
-    },
-    [],
-    () => '<script>alert(1)</script>',
+test('the dashboard labels both views, says what each cannot see, and escapes what it shows', () => {
+  const events = EventStore.open(':memory:');
+  events.record({
+    ts: new Date().toISOString(),
+    kind: 'play_start',
+    component: 'mako-auth',
+    outcome: 'ok',
+    source: 'mako',
+    showId: 'iltv_mako_1',
+    client: 'a',
+  });
+  const d = buildDashboard(events, { active: [], title: () => '<script>x</script>', ingest: [], canary: [] });
+  expect(d.home.today).toMatchObject({ plays: 1, uniqueAvg: 1 });
+  const html = renderUsagePage(d);
+  expect(html).toContain('This home (resolver)');
+  expect(html).toContain('Public addon (all users, anonymous)');
+  expect(html).toContain("cannot see other people's resolvers");
+  expect(html).toContain('cannot see catalog browsing');
+  expect(html).not.toContain('<script>x');
+});
+
+test('a secret never reaches a log line, wherever it appears', async () => {
+  const secret = 'S3cr3t-T0ken-value-123';
+  expect(scrub({ url: `https://h/p/${secret}/manifest.json`, nested: { a: [secret] } }, [secret])).toEqual({
+    url: 'https://h/p/[redacted]/manifest.json',
+    nested: { a: ['[redacted]'] },
+  });
+  const dir = mkdtempSync(join(tmpdir(), 'log-'));
+  const logger = createLogger(
+    { file: join(dir, 'israel-tv.log'), maxMB: 1, keep: 2, level: 'info' },
+    { MY_REMOTE_TOKEN: secret },
   );
-  expect(html).not.toContain('<script>');
-  expect(html).toContain('&#60;script&#62;');
-});
-
-test('the Worker fingerprint follows its config', async () => {
-  const { workerFingerprint } = await import('../src/publish.ts');
-  const a = workerFingerprint(cf().publisher as never);
-  expect(workerFingerprint(cf().publisher as never)).toBe(a);
-  expect(workerFingerprint(cf(false).publisher as never)).not.toBe(a);
+  const log = logger.for('mako-auth');
+  log(`request for /${secret}/manifest.json`, {
+    path: `/${secret}/stream`,
+    token: 'abc-def-ghi',
+    error: new Error(`bad ${secret}`),
+  });
+  logger.flush();
+  let text = '';
+  for (let i = 0; i < 50 && !text.includes('manifest'); i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    text = readdirSync(dir)
+      .filter((f) => f.endsWith('.log'))
+      .map((f) => readFileSync(join(dir, f), 'utf8'))
+      .join('');
+  }
+  expect(text).toContain('"component":"mako-auth"');
+  expect(text).toContain('[redacted]');
+  expect(text).not.toContain(secret);
+  expect(text).not.toContain('abc-def-ghi');
 });

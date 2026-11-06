@@ -1,4 +1,5 @@
 import type { ScrapedShow } from '@israel-tv/core';
+import { EventStore } from '@israel-tv/events';
 import { Store } from '@israel-tv/store';
 import { expect, test } from 'vitest';
 import { buildStatus } from '../src/publish.ts';
@@ -53,6 +54,7 @@ function show(key: string, seasons: { key: string; title: string; n: number; dat
 }
 
 const opts = { minShareOfPrevious: 0.8 };
+const quiet = { log: () => {}, for: () => () => {}, flush: () => {} };
 const entries = (...keys: string[]) => keys.map((key) => ({ key, title: key }));
 
 test('full run saves shows, skips empty ones, and allocates ids only for real shows', async () => {
@@ -181,24 +183,47 @@ test('an episode listed twice by the source is stored once', async () => {
   expect(r).toMatchObject({ status: 'ok', newEpisodes: 2 });
 });
 
-test('admin refuses cross-site requests from web pages', async () => {
+test('admin refuses cross-site requests from web pages, and anyone without the token', async () => {
   const { adminApp, Daemon } = await import('../src/daemon.ts');
   const { parseConfig } = await import('@israel-tv/core');
-  const app = adminApp(new Daemon(parseConfig({}), Store.open(':memory:'), () => {}));
+  const d = new Daemon(parseConfig({}), Store.open(':memory:'), EventStore.open(':memory:'), quiet);
+  const app = adminApp(d, 'the-admin-token');
   const env = { incoming: { socket: { remoteAddress: '192.168.1.5' } } };
+  const auth = { host: '192.168.1.10:7702', authorization: 'Bearer the-admin-token' };
   const viaPage = await app.request(
     '/run/full',
-    { method: 'POST', headers: { origin: 'http://evil.example', host: '192.168.1.10:7702' } },
+    { method: 'POST', headers: { ...auth, origin: 'http://evil.example' } },
     env,
   );
   expect(viaPage.status).toBe(403);
-  const status = await app.request('/status', { headers: { host: '192.168.1.10:7702' } }, env);
-  const rebound = await app.request('/status', { headers: { host: 'evil.example:7702' } }, env);
+  // A guest on the same network without the token sees nothing.
+  const guest = await app.request('/usage', { headers: { host: '192.168.1.10:7702' } }, env);
+  expect(guest.status).toBe(404);
+  const wrong = await app.request('/status', { headers: { ...auth, authorization: 'Bearer nope' } }, env);
+  expect(wrong.status).toBe(404);
+  // A browser opens it once with ?token=…: the token moves into a cookie and out of the address bar.
+  const first = await app.request(
+    '/usage?token=the-admin-token',
+    { headers: { host: '192.168.1.10:7702' } },
+    env,
+  );
+  expect(first.status).toBe(303);
+  expect(first.headers.get('location')).toBe('/usage');
+  expect(first.headers.get('set-cookie')).toMatch(/^iltv_admin=the-admin-token; HttpOnly; SameSite=Strict/);
+  const withCookie = await app.request(
+    '/usage',
+    { headers: { host: '192.168.1.10:7702', cookie: 'iltv_admin=the-admin-token' } },
+    env,
+  );
+  expect(withCookie.status).toBe(200);
+  expect(await withCookie.text()).toContain('Public addon (all users, anonymous)');
+  const status = await app.request('/status', { headers: auth }, env);
+  const rebound = await app.request('/status', { headers: { ...auth, host: 'evil.example:7702' } }, env);
   expect(rebound.status).toBe(403);
   expect(status.status).toBe(200);
   const outside = await app.request(
     '/status',
-    { headers: { host: '192.168.1.10:7702' } },
+    { headers: auth },
     { incoming: { socket: { remoteAddress: '8.8.8.8' } } },
   );
   expect(outside.status).toBe(403);
@@ -237,7 +262,12 @@ test('a Kan refresh during a back-off does not spin the event loop', async () =>
   const { parseConfig } = await import('@israel-tv/core');
   const store = Store.open(':memory:');
   store.setState('kan:crawl', { shows: {}, backoffUntil: new Date(Date.now() + 3_600_000).toISOString() });
-  const d = new Daemon(parseConfig({ browser: { type: 'chrome' } }), store, () => {});
+  const d = new Daemon(
+    parseConfig({ browser: { type: 'chrome' } }),
+    store,
+    EventStore.open(':memory:'),
+    quiet,
+  );
   (d as unknown as { kanRefresh: Set<string> }).kanRefresh.add(
     'https://www.kan.org.il/content/kan/kan-11/p-1/',
   );

@@ -54,7 +54,7 @@ describe('Mako', () => {
     const app = createResolverApp({ episode, fetch: makoNet(calls) });
     const s = await (await app.request('http://home.lan:7001/stream/series/iltv_mako_1:2:3.json')).json();
     expect(s.streams[0].url).toMatch(
-      /^http:\/\/home\.lan:7001\/play\/mako\/iltv_mako_1%3A2%3A3\.m3u8\?c=[\w-]+$/,
+      /^http:\/\/home\.lan:7001\/play\/mako\/iltv_mako_1%3A2%3A3.m3u8\?p=[\w-]+$/,
     );
 
     const r = await app.request('/play/mako/iltv_mako_1%3A2%3A3.m3u8', {
@@ -200,12 +200,19 @@ test('a failing geo proxy gives a 502 that says so, and one log line', async () 
   const geoFetch = async () => {
     throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
   };
-  const app = createResolverApp({ episode, fetch: makoNet([]), geoFetch, log: (l) => lines.push(l) });
+  const app = createResolverApp({
+    episode,
+    fetch: makoNet([]),
+    geoFetch,
+    log: (component) => (msg, fields) => lines.push(`${component}: ${msg} ${JSON.stringify(fields)}`),
+  });
   const s = await (await app.request('http://h/stream/series/iltv_reshet_1:1:1.json')).json();
   const r = await app.request(new URL(s.streams[0].url).pathname);
   expect(r.status).toBe(502);
   expect(await r.text()).toMatch(/geo proxy failed: /);
-  expect(lines[0]).toMatch(/relay through the geo proxy failed for cdnapisec\.kaltura\.com/);
+  const line = lines.find((l) => l.includes('relay through the geo proxy failed'));
+  expect(line).toMatch(/^geo-relay: /);
+  expect(line).toContain('cdnapisec.kaltura.com');
 });
 
 test('an upstream refusal through the proxy is reported as a failed relay', async () => {
@@ -229,8 +236,16 @@ test('a Mako show opened from Cinemeta (IMDb id) plays through the resolver, num
   expect(named.streams).toEqual([]);
 });
 
-test('a play is recorded: stream, ticket and play events share one correlation id; relay sessions too', async () => {
-  const events: { kind: string; corr?: string; outcome: string; upstream?: string; video?: string }[] = [];
+test('a play is recorded: stream request, ticket and failure share one playId, each from its module', async () => {
+  const events: {
+    kind: string;
+    component: string;
+    playId?: string;
+    outcome: string;
+    status?: number;
+    detail?: Record<string, unknown>;
+    episodeId?: string;
+  }[] = [];
   const app = createResolverApp({
     episode: () => ({ key: 'k', title: 't', streams: [], play: { vcmid: 'v', channelId: 'c' } }),
     onEvent: (e) => events.push(e),
@@ -245,13 +260,16 @@ test('a play is recorded: stream, ticket and play events share one correlation i
   const play = new URL(s.streams[0].url);
   const r = await app.request(`${play.pathname}${play.search}`);
   expect(r.status).toBe(403);
-  const corr = play.searchParams.get('c');
-  expect(events.map((e) => e.kind)).toEqual(['stream', 'ticket', 'play']);
-  expect(events.every((e) => e.corr === corr)).toBe(true);
-  const p = events[2];
-  expect(p).toMatchObject({ outcome: 'error', video: 'iltv_mako_1:2:3' });
-  expect(p?.upstream).toContain('ticket 200');
-  expect(p?.upstream).toContain('master 403');
+  const playId = play.searchParams.get('p');
+  expect(events.map((e) => `${e.component}/${e.kind}`)).toEqual([
+    'resolver/stream_request',
+    'mako-auth/ticket_fetch',
+    'mako-auth/failure',
+  ]);
+  expect(events.every((e) => e.playId === playId)).toBe(true);
+  const f = events[2];
+  expect(f).toMatchObject({ outcome: 'error', status: 403, episodeId: 'iltv_mako_1:2:3' });
+  expect(String(f?.detail?.upstream)).toContain('ticket 200');
 });
 
 test('a Reshet episode is relayed only when its direct stream is refused from here (probed once per show)', async () => {

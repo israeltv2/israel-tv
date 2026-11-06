@@ -1,0 +1,21 @@
+{
+  "name": "@israel-tv/events",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@israel-tv/core": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.5"
+  },
+  "devDependencies": {
+    "drizzle-kit": "1.0.0-rc.5"
+  }
+}
