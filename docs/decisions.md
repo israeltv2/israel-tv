@@ -1151,3 +1151,15 @@ on any page error, failed request or sideways scrolling, screenshots kept as CI 
   checks before a push. Commit messages are not checked locally: the squash-merge title is the commit that counts, and
   CI checks it.
 - **The dashboard's own budget** (45 KB JS gzip, measured 36) and its browser check run in CI (round 4 above).
+
+## Series posters are portrait (2026-11-06)
+
+Series rows were published as `landscape`, but the images are portrait (measured: 199 of 200 Mako and Reshet posters,
+e.g. Mako 420x600, Reshet 1080x1920; our Kan copies 300x450), so apps like Nuvio drew them sideways. Now every series
+row is `poster` (live stays `square`), and the publisher makes that true: it measures each poster once (the header
+only; fetched before the first publish that needs it, failures retried after a day). A portrait image is used as it
+is; any other (one Reshet show, landscape Kan images) gets a 2:3 version made here — the whole image on a blurred,
+darkened fill of itself, 400x600 JPEG, pure JS (`jpeg-js`) so every platform can do it — served from our site. A
+poster on a host that refuses viewers outside Israel (Kan's own site) is never published: our copy, or a placeholder
+(`assets/branding/poster-placeholder.jpg`, replaceable in `branding.dir`) until the copy exists; backgrounds and
+thumbnails on such hosts are dropped. A test fails if a series row is not `poster` or its poster is not portrait.

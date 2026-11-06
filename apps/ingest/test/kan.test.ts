@@ -471,6 +471,9 @@ test('a Kan show keeps our own copy of its image, used for its poster, backgroun
   const { ConfigSchema } = await import('@israel-tv/core');
   const { renderFromStore } = await import('../src/publish.ts');
   const { kanArtwork } = await import('../src/kan.ts');
+  const { default: jpeg } = await import('jpeg-js');
+  const px = new Uint8Array(300 * 450 * 4).map((_, i) => (i * 7) % 251);
+  const portraitJpeg = jpeg.encode({ width: 300, height: 450, data: px }, 80).data;
   const dir = mkdtempSync(join(tmpdir(), 'art-'));
   const store = Store.open(join(dir, 'israel-tv.sqlite'));
   const base = loader(routes);
@@ -479,7 +482,7 @@ test('a Kan show keeps our own copy of its image, used for its poster, backgroun
     async load(url: string, o?: { image?: (html: string) => string | undefined }) {
       const page = await base.load(url);
       const src = o?.image?.(page.html);
-      return src ? { ...page, image: { url: src, status: 200, jpeg: new Uint8Array(4000).fill(7) } } : page;
+      return src ? { ...page, image: { url: src, status: 200, jpeg: portraitJpeg } } : page;
     },
   };
   const artworkDir = join(dir, 'artwork');

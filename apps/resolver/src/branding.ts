@@ -12,14 +12,19 @@ export function channelLogo(id: string): Uint8Array | undefined {
   return /^[a-z0-9_]+$/.test(id) && existsSync(p) ? readFileSync(p) : undefined;
 }
 
-export type BrandImage = 'logo' | 'resolver-logo' | 'background';
+export type BrandImage = 'logo' | 'resolver-logo' | 'background' | 'poster-placeholder';
 
 /** The image's bytes and content type, from `dir` first, else bundled. */
 export function brandImage(
   dir: string | undefined,
   name: BrandImage,
 ): { body: Uint8Array; type: string } | undefined {
-  const candidates = name === 'background' ? ['background.jpg', 'background.png'] : [`${name}.png`];
+  const candidates =
+    name === 'background'
+      ? ['background.jpg', 'background.png']
+      : name === 'poster-placeholder'
+        ? ['poster-placeholder.jpg']
+        : [`${name}.png`];
   for (const base of [dir, BUNDLED]) {
     if (!base) continue;
     for (const file of candidates) {

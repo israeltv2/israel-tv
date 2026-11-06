@@ -28,6 +28,10 @@ export const sitePaths = {
   channelLogo: (id: string) => `logos/${id}.png`,
   /** Our copy of a show's artwork (sources whose images are refused outside Israel). */
   artwork: (seriesId: string) => `art/${seriesId}.jpg`,
+  /** A show's portrait poster made by us (its own image was not portrait). */
+  poster: (seriesId: string) => `art/${seriesId}-poster.jpg`,
+  /** The poster for a show whose image cannot be published yet. */
+  posterPlaceholder: 'art/placeholder-poster.jpg',
 } as const;
 
 /**
