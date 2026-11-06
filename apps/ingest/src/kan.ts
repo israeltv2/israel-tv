@@ -351,9 +351,10 @@ export async function crawlKan(
           if (poster) state.shows[key].lobbyPoster = new URL(poster, l.origin).toString();
         }
       }
-      if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size)
+      if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size) {
         state.lobbiesAt = new Date(now).toISOString();
-      state.lobbyPosters = true;
+        state.lobbyPosters = true;
+      }
       log(`kan: ${Object.keys(state.shows).length} shows known`);
     }
 
