@@ -15,7 +15,7 @@ export function backupCatalog(
   now = Date.now(),
 ): { file?: string; bytes?: number; removed: string[] } {
   if (opts.keepDays === 0) return { removed: [] };
-  mkdirSync(opts.dir, { recursive: true });
+  mkdirSync(opts.dir, { recursive: true, mode: 0o700 });
   const day = new Date(now).toISOString().slice(0, 10);
   const file = join(opts.dir, `israel-tv-${day}.sqlite`);
   if (existsSync(file)) rmSync(file);

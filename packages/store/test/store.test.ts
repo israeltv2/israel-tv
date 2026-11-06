@@ -96,3 +96,17 @@ test('prune removes old warnings before the runs they belong to', () => {
   expect(s.recentRuns()).toEqual([]);
   expect(s.recentWarnings()).toEqual([]);
 });
+
+test('the catalog database and its backups are readable by their owner only', async () => {
+  if (process.platform === 'win32') return;
+  const { mkdtempSync, statSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'perm-'));
+  const store = Store.open(join(dir, 'data', 'israel-tv.sqlite'));
+  expect(statSync(join(dir, 'data', 'israel-tv.sqlite')).mode & 0o077).toBe(0);
+  expect(statSync(join(dir, 'data')).mode & 0o077).toBe(0);
+  store.backupTo(join(dir, 'backup.sqlite'));
+  expect(statSync(join(dir, 'backup.sqlite')).mode & 0o077).toBe(0);
+  store.close();
+});

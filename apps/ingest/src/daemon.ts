@@ -625,7 +625,7 @@ export async function startDaemon(
     }
   }
   log(
-    `admin and usage dashboard (local network, owner only): ${urls(config.admin.host, config.admin.port, '/usage')} — open it once with ?token=… (\`israel-tv admin-url\` prints the link)`,
+    `the dashboard (local network, owner only): ${urls(config.admin.host, config.admin.port, '/dash/')} — open it once with ?token=… (\`israel-tv admin-url\` prints the link)`,
   );
   if (config.publisher.type === 'local') {
     log(

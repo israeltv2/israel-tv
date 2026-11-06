@@ -140,3 +140,14 @@ test('a request is rate-limited once, not once per round', async () => {
   expect(w.apiCalls.length - before).toBeGreaterThanOrEqual(2); // asked for the season's stream file first
   expect(counted).toBe(1);
 });
+
+test('the router refuses anything but GET and HEAD', async () => {
+  const w = wire();
+  const r = await route(new Request('https://h/stream/series/x.json', { method: 'POST' }), {
+    ASSETS: { fetch: async () => new Response('') } as unknown as Fetcher,
+    API: { fetch: async () => new Response('should not be called') } as unknown as Fetcher,
+  });
+  expect(r.status).toBe(405);
+  expect(r.headers.get('allow')).toBe('GET, HEAD');
+  expect(w.apiCalls).toHaveLength(0);
+});

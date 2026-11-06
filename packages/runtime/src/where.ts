@@ -52,7 +52,7 @@ export function instanceUrls(config: Config): string[] {
     );
   if (role !== 'resolver-only')
     lines.push(
-      `Admin page (this network only): ${at(config.admin.host, config.admin.port, '/usage').join('  ')}  (\`admin-url\` adds your token)`,
+      `Dashboard (this network only): ${at(config.admin.host, config.admin.port, '/dash/').join('  ')}  (\`admin-url\` adds your token)`,
     );
   if (config.resolver.remote.enabled)
     lines.push('Away from home (Mako): `remote-url` prints the link with its token');
