@@ -32,6 +32,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
       - run: pnpm check:addresses
         if: matrix.os == 'ubuntu-latest'
+      - run: pnpm budget:workers
+        if: matrix.os == 'ubuntu-latest'
       - run: pnpm test:strict
       # Start local-only and resolver-only and fetch their manifests (no broadcaster site contacted).
       - run: pnpm smoke

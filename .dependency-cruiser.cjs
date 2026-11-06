@@ -50,6 +50,14 @@ module.exports = {
       to: { path: '^packages/(store|events|runtime|net|kan|mako|reshet|render)/' },
     },
     {
+      name: 'workers-no-schemas',
+      comment:
+        'The Workers and the addon app use core only through its edge entry: the config/contract schemas (zod) stay out of the Worker bundle.',
+      severity: 'error',
+      from: { path: '^(apps/catalog/src|packages/addon/src)/' },
+      to: { path: '^packages/core/src/(config|contract|model|index)\\.ts$' },
+    },
+    {
       name: 'router-imports-only-the-contract',
       comment: 'The data Worker’s router stays tiny and stable: it imports nothing but the router contract.',
       severity: 'error',

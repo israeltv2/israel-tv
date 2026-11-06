@@ -7,6 +7,7 @@ import { ADMIN_API, CSRF_HEADER } from '@israel-tv/admin-contract';
 import {
   type Config,
   DAY_MS,
+  LIVE_CHANNELS,
   parseSeriesId,
   type Source,
   tmdbApiKey,
@@ -374,7 +375,8 @@ export class Daemon {
     return buildDashboard(this.events, {
       active: this.sessions.active(),
       title: (id) => {
-        if (!titles.has(id)) titles.set(id, this.store.getShow(id)?.title ?? '');
+        if (!titles.has(id))
+          titles.set(id, this.store.getShow(id)?.title ?? LIVE_CHANNELS.find((c) => c.id === id)?.name ?? '');
         return titles.get(id) || undefined;
       },
       ingest: status.sources.map((s) => ({

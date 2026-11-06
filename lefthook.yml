@@ -1,0 +1,14 @@
+# Git hooks for contributors (installed by `pnpm install`): quick checks before a commit, the type check before a
+# push. CI runs everything again; skip once with `git commit --no-verify` if you must.
+pre-commit:
+  commands:
+    format:
+      glob: "*.{ts,mjs,js,json,jsonc,css,md,html}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+pre-push:
+  commands:
+    typecheck:
+      run: pnpm typecheck
+    boundaries:
+      run: pnpm boundaries

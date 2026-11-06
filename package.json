@@ -23,7 +23,8 @@
     "test:strict": "node tools/test-strict.mjs",
     "smoke": "node tools/smoke.mjs",
     "check:addresses": "node tools/check-addresses.mjs",
-    "e2e:dashboard": "node tools/dashboard-e2e.mjs"
+    "e2e:dashboard": "node tools/dashboard-e2e.mjs",
+    "budget:workers": "node tools/worker-budget.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",
@@ -34,7 +35,8 @@
     "publint": "0.3.25",
     "typescript": "7.0.2",
     "vitest": "5.1.0",
-    "playwright-core": "catalog:"
+    "playwright-core": "catalog:",
+    "lefthook": "2.2.2"
   },
   "license": "AGPL-3.0-only"
 }

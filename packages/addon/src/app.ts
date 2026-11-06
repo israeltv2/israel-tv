@@ -13,7 +13,7 @@ import {
   staleItem,
   staleSince,
   withOrigin,
-} from '@israel-tv/core';
+} from '@israel-tv/core/edge';
 import { Hono } from 'hono';
 
 /** Reads a rendered file by its site path; undefined when it does not exist. */
