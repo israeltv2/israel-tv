@@ -80,15 +80,18 @@ The whole procedure, with what each step shows: [home helper](home-helper.md#the
    (the Wi-Fi or Ethernet one, not "vEthernet"); Mac _System Settings → Wi-Fi → Details_ or _Network → Ethernet →
    Details_; NAS or Linux: its admin page, the router's device list, or `hostname -I` (first address).
 5. **In the app:** add `http://<that address>:7701/manifest.json` (easiest from a phone or computer on the same
-   account). **Verify (person):** an addon "Israel TV · home helper" appears; a Keshet 12 episode plays; abroad,
+   account; if it does not appear on another device, such as the TV or Nuvio elsewhere, add the link there too).
+   **Verify (person):** an addon "Israel TV · home helper" appears; a Keshet 12 episode plays; abroad,
    Israel-only episodes show a source "דרך ישראל · via Israel". Stremio in a web browser cannot use this `http://`
    link; the apps can.
 6. **Keep it running:** Docker Desktop → Settings → _Start Docker Desktop when you sign in_; the computer never sleeps
    when plugged in (Windows _Settings → System → Power_; Mac _System Settings → Energy → Prevent automatic sleeping_);
    after a system restart someone must sign in. Windows: the home network must be _Private_ and Docker allowed on
    private networks. Mac: if asked whether Docker may accept incoming connections, allow it.
-7. **Tell them:** Keshet 12 plays on the home network only; away from home needs a domain and technical setup
-   ([away from home](resolver-only.md#away-from-home)) — do not attempt it unless they ask.
+7. **Tell them:** the helper's sources (Keshet 12, and abroad the "via Israel" ones) play on the home network only;
+   away from home the public link's other episodes and live channels still work. Opening the helper to the outside
+   needs a domain and the install without Docker ([away from home](resolver-only.md#away-from-home)) — do not
+   attempt it unless they ask.
 
 No Docker and they are comfortable with a terminal: [without Docker](resolver-only.md).
 

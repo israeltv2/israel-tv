@@ -118,7 +118,7 @@ request without the token, gets an empty 404, and each client is rate-limited.
 
 - `pnpm resolver check-catalog` says what is wrong with `catalogUrl` (a typo, or a catalog speaking another
   version of the [contract](../contract.md)).
-- `pnpm resolver events --errors` lists recent failures; the log is in the config folder's `data/logs/current.log`.
+- `pnpm resolver events --errors` lists recent failures; the log is in the config folder's `data/logs/current.log` (Windows: the newest `israel-tv.*.log` there).
 - Updating: `git pull`, `pnpm install --prod --filter "@israel-tv/resolver..."`, restart.
 - Ports: 7701 (the helper), 7703 (away from home, for the tunnel on this computer only). Do not expose 7701 to the
   internet: it has no login and would relay through your proxy.

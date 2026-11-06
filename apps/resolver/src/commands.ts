@@ -20,9 +20,14 @@ export async function checkProxy(config: Config, out: (line: string) => void = c
       const country = (await r.text()).trim();
       const good = r.ok && country === 'IL';
       if (good) ok++;
-      out(
-        `${p.server}: ${r.ok ? `exits in ${country}` : `HTTP ${r.status}`}${good ? ' ✓' : ' ✗ (needs an Israeli exit)'}`,
-      );
+      const why = good
+        ? ' ✓'
+        : r.status === 407
+          ? ' ✗ the proxy refused the login: check the proxy user name and password'
+          : r.ok
+            ? ' ✗ not an Israeli exit: pick a server in Israel'
+            : ' ✗ the proxy answered with an error';
+      out(`${p.server}: ${r.ok ? `exits in ${country}` : `HTTP ${r.status}`}${why}`);
     } catch (err) {
       // The geo fetch already explains the failure as "<proxy>: <why>".
       out(`${p.server}: ✗ ${(err as Error).message.replace(`${p.server}: `, '')}`);
@@ -73,10 +78,10 @@ export function printEvents(
  * At start, when a proxy is configured: say which (address only, never the login) and check once that it exits in
  * Israel, so a wrong proxy shows in the log at once rather than as a failed play later.
  */
-export function checkProxyAtStart(config: Config, log: (line: string) => void): void {
+export function checkProxyAtStart(config: Config, log: (line: string) => void, announce = true): void {
   const proxies = proxyEndpoints(config.geo);
   if (proxies.length === 0) return;
-  log(`geo proxy: ${proxies.map((p) => p.server).join(', ')}`);
+  if (announce) log(`geo proxy: ${proxies.map((p) => p.server).join(', ')}`);
   void checkProxy(config, (line) => log(`proxy check: ${line}`)).catch((err: Error) =>
     log(`proxy check: ${err.message}`),
   );

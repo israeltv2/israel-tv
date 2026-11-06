@@ -4,7 +4,7 @@
 #   powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolver  # the resolver on its own
 # Remove it:   powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Remove [-Resolver]
 # Restart it (after an update or a settings change):  ... install-task.ps1 -Restart [-Resolver]   (-Stop to stop it)
-# Logs: the config folder's data\logs\current.log (`pnpm israel-tv paths` shows the folder).
+# Logs: the config folder's data\logs (the newest israel-tv.*.log); start-up problems: task-output.txt there too.
 # The config and .env live in the config folder (`pnpm israel-tv paths` shows it). The task runs while you are
 # logged in; Windows asks once whether node may accept connections on private networks: allow it.
 param([switch]$Resolver, [switch]$Remove, [switch]$Stop, [switch]$Restart)
@@ -39,7 +39,10 @@ $node = (Get-Command node -ErrorAction Stop).Source
 $cli = if ($Resolver) { 'apps\resolver\src\cli.ts' } else { 'apps\ingest\src\cli.ts' }
 # No window (conhost --headless), and a loop that starts it again 30 seconds after it stops for any reason
 # (Task Scheduler's own restart only covers a task that fails to launch). Logs go to the config folder's data\logs.
-$loop = "`$task = '$marker'; while (`$true) { & '$node' '$cli' start; Start-Sleep -Seconds 30 }"
+# What the app prints before its log starts (a settings error, a taken port) goes to task-output.txt in the config folder.
+$out = Join-Path $env:LOCALAPPDATA "israel-tv\task-output$(if ($Resolver) { '-resolver' }).txt"
+New-Item -ItemType Directory -Force (Split-Path $out) | Out-Null
+$loop = "`$task = '$marker'; while (`$true) { & '$($node.Replace("'","''"))' '$cli' start *>> '$($out.Replace("'","''"))'; Start-Sleep -Seconds 30 }"
 $action = New-ScheduledTaskAction -Execute 'conhost.exe' `
   -Argument "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -Command `"$loop`"" -WorkingDirectory $repo
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
