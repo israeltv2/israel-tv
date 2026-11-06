@@ -118,11 +118,14 @@ export function createLogger(config: Config['log'], env: NodeJS.ProcessEnv = pro
           size: `${config.maxMB}m`,
           frequency: 'daily',
           mkdir: true,
-          symlink: true,
+          // current.log points at the newest file; Windows lets ordinary users make no such link.
+          symlink: process.platform !== 'win32',
           limit: { count: config.keep, removeOtherLogFiles: true },
         },
       })
     : undefined;
+  // A failing log file (disk full, permissions) is reported, never fatal.
+  file?.on?.('error', (err: Error) => process.stderr.write(`log file problem: ${err.message}\n`));
   // With a log file, lines also go to a terminal (when there is one) or the container's output (`docker logs`);
   // a service's own output (launchd, systemd, Task Scheduler) gets nothing, so it never grows unrotated.
   const alsoShown = process.stdout.isTTY || !!env.ISRAEL_TV_IN_CONTAINER;

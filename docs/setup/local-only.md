@@ -82,5 +82,5 @@ your app keep working, and set the computer not to sleep.
 
 - `pnpm israel-tv status` — recent runs and warnings; the admin page shows the same with more detail.
 - `pnpm logs --errors` — recent failures; `pnpm logs --play <id>` follows one play. The full log is in the config
-  folder's `data/logs/current.log`.
+  folder's `data/logs/current.log` (Windows: the newest `israel-tv.*.log` there).
 - [Operations](../operations.md) covers investigating a failed play, backups and updating.
