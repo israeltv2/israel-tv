@@ -8,7 +8,8 @@
 #   chown -R israeltv: /opt/israel-tv
 #   cp deploy/israel-tv-resolver.service /etc/systemd/system/ && systemctl enable --now israel-tv-resolver
 # Check the catalog: cd /opt/israel-tv && sudo -u israeltv ISRAEL_TV_CONFIG=/opt/israel-tv/israel-tv.config.json node apps/resolver/src/cli.ts check-catalog
-# Logs: journalctl -u israel-tv-resolver -f. Restart after a change: systemctl restart israel-tv-resolver
+# Logs: tail -f /opt/israel-tv/data/logs/current.log (the example config logs to rotated files; journalctl
+#   -u israel-tv-resolver shows only start-up crashes). Events: pnpm resolver events --errors. Restart after a change: systemctl restart israel-tv-resolver
 [Unit]
 Description=Israel TV resolver (resolver-only)
 After=network-online.target
