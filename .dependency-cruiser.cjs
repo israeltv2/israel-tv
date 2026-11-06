@@ -8,7 +8,8 @@ module.exports = {
       name: 'no-cycles',
       severity: 'error',
       from: {},
-      to: { circular: true },
+      // A type-only import (e.g. a module naming the Daemon type it is given) is no runtime cycle.
+      to: { circular: true, dependencyTypesNot: ['type-only'] },
     },
     {
       name: 'packages-not-apps',
@@ -54,6 +55,23 @@ module.exports = {
       severity: 'error',
       from: { path: '^apps/catalog/src/router\\.ts$' },
       to: { pathNot: '^packages/core/src/router-contract\\.ts$' },
+    },
+    {
+      name: 'dashboard-web-browser-only',
+      comment:
+        'The dashboard page runs in a browser: it imports its own modules, the contract (types only) and its vendor modules.',
+      severity: 'error',
+      from: { path: '^apps/dashboard/web/' },
+      to: {
+        pathNot: ['^apps/dashboard/web/', '^packages/admin-contract/', 'node_modules/(preact|htm|uplot)/'],
+      },
+    },
+    {
+      name: 'dashboard-not-ingest',
+      comment: 'The dashboard knows the admin API only through its contract, never the daemon.',
+      severity: 'error',
+      from: { path: '^apps/dashboard/' },
+      to: { path: '^(apps/(ingest|resolver|catalog)|packages/(store|events|runtime))/' },
     },
     {
       name: 'no-src-into-other-package',

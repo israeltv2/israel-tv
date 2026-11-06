@@ -35,6 +35,15 @@ jobs:
       - run: pnpm test:strict
       # Start local-only and resolver-only and fetch their manifests (no broadcaster site contacted).
       - run: pnpm smoke
+      # The owner's dashboard in a real browser: every section, phone and desktop, light and dark.
+      - run: pnpm e2e:dashboard
+        if: matrix.os == 'ubuntu-latest'
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.os == 'ubuntu-latest'
+        with:
+          name: dashboard-screens
+          path: dashboard-screens/
+          if-no-files-found: ignore
   windows-task:
     # The Windows background task, for real: install it for the helper, fetch the manifest it serves, stop it (no
     # process may keep the port), remove it.
@@ -93,4 +102,5 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          package-manager-cache: false
       - run: pnpm audit --prod --audit-level=high

@@ -368,7 +368,7 @@ async function main(argv: string[]): Promise<number> {
       case 'admin-url': {
         const token = adminToken(config, store);
         for (const a of lanAddresses(config.admin.host))
-          console.log(`http://${a}:${config.admin.port}/usage?token=${encodeURIComponent(token)}`);
+          console.log(`http://${a}:${config.admin.port}/dash/?token=${encodeURIComponent(token)}`);
         return 0;
       }
       default:

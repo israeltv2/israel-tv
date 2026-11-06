@@ -1,0 +1,235 @@
+:root {
+  --bg: #f7f7f8;
+  --card: #ffffff;
+  --text: #16181d;
+  --muted: #5d6470;
+  --grid: #e4e6ea;
+  --line: #dfe2e6;
+  --accent: #2557d6;
+  --green: #137a3f;
+  --red: #b42318;
+  --amber: #9a6100;
+  --c1: #2557d6;
+  --c2: #c2410c;
+  --c3: #0f766e;
+  --c4: #7c3aed;
+  --c5: #a16207;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #171a20;
+    --text: #e6e8ec;
+    --muted: #9aa3b0;
+    --grid: #2a2f38;
+    --line: #2a2f38;
+    --accent: #7aa2ff;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --c1: #7aa2ff;
+    --c2: #fb923c;
+    --c3: #2dd4bf;
+    --c4: #c4b5fd;
+    --c5: #facc15;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+a {
+  color: var(--accent);
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    15px / 1.45 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Noto Sans Hebrew",
+    sans-serif;
+}
+header {
+  position: sticky;
+  inset-block-start: 0;
+  background: var(--card);
+  border-block-end: 1px solid var(--line);
+  padding: 0.6rem 1rem 0;
+  z-index: 2;
+}
+header h1 {
+  display: inline;
+  font-size: 1.1rem;
+  margin: 0 0.5rem 0 0;
+}
+nav {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  margin-block-start: 0.4rem;
+}
+nav a {
+  padding: 0.45rem 0.7rem;
+  color: var(--muted);
+  text-decoration: none;
+  border-block-end: 2px solid transparent;
+  white-space: nowrap;
+}
+nav a[aria-current="page"] {
+  color: var(--text);
+  border-block-end-color: var(--accent);
+}
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.75rem;
+}
+section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin-block-end: 0.9rem;
+}
+h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.6rem;
+}
+h3 {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.4rem;
+}
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+  margin-block-end: 0.8rem;
+}
+.kpi {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.kpi-v {
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-l {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.chart {
+  inline-size: 100%;
+  min-block-size: 120px;
+}
+.table .row {
+  padding: 0.55rem 0;
+  border-block-end: 1px solid var(--line);
+}
+.table .row:last-child {
+  border-block-end: 0;
+}
+.list {
+  margin: 0;
+  padding-inline-start: 1.2rem;
+}
+.list li {
+  margin: 0.2rem 0;
+}
+bdi {
+  unicode-bidi: isolate;
+}
+.badge {
+  display: inline-block;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.badge.green,
+.badge.ok {
+  color: var(--green);
+  border-color: currentColor;
+}
+.badge.red,
+.badge.failing {
+  color: var(--red);
+  border-color: currentColor;
+}
+.badge.degraded {
+  color: var(--amber);
+  border-color: currentColor;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 0.85rem;
+}
+.warn {
+  color: var(--amber);
+}
+.ok {
+  color: var(--green);
+}
+.pad {
+  padding: 1rem;
+}
+.spark {
+  vertical-align: middle;
+  margin-inline-start: 0.4rem;
+}
+.spark rect {
+  fill: var(--red);
+}
+pre {
+  overflow-x: auto;
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin: 0.3rem 0;
+}
+code {
+  font-size: 0.85em;
+}
+button {
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--card);
+  cursor: pointer;
+}
+input {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  margin-inline: 0.4rem;
+}
+form.inline {
+  margin: 0.8rem 0;
+}
+.u-legend {
+  color: var(--text);
+}
+@media (max-width: 600px) {
+  main {
+    padding: 0.5rem;
+  }
+  section {
+    padding: 0.75rem;
+  }
+  .kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

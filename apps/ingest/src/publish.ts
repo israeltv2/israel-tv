@@ -414,7 +414,13 @@ export interface DeployResult {
   ms: number;
   detail: string;
   url?: string;
+  /** The Worker version the deploy made (Cloudflare). */
+  versionId?: string;
 }
+
+/** Where the last deployed Worker versions are kept (shown on the dashboard). */
+export const DATA_VERSION = 'cloudflare:data-version';
+export const API_VERSION = 'cloudflare:api-version';
 
 /** The data Worker's code fingerprint: a new version is deployed when its router or config changes. */
 const WORKER_DEPLOYED = 'publish:worker-fingerprint';
@@ -605,12 +611,15 @@ export async function deployApi(
     try {
       const d = await run(true);
       store.setState(ANALYTICS_OFF, null);
+      if (d.versionId) store.setState(API_VERSION, d.versionId);
       return d;
     } catch (err) {
       if (!/enable Analytics Engine/i.test((err as Error).message)) throw err;
       store.setState(ANALYTICS_OFF, { at: new Date().toISOString() });
       log('deploy-api: Analytics Engine is not enabled on the Cloudflare account; deploying without it');
-      return await run(false);
+      const d = await run(false);
+      if (d.versionId) store.setState(API_VERSION, d.versionId);
+      return d;
     }
   } finally {
     rmSync(secretsPath, { force: true });
@@ -673,7 +682,14 @@ async function runWrangler(
   });
   const url = /https:\/\/[^\s]+\.workers\.dev/.exec(output)?.[0];
   const uploaded = /Uploaded (\d+) files?/.exec(output)?.[0] ?? 'no asset changes';
-  return { ms: Date.now() - t0, detail: uploaded, output: cleanSecrets(output), ...(url ? { url } : {}) };
+  const versionId = /Version ID:\s*([0-9a-f-]{36})/i.exec(output)?.[1];
+  return {
+    ms: Date.now() - t0,
+    detail: uploaded,
+    output: cleanSecrets(output),
+    ...(url ? { url } : {}),
+    ...(versionId ? { versionId } : {}),
+  };
 }
 
 export async function deploy(
@@ -745,6 +761,7 @@ export async function publishSite(
   try {
     const d = await deploy(config, process.env, originKnown);
     store.finishRun(runId, { status: 'ok' });
+    if (d.versionId) store.setState(DATA_VERSION, d.versionId);
     if (worker) store.setState(WORKER_DEPLOYED, worker);
     // The first deploy tells us the public address: the next publish writes it into the files.
     if (d.url && config.publisher.type === 'cloudflare' && !config.publisher.publicUrl)

@@ -12,3 +12,4 @@ israel-tv.config.json
 data/
 .revision
 !.env.example
+dashboard-screens
