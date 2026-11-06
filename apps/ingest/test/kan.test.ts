@@ -418,3 +418,57 @@ test('a lobby that fails does not stop the crawl of known shows', async () => {
   for (let i = 0; i < 30 && eps() < 9; i++) await crawlKan(store, opts(l as never, 10));
   expect(eps()).toBe(9);
 });
+
+test('one episode page that times out is treated like a server error, not a dead browser', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const l = {
+    ...base,
+    async load(url: string) {
+      if (url.endsWith('/s1/1006640/')) throw new Error('page.goto: Timeout 60000ms exceeded.');
+      return base.load(url);
+    },
+  };
+  for (let i = 0; i < 80; i++) {
+    await crawlKan(store, opts(l as never, 10));
+    age(store);
+  }
+  const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
+  const byKey = new Map(store.assignments(id).episodes.map((e) => [e.key, e.episode]));
+  expect(byKey.has('kan:1006640')).toBe(false);
+  expect(byKey.size).toBe(8);
+});
+
+test('a proxy error backs off without charging the page', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const l = {
+    ...base,
+    async load(url: string) {
+      if (/\/s1\/\d+\/$/.test(url)) throw new Error('page.goto: net::ERR_PROXY_CONNECTION_FAILED at x');
+      return base.load(url);
+    },
+  };
+  let r = await crawlKan(store, opts(l as never, 10));
+  for (let i = 0; i < 5 && !r.failed; i++) r = await crawlKan(store, opts(l as never, 10));
+  expect(r.failed).toBe(true);
+  const st = store.getState<Crawl>('kan:crawl');
+  expect(Object.values(st?.shows ?? {}).every((s) => !s.retry && s.failed.length === 0)).toBe(true);
+});
+
+test('a show that appears in a later lobby read is airing from the start', async () => {
+  const store = Store.open(':memory:');
+  await crawlKan(store, opts(loader(routes) as never, 3));
+  const st = store.getState<Crawl & { lobbiesAt?: string; shows: Record<string, { lastNewAt?: string }> }>(
+    'kan:crawl',
+  );
+  if (!st) throw new Error('no state');
+  const [firstKey] = Object.keys(st.shows);
+  expect(Object.values(st.shows).every((s) => !s.lastNewAt)).toBe(true); // install-time shows: not airing
+  if (firstKey) delete st.shows[firstKey];
+  st.lobbiesAt = '2000-01-01T00:00:00.000Z';
+  store.setState('kan:crawl', st);
+  await crawlKan(store, opts(loader(routes) as never, 3));
+  const after = store.getState<Crawl & { shows: Record<string, { lastNewAt?: string }> }>('kan:crawl');
+  expect(firstKey && after?.shows[firstKey]?.lastNewAt).toBeTruthy();
+});

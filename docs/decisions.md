@@ -440,3 +440,11 @@ now compared like with like: show pages with show pages or the lobby, episode pa
 of a slice, the last episode page of that site that loaded). With nothing comparable, the page stays uncharged
 and the run is `partial` saying so. (2) A failing lobby stopped every slice, on both sites; a lobby that fails is
 now a warning, skipped, and read again next slice, while known shows carry on.
+
+### Code review, round 20 (2026-11-06)
+
+Two findings, fixed: (1) any error thrown while loading a page (a 60 s timeout, a redirect loop, an empty
+response) counted as a dead browser, so one such page stopped Kan for good. Now only a browser that does not
+start, or a proxy, network or browser-closed error, backs off at once; other load errors go through the suspect
+rule like a server error. (2) A show first seen in a lobby after the first lobby read (a premiere) was re-read only
+weekly, so its next episodes came up to a week late; such shows are now airing from the start (6-hour re-reads).
