@@ -7,7 +7,7 @@ import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
 import { listen, startDaemon } from './daemon.ts';
 import { crawlKan, kanCrawlOptions } from './kan.ts';
-import { checkLive, liveRender } from './live.ts';
+import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { createLogger } from './log.ts';
 import { PublishError, publishSite, renderFromStore, writeSite } from './publish.ts';
@@ -180,7 +180,7 @@ async function main(argv: string[]): Promise<number> {
         // Serve what the database holds now (a run may have finished since the last publish). With Cloudflare,
         // render into a separate preview folder so a later publish still sees what changed since the upload.
         const dir = p.type === 'cloudflare' ? join(dirname(p.dir), 'preview') : p.dir;
-        writeSite(dir, renderFromStore(store, config, config.sources.live ? liveRender() : []));
+        writeSite(dir, renderFromStore(store, config));
         const port = values.port ? Number(values.port) : p.type === 'local' ? p.port : 7700;
         const host = p.type === 'local' ? p.host : '127.0.0.1';
         await listen(

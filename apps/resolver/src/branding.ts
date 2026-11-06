@@ -4,6 +4,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BUNDLED = fileURLToPath(new URL('../../../assets/branding/', import.meta.url));
+const LOGOS = fileURLToPath(new URL('../../../assets/logos/', import.meta.url));
+
+/** A live channel's bundled logo tile (square PNG), when there is one. */
+export function channelLogo(id: string): Uint8Array | undefined {
+  const p = join(LOGOS, `${id}.png`);
+  return /^[a-z0-9_]+$/.test(id) && existsSync(p) ? readFileSync(p) : undefined;
+}
 
 export type BrandImage = 'logo' | 'resolver-logo' | 'background';
 

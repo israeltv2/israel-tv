@@ -537,12 +537,37 @@ treated the same way (its blocks are per title, so the probe is per show).
 The owner's logo, resolver logo and background are the project's branding (`assets/branding/`). The logos had
 truly transparent corners (alpha 0); their artwork was not centred on the 1024 canvas (near-invisible alpha
 pixels reached the left edge), so they were trimmed to their visible pixels (alpha > 24), centred on a square
-with a 4% margin, and saved as a 1024 px master and a 256 px manifest logo (41 KB). The background (1920×1080,
-1.6 MB PNG) is served as an 87 KB JPEG. It shows Jerusalem's skyline including the Dome of the Rock: the owner's
-choice, kept as is. Anyone running their own instance can drop their own `logo.png`, `resolver-logo.png` and
+with a 4% margin, and saved as a 1024 px master and a 256 px manifest logo (41 KB). The background (1920×1080
+PNG) is served as a JPEG of about 120 KB. The owner replaced the first background (which showed the Dome of the
+Rock) with one showing the coast and Jerusalem's walls at night; the current one is used. Anyone running their own instance can drop their own `logo.png`, `resolver-logo.png` and
 `background.jpg`/`.png` into `branding.dir` (default `./branding` next to the config).
 
 Image URLs in a Stremio manifest must be absolute, and the address an addon is served from is only known when a
 request comes in. Rendered files carry a placeholder origin that the Worker and the local server replace with the
 request's origin when serving JSON; without request logs the Worker still runs first for the three kinds of
 files that carry images (manifest, the live row, live channel pages).
+
+### Live channel logos
+
+Square 512 px tiles in `assets/logos/`, served as our own static files (`/logos/<channel id>.png`), so the app
+never depends on the broadcasters' servers (some refuse requests from outside Israel). Each logo is centred on a
+white rounded tile (most are dark ink on transparent), except logos that are their own coloured square, which
+fill the tile, and the Knesset Channel's white logo on navy. Sources and licences, checked on each file page:
+
+| Channel(s)               | Source                                                                                         | Licence / status                                                      |
+| ------------------------ | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| כאן 11                   | Wikimedia Commons, `File:Kan11Logo.svg`                                                        | Public domain (PD-textlogo); trademark                                |
+| כאן חינוכית              | Wikimedia Commons, `File:KanHinuchit.svg`                                                      | PD-textlogo, also tagged CC BY-SA 4.0 (uploader "רונאלדיניו המלך")    |
+| מכאן 33                  | Wikimedia Commons, `File:شعار_قناة_مكان.png` (the "مكان" wordmark, without "33")               | Public domain                                                         |
+| קשת 12                   | Wikimedia Commons, `File:Keshet12_2018.svg`                                                    | Public domain (PD-textlogo)                                           |
+| רשת 13                   | Wikimedia Commons, `File:Channel_13_(Israel)_logo.svg` (2022 design; the 2025 one is not free) | Public domain (PD-textlogo); trademark                                |
+| עכשיו 14                 | Wikimedia Commons, `File:Noamperetz-now14logo.png`                                             | CC BY-SA 4.0, "Israeli Channel 14" (uploader's claim, no VRTS ticket) |
+| ערוץ 24                  | Wikimedia Commons, `File:Arutz_24_logo.png`                                                    | Public domain (PD-textlogo)                                           |
+| ערוץ הכנסת               | The channel's own site, knesset.tv (its share image)                                           | Trademark of the channel, used only to identify it                    |
+| ynet                     | Wikimedia Commons, `File:Ynet_website_logo.svg`                                                | Public domain (PD-textlogo); trademark                                |
+| i24 (4 languages)        | Wikimedia Commons, `File:LOGO_i24NEWS.png`                                                     | CC BY-SA 4.0, "i24NEWS"                                               |
+| ערוץ סברי מרנן           | Wikimedia Commons, `File:סברי_מרנן.jpg`                                                        | Public domain (PD-textlogo)                                           |
+| כלכלה 10, ערוץ ארץ נהדרת | No free logo exists (only fair-use files on Wikipedia; the channel site is behind a bot wall)  | Our own text tiles                                                    |
+
+The CC BY-SA files are credited here, which is the attribution they ask for; the tiles made from them are shared
+under the same licence.

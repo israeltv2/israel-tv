@@ -45,3 +45,15 @@ test("the resolver's manifest names its own logo and background", async () => {
   expect(m.background).toBe('http://home:7701/background.jpg');
   expect((await app.request('http://home:7701/logo.png')).status).toBe(200);
 });
+
+test('every live channel has a logo tile, and its meta points at our copy', async () => {
+  const { LIVE_CHANNELS } = await import('@israel-tv/core');
+  const { channelLogo } = await import('@israel-tv/resolver');
+  const { liveRender } = await import('../src/live.ts');
+  for (const c of LIVE_CHANNELS) expect(channelLogo(c.id), c.id).toBeDefined();
+  const live = liveRender(new Set(['iltv_live_kan11']));
+  expect(live.find((c) => c.id === 'iltv_live_kan11')?.logo).toBe(
+    '{{israel-tv-origin}}/logos/iltv_live_kan11.png',
+  );
+  expect(channelLogo('../x')).toBeUndefined();
+});
