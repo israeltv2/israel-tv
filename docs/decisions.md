@@ -506,3 +506,28 @@ the show moving to the top of its row.
   the episode loop; an explicit `stopped` flag instead of matching the note's wording; one batch item type;
   stale comments fixed; tests typed against `PageLoader` (21 casts gone) with a shared episode helper.
   Skipped: a shared `failing()` loader helper and one crawl-state type for the tests (readability only).
+
+## Round 2 (2026-11-06)
+
+### Reshet start-up time, direct vs relayed (measured)
+
+The owner's first TV test: Reshet (חדשות היום) took long to start. Measured from the home network, time from
+the stream URL to the first segment's first bytes (master, variant, first segment; 3 runs each):
+
+| Path                                                | Time        |
+| --------------------------------------------------- | ----------- |
+| Direct (public addon: Kaltura `playManifest`)       | 1.39–2.15 s |
+| Relayed (resolver, "via Israel", through the proxy) | 1.39–2.27 s |
+
+Both are the same because only Kaltura's manifest goes through the proxy; the segments come straight from
+Kaltura's CDN (`cfvod.kaltura.com`, not a relayed host). The news episode's master has four variants up to
+720p, 2-second segments; its first segment (178 KB) downloads in 0.42 s. So nothing on the network path explains
+a slow start; the TV's own play events (round 2, item A) now record the time to the first playlist for every
+play, so the next slow start can be looked up instead of guessed.
+
+What changed anyway: the resolver offered the relayed stream for every Reshet and Kan episode, even at home
+where nothing is blocked, so the app listed two streams and might pick the one with an extra hop. Now the
+resolver (which runs on the viewer's network) tries the direct stream first and offers the relay only when it is
+refused (401/403/451, or no answer within 4 s), cached per show (or live channel stream) for 6 hours. At home
+in Israel, Reshet and Kan play straight from the CDN and the "via Israel" stream no longer appears. Kan is
+treated the same way (its blocks are per title, so the probe is per show).

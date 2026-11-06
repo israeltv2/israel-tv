@@ -50,7 +50,7 @@ export interface ResolverDeps {
   /** Plain fetch (Mako; no proxy needed). */
   fetch: (
     url: string,
-    init?: { headers?: Record<string, string>; redirect?: 'follow' | 'manual' },
+    init?: { headers?: Record<string, string>; redirect?: 'follow' | 'manual'; signal?: AbortSignal },
   ) => Promise<Response>;
   /** Fetch through the geo adapter; undefined when no geo proxy is configured. */
   geoFetch?: GeoFetch;
@@ -157,6 +157,7 @@ export function createResolverApp(deps: ResolverDeps) {
     const client = await clientOf(c);
     const streams: Stream[] = [];
     let info: SessionInfo = {};
+    let note: string | undefined;
     // Shows opened from other catalogs (tt123:2:5 or tmdb:123:2:5) map onto ours, numbered seasons only.
     const ext = /^(tt\d+|tmdb:\d+):(\d+):(\d+)$/.exec(id);
     const mapped = ext?.[1] ? deps.external?.(ext[1]) : undefined;
@@ -175,12 +176,17 @@ export function createResolverApp(deps: ResolverDeps) {
           title: 'Mako',
         });
       }
-      // Reshet and Kan video is geo-blocked outside Israel. With a geo proxy, offer the relayed stream for
-      // every such episode: whether it is blocked depends on where the viewer is, not on where ingest ran.
+      // Reshet and Kan video is geo-blocked outside Israel. Whether it is blocked depends on where the viewer
+      // is, and the resolver runs on the viewer's network: so try the direct stream from here, and offer the
+      // relay only when it is refused (the public addon already offers the direct stream).
       const geoSource = source !== undefined && GEO_LIMITED.has(source);
       if (ep && deps.geoFetch && (geoSource || ep.availableAbroad === false)) {
         const direct = ep.streams.find((s) => s.kind === 'direct' || s.kind === 'resolver');
-        if (direct) streams.push(relayStream(origin, direct.url, 'דרך ישראל · via Israel', corr));
+        if (direct) {
+          const probe = await blockedHere(v.series, direct.url);
+          note = probe.note;
+          if (probe.blocked) streams.push(relayStream(origin, direct.url, 'דרך ישראל · via Israel', corr));
+        }
       }
     } else {
       const ch = channels.find((x) => x.id === id);
@@ -194,8 +200,12 @@ export function createResolverApp(deps: ResolverDeps) {
           });
         });
         if (ch.geo && deps.geoFetch) {
-          for (const l of ch.direct)
-            streams.push(relayStream(origin, l.url, `${l.title} · דרך ישראל · via Israel`, corr));
+          for (const l of ch.direct) {
+            const probe = await blockedHere(`${ch.id}|${l.url}`, l.url);
+            note = probe.note;
+            if (probe.blocked)
+              streams.push(relayStream(origin, l.url, `${l.title} · דרך ישראל · via Israel`, corr));
+          }
         }
       }
     }
@@ -209,10 +219,43 @@ export function createResolverApp(deps: ResolverDeps) {
       ...(info.video ? {} : { video: id }),
       status: 200,
       outcome: streams.length > 0 ? 'ok' : 'error',
-      reason: streams.length > 0 ? `${streams.length} streams` : 'no stream for this id here',
+      reason: [streams.length > 0 ? `${streams.length} streams` : 'no stream for this id here', note]
+        .filter(Boolean)
+        .join('; '),
     });
     return c.json({ streams }, 200, { 'cache-control': 'no-store' });
   });
+
+  // ---- is it blocked here? ---------------------------------------------------------------------------
+
+  /** Per show (or channel stream): whether its direct video is refused from this network, for a while. */
+  const probes = new Map<string, { blocked: boolean; note: string; at: number }>();
+  const PROBE_TTL_MS = 6 * 3_600_000;
+
+  async function blockedHere(key: string, url: string): Promise<{ blocked: boolean; note: string }> {
+    const hit = probes.get(key);
+    if (hit && Date.now() - hit.at < PROBE_TTL_MS) return hit;
+    let result: { blocked: boolean; note: string };
+    try {
+      const r = await deps.fetch(url, {
+        headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android) ExoPlayer' },
+        signal: AbortSignal.timeout(4000),
+      });
+      await r.body?.cancel();
+      result =
+        r.status === 401 || r.status === 403 || r.status === 451
+          ? { blocked: true, note: `direct refused here (HTTP ${r.status}): relayed` }
+          : r.ok
+            ? { blocked: false, note: 'direct plays here: not relayed' }
+            : { blocked: true, note: `direct answered HTTP ${r.status}: relayed` };
+    } catch (err) {
+      // Could not tell: offer the relay rather than nothing.
+      result = { blocked: true, note: `direct probe failed (${(err as Error).message}): relayed` };
+    }
+    probes.set(key, { ...result, at: Date.now() });
+    if (probes.size > 2000) probes.delete(probes.keys().next().value as string);
+    return result;
+  }
 
   function relayUrl(origin: string, url: string, corr?: string): string {
     const u = Buffer.from(url).toString('base64url');

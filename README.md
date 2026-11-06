@@ -96,9 +96,11 @@ a while after many connections in a short time; Israel TV keeps its own use slow
 
 What the proxy is used for:
 
-- **By the resolver:** for every Reshet and Kan episode (and Kan live), the resolver adds a stream named
-  "דרך ישראל · via Israel" that fetches the video through the proxy. Pick that one when you are abroad. Keep
-  the resolver enabled and installed in your app, or the proxy does nothing for playback.
+- **By the resolver:** when a Reshet or Kan episode (or Kan live) is refused from your network, the resolver
+  adds a stream named "דרך ישראל · via Israel" that fetches it through the proxy. It checks the direct stream
+  once per show every 6 hours; where the direct stream plays (in Israel), no relayed stream is offered and the
+  video goes straight from the broadcaster's CDN. Keep the resolver enabled and installed in your app, or the
+  proxy does nothing for playback.
 - **By the Kan crawl:** Kan's web pages, if Kan VOD is on.
 
 Everything else (reading Mako and Reshet, Mako playback, most live channels) goes out directly. If the proxy

@@ -253,3 +253,29 @@ test('a play is recorded: stream, ticket and play events share one correlation i
   expect(p?.upstream).toContain('ticket 200');
   expect(p?.upstream).toContain('master 403');
 });
+
+test('a Reshet episode is relayed only when its direct stream is refused from here (probed once per show)', async () => {
+  let status = 200;
+  let probes = 0;
+  const app = createResolverApp({
+    episode: () => ({
+      key: 'k',
+      title: 't',
+      streams: [{ url: 'https://cdnapisec.kaltura.com/p/1/x.m3u8', kind: 'direct' }],
+    }),
+    geoFetch: (async () => new Response('')) as never,
+    fetch: async () => {
+      probes++;
+      return new Response('', { status });
+    },
+  });
+  const ask = async (id: string) =>
+    (await (await app.request(`http://h/stream/series/${id}.json`)).json()).streams as { url: string }[];
+  expect(await ask('iltv_reshet_1:1:1')).toEqual([]);
+  expect(await ask('iltv_reshet_1:1:2')).toEqual([]);
+  expect(probes).toBe(1);
+  status = 403;
+  const relayed = await ask('iltv_reshet_2:1:1');
+  expect(relayed).toHaveLength(1);
+  expect(relayed[0]?.url).toContain('/relay/');
+});
