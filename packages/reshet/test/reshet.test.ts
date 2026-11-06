@@ -153,3 +153,25 @@ test('a promotional page with no video on it is a show without VOD', () => {
     note: expect.stringMatching(/no episode list/),
   });
 });
+
+test('older template: air dates from the titles, numbers by date when the source counts newest = 1', async () => {
+  const { assignNumbers } = await import('@israel-tv/core');
+  const p = parseShowPage(html('show-13-in-the-afternoon'));
+  const eps = p.seasons[0]?.episodes ?? [];
+  expect(eps.length).toBe(36);
+  expect(eps[0]?.airDate).toBe('2024-04-21');
+  expect(eps.at(-1)?.airDate).toBe('2024-03-03');
+  const r = assignNumbers(
+    {
+      source: 'reshet',
+      key: '/x',
+      title: 'x',
+      catalog: 'iltv_reshet13',
+      seasons: [{ key: 's', title: '', episodes: eps }],
+    },
+    { seasons: [], episodes: [] },
+  );
+  expect(r.episodes.find((e) => e.key === eps.at(-1)?.key)?.episode).toBe(1); // 03.03.24, the oldest
+  expect(r.episodes.find((e) => e.key === eps[0]?.key)?.episode).toBe(36);
+  expect(r.warnings.map((w) => w.code)).toContain('numbers-reversed');
+});

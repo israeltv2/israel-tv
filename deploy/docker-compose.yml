@@ -5,6 +5,9 @@
 #   cp .env.example deploy/data/.env   # fill in only what your config uses; chmod 600
 #   docker compose -f deploy/docker-compose.yml up -d
 # Data (database, rendered files) lives in deploy/data.
+# Inside Docker the startup log shows the container's address (172.x); in your app install
+# http://<this machine's LAN IP>:7701/manifest.json (and :7700 for the local publisher) instead, and open
+# the admin page at http://127.0.0.1:7702/status on this machine.
 services:
   israel-tv:
     build: ..

@@ -65,7 +65,9 @@ export function buildStatus(
       notes.push(`last full run failed: ${last.error ?? 'unknown error'}`);
     } else if (last.status === 'partial') {
       health = 'warn';
-      notes.push(`last full run partial: ${last.showsFailed} shows failed`);
+      notes.push(
+        `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`,
+      );
     }
     // Time since the last good run; for a source that never had one, since its first attempt.
     const ref = lastGood ?? (last ? store.firstRun(read.kind, source) : undefined);

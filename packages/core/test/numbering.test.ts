@@ -131,3 +131,14 @@ test('a new season whose number is taken becomes named instead of merging', () =
   expect(r.seasons.find((s) => s.key === 'b')).toEqual({ key: 'b', number: 101, kind: 'named' });
   expect(r.warnings[0]?.code).toBe('season-number-taken');
 });
+
+test('printed numbers that run against the dates are ignored (numbered by date)', () => {
+  const r = assignNumbers(
+    show([
+      season('s', 'עונה 1', [ep('c', 1, '2026-03-03'), ep('b', 2, '2026-03-02'), ep('a', 3, '2026-03-01')]),
+    ]),
+    EMPTY,
+  );
+  expect([num(r, 'a')?.episode, num(r, 'b')?.episode, num(r, 'c')?.episode]).toEqual([1, 2, 3]);
+  expect(r.warnings[0]?.code).toBe('numbers-reversed');
+});
