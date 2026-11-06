@@ -228,3 +228,34 @@ test('a Kan episode page that fails once does not get numbered after the later o
   expect(byKey.get('kan:1006639')).toBe(1);
   expect(byKey.get('kan:1006640')).toBe(2);
 });
+
+test('an episode page given up on is not queued again when the show page is re-read', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const dead = {
+    ...base,
+    async load(url: string) {
+      return url.endsWith('/s1/1006640/') ? { status: 404, html: '', challenged: false } : base.load(url);
+    },
+  };
+  const age = () => {
+    const st = store.getState<{
+      shows: Record<string, { retry?: Record<string, { at: string }>; checkedAt?: string }>;
+    }>('kan:crawl');
+    for (const s of Object.values(st?.shows ?? {})) {
+      for (const r of Object.values(s.retry ?? {})) r.at = '2000-01-01T00:00:00.000Z';
+    }
+    if (st) store.setState('kan:crawl', st);
+  };
+  for (let i = 0; i < 40; i++) {
+    await crawlKan(store, opts(dead as never, 10));
+    age();
+  }
+  const eps = store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes));
+  expect(eps.length).toBe(8); // all but the dead page
+  // Re-read the show page: the dead page must not come back to block the queue.
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-1006421/';
+  await crawlKan(store, { ...opts(dead as never, 3), priority: [key] });
+  const st = store.getState<{ shows: Record<string, { pending: string[] }> }>('kan:crawl');
+  expect(st?.shows[key]?.pending).toEqual([]);
+});

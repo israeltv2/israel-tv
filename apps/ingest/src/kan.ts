@@ -64,7 +64,7 @@ interface ShowState {
   image?: string;
   /** Episode page paths found on the show page and not read yet. */
   pending: string[];
-  /** Episode page paths that failed to parse (not retried until the show page is read again). */
+  /** Episode pages given up on after several tries; kept so they never re-enter the queue. */
   failed: string[];
   /** Last time a re-read of the show page found new episode links (not set by the first read). */
   lastNewAt?: string;
@@ -274,10 +274,12 @@ export async function crawlKan(
         id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
       );
       const seenBefore = new Set([...s.pending, ...s.failed]);
-      s.failed = [];
+      // Pages given up on (after several tries) stay given up: they never re-enter the ordered queue, where
+      // they would hold back newer episodes and, if they ever loaded, be numbered after them.
+      const gaveUp = new Set(s.failed);
       s.pending = page.episodes
         .map((e) => `${s.origin}${e.path}`)
-        .filter((u) => !known.has(`kan:${/(\d+)\/$/.exec(u)?.[1]}`));
+        .filter((u) => !known.has(`kan:${/(\d+)\/$/.exec(u)?.[1]}`) && !gaveUp.has(u));
       // "Airing" means the show page revealed links we had never seen, not an old backlog or retries.
       const fresh = firstRead ? [] : s.pending.filter((u) => !seenBefore.has(u));
       if (fresh.length > 0) {

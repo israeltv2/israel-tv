@@ -389,3 +389,9 @@ all newer episodes. The crawler now never reads past a gap: a failed episode pag
 queue, the show pauses, and the page is retried at least two hours apart; only after three tries is it given
 up (with a warning) and reading continues. (On the deployment no Kan episode page had failed yet, so nothing
 stored was out of order.)
+
+### Code review, round 14 (2026-11-06)
+
+One finding, fixed: pages given up on after the round 13 retries were put back at the head of the queue on
+every show re-read with a fresh retry count, so a few dead episode pages could hold back new episodes for days.
+Given-up pages now stay given up (persisted, never re-queued).
