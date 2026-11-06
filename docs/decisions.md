@@ -713,3 +713,20 @@ replaced the files. Errors are now cleaned of every secret value and of `/accoun
 stored, and the whole status is cleaned again before anything is published; the stored copies on the deployment
 were cleaned too. Everything else checked out (remote resolver token and allowlist, admin token, dashboard
 escaping, image paths, Worker origin, rate limits, artwork, backup/restore, deploy secrets file, relay).
+
+### Code review, round 2 (first pass)
+
+Five findings, fixed:
+
+1. Kan show pages on the public addon kept the placeholder in their image URLs (series metadata was served as
+   plain static files, never through the Worker that fills in the address): the Worker now runs first for all
+   `/meta/*` too. Metadata requests now count toward the free plan's daily Worker requests (one per show opened).
+2. The daily rollup's overall total could be displaced by events with no source or show (e.g. an IMDb id the
+   resolver does not know), making daily totals near zero: each rollup level now only takes events that
+   belong to it.
+3. The canary's own plays counted as household usage: the canary marks its stream request, the resolver gives
+   that play a `canary-` play id, and rollups and "playing now" leave such plays out.
+4. After a VACUUM, the size check counted the database twice (the WAL file held a full copy), halving the cap:
+   the WAL is checkpointed after VACUUM and the size is measured from the database's pages.
+5. Requests refused by the rate limit were logged as stream requests, so the Workers Logs fallback counted
+   them as plays: they are logged as `route: limited`.

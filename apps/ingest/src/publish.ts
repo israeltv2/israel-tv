@@ -453,7 +453,7 @@ export function workerConfig(
       directory: p.dir,
       // Static files are served without running the Worker (browsing is free and not counted), except the
       // ones that carry image URLs relative to the addon's address, which the Worker fills in.
-      run_worker_first: ['/manifest.json', '/catalog/*', '/meta/tv/*'],
+      run_worker_first: ['/manifest.json', '/catalog/*', '/meta/*'],
     },
     // The Worker logs its own events (no addresses); Cloudflare's invocation logs would keep request metadata.
     observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },

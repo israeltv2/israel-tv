@@ -69,10 +69,11 @@ export default {
           JSON.stringify({
             ev: EVENT_MARK,
             kind: 'request',
-            route: kind,
+            // Not `stream`/`search`: a refused request is not usage (the daily counts filter on route).
+            route: 'limited',
+            limited: kind,
             status: 429,
             outcome: 'error',
-            limited: true,
             client,
           }),
         );

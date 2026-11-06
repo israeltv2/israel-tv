@@ -68,7 +68,7 @@ test('the Worker runs only for rows and files with image URLs, counts streams in
     analytics_engine_datasets: unknown;
     main: string;
   };
-  expect(c.assets.run_worker_first).toEqual(['/manifest.json', '/catalog/*', '/meta/tv/*']);
+  expect(c.assets.run_worker_first).toEqual(['/manifest.json', '/catalog/*', '/meta/*']);
   expect(c.observability).toEqual({
     enabled: true,
     head_sampling_rate: 1,
