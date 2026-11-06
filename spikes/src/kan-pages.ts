@@ -1,7 +1,7 @@
-// Spike 1a: load Kan pages in installed Chrome through the Nord Israel proxy.
-// Run: node --env-file=../.env src/kan-pages.ts [server]
+// Spike 1a: load Kan pages in installed Chrome through the configured Israeli-exit proxy.
+// Run: node --env-file=../.env src/kan-pages.ts [proxy-index] [--fresh]  (proxy from israel-tv.config.json)
 import { chromium } from 'playwright-core';
-import { NORD_IL_SERVERS, nordProxy } from './nord.ts';
+import { pickProxy } from './proxy.ts';
 
 const PAGES = [
   'https://www.kan.org.il/lobby/kan11/',
@@ -11,12 +11,12 @@ const PAGES = [
   'https://www.kan.org.il/content/kan/kan-11/',
 ];
 
-const server = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? NORD_IL_SERVERS[0] ?? 'il100';
+const proxyIndex = Number(process.argv.slice(2).find((a) => /^\d+$/.test(a)) ?? 0);
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: false,
   args: ['--window-position=-2400,-2400', '--window-size=1280,900'],
-  proxy: nordProxy(server),
+  proxy: pickProxy(proxyIndex),
 });
 const fresh = process.argv.includes('--fresh');
 const newPage = async () =>

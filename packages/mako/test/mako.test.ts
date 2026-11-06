@@ -1,0 +1,130 @@
+import { readFileSync } from 'node:fs';
+import { assignNumbers } from '@israel-tv/core';
+import type { Fetcher } from '@israel-tv/net';
+import { describe, expect, test } from 'vitest';
+import { fetchIndex, fetchPlaylist, fetchShow } from '../src/client.ts';
+import { episodesFromPage, parseIndex, parseShowPage } from '../src/parse.ts';
+
+const fx = (name: string): unknown =>
+  JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8'));
+
+/** Serves recorded responses by URL path; fails on anything not recorded. */
+function fixtureFetcher(routes: Record<string, string>): Fetcher & { urls: string[] } {
+  const urls: string[] = [];
+  return {
+    urls,
+    requests: 0,
+    async text() {
+      throw new Error('not used');
+    },
+    async json<T>(url: string) {
+      urls.push(url);
+      const u = new URL(url);
+      const name = routes[u.pathname];
+      if (!name) throw new Error(`no fixture for ${u.pathname}`);
+      return fx(name) as T;
+    },
+  };
+}
+
+test('index: 663 shows with unique keys', () => {
+  const idx = parseIndex(fx('index'));
+  expect(idx.length).toBe(663);
+  expect(new Set(idx.map((e) => e.key)).size).toBe(idx.length);
+  expect(idx[0]).toMatchObject({ key: '/mako-vod-channel2-news/main-newscast', title: 'המהדורה המרכזית' });
+});
+
+test('season page: the ad slot is dropped and numbers come from extraInfo', () => {
+  const eps = episodesFromPage(parseShowPage(fx('season-masterchef-s12')));
+  expect(eps.length).toBe(34);
+  expect(eps[0]).toMatchObject({
+    title: 'פרק הבכורה',
+    numberHint: 1,
+    airDate: '2025-08-25',
+    availableAbroad: true,
+  });
+  expect(eps[0]?.play).toEqual({
+    vcmid: '104ae678fefd8910VgnVCM200000650a10acRCRD',
+    channelId: '8d62263f127c8910VgnVCM100000700a10acRCRD',
+    galleryChannelId: '104ae678fefd8910VgnVCM200000650a10acRCRD',
+  });
+});
+
+test('daily news: no printed numbers, dates come from the title', () => {
+  const eps = episodesFromPage(parseShowPage(fx('show-main-newscast')));
+  expect(eps.length).toBe(132); // 133 slots, one is an ad
+  expect(eps.every((e) => e.numberHint === undefined && e.airDate)).toBe(true);
+});
+
+describe('fetchShow + numbering on recorded shows', () => {
+  test('Masterchef: named seasons get 101+, numbered keep their number; current season reused', async () => {
+    const f = fixtureFetcher({
+      '/mako-vod-keshet/masterchef': 'show-masterchef',
+      '/mako-vod-keshet/masterchef-s12': 'season-masterchef-s12',
+      // Older seasons not recorded: serve the s12 page shape to keep the test offline.
+      '/mako-vod-keshet/masterchef-vip_2022': 'season-masterchef-s12',
+      '/mako-vod-keshet/masterchef-s11': 'season-masterchef-s12',
+      '/mako-vod-keshet/masterchef-dream_team': 'season-masterchef-s12',
+    });
+    const show = await fetchShow(f, { key: '/mako-vod-keshet/masterchef', title: 'מאסטר שף' });
+    expect(f.urls.length).toBe(5); // show page (= current season) + 4 older seasons
+    const r = assignNumbers(show, { seasons: [], episodes: [] });
+    expect(r.seasons.map((s) => [s.key.split('/').pop(), s.number])).toEqual([
+      ['masterchef-vip_2022', 101],
+      ['masterchef-s11', 11],
+      ['masterchef-dream_team', 102],
+      ['masterchef-s12', 12],
+      ['masterchef-dream_team_2', 103],
+    ]);
+    expect(show.description).toContain('נבחרת החלומות');
+  });
+
+  test('airing check fetches only the show page', async () => {
+    const f = fixtureFetcher({ '/mako-vod-keshet/mkr_israel': 'show-mkr_israel' });
+    const show = await fetchShow(
+      f,
+      { key: '/mako-vod-keshet/mkr_israel', title: 'x' },
+      { currentSeasonOnly: true },
+    );
+    expect(f.urls.length).toBe(1);
+    const current = show.seasons.find((s) => s.episodes.length > 0);
+    expect(current?.key).toBe('/mako-vod-keshet/mkr_israel-vip5');
+    // Listed newest first at the source; numbers still come from "פרק N".
+    const r = assignNumbers(show, { seasons: [], episodes: [] });
+    expect(r.seasons.find((s) => s.key === current?.key)?.number).toBe(105);
+    expect(
+      r.episodes
+        .filter((e) => e.season === 105)
+        .map((e) => e.episode)
+        .sort((a, b) => a - b),
+    ).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  test('Uvda: year seasons from titles', async () => {
+    const page = parseShowPage(fx('show-uvda'));
+    const f = fixtureFetcher({ '/mako-vod-keshet/uvda': 'show-uvda' });
+    const show = await fetchShow(
+      f,
+      { key: '/mako-vod-keshet/uvda', title: 'עובדה' },
+      { currentSeasonOnly: true },
+    );
+    const r = assignNumbers(show, { seasons: [], episodes: [] });
+    expect(page.seasons?.length).toBe(20);
+    expect(r.seasons.find((s) => s.key.endsWith('uvda-2024'))?.number).toBe(2025);
+    expect(r.seasons.find((s) => s.key.endsWith('uvda-swords_of_iron'))?.number).toBe(2024);
+  });
+});
+
+test('playlist: Akamai and CloudFront HLS urls', async () => {
+  const f = fixtureFetcher({ '/AjaxPage': 'playlist-masterchef-s12-e1' });
+  const media = await fetchPlaylist(f, { vcmid: 'v', channelId: 'c' });
+  expect(media.map((m) => m.cdn)).toEqual(['AKAMAI', 'AWS']);
+  expect(media[0]?.url).toMatch(/^https:\/\/mako-vod\.akamaized\.net\/.*master\.m3u8$/);
+  expect(f.urls[0]).toContain('jspName=playlist.jsp');
+});
+
+test('index fetch goes to the responsive endpoint', async () => {
+  const f = fixtureFetcher({ '/mako-vod-index': 'index' });
+  expect((await fetchIndex(f)).length).toBe(663);
+  expect(f.urls[0]).toBe('https://www.mako.co.il/mako-vod-index?platform=responsive');
+});
