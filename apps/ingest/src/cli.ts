@@ -6,6 +6,7 @@ import { loadConfig } from './config.ts';
 import { startDaemon } from './daemon.ts';
 import { checkLive, liveRender } from './live.ts';
 import { startLocalServer } from './local-server.ts';
+import { createLogger } from './log.ts';
 import { deploy, renderFromStore, writeSite } from './publish.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
@@ -102,7 +103,7 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case 'start': {
-        startDaemon(config, store, log);
+        startDaemon(config, store, config.log.file ? createLogger(config.log.file, config.log.maxMB) : log);
         await new Promise(() => {});
         return 0;
       }

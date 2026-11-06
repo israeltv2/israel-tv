@@ -1,5 +1,6 @@
 // The long-running process: scheduled runs, one job at a time (single writer), publish after each run,
 // LAN-only admin endpoints, the local publisher and the private resolver.
+import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { serve } from '@hono/node-server';
 import { type Config, parseSeriesId, type Source } from '@israel-tv/core';
@@ -14,6 +15,15 @@ import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 
 type Log = (line: string) => void;
+
+/** Git revision of this install, written by deploy tooling into `.revision` at the repo root (optional). */
+const REVISION = (() => {
+  try {
+    return readFileSync(new URL('../../../.revision', import.meta.url), 'utf8').trim();
+  } catch {
+    return 'dev';
+  }
+})();
 
 /** True for loopback, private (RFC 1918), CGNAT, link-local and unique-local addresses. */
 export function isLocalAddress(addr: string | undefined): boolean {
@@ -153,7 +163,7 @@ export class Daemon {
   }
 
   status() {
-    return { ...buildStatus(this.store, this.sources), daemon: this.state() };
+    return { ...buildStatus(this.store, this.sources), daemon: { ...this.state(), revision: REVISION } };
   }
 
   stop(): void {
