@@ -270,3 +270,28 @@ test('the manifest carries the version it is given and a short description in pl
   );
   expect(m.description.length).toBeLessThan(160);
 });
+
+test('live channels: the logo is the logo, the backdrop is a real background picture', () => {
+  const assets = new Map([['background.jpg', new Uint8Array([1])]]);
+  const live = [
+    {
+      id: 'iltv_live_kan11',
+      name: 'כאן 11',
+      logo: '{{israel-tv-origin}}/logos/iltv_live_kan11.png',
+      streams: [],
+    },
+  ];
+  const meta = read(renderSite({ ...base, assets, live, shows: [] }), 'meta/tv/iltv_live_kan11.json').meta;
+  expect(meta.logo).toBe('{{israel-tv-origin}}/logos/iltv_live_kan11.png');
+  expect(meta.background).toBe('{{israel-tv-origin}}/background.jpg');
+});
+
+test('search finds a show by its other names (English from TMDB) too, and still shows its own name', () => {
+  const files = renderSite({
+    ...base,
+    shows: [show('iltv_mako_2', '2026-11-05', { aliases: ['MasterChef Israel'] })],
+  });
+  const row = read(files, 'search.json')[0];
+  expect(row[3]).toBe('show iltv_mako_2');
+  expect(row[4]).toContain('masterchef');
+});

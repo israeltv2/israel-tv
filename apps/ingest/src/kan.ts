@@ -20,6 +20,7 @@ import {
   type ScrapedShow,
 } from '@israel-tv/core';
 import {
+  cleanKanTitle,
   createChromeLoader,
   type LoadedPage,
   type LoadOptions,
@@ -106,6 +107,8 @@ interface CrawlState {
   shows: Record<string, ShowState>;
   /** Per site, the last episode page that loaded with a player: the yardstick for a failing episode page. */
   goodEpisode?: Record<string, string>;
+  /** Episode pages whose player offered subtitles, and one sample of what it gave (to learn their shape). */
+  subtitles?: { n: number; url: string; sample: string };
 }
 
 const STATE_KEY = 'kan:crawl';
@@ -221,6 +224,14 @@ export async function crawlKan(
     for (const s of Object.values(state.shows)) if (!s.art) delete s.artTriedAt;
     state.artMethod = ART_METHOD;
   }
+  // Names kept from before titles were cleaned (and any new rule) are cleaned in place, without a page read.
+  for (const [key, s] of Object.entries(state.shows)) {
+    const clean = s.title ? cleanKanTitle(s.title) : s.title;
+    if (clean && clean !== s.title) {
+      s.title = clean;
+      renameShow(store, key, clean);
+    }
+  }
   if (state.backoffUntil && Date.parse(state.backoffUntil) > now) {
     return { pages: 0, newEpisodes: 0, note: `backing off until ${state.backoffUntil}` };
   }
@@ -321,6 +332,15 @@ export async function crawlKan(
     }
     charge();
     return 'charged';
+  };
+  const noteSubtitles = (url: string, sub: unknown) => {
+    const sample = JSON.stringify(sub).slice(0, 400);
+    if (!state.subtitles) log(`kan: subtitles offered on ${url}: ${sample}`);
+    state.subtitles = {
+      n: (state.subtitles?.n ?? 0) + 1,
+      url: state.subtitles?.url ?? url,
+      sample: state.subtitles?.sample ?? sample,
+    };
   };
   const rethrowOutage = (err: unknown) => {
     if (failureOf(err) === 'outage') throw err;
@@ -556,6 +576,7 @@ export async function crawlKan(
             if (!chargeEpisode('no video player config on the page (layout changed?)')) break;
             continue;
           }
+          if (e.subtitles !== undefined) noteSubtitles(url, e.subtitles);
           batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
           state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
           delete s.retry?.[url];
@@ -577,6 +598,7 @@ export async function crawlKan(
         try {
           const e = parseEpisodePage(await load(url, 'episode'), origin(url));
           if (e?.published) dates.set(kanEpisodeKey(e), e.published);
+          if (e?.subtitles !== undefined) noteSubtitles(url, e.subtitles);
         } catch (err) {
           rethrowOutage(err);
         }
@@ -674,6 +696,15 @@ function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[
   const fresh = batch.some((b) => s.fresh?.includes(b.url));
   if (s.fresh) s.fresh = s.fresh.filter((u) => !batch.some((b) => b.url === u));
   return store.saveShow(seriesId, clean, numbering.added, latestAirDate(clean), fresh);
+}
+
+/** A stored show's name, changed in place. */
+function renameShow(store: Store, key: string, title: string): void {
+  const seriesId = store.findSeriesId('kan', key);
+  const row = seriesId ? store.getShow(seriesId) : undefined;
+  if (!seriesId || !row || row.show.title === title) return;
+  const show = { ...row.show, title };
+  store.saveShow(seriesId, show, { seasons: [], episodes: [] }, latestAirDate(show), false);
 }
 
 /** Add air dates to episodes we already have (numbers and everything else unchanged). */

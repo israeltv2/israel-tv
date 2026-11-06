@@ -26,6 +26,7 @@ import { mountAdminApi } from './admin-api.ts';
 import { csrfFor, sameSecret } from './admin-auth.ts';
 import { backupCatalog, checkBackup } from './backup.ts';
 import { type CanaryResult, canaryEvent, runCanary } from './canary.ts';
+import { QUOTA_KEY, type Quota, readQuota } from './cloudflare-quota.ts';
 import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
@@ -267,6 +268,21 @@ export class Daemon {
     for (const p of this.config.schedule.airingChecks) at(p, () => this.airingRun());
     if (kanEnabled(this.config)) at(this.config.schedule.kanCrawl, () => this.kanCrawl());
     at(this.config.schedule.daily, () => this.daily());
+    // Cloudflare free-plan use, hourly (and once now).
+    at('20 * * * *', () => void this.readQuota());
+    void this.readQuota();
+  }
+
+  /** Today's Cloudflare free-plan use; a failed read is kept for the dashboard, not an error of the addon. */
+  async readQuota(): Promise<void> {
+    try {
+      const q = await readQuota(this.config);
+      if (q) this.store.setState(QUOTA_KEY, q);
+    } catch (err) {
+      const prev = this.store.getState<Quota>(QUOTA_KEY);
+      if (prev) this.store.setState(QUOTA_KEY, { ...prev, readError: cleanSecrets((err as Error).message) });
+      this.log(`cloudflare quota: ${cleanSecrets((err as Error).message)}`);
+    }
   }
 
   nextRuns(): Record<string, string | null> {
@@ -411,6 +427,10 @@ export class Daemon {
         : []),
       ...(this.remoteProblem ? [this.remoteProblem] : []),
       ...(this.publicUsageProblem ? [this.publicUsageProblem] : []),
+      ...(() => {
+        const q = this.store.getState<Quota>(QUOTA_KEY);
+        return q?.warn && q.day === new Date().toISOString().slice(0, 10) ? [q.warn] : [];
+      })(),
       ...(this.events.overCap()
         ? [
             `events.sqlite is over its ${this.config.events.maxMB} MB cap: raw events were cut to the last week`,

@@ -113,6 +113,17 @@ export const ConfigSchema = z.strictObject({
       live: z.boolean().default(true),
     })
     .prefault({}),
+  /**
+   * Taken off the addon without a code change (a takedown request, a broken source): these series ids
+   * (`iltv_mako_12`) and whole sources leave every catalog, search, meta, stream and play file at the next
+   * publish. Reading continues, so ids and numbers stay as they are if an item comes back.
+   */
+  hide: z
+    .strictObject({
+      shows: z.array(z.string().regex(/^iltv_[a-z0-9]+_\d+$/, 'a series id like iltv_mako_12')).default([]),
+      sources: z.array(z.enum(['mako', 'reshet', 'kan', 'live'])).default([]),
+    })
+    .prefault({}),
   /** How to reach Israel-only content. `none` is right when this runs inside Israel. */
   geo: z
     .preprocess(withDefaultType('none'), z.discriminatedUnion('type', [GeoNone, GeoHttp, GeoSocks]))

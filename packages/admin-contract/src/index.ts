@@ -160,6 +160,19 @@ export const SystemSchema = z.object({
     .object({ file: z.string(), at: iso, sizeMB: z.number(), check: z.string().optional() })
     .optional(),
   eventsPerDay: z.array(z.object({ day, n: z.number() })),
+  /** Cloudflare free-plan use today (public addon only; read hourly). */
+  quota: z
+    .object({
+      day,
+      at: iso,
+      requests: z.number(),
+      byScript: z.array(z.object({ script: z.string(), requests: z.number() })),
+      aeWrites: z.number(),
+      limits: z.object({ requests: z.number(), aeWrites: z.number() }),
+      warn: z.string().optional(),
+      readError: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const ActionSchema = z.object({ accepted: z.boolean(), message: z.string() });

@@ -29,6 +29,7 @@ import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
 import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster } from './posters.ts';
 import { emptyShowsKey, episodeCount } from './runner.ts';
+import { ALIASES_KEY } from './tmdb.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -187,7 +188,12 @@ export function catalogWarnings(status: StatusFile): Record<string, string> {
 }
 
 export function renderFromStore(store: Store, config: Config): SiteFiles {
-  const rows = store.listShows();
+  const hiddenShows = new Set(config.hide.shows);
+  const hiddenSources = new Set<string>(config.hide.sources);
+  // Hidden shows and sources are left out of everything published (see config `hide`).
+  const rows = store
+    .listShows()
+    .filter((r) => !hiddenShows.has(r.seriesId) && !hiddenSources.has(r.show.source));
   const status = buildStatus(store, activeSources(config), Date.now(), rows);
   const registry = store.registry();
   const seasonsBy = groupBy(registry.seasons, (x) => x.seriesId);
@@ -237,6 +243,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     if (!poster) placeholderUsed = true;
     return { ...show, poster: poster ?? placeholder };
   };
+  const aliases = store.getState<Record<string, string[]>>(ALIASES_KEY) ?? {};
   const shows: RenderShow[] = rows.map((r) => ({
     seriesId: r.seriesId,
     catalog: r.catalog,
@@ -253,6 +260,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     state: r.state,
     tmdbId: r.tmdbId,
     imdbId: r.imdbId,
+    ...(aliases[r.seriesId]?.length ? { aliases: aliases[r.seriesId] } : {}),
   }));
   for (const [path, name] of [
     [sitePaths.logo, 'logo'],
@@ -264,7 +272,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   }
   // Live channel logos are served from here (their sources are not ours to hotlink).
   const logos = new Set<string>();
-  if (config.sources.live) {
+  if (config.sources.live && !hiddenSources.has('live')) {
     for (const c of LIVE_CHANNELS) {
       const png = channelLogo(c.id);
       if (png) {
@@ -273,11 +281,11 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
       }
     }
   }
-  const live = config.sources.live ? liveRender(logos) : [];
+  const live = config.sources.live && !hiddenSources.has('live') ? liveRender(logos) : [];
   const files = renderSite({
     version: RELEASE_VERSION,
     assets,
-    sources: activeSources(config),
+    sources: activeSources(config).filter((src) => !hiddenSources.has(src)),
     shows,
     live,
     status,
@@ -285,12 +293,14 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     freshness: {
       publishedAt: freshnessStamp(),
       sources: Object.fromEntries(
-        activeSources(config).map((src) => {
-          const good = store.lastGoodRun(src === 'kan' ? 'crawl' : 'full', src);
-          // Rounded down like publishedAt, so this file does not change (and force an upload) on every run.
-          const at = good ? freshnessStamp(Date.parse(good.finishedAt ?? good.startedAt)) : undefined;
-          return [src, { cadenceHours: 24, ...(at ? { lastGoodAt: at } : {}) }];
-        }),
+        activeSources(config)
+          .filter((src) => !hiddenSources.has(src))
+          .map((src) => {
+            const good = store.lastGoodRun(src === 'kan' ? 'crawl' : 'full', src);
+            // Rounded down like publishedAt, so this file does not change (and force an upload) on every run.
+            const at = good ? freshnessStamp(Date.parse(good.finishedAt ?? good.startedAt)) : undefined;
+            return [src, { cadenceHours: 24, ...(at ? { lastGoodAt: at } : {}) }];
+          }),
       ),
       catalogs: Object.fromEntries(CATALOGS.map((c) => [c.id, c.source])),
     },
@@ -318,14 +328,21 @@ function groupBy<T>(list: T[], key: (x: T) => string): Map<string, T[]> {
   return m;
 }
 
-const HEADERS_FILE = `/*
+/**
+ * Cloudflare's static-asset headers. Every matching rule applies, values added up, so a rule that sets its own
+ * Cache-Control first detaches the one from `/*` (`! Cache-Control`): one value per response.
+ */
+export const HEADERS_FILE = `/*
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=600
 /manifest.json
+  ! Cache-Control
   Cache-Control: public, max-age=3600
 /streams/*
+  ! Cache-Control
   Cache-Control: public, max-age=300
 /status*
+  ! Cache-Control
   Cache-Control: no-store
 `;
 

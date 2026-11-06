@@ -1186,3 +1186,34 @@ Measured on the live catalog against another addon's output for the same shows:
 - **imdb_id** on catalog items and metas when the match is known, for Trakt and other addons.
 - **Version:** the manifests show the release (root `package.json`, which release-please bumps), not `1.0.0`. The
   description is one plain sentence about what is in it and what limits playing.
+
+## Live sweep fixes (2026-11-06)
+
+Measured on the live addon, then fixed:
+
+- **One Cache-Control per answer.** Cloudflare applies every matching `_headers` rule and adds the values up, so
+  `manifest.json` carried `public, max-age=600, public, max-age=3600`. Rules that set their own now detach the
+  inherited one (`! Cache-Control`); a test checks every rule.
+- **Kan show names** (17 of 68 carried site text): `cleanKanTitle` removes the site name, "פרקים מלאים לצפייה
+  ישירה" / "הסרט המלא", "| סדרה … מבית …" and an Arabic name with its tagline; dashes that belong to a name stay.
+  Stored names are cleaned in place on the next slice. Mako and Reshet names were clean.
+- **Stream labels:** the name is the source and its best quality (`רשת 13 · 720p`, `כאן · 1080p`), the title the
+  episode, and plainly `זמין לצפייה רק בישראל` when it plays only from Israel. Quality is per source, measured:
+  Reshet's Kaltura masters top out at 720p (every sampled episode; Kaltura lists a 1080p file the master never
+  offers), Kan names its ladder in the address. Live streams are named by channel; the home helper's say
+  `דרך העוזר הביתי` / `דרך החיבור הישראלי שלך`.
+- **Live channel pages** use the addon's background picture as the backdrop; the square logo stays the logo.
+- **Large metas, not changed:** daily shows reach 421 KB (חדשות הבוקר, 1,832 episodes) but 52 KB on the wire. On
+  Chrome throttled to a TV-class CPU (6×) and slow 4G: 0.43 s to fetch (0.17 s for a small show), 3 ms to parse,
+  61 ms to lay out its largest season (253 episodes). Not slow, so no cap or split; ids stay as they are.
+- **Subtitles:** Reshet — no caption assets on 60 sampled Kaltura entries, none in the HLS masters. Mako — no
+  subtitle fields in its playlist data. Kan live — `כאן 11 · כתוביות` (already offered) has open captions in the
+  picture, no subtitle track. Kan VOD — the player config has a `subtitles` field, `null` on the recorded page; the
+  crawler now records the first non-empty one it meets (count and sample in its state, a log line) so a subtitles
+  resource can be built on the real shape. Nothing to expose yet.
+- **English search:** for shows matched to TMDB, the English and original names and alternative titles (one TMDB
+  request per match; earlier matches filled 60 a run) are search aliases: found, never shown.
+- **Kill switch:** config `hide` (series ids, whole sources) leaves them out of everything published, keeps their
+  ids. Removal requests: [takedown.md](takedown.md).
+- **Free-plan quota** on the dashboard (System): today's Worker requests per Worker and Analytics Engine writes
+  against Cloudflare's free 100,000 a day each, read hourly; from 80% also on `/status`.

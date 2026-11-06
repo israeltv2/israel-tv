@@ -72,11 +72,14 @@ Israel.
 - **A row starts with ⚠.** That channel's site has not been read for a while; what you see is the last good list.
 - **Something does not play.** Check the [status page](https://israel-tv.israeltv2.workers.dev/status), then
   [report it](https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml) with the show and episode.
-- **Search finds nothing.** Search in Hebrew, as the channel writes the title.
+- **Search finds nothing.** Search in Hebrew, as the channel writes the title. Many well-known shows can also be
+  found by their English name.
 - **Does it work with my other addons?** Yes. When you open an Israeli show from another addon's rows (such as
   Stremio's own), Israel TV adds its episodes there too if it knows that show and its seasons are numbered the same.
   It never touches movies. (Details for addon users: it answers its own `iltv_` ids, and `tt`/`tmdb:` series ids
   matched to its shows.)
+- **You own something shown here and want it removed?** Write to israeltv2@proton.me with what it is; see
+  [removal requests](docs/takedown.md).
 - **Is it maintained?** It is in beta and runs every day. When a channel's site changes, its row shows ⚠ until the
   reading is fixed; reports help.
 

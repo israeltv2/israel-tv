@@ -1,13 +1,50 @@
 // Match our shows to TMDB (and through it IMDb), so a show opened from another catalog (e.g. Cinemeta)
-// also gets our streams. Only exact matches are accepted: an Israeli show whose Hebrew or original title
-// normalizes to ours. Numbered seasons only are answered (see render), because named or year seasons
-// do not line up with TMDB's season numbers.
+// also gets our streams, and a search in English finds it. Only exact matches are accepted: an Israeli show
+// whose Hebrew or original title normalizes to ours. Numbered and year seasons are answered (see render);
+// named seasons do not line up with TMDB's season numbers.
 
 import { setTimeout as sleep } from 'node:timers/promises';
 import { DAY_MS, normalizeForSearch } from '@israel-tv/core';
 import type { Store } from '@israel-tv/store';
 
 const API = 'https://api.themoviedb.org/3';
+/** seriesId → other names of a matched show (English, original, alternative titles): search aliases only. */
+export const ALIASES_KEY = 'tmdb:aliases';
+type Aliases = Record<string, string[]>;
+/** Shows matched before aliases were kept get theirs a few at a time. */
+const ALIAS_BACKFILL_PER_RUN = 60;
+
+/** A matched show's other names, cleaned: no repeats, at most 8, none longer than 60 characters. */
+export function cleanAliases(names: (string | null | undefined)[], title: string): string[] {
+  const own = normalizeForSearch(title);
+  const seen = new Set<string>([own]);
+  const out: string[] = [];
+  for (const n of names) {
+    const t = (n ?? '').trim();
+    const k = normalizeForSearch(t);
+    if (!k || t.length > 60 || seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+  }
+  return out.slice(0, 8);
+}
+
+async function aliasesOf(get: Get, apiKey: string, id: number, title: string): Promise<string[]> {
+  const q = new URLSearchParams({
+    api_key: apiKey,
+    language: 'en-US',
+    append_to_response: 'alternative_titles',
+  });
+  const d = (await get(`${API}/tv/${id}?${q}`)) as {
+    name?: string;
+    original_name?: string;
+    alternative_titles?: { results?: { title?: string }[] };
+  };
+  return cleanAliases(
+    [d.name, d.original_name, ...(d.alternative_titles?.results ?? []).map((r) => r.title)],
+    title,
+  );
+}
 
 export interface TmdbResult {
   id: number;
@@ -51,6 +88,7 @@ export async function matchShows(
   const runId = store.startRun('match', 'tmdb');
   let matched = 0;
   let checked = 0;
+  const aliases: Aliases = { ...(store.getState<Aliases>(ALIASES_KEY) ?? {}) };
   try {
     for (const row of rows) {
       const q = new URLSearchParams({ api_key: apiKey, language: 'he-IL', query: row.title });
@@ -74,14 +112,28 @@ export async function matchShows(
           },
         ]);
         store.setExternalIds(row.seriesId, { tmdbId: null, imdbId: null });
+        delete aliases[row.seriesId];
       } else {
         store.setExternalIds(row.seriesId, { tmdbId: hit?.id ?? null, imdbId });
+        if (hit) aliases[row.seriesId] = await aliasesOf(get, apiKey, hit.id, row.title);
+        else delete aliases[row.seriesId];
       }
       checked++;
       await sleep(opts.delayMs ?? 250);
     }
+    // Shows matched before their other names were kept.
+    const missing = store
+      .listShows()
+      .filter((r) => r.tmdbId && !aliases[r.seriesId])
+      .slice(0, ALIAS_BACKFILL_PER_RUN);
+    for (const r of missing) {
+      aliases[r.seriesId] = await aliasesOf(get, apiKey, r.tmdbId as number, r.title);
+      await sleep(opts.delayMs ?? 250);
+    }
+    store.setState(ALIASES_KEY, aliases);
     store.finishRun(runId, { status: 'ok', showsOk: matched, requests: checked });
   } catch (err) {
+    store.setState(ALIASES_KEY, aliases);
     store.finishRun(runId, {
       status: 'failed',
       showsOk: matched,

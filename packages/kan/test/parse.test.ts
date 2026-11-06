@@ -89,3 +89,30 @@ test('an episode page gives its publication day', () => {
   const html = readFileSync(new URL('./fixtures/episode-1006639.html', import.meta.url), 'utf8');
   expect(parseEpisodePage(html)?.published).toBe('2026-03-04');
 });
+
+test('show names lose what Kan page titles add around them (the live cases)', async () => {
+  const { cleanKanTitle } = await import('../src/parse.ts');
+  const cases: [string, string][] = [
+    ['סיפורים מהכורסה - פרקים מלאים לצפייה ישירה', 'סיפורים מהכורסה'],
+    ['רב הנסתר - פרקים מלאים', 'רב הנסתר'],
+    ['שב"ס - פרקים מלאים לצפייה ישירה', 'שב"ס'],
+    ['הפרטיזן האחרון - הסרט המלא לצפייה ישירה', 'הפרטיזן האחרון'],
+    ['כאן חינוכית | שכונת חיים - פרקים מלאים לצפייה ישירה', 'שכונת חיים'],
+    ['כאן חינוכית | סטודיו אמציה - רק אנימציה', 'סטודיו אמציה - רק אנימציה'],
+    ['מדרסה | סדרה ישראלית מבית היוצר של כאן חינוכית', 'מדרסה'],
+    ['מאה אחוז | مئة في المئة - על פסגת ההר לא מוותרים על אף ילד', 'מאה אחוז'],
+    ['אירוויזיון 2025 | כאן', 'אירוויזיון 2025'],
+    // Names that already are names stay as they are.
+    ['100 שושנים - מחווה לשושנה דמארי', '100 שושנים - מחווה לשושנה דמארי'],
+    ['שלום חנוך ומתי כספי: העיקר זה השירים', 'שלום חנוך ומתי כספי: העיקר זה השירים'],
+    ['נטע, כפרה עליה', 'נטע, כפרה עליה'],
+  ];
+  for (const [raw, clean] of cases) expect(cleanKanTitle(raw), raw).toBe(clean);
+});
+
+test('an episode page with subtitles in its player config says so (kept as given, to learn the shape)', () => {
+  const page = readFileSync(new URL('./fixtures/episode-1006639.html', import.meta.url), 'utf8');
+  expect(parseEpisodePage(page)?.subtitles).toBeUndefined(); // "subtitles":null
+  const withSubs = page.replace('"subtitles":null', '"subtitles":[{"src":"/x.vtt","lang":"he"}]');
+  expect(parseEpisodePage(withSubs)?.subtitles).toEqual([{ src: '/x.vtt', lang: 'he' }]);
+});

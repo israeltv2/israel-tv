@@ -217,6 +217,24 @@ export function DeploysView(props: { d: Deploys }) {
   </section>`;
 }
 
+/** Cloudflare free-plan use today, with the limits and a warning from 80%. */
+function QuotaView(props: { q: NonNullable<System['quota']> }) {
+  const q = props.q;
+  const pct = (n: number, of: number) => Math.round((n / of) * 100);
+  const cls = (n: number, of: number) => (n >= of * 0.8 ? 'warn' : 'ok');
+  return html`<h3>Cloudflare free plan · ${q.day} (UTC)</h3>
+    <div class="kpis">
+      <${Kpi} label="Worker requests" value=${`${pct(q.requests, q.limits.requests)}%`} sub=${`${n(q.requests)} of ${n(q.limits.requests)}`} />
+      <${Kpi} label="usage data points" value=${`${pct(q.aeWrites, q.limits.aeWrites)}%`} sub=${`${n(q.aeWrites)} of ${n(q.limits.aeWrites)}`} />
+    </div>
+    <p class="small">
+      <span class=${cls(q.requests, q.limits.requests)}>${q.byScript.map((r) => `${r.script}: ${n(r.requests)}`).join(' · ')}</span>
+      <span class="muted"> · read ${when(q.at)}</span>
+    </p>
+    ${q.warn ? html`<p class="warn small">${q.warn}</p>` : ''}
+    ${q.readError ? html`<p class="warn small">Last read failed: ${q.readError}</p>` : ''}`;
+}
+
 export function SystemView(props: { s: System }) {
   const s = props.s;
   return html`<section>
@@ -227,6 +245,7 @@ export function SystemView(props: { s: System }) {
       <${Kpi} label="memory" value=${`${n(Math.round(s.memoryMB.process))} MB`} sub=${`${n(Math.round(s.memoryMB.freeSystem))} MB free`} />
       <${Kpi} label="disk free" value=${s.diskFreeMB === undefined ? '—' : `${n(Math.round(s.diskFreeMB / 1024))} GB`} />
     </div>
+    ${s.quota ? html`<${QuotaView} q=${s.quota} />` : ''}
     <h3>Databases</h3>
     <ul class="list">${s.databases.map((d) => html`<li>${d.name}: ${d.sizeMB} MB${d.growthPerDayMB !== undefined ? html` <span class="muted">(+${d.growthPerDayMB.toFixed(3)} MB a day)</span>` : ''}</li>`)}</ul>
     <h3>Backup</h3>

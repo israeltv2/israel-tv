@@ -92,11 +92,12 @@ export function geoRelay(d: GeoRelayDeps) {
     key: string,
     url: string,
     title: string,
+    name = 'Israel TV',
   ): Promise<{ stream?: Stream; note: string; directPlays: boolean }> {
     const probe = await blockedHere(key, url);
     if (!probe.blocked) return { note: probe.note, directPlays: true };
     return {
-      stream: { url: relayUrl(origin, url, play.playId), name: 'Israel TV', title },
+      stream: { url: relayUrl(origin, url, play.playId), name, title },
       note: probe.note,
       directPlays: false,
     };

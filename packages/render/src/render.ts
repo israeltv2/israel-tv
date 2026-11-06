@@ -8,6 +8,7 @@ import {
   type ExtIds,
   type Freshness,
   GEO_LIMITED,
+  ISRAEL_ONLY,
   type Manifest,
   type Meta,
   type MetaPreview,
@@ -23,6 +24,7 @@ import {
   type StatusFile,
   type Stream,
   sitePaths,
+  streamName,
   type Video,
   videoId,
 } from '@israel-tv/core';
@@ -40,6 +42,8 @@ export interface RenderShow {
   state: 'listed' | 'delisted';
   tmdbId: number | null;
   imdbId: string | null;
+  /** Other names (from TMDB, in English or the original): found by search, never shown. */
+  aliases?: string[];
 }
 
 export interface LiveChannelRender {
@@ -195,10 +199,14 @@ function seasonStreamFiles(s: RenderShow): Map<number, SeasonStreams> {
       const file = out.get(a.season) ?? {};
       file[String(a.episode)] = direct.map((x) => ({
         url: x.url,
-        name: 'Israel TV',
-        title:
-          [x.label, ep.availableAbroad === false ? 'ישראל בלבד' : undefined].filter(Boolean).join(' · ') ||
-          s.title,
+        name: streamName(s.show.source, x.url),
+        title: [
+          ep.title || `פרק ${a.episode}`,
+          x.label,
+          ep.availableAbroad === false ? ISRAEL_ONLY : undefined,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         behaviorHints: { bingeGroup: `iltv-${s.seriesId}` },
       }));
       out.set(a.season, file);
@@ -290,7 +298,7 @@ export function renderSite(input: RenderInput): SiteFiles {
       'series',
       s.catalog,
       s.title,
-      normalizeForSearch(s.title),
+      normalizeForSearch([s.title, ...(s.aliases ?? [])].join(' | ')),
       s.show.poster ?? '',
       ...(s.show.genres?.length ? [s.show.genres] : []),
     ] as SearchRow);
@@ -331,7 +339,15 @@ export function renderSite(input: RenderInput): SiteFiles {
       if (ch.logo) p.poster = ch.logo;
       if (ch.description) p.description = ch.description;
       row.push(p);
-      const meta: Meta = { ...p, ...(ch.logo ? { logo: ch.logo, background: ch.logo } : {}) };
+      // The channel's logo is a square tile: shown as its logo; the page's backdrop is the addon's own picture.
+      const backdrop = input.assets?.has(sitePaths.background)
+        ? `${ORIGIN_TOKEN}/${sitePaths.background}`
+        : undefined;
+      const meta: Meta = {
+        ...p,
+        ...(ch.logo ? { logo: ch.logo } : {}),
+        ...(backdrop ? { background: backdrop } : {}),
+      };
       files.set(sitePaths.meta('tv', ch.id), json({ meta }));
       files.set(sitePaths.liveStreams(ch.id), json({ streams: ch.streams }));
       search.push([ch.id, 'tv', 'iltv_live', ch.name, normalizeForSearch(ch.name), ch.logo ?? '']);
