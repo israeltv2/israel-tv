@@ -326,3 +326,62 @@ test('when Akamai refuses a Mako master, the next CDN Mako lists is tried', asyn
     /cdn AKAMAI, ticket 200, master 403, cdn AWS, ticket 200, master 200/,
   );
 });
+
+test('the remote resolver: Mako only, behind its token, nothing else, limited per client', async () => {
+  const { createRemoteResolverApp } = await import('../src/remote.ts');
+  const token = 'x'.repeat(40);
+  let t = 0;
+  const app = createRemoteResolverApp(
+    { token, publicUrl: 'https://away.example.net', playsPerMinute: 2, requestsPerMinute: 100 },
+    {
+      episode: () => ({
+        key: 'k',
+        title: 't',
+        streams: [{ url: 'https://cdnapisec.kaltura.com/p/1/x.m3u8', kind: 'direct' }],
+        play: { vcmid: 'v', channelId: 'c' },
+      }),
+      fetch: async (url) => {
+        if (url.includes('playlist.jsp'))
+          return Response.json({ media: [{ url: 'https://x.akamaized.net/m.m3u8', cdn: 'AKAMAI' }] });
+        if (url.includes('entitlement')) return Response.json({ tickets: [{ ticket: 'hdnea%3Dx' }] });
+        return new Response('#EXTM3U\nv.m3u8\n');
+      },
+    },
+    () => t,
+  );
+  const get = (p: string, ip = '203.0.113.7') =>
+    app.request(`http://127.0.0.1:7703${p}`, { headers: { 'cf-connecting-ip': ip } });
+  // Wrong or missing token, unknown paths, other methods: a bare 404.
+  for (const p of [
+    '/manifest.json',
+    `/${'y'.repeat(40)}/manifest.json`,
+    `/${token}/relay/a/b.ts`,
+    `/${token}/stream/series/iltv_reshet_1:1:1.json`,
+    `/${token}/status`,
+    `/${token}`,
+  ]) {
+    const r = await get(p);
+    expect(r.status, p).toBe(404);
+    expect(await r.text(), p).toBe('');
+  }
+  const m = await (await get(`/${token}/manifest.json`)).json();
+  expect(m.name).toBe('Israel TV · Mako (away from home)');
+  expect(m.resources[0].idPrefixes).not.toContain('iltv_reshet_');
+  // Stream URLs point back through the public address with the token, and never at a relay.
+  const s = await (await get(`/${token}/stream/series/iltv_mako_1:2:3.json`)).json();
+  expect(s.streams).toHaveLength(1);
+  expect(s.streams[0].url).toMatch(new RegExp(`^https://away\\.example\\.net/${token}/play/mako/`));
+  const play = new URL(s.streams[0].url);
+  expect((await get(`${play.pathname}${play.search}`)).status).toBe(200);
+  expect((await get(`${play.pathname}${play.search}`)).status).toBe(200);
+  expect((await get(`${play.pathname}${play.search}`)).status).toBe(429);
+  expect((await get(`${play.pathname}${play.search}`, '198.51.100.9')).status).toBe(200);
+  t = 60_000;
+  expect((await get(`${play.pathname}${play.search}`)).status).toBe(200);
+  expect(() =>
+    createRemoteResolverApp(
+      { token: 'short', publicUrl: 'https://a', playsPerMinute: 1, requestsPerMinute: 1 },
+      { episode: () => undefined, fetch: async () => new Response('') },
+    ),
+  ).toThrow(/32 characters/);
+});

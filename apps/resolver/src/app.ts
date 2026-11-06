@@ -54,6 +54,10 @@ export interface ResolverDeps {
   salt?: string;
   /** The resolver's logo and the background for its manifest. */
   branding?: { logo?: { body: Uint8Array; type: string }; background?: { body: Uint8Array; type: string } };
+  /** The address this app is reached at, for the URLs it hands out (default: the request's origin). */
+  publicBase?: (c: Context) => string;
+  /** Manifest overrides (the remote, Mako-only resolver names itself differently). */
+  manifest?: { id: string; name: string; description: string; idPrefixes: string[] };
   /** The client's address for a request (default: the connecting socket's). */
   clientAddress?: (c: Context) => string | undefined;
 }
@@ -95,21 +99,29 @@ export function createResolverApp(deps: ResolverDeps) {
     c.header('Access-Control-Allow-Origin', '*');
   });
 
-  const base = (c: { req: { url: string } }) => new URL(c.req.url).origin;
+  const base = (c: Context) => deps.publicBase?.(c) ?? new URL(c.req.url).origin;
 
   app.get('/', (c) => c.redirect('/manifest.json'));
   app.get('/manifest.json', (c) =>
     c.json({
-      id: 'community.israel-tv.resolver',
+      id: deps.manifest?.id ?? 'community.israel-tv.resolver',
       version: '1.0.0',
-      name: 'Israel TV · home resolver',
+      name: deps.manifest?.name ?? 'Israel TV · home resolver',
       description:
+        deps.manifest?.description ??
         'Plays Mako (Keshet 12) episodes and live channels, and relays geo-blocked Reshet/Kan video through your configured proxy when it is refused where you are. Runs on your home network.',
       resources: [
         {
           name: 'stream',
           types: ['series', 'tv'],
-          idPrefixes: ['iltv_mako_', 'iltv_reshet_', 'iltv_kan_', 'iltv_live_', 'tt', 'tmdb:'],
+          idPrefixes: deps.manifest?.idPrefixes ?? [
+            'iltv_mako_',
+            'iltv_reshet_',
+            'iltv_kan_',
+            'iltv_live_',
+            'tt',
+            'tmdb:',
+          ],
         },
       ],
       types: ['series', 'tv'],

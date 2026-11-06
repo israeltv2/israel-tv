@@ -15,7 +15,7 @@ import {
 } from '@israel-tv/core';
 import type { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
-import { PlaySessions, resolverApp } from '@israel-tv/resolver';
+import { PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
@@ -249,6 +249,9 @@ export class Daemon {
   /** Last outcome of relaying through the geo proxy (resolver), for /status. */
   geo: { proxies: string[]; lastOkAt?: string; lastErrorAt?: string; lastError?: string } = { proxies: [] };
 
+  /** Why the remote resolver is not running, when it is enabled but cannot start. */
+  remoteProblem: string | undefined;
+
   /** Play and relay sessions of the resolver (what is playing now). */
   readonly sessions = new PlaySessions((e) => this.record(e));
 
@@ -365,6 +368,7 @@ export class Daemon {
             'Analytics Engine is not enabled on the Cloudflare account (Workers & Pages → Analytics Engine → enable); the public addon is counted from Workers Logs meanwhile',
           ]
         : []),
+      ...(this.remoteProblem ? [this.remoteProblem] : []),
       ...(this.events.overCap()
         ? [
             `events.sqlite is over its ${this.config.events.maxMB} MB cap: raw events were cut to the last week`,
@@ -544,6 +548,28 @@ export async function startDaemon(
       config.resolver.port,
       'resolver.port',
     );
+  }
+  if (config.resolver.remote.enabled) {
+    const remote = remoteResolverApp(config, {
+      log: (component) => logger.for(`remote-${component}`),
+      onEvent: (e) => d.record(e),
+      sessions: d.sessions,
+      salt: events.clientSalt(),
+    });
+    if ('error' in remote) {
+      d.remoteProblem = `remote resolver not started: ${remote.error}`;
+      log(d.remoteProblem);
+    } else {
+      await listen(
+        remote.fetch as never,
+        config.resolver.remote.host,
+        config.resolver.remote.port,
+        'resolver.remote.port',
+      );
+      log(
+        `remote resolver (Mako away from home) on ${config.resolver.remote.host}:${config.resolver.remote.port}, served at ${config.resolver.remote.publicUrl} — \`israel-tv remote-url\` prints the link to install`,
+      );
+    }
   }
   log(
     `admin and usage dashboard (local network, owner only): ${urls(config.admin.host, config.admin.port, '/usage')} — open it once with ?token=… (\`israel-tv admin-url\` prints the link)`,
