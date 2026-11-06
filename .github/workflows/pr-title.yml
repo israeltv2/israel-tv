@@ -4,6 +4,12 @@ name: pr-title
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  # Started by the release workflow for release-please's pull request (see release.yml), with its title.
+  workflow_dispatch:
+    inputs:
+      title:
+        description: The pull request title to check
+        required: true
 permissions:
   contents: read
 jobs:
@@ -12,7 +18,7 @@ jobs:
     steps:
       - name: Check the title
         env:
-          TITLE: ${{ github.event.pull_request.title }}
+          TITLE: ${{ github.event.pull_request.title || inputs.title }}
         run: |
           if ! printf '%s' "$TITLE" | grep -Eq '^(feat|fix|docs|chore|refactor|test|ci|perf|build|style|revert)(\([a-z0-9-]+\))?!?: .+'; then
             echo "Pull request title must follow Conventional Commits, e.g. 'fix(kan): …' or 'docs: …'. Got: $TITLE"
