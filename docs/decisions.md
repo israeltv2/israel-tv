@@ -403,3 +403,10 @@ episode page at the head of each show's queue, so after three tries it was given
 never read again — dropping a real episode. Server-side errors now make the slice back off like a challenge,
 without charging any page a try; only failures about the page itself (404, no player on the page) count, and
 those are retried 12 hours apart, so giving up takes at least a day.
+
+### Code review, round 16 (2026-11-06)
+
+One finding, a regression from round 15, fixed: a single Kan episode page answering 5xx on every try (while
+the rest of the site works) made every slice back off and nothing behind it was ever read. Server errors on an
+episode page now back off for at most two slices in a row; from the third, they count as that page's own
+problem and take the round-13 path (show paused 12 h per try, given up after three), so the crawl moves on.

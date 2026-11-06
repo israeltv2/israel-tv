@@ -74,6 +74,8 @@ interface ShowState {
   failedAt?: string;
   /** Episode pages that failed and will be tried again before reading past them. */
   retry?: Record<string, { n: number; at: string }>;
+  /** Consecutive slices in which an episode page answered a server error (5xx/429). */
+  serverErrors?: Record<string, number>;
 }
 
 interface CrawlState {
@@ -89,6 +91,8 @@ const STATE_KEY = 'kan:crawl';
  */
 const MAX_EPISODE_TRIES = 3;
 const RETRY_GAP_MS = 12 * 3_600_000;
+/** After this many slices in a row with a server error on the same episode page, it counts as that page's problem. */
+const SERVER_ERROR_SLICES = 3;
 const HOUR = HOUR_MS;
 
 export interface KanCrawlOptions {
@@ -199,7 +203,10 @@ export async function crawlKan(
     // the slice stops and backs off, and no page is charged a try for them.
     if (r.challenged || r.status === 403 || r.status === 407 || r.status === 429 || r.status >= 500) {
       blocked++;
-      throw new Error(`${url}: ${r.challenged ? 'Cloudflare challenge did not clear' : `HTTP ${r.status}`}`);
+      const err = new Error(
+        `${url}: ${r.challenged ? 'Cloudflare challenge did not clear' : `HTTP ${r.status}`}`,
+      );
+      throw Object.assign(err, { serverError: !r.challenged && (r.status === 429 || r.status >= 500) });
     }
     blocked = 0;
     if (r.status >= 400) throw new Error(`${url}: HTTP ${r.status}`);
@@ -325,9 +332,20 @@ export async function crawlKan(
             if (e) batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
             else problem = 'no video player config on the page (layout changed?)';
           } catch (err) {
-            if (blocked > 0) throw err;
+            // One episode page answering 5xx slice after slice (while the rest of the site works) would block
+            // every slice forever: after a few slices in a row it counts as that page's problem instead.
+            const server = (err as { serverError?: boolean }).serverError === true;
+            const streak = server ? (s.serverErrors?.[url] ?? 0) + 1 : 0;
+            if (server && streak >= SERVER_ERROR_SLICES) {
+              blocked = 0;
+              if (s.serverErrors) delete s.serverErrors[url];
+            } else if (blocked > 0) {
+              if (server) s.serverErrors = { ...(s.serverErrors ?? {}), [url]: streak };
+              throw err;
+            }
             problem = (err as Error).message;
           }
+          if (!problem && s.serverErrors?.[url]) delete s.serverErrors[url];
           if (problem) {
             problems++;
             // Kan episodes are numbered in reading order (page-id order), so never read past a gap: keep this
