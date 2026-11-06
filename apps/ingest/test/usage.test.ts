@@ -163,7 +163,7 @@ test('the Worker deploys without Analytics Engine when the account has not enabl
 test('a failed deploy never puts the account id (or any secret) into the published status', async () => {
   const { publishError, buildStatus } = await import('../src/publish.ts');
   const { Store } = await import('@israel-tv/store');
-  const id = 'a2771a51611bd4b0239e4d4302f783f0';
+  const id = '0123456789abcdef0123456789abcdef';
   const env = { CLOUDFLARE_ACCOUNT_ID: id, CLOUDFLARE_API_TOKEN: 'tok-tok-tok-123' };
   const saved = { ...process.env };
   Object.assign(process.env, env);
