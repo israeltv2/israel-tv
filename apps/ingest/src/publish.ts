@@ -359,9 +359,12 @@ const WORKER_DEPLOYED = 'publish:worker-fingerprint';
 const WORKER_SOURCES = ['apps/catalog/src', 'packages/addon/src', 'packages/core/src'];
 
 /** A fingerprint of the Worker's code and config, to deploy a new version even when no data changed. */
-export function workerFingerprint(p: Extract<PublisherConfig, { type: 'cloudflare' }>): string {
+export function workerFingerprint(
+  p: Extract<PublisherConfig, { type: 'cloudflare' }>,
+  analytics = true,
+): string {
   const h = createHash('sha256');
-  h.update(JSON.stringify(workerConfig(p, join(REPO_ROOT, 'apps/catalog'))));
+  h.update(JSON.stringify(workerConfig(p, join(REPO_ROOT, 'apps/catalog'), analytics)));
   for (const dir of WORKER_SOURCES) {
     const abs = join(REPO_ROOT, dir);
     if (!existsSync(abs)) continue;
@@ -381,6 +384,7 @@ export function workerFingerprint(p: Extract<PublisherConfig, { type: 'cloudflar
 export function workerConfig(
   p: Extract<PublisherConfig, { type: 'cloudflare' }>,
   catalogDir: string,
+  analytics = true,
 ): unknown {
   const text = readFileSync(join(catalogDir, 'wrangler.jsonc'), 'utf8')
     .split('\n')
@@ -401,7 +405,8 @@ export function workerConfig(
     // The Worker logs its own events (no addresses); Cloudflare's invocation logs would keep request metadata.
     observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },
     // One data point per stream request, counted by Cloudflare (read back once a day; see public-usage.ts).
-    analytics_engine_datasets: [{ binding: 'USAGE', dataset: 'israel_tv_usage' }],
+    // Analytics Engine must be enabled once on the account; until it is, the Worker deploys without it.
+    ...(analytics ? { analytics_engine_datasets: [{ binding: 'USAGE', dataset: 'israel_tv_usage' }] } : {}),
   };
 }
 
@@ -409,6 +414,7 @@ async function deployCloudflare(
   p: Extract<PublisherConfig, { type: 'cloudflare' }>,
   env: NodeJS.ProcessEnv,
   salt?: string,
+  analytics = true,
 ): Promise<DeployResult> {
   const t0 = Date.now();
   const cwd = join(REPO_ROOT, 'apps/catalog');
@@ -436,7 +442,7 @@ async function deployCloudflare(
     FORCE_COLOR: '0',
   };
   const configPath = join(wranglerHome, 'wrangler.json');
-  writeFileSync(configPath, JSON.stringify(workerConfig(p, cwd), null, 2));
+  writeFileSync(configPath, JSON.stringify(workerConfig(p, cwd, analytics), null, 2));
   const args = ['deploy', '--config', configPath, '--name', p.workerName, '--assets', p.dir];
   // The client-hash salt goes up as a Worker secret, through a file only this user can read, removed after.
   const secretsPath = join(wranglerHome, 'secrets.json');
@@ -480,10 +486,20 @@ export async function deploy(
   config: Config,
   env: NodeJS.ProcessEnv = process.env,
   salt?: string,
+  analytics = true,
 ): Promise<DeployResult> {
   const p = config.publisher;
   if (p.type === 'local') return { ms: 0, detail: `served from ${p.dir} by the local server` };
-  return deployCloudflare(p, env, salt);
+  return deployCloudflare(p, env, salt, analytics);
+}
+
+/** Set while Cloudflare refuses the Analytics Engine binding (not enabled on the account); retried weekly. */
+export const ANALYTICS_OFF = 'cloudflare:analytics-off';
+
+/** Whether to deploy with Analytics Engine: yes, unless Cloudflare refused it in the last week. */
+export function analyticsWanted(store: Store, now = Date.now()): boolean {
+  const off = store.getState<{ at: string }>(ANALYTICS_OFF);
+  return !off || now - Date.parse(off.at) > 7 * 86_400_000;
 }
 
 /**
@@ -514,7 +530,9 @@ export async function publishSite(
   }
   const retry = store.lastRun('publish', kind)?.status === 'failed';
   // A new version of the Worker (its code or its config) is deployed even when no data changed.
-  const worker = config.publisher.type === 'cloudflare' ? workerFingerprint(config.publisher) : undefined;
+  let analytics = analyticsWanted(store);
+  const worker =
+    config.publisher.type === 'cloudflare' ? workerFingerprint(config.publisher, analytics) : undefined;
   const workerChanged = worker !== undefined && store.getState<string>(WORKER_DEPLOYED) !== worker;
   if (w.changed.length === 0 && w.deleted === 0 && !retry && !workerChanged) {
     log('publish: nothing changed');
@@ -522,9 +540,23 @@ export async function publishSite(
   }
   const runId = store.startRun('publish', kind);
   try {
-    const d = await deploy(config, process.env, salt);
+    let d: DeployResult;
+    try {
+      d = await deploy(config, process.env, salt, analytics);
+      if (analytics) store.setState(ANALYTICS_OFF, null);
+    } catch (err) {
+      // Analytics Engine is a one-time opt-in on the Cloudflare account: deploy without it meanwhile.
+      if (!analytics || !/enable Analytics Engine/i.test((err as Error).message)) throw err;
+      analytics = false;
+      store.setState(ANALYTICS_OFF, { at: new Date().toISOString() });
+      log(
+        'publish: Analytics Engine is not enabled on the Cloudflare account; deploying without it (see /status)',
+      );
+      d = await deploy(config, process.env, salt, false);
+    }
     store.finishRun(runId, { status: 'ok' });
-    if (worker) store.setState(WORKER_DEPLOYED, worker);
+    if (worker && config.publisher.type === 'cloudflare')
+      store.setState(WORKER_DEPLOYED, workerFingerprint(config.publisher, analytics));
     log(
       `publish: ${w.written} of ${w.total} files changed, ${w.deleted} removed; ${d.detail}${d.url ? ` → ${d.url}/manifest.json` : ''} (${Math.round((Date.now() - t0) / 1000)} s)`,
     );

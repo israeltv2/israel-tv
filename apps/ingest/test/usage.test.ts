@@ -131,3 +131,26 @@ test('a secret never reaches a log line, wherever it appears', async () => {
   expect(text).not.toContain(secret);
   expect(text).not.toContain('abc-def-ghi');
 });
+
+test('account ids count as secrets too', async () => {
+  const { secretValues } = await import('../src/log.ts');
+  expect(secretValues({ CLOUDFLARE_ACCOUNT_ID: 'a2b3c4d5e6f7', HOME: '/Users/x' })).toEqual(['a2b3c4d5e6f7']);
+});
+
+test('the Worker deploys without Analytics Engine when the account has not enabled it', async () => {
+  const dir = new URL('../../catalog', import.meta.url).pathname;
+  const on = workerConfig(cf().publisher as never, dir, true) as Record<string, unknown>;
+  const off = workerConfig(cf().publisher as never, dir, false) as Record<string, unknown>;
+  expect(on.analytics_engine_datasets).toBeDefined();
+  expect(off.analytics_engine_datasets).toBeUndefined();
+  expect(workerFingerprint(cf().publisher as never, true)).not.toBe(
+    workerFingerprint(cf().publisher as never, false),
+  );
+  const { Store } = await import('@israel-tv/store');
+  const { analyticsWanted, ANALYTICS_OFF } = await import('../src/publish.ts');
+  const store = Store.open(':memory:');
+  expect(analyticsWanted(store)).toBe(true);
+  store.setState(ANALYTICS_OFF, { at: new Date().toISOString() });
+  expect(analyticsWanted(store)).toBe(false);
+  expect(analyticsWanted(store, Date.now() + 8 * 86_400_000)).toBe(true);
+});
