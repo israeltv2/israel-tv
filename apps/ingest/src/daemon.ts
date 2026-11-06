@@ -13,7 +13,7 @@ import {
   tmdbApiKey,
   type UsageEvent,
 } from '@israel-tv/core';
-import { dashboardFile, IMPORT_MAP_HASH } from '@israel-tv/dashboard';
+import { dashboardBuilt, dashboardCsp, dashboardFile, newNonce } from '@israel-tv/dashboard';
 import type { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
 import { checkProxyAtStart, PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
@@ -378,11 +378,11 @@ export class Daemon {
       }
       // Relay sessions started before today and still open are written now, so they land in the day being rolled
       // up; ones started today go on as one session.
-      this.sessions.flush(false, Date.parse(`${new Date(now).toISOString().slice(0, 10)}T00:00:00.000Z`));
+      this.sessions.flush(false, Date.parse(this.events.dayRange(this.events.dayOf(now)).from));
       const m = this.events.maintain(now, this.config.events.maxMB * 1024 * 1024);
       this.log('usage events maintained', m);
       await this.canary();
-      const yesterday = new Date(now - 86_400_000).toISOString().slice(0, 10);
+      const yesterday = this.events.lastDays(2, now)[0] as string;
       try {
         const r = await pullPublicUsage(this.events, this.config, yesterday);
         if (r) this.log('public addon usage read', { ...r });
@@ -447,14 +447,41 @@ export class Daemon {
     return queryEvents(this.events, q);
   }
 
-  noteRelay(r: { ok: boolean; error?: string }): void {
+  noteRelay(r: { ok: boolean; error?: string; exit?: string }): void {
     const at = new Date().toISOString();
     if (r.ok) this.geo.lastOkAt = at;
     else {
       this.geo.lastErrorAt = at;
       if (r.error) this.geo.lastError = r.error;
     }
+    if (!r.exit) return;
+    const e = this.exits.get(r.exit) ?? { server: r.exit, ok: 0, errors: 0 };
+    if (r.ok) {
+      e.ok++;
+      e.lastOkAt = at;
+    } else {
+      e.errors++;
+      e.lastErrorAt = at;
+      if (r.error) e.lastError = r.error;
+    }
+    this.exits.set(r.exit, e);
   }
+
+  /** What the relay saw per proxy exit since the service started (the dashboard's proxy table). */
+  readonly exits = new Map<
+    string,
+    {
+      server: string;
+      ok: number;
+      errors: number;
+      lastOkAt?: string;
+      lastErrorAt?: string;
+      lastError?: string;
+    }
+  >();
+
+  /** When the service started. */
+  readonly startedAt = new Date().toISOString();
 
   status() {
     const notes = [
@@ -469,6 +496,9 @@ export class Daemon {
         const q = this.store.getState<Quota>(QUOTA_KEY);
         return q?.warn && q.day === new Date().toISOString().slice(0, 10) ? [q.warn] : [];
       })(),
+      ...(dashboardBuilt()
+        ? []
+        : ['the dashboard is not built in this copy (`pnpm build`); /dash shows how to fix it']),
       ...(this.events.overCap()
         ? [
             `events.sqlite is over its ${this.config.events.maxMB} MB cap: raw events were cut to the last week`,
@@ -565,12 +595,13 @@ export function adminApp(d: Daemon, token: string) {
   mountAdminApi(app, d, token);
   app.get('/dash', (c) => c.redirect('/dash/'));
   app.get('/dash/*', (c) => {
-    const f = dashboardFile(c.req.path.slice('/dash/'.length) || 'index.html');
+    const nonce = newNonce();
+    const f = dashboardFile(c.req.path.slice('/dash/'.length), nonce);
     if (!f) return c.json({ error: 'not found' }, 404);
-    return c.body(f.body, 200, {
+    return c.body(typeof f.body === 'string' ? f.body : new Uint8Array(f.body), 200, {
       'content-type': f.type,
       'cache-control': f.immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
-      'content-security-policy': `default-src 'self'; script-src 'self' ${IMPORT_MAP_HASH}; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
+      'content-security-policy': dashboardCsp(nonce),
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'no-referrer',
     });

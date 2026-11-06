@@ -251,7 +251,7 @@ async function main(argv: string[]): Promise<number> {
         return (await publishSite(store, config, log)) ? 0 : 1;
       case 'deploy-api':
       case 'deploy': {
-        const events = EventStore.open(config.events.path);
+        const events = EventStore.open(config.events.path, { timeZone: config.schedule.timezone });
         try {
           const d = await deployApi(config, store, events.clientSalt(), log);
           log(
@@ -280,7 +280,7 @@ async function main(argv: string[]): Promise<number> {
         const logger = createLogger(config.log);
         // One-time migrations are in the service's own log too, not only on the console.
         if (renumberLine) logger.log(renumberLine);
-        const events = EventStore.open(config.events.path);
+        const events = EventStore.open(config.events.path, { timeZone: config.schedule.timezone });
         const daemon = await startDaemon(config, store, events, logger, {
           initialRun: !values['no-initial-run'],
         });
@@ -353,7 +353,7 @@ async function main(argv: string[]): Promise<number> {
       case 'events':
         return printEvents(config, values);
       case 'usage': {
-        const events = EventStore.openReadOnly(config.events.path);
+        const events = EventStore.openReadOnly(config.events.path, { timeZone: config.schedule.timezone });
         try {
           const status = buildStatus(store, activeSources(config));
           const dash = buildDashboard(events, {

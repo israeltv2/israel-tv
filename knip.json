@@ -12,7 +12,8 @@
       "ignore": ["**"]
     },
     "apps/dashboard": {
-      "entry": ["web/main.ts"]
+      "entry": ["test/*.ts"],
+      "project": ["src/**/*.{ts,tsx,css}", "server/*.ts", "test/*.ts"]
     }
   },
   "ignoreDependencies": ["wrangler", "pino-roll", "@swc/core"],

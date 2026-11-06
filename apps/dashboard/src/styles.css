@@ -1,0 +1,109 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/noto-sans-hebrew/wght.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens. Health states always come with an icon and a word; source colours are never green, amber or red,
+   so a source never reads as a health state. */
+:root {
+  --bg: oklch(0.985 0.002 260);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.967 0.003 260);
+  --border: oklch(0.91 0.004 260);
+  --fg: oklch(0.21 0.01 265);
+  --muted: oklch(0.52 0.015 260);
+  --accent: oklch(0.51 0.2 265);
+  --accent-fg: oklch(0.99 0 0);
+  --ok: oklch(0.52 0.13 155);
+  --warn: oklch(0.6 0.15 65);
+  --error: oklch(0.55 0.2 27);
+  --unknown: oklch(0.6 0.02 260);
+  --mako: oklch(0.55 0.2 262);
+  --reshet: oklch(0.56 0.22 330);
+  --kan: oklch(0.55 0.1 210);
+  --live: oklch(0.5 0.2 295);
+  --chart-grid: oklch(0.92 0.004 260);
+}
+.dark {
+  --bg: oklch(0.155 0.008 265);
+  --surface: oklch(0.2 0.01 265);
+  --surface-2: oklch(0.24 0.012 265);
+  --border: oklch(0.3 0.012 265);
+  --fg: oklch(0.95 0.005 260);
+  --muted: oklch(0.7 0.015 260);
+  --accent: oklch(0.7 0.15 265);
+  --accent-fg: oklch(0.16 0.01 265);
+  --ok: oklch(0.76 0.15 155);
+  --warn: oklch(0.82 0.15 80);
+  --error: oklch(0.72 0.17 25);
+  --unknown: oklch(0.65 0.02 260);
+  --mako: oklch(0.72 0.14 255);
+  --reshet: oklch(0.74 0.17 330);
+  --kan: oklch(0.78 0.11 205);
+  --live: oklch(0.73 0.14 295);
+  --chart-grid: oklch(0.28 0.01 265);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-error: var(--error);
+  --color-unknown: var(--unknown);
+  --color-mako: var(--mako);
+  --color-reshet: var(--reshet);
+  --color-kan: var(--kan);
+  --color-live: var(--live);
+  --font-sans:
+    "Inter Variable", "Noto Sans Hebrew Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must win over every component's own */
+      animation-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: as above */
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Recharts: draw with the tokens. */
+.recharts-cartesian-grid line {
+  stroke: var(--chart-grid);
+}
+.recharts-cartesian-axis-tick text {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.recharts-tooltip-cursor {
+  fill: var(--surface-2);
+}

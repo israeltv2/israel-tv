@@ -82,7 +82,6 @@ export interface Dashboard {
 }
 
 const DAY_MS = 86_400_000;
-const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 function totals(rows: DailyRow[]): Totals {
   const all = rows.filter((r) => r.source === '' && r.showId === '');
@@ -128,12 +127,14 @@ export function buildDashboard(
   now = Date.now(),
 ): Dashboard {
   const cpu0 = process.cpuUsage();
-  const today = isoDay(now);
-  const since30 = isoDay(now - 29 * DAY_MS);
-  const since7 = isoDay(now - 6 * DAY_MS);
+  // Days in the dashboard's time zone (the store's).
+  const [since30] = events.lastDays(30, now);
+  const week = events.lastDays(7, now);
+  const since7 = week[0] as string;
+  const today = week[6] as string;
   // Home: finished days from the rollups, today from the raw events.
   const homeRows = [
-    ...events.daily(since30, 'home').filter((r) => r.day !== today),
+    ...events.daily(since30 as string, 'home').filter((r) => r.day !== today),
     ...events.homeDay(today),
   ];
   const within = (rows: DailyRow[], since: string) => rows.filter((r) => r.day >= since);
@@ -142,10 +143,10 @@ export function buildDashboard(
       .filter((r) => r.source === '' && r.showId === '')
       .map((r) => ({ day: r.day, n: r.uniqueClients }))
       .sort((a, b) => b.day.localeCompare(a.day));
-  const publicRows = events.daily(since30, 'public');
+  const publicRows = events.daily(since30 as string, 'public');
   const lastPublic = events.getMeta('public-usage:last');
   const pub = lastPublic ? (JSON.parse(lastPublic) as { via?: string; note?: string; day?: string }) : {};
-  const sizeAt = (d: number) => Number(events.getMeta(`size:${isoDay(now - d * DAY_MS)}`)) || undefined;
+  const sizeAt = (d: number) => Number(events.getMeta(`size:${events.dayOf(now - d * DAY_MS)}`)) || undefined;
   const [size0, size7] = [sizeAt(0), sizeAt(7)];
   const growth = size0 && size7 ? (size0 - size7) / 7 / 1_048_576 : undefined;
   const dash: Dashboard = {
@@ -156,7 +157,7 @@ export function buildDashboard(
       d30: totals(homeRows),
       uniqueByDay: uniqueByDay(homeRows).slice(0, 30),
       topShows: topShows(within(homeRows, since7), input.title),
-      failures: events.failuresByReason(`${since7}T00:00:00.000Z`),
+      failures: events.failuresByReason(events.dayRange(since7).from),
       active: input.active.map((a) => {
         const name = a.showId ? input.title(a.showId) : undefined;
         return name ? { ...a, title: name } : a;
@@ -174,7 +175,7 @@ export function buildDashboard(
     ingest: input.ingest,
     canary: input.canary,
     data: {
-      eventsPerDay: events.perDay(`${since7}T00:00:00.000Z`),
+      eventsPerDay: events.perDay(events.dayRange(since7).from),
       sizeMB: Math.round((events.sizeBytes() / 1_048_576) * 10) / 10,
       ...(growth !== undefined ? { growthPerDayMB: Math.round(growth * 100) / 100 } : {}),
       overCap: events.overCap(),

@@ -53,7 +53,7 @@ export function printEvents(
   q: { play?: string; kind?: string; errors?: boolean; since?: string; show?: string; limit?: string },
   out: (line: string) => void = console.log,
 ): number {
-  const events = EventStore.openReadOnly(config.events.path);
+  const events = EventStore.openReadOnly(config.events.path, { timeZone: config.schedule.timezone });
   try {
     const rows = queryEvents(events, {
       ...(q.play ? { playId: q.play } : {}),

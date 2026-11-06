@@ -67,11 +67,11 @@ module.exports = {
     {
       name: 'dashboard-web-browser-only',
       comment:
-        'The dashboard page runs in a browser: it imports its own modules, the contract (types only) and its vendor modules.',
+        'The dashboard page runs in a browser: it imports its own modules, the contract (route table; types from the rest) and npm packages.',
       severity: 'error',
-      from: { path: '^apps/dashboard/web/' },
+      from: { path: '^apps/dashboard/src/' },
       to: {
-        pathNot: ['^apps/dashboard/web/', '^packages/admin-contract/', 'node_modules/(preact|htm|uplot)/'],
+        pathNot: ['^apps/dashboard/src/', '^packages/admin-contract/', 'node_modules/'],
       },
     },
     {
@@ -95,7 +95,7 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
-    exclude: { path: ['node_modules', '/test/', 'spikes/', '/drizzle/'] },
+    exclude: { path: ['node_modules', '/test/', 'spikes/', '/drizzle/', '/dist/'] },
     // TypeScript 7 has no JavaScript compiler API yet: sources are parsed with swc.
     parser: 'swc',
     tsPreCompilationDeps: true,
@@ -103,7 +103,7 @@ module.exports = {
     enhancedResolveOptions: {
       exportsFields: ['exports'],
       conditionNames: ['import', 'default'],
-      extensions: ['.ts', '.js'],
+      extensions: ['.ts', '.tsx', '.js'],
     },
     tsConfig: { fileName: 'tsconfig.base.json' },
   },

@@ -13,7 +13,7 @@ import { PlaySessions } from './sessions.ts';
 export async function runResolverOnly(config: Config): Promise<number> {
   const logger = createLogger(config.log);
   const log = logger.for('resolver');
-  const events = EventStore.open(config.events.path);
+  const events = EventStore.open(config.events.path, { timeZone: config.schedule.timezone });
   const sessions = new PlaySessions((e) => events.record(e));
   const shared = {
     log: (component: string) => logger.for(component),

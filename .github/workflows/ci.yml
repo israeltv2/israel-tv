@@ -24,6 +24,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm lint
         if: matrix.os == 'ubuntu-latest'
@@ -40,6 +41,8 @@ jobs:
       - run: pnpm smoke
       # The owner's dashboard in a real browser: every section, phone and desktop, light and dark.
       - run: pnpm e2e:dashboard
+        if: matrix.os == 'ubuntu-latest'
+      - run: pnpm shots:dashboard
         if: matrix.os == 'ubuntu-latest'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always() && matrix.os == 'ubuntu-latest'

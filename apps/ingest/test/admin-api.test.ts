@@ -3,6 +3,7 @@
 import {
   DeploysSchema,
   FailuresSchema,
+  HealthSchema,
   LiveSchema,
   OverviewSchema,
   PlaysSchema,
@@ -70,6 +71,8 @@ test('every admin API answer fits its schema', async () => {
     return r.json();
   };
   SessionSchema.parse(await get('/session'));
+  const h = HealthSchema.parse(await get('/health'));
+  expect(h.problems.some((p) => p.section === 'failures')).toBe(true);
   const o = OverviewSchema.parse(await get('/overview'));
   expect(o.home.perDay).toHaveLength(30);
   SourcesSchema.parse(await get('/sources'));
@@ -130,22 +133,24 @@ test('the gate: token, CSRF on changes, no token in the address on the API, odd 
   expect((await app.request('/api/v1/trace/..%2F..', { headers: bearer }, env)).status).toBe(400);
 });
 
-test('the dashboard page: served with a strict policy; its modules load; the live stream starts with a snapshot', async () => {
+test('the dashboard page: served with a strict policy and a fresh nonce; its built files load; the live stream starts with a snapshot', async () => {
   const { app } = setup();
   const page = await app.request('/dash/', { headers: bearer }, env);
   expect(page.status).toBe(200);
   const csp = page.headers.get('content-security-policy') ?? '';
-  expect(csp).toMatch(/script-src 'self' 'sha256-[^']+'/);
+  expect(csp).toContain("script-src 'self';");
+  expect(csp).toMatch(/style-src 'self' 'nonce-[A-Za-z0-9+/=]{20,}'/);
   expect(csp).toContain("frame-ancestors 'none'");
   const html = await page.text();
-  expect(html).toContain('"preact":"/dash/vendor/preact.mjs"');
-  for (const f of ['app/main.ts', 'app/views.ts', 'vendor/preact.mjs', 'vendor/uplot.min.js', 'styles.css']) {
-    const r = await app.request(`/dash/${f}`, { headers: bearer }, env);
-    expect(r.status, f).toBe(200);
+  expect(html).not.toContain('__CSP_NONCE__');
+  // The built page (CI builds before testing) loads its own hashed files only, cached for good.
+  for (const src of [...html.matchAll(/(?:src|href)="\/dash\/(assets\/[^"]+)"/g)].map((m) => m[1])) {
+    const r = await app.request(`/dash/${src}`, { headers: bearer }, env);
+    expect(r.status, src).toBe(200);
+    expect(r.headers.get('cache-control')).toContain('immutable');
   }
-  const js = await (await app.request('/dash/app/api.ts', { headers: bearer }, env)).text();
-  expect(js).not.toMatch(/:\s*Promise<|import type/); // types stripped
-  expect((await app.request('/dash/app/../../src/server.ts', { headers: bearer }, env)).status).toBe(404);
+  expect((await app.request('/dash/../package.json', { headers: bearer }, env)).status).toBe(404);
+  expect((await app.request('/dash/assets/nope.js', { headers: bearer }, env)).status).toBe(404);
   const stream = await app.request('/api/v1/live/stream', { headers: bearer }, env);
   expect(stream.headers.get('content-type')).toMatch(/text\/event-stream/);
   const reader = stream.body?.getReader();

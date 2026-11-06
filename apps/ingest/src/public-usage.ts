@@ -21,10 +21,17 @@ async function fromAnalyticsEngine(
   token: string,
   account: string,
   day: string,
+  range: { from: string; to: string },
   fetchImpl: typeof fetch,
 ): Promise<DailyRow[]> {
-  const next = new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
-  const where = `timestamp >= toDateTime('${day} 00:00:00') AND timestamp < toDateTime('${next} 00:00:00')`;
+  // The day's span in the dashboard's time zone, as UTC times (Analytics Engine's timestamps are UTC).
+  const utc = (iso: string) => iso.slice(0, 19).replace('T', ' ');
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(range.from) ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(range.to)
+  )
+    throw new Error('bad day range');
+  const where = `timestamp >= toDateTime('${utc(range.from)}') AND timestamp < toDateTime('${utc(range.to)}')`;
   const q = (group: string, cols: string) =>
     `SELECT ${cols} sum(_sample_interval) AS plays, count(DISTINCT blob4) AS clients,
        sumIf(_sample_interval, blob5 = 'error') AS failures
@@ -74,11 +81,13 @@ export async function pullPublicUsage(
   const token = env[p.apiTokenEnv];
   const account = env[p.accountIdEnv];
   if (!token || !account) return undefined;
-  const rows = await fromAnalyticsEngine(token, account, day, fetchImpl).catch((err: Error) => {
-    throw new Error(
-      `Analytics Engine could not be read (${err.message}): the API token needs "Account Analytics: Read", and Analytics Engine must be enabled on the account`,
-    );
-  });
+  const rows = await fromAnalyticsEngine(token, account, day, events.dayRange(day), fetchImpl).catch(
+    (err: Error) => {
+      throw new Error(
+        `Analytics Engine could not be read (${err.message}): the API token needs "Account Analytics: Read", and Analytics Engine must be enabled on the account`,
+      );
+    },
+  );
   events.putDaily(rows);
   const result: PublicUsageResult = { day, via: 'analytics-engine', rows: rows.length };
   events.setMeta('public-usage:last', JSON.stringify(result));

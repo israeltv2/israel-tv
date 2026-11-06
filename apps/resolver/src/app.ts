@@ -56,7 +56,7 @@ export interface ResolverDeps {
   /** Log for a component (`resolver`, `mako-auth`, `geo-relay`). */
   log?: (component: 'resolver' | 'mako-auth' | 'geo-relay') => Log;
   /** Outcome of each relay through the geo proxy (for /status). */
-  onRelay?: (r: { ok: boolean; error?: string }) => void;
+  onRelay?: (r: { ok: boolean; error?: string; exit?: string }) => void;
   /** Usage and diagnostics events. */
   onEvent?: (e: UsageEvent) => void;
   /** Play and relay sessions (shared with the usage dashboard); one is made when not given. */

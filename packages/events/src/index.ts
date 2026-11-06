@@ -8,8 +8,11 @@ import { fileURLToPath } from 'node:url';
 import {
   EVENT_RETENTION_DAYS,
   NOT_INTERNAL_SQL,
+  nextDay,
   ROLLUP_RETENTION_DAYS,
   type UsageEvent,
+  zonedDay,
+  zonedDayStart,
 } from '@israel-tv/core';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-sqlite';
@@ -38,14 +41,24 @@ export interface EventFilter {
 /** Kinds that count as a play. */
 const PLAY_KINDS = ['play_start', 'relay_session'] as const;
 
+export interface EventStoreOptions {
+  /**
+   * Days (rollups, "today", per-day figures) are calendar days in this time zone (the config's
+   * schedule.timezone); event times themselves are always stored in UTC.
+   */
+  timeZone?: string;
+}
+
 export class EventStore {
   readonly db;
   readonly path: string;
+  readonly timeZone: string;
   private readonly buffer: UsageEvent[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
 
-  private constructor(path: string, readOnly: boolean) {
+  private constructor(path: string, readOnly: boolean, opts: EventStoreOptions = {}) {
     this.path = path;
+    this.timeZone = opts.timeZone ?? 'UTC';
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     const client = new DatabaseSync(path, { readOnly });
     if (!readOnly) ownerOnly(path);
@@ -57,8 +70,8 @@ export class EventStore {
     this.db = drizzle({ client });
   }
 
-  static open(path: string): EventStore {
-    const s = new EventStore(path, false);
+  static open(path: string, opts: EventStoreOptions = {}): EventStore {
+    const s = new EventStore(path, false, opts);
     migrate(s.db, { migrationsFolder: MIGRATIONS });
     s.retagProbes();
     return s;
@@ -76,8 +89,27 @@ export class EventStore {
     this.setMeta('fix:probe-ids', new Date().toISOString());
   }
 
-  static openReadOnly(path: string): EventStore {
-    return new EventStore(path, true);
+  static openReadOnly(path: string, opts: EventStoreOptions = {}): EventStore {
+    return new EventStore(path, true, opts);
+  }
+
+  /** The day (in this store's time zone) a moment falls on. */
+  dayOf(t: number | string): string {
+    return zonedDay(typeof t === 'number' ? t : Date.parse(t), this.timeZone);
+  }
+
+  /** A day's span as ISO times: [from, to). */
+  dayRange(day: string): { from: string; to: string } {
+    return {
+      from: new Date(zonedDayStart(day, this.timeZone)).toISOString(),
+      to: new Date(zonedDayStart(nextDay(day), this.timeZone)).toISOString(),
+    };
+  }
+
+  /** The last `n` days up to the one `now` falls on, oldest first. */
+  lastDays(n: number, now = Date.now()): string[] {
+    const today = this.dayOf(now);
+    return Array.from({ length: n }, (_, i) => nextDay(today, i - (n - 1)));
   }
 
   close(): void {
@@ -155,8 +187,7 @@ export class EventStore {
   /** The home rollup for one day computed from raw events (also used for "today" on the dashboard). */
   homeDay(day: string): DailyRow[] {
     this.flush();
-    const from = `${day}T00:00:00.000Z`;
-    const to = `${day}T99`;
+    const { from, to } = this.dayRange(day);
     // Per show, per source (show '') and overall (source '' and show ''): each counts its own distinct clients.
     // Each level only takes the events that belong to it, so a level's rows never share a key with another's
     // (an event without a show cannot pose as a source total, one without a source as the overall total).
@@ -225,8 +256,15 @@ export class EventStore {
   /** Raw events per day (for the "events per day" figure). */
   perDay(since: string): { day: string; n: number }[] {
     this.flush();
-    return this.db.all(sql`select substr(ts, 1, 10) as day, count(*) as n from ${t.events}
-      where ts >= ${since} group by day order by day`);
+    // Per UTC hour in SQL (small), then onto this store's days.
+    const hours = this.db.all<{ h: string; n: number }>(sql`select substr(ts, 1, 13) as h, count(*) as n
+      from ${t.events} where ts >= ${since} group by h`);
+    const byDay = new Map<string, number>();
+    for (const r of hours) {
+      const day = this.dayOf(Date.parse(`${r.h}:30:00Z`));
+      byDay.set(day, (byDay.get(day) ?? 0) + r.n);
+    }
+    return [...byDay].sort((a, b) => a[0].localeCompare(b[0])).map(([day, n]) => ({ day, n }));
   }
 
   // ---- maintenance ----------------------------------------------------------------------------------
@@ -260,11 +298,10 @@ export class EventStore {
     maxBytes = 200 * 1024 * 1024,
   ): { rolledUp: string[]; vacuumed: boolean; overCap: boolean } {
     this.flush();
-    const today = new Date(nowMs).toISOString().slice(0, 10);
+    const today = this.dayOf(nowMs);
     const last = this.getMeta('rollup:last');
-    const oldest = this.db
-      .get<{ ts: string | null }>(sql`select min(ts) as ts from ${t.events}`)
-      ?.ts?.slice(0, 10);
+    const first = this.db.get<{ ts: string | null }>(sql`select min(ts) as ts from ${t.events}`)?.ts;
+    const oldest = first ? this.dayOf(first) : undefined;
     const rolledUp: string[] = [];
     let day = last ? nextDay(last) : oldest;
     while (day && day < today) {
@@ -354,10 +391,6 @@ export function eventTime(ts: string | number | Date | undefined, now = Date.now
             ? Date.parse(ts)
             : Number.NaN;
   return new Date(Number.isFinite(ms) ? ms : now).toISOString();
-}
-
-function nextDay(day: string): string {
-  return new Date(Date.parse(`${day}T00:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
 }
 
 export { PLAY_KINDS };
