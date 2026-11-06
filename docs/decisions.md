@@ -1316,3 +1316,12 @@ junk names, duplicate ids or numbers, or unreachable posters. Fixed:
   (catalog, live channels, the home helper), search results and the status rows. Never twice; Latin-first and
   pure-Hebrew lines unchanged; ids and search keys untouched.
 - **Filler endings** in episode titles go: "המלא", "המלאה", "הפרק המלא", "התוכנית המלאה" ("פרק 1 המלא" → "פרק 1").
+
+## Public repository: macOS required, release pull requests mergeable (2026-11-07)
+
+- The repository is public, so GitHub's macOS runners are available: macOS is back in the `check` matrix and a
+  required check (`check (macos-latest)`), replacing the separate non-blocking job on main.
+- Dispatched runs (the checks on release-please's pull request, see "Release pull requests and CI") also post their
+  results as commit statuses under the same names (`check (…)`, `windows-task`, `audit`, `title`): the branch
+  ruleset counts statuses on a pull request's head commit, but not check runs from dispatched workflows (measured on
+  release PR #105: six passing check runs, merge state "blocked").
