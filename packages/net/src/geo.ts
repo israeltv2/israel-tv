@@ -18,7 +18,6 @@ export function proxyEndpoints(
   const password = geo.passwordEnv ? env[geo.passwordEnv] : undefined;
   return geo.urls.map((u) => {
     const url = new URL(u);
-    if (geo.type === 'socks5' && url.protocol !== 'socks5:') url.protocol = 'socks5:';
     return {
       server: url.toString().replace(/\/$/, ''),
       ...(username ? { username } : {}),

@@ -59,7 +59,13 @@ export async function fetchShow(
   }
   const ids = seasons.flatMap((x) => x.episodes.map((e) => e.key));
   if (ids.length > 0) {
-    const blocked = await blockedEntries(ids, opts.profiles ?? new Map(), opts.kaltura ?? kalturaPost);
+    // Only adds the "blocked outside Israel" label: if Kaltura's API fails, the show is still read.
+    let blocked = new Map<string, boolean>();
+    try {
+      blocked = await blockedEntries(ids, opts.profiles ?? new Map(), opts.kaltura ?? kalturaPost);
+    } catch (err) {
+      notes.push(`Kaltura lookup failed, episodes not labelled for geo-blocking: ${(err as Error).message}`);
+    }
     for (const x of seasons) {
       for (const e of x.episodes) {
         const b = blocked.get(e.key);

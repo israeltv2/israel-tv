@@ -51,8 +51,9 @@ export interface RenderInput {
   registry: unknown;
   /** catalog id → warning shown as the first item of that row (failures are visible, not hidden). */
   catalogWarnings: Record<string, string>;
-  /** Base URL of the private resolver, mentioned in the description when known. */
   name?: string;
+  /** Enabled sources, for the description (default: all). */
+  sources?: string[];
 }
 
 export type SiteFiles = Map<string, string>;
@@ -136,13 +137,33 @@ function seasonStreamFiles(s: RenderShow): Map<number, SeasonStreams> {
   return out;
 }
 
+const SOURCE_NAMES: Record<string, string> = {
+  mako: 'Keshet 12 (Mako)',
+  reshet: 'Reshet 13',
+  kan: 'Kan 11 and Kan Educational',
+  live: 'live channels',
+};
+
+function describe(sources: string[]): string {
+  const names = sources.map((s) => SOURCE_NAMES[s]).filter(Boolean);
+  const list =
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : (names[0] ?? 'Israeli TV');
+  const notes: string[] = [];
+  if (sources.includes('mako'))
+    notes.push(
+      'Mako episodes play through the Israel TV resolver on the home network of whoever runs this instance',
+    );
+  if (sources.includes('reshet') || sources.includes('kan'))
+    notes.push('Reshet and Kan video is mostly limited to Israel');
+  return `Israeli TV: ${list}.${notes.length ? ` ${notes.join('; ')}.` : ''}`;
+}
+
 export function buildManifest(input: RenderInput, catalogIds: Set<string>): Manifest {
   return {
     id: 'community.israel-tv',
     version: input.version,
     name: input.name ?? 'Israel TV',
-    description:
-      'Israeli TV: Keshet 12 (Mako), Reshet 13, Kan and live channels. Catalog and metadata; Mako playback needs the private resolver addon on your home network.',
+    description: describe(input.sources ?? ['mako', 'reshet', 'kan', 'live']),
     resources: [
       'catalog',
       { name: 'meta', types: ['series', 'tv'], idPrefixes: ['iltv_'] },

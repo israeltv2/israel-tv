@@ -192,3 +192,16 @@ describe('hardening', () => {
     expect(await r.text()).toMatch(/unexpected Mako media host/);
   });
 });
+
+test('a failing geo proxy gives a 502 that says so, and one log line', async () => {
+  const lines: string[] = [];
+  const geoFetch = async () => {
+    throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+  };
+  const app = createResolverApp({ episode, fetch: makoNet([]), geoFetch, log: (l) => lines.push(l) });
+  const s = await (await app.request('http://h/stream/series/iltv_reshet_1:1:1.json')).json();
+  const r = await app.request(new URL(s.streams[0].url).pathname);
+  expect(r.status).toBe(502);
+  expect(await r.text()).toMatch(/geo proxy failed \(ENOTFOUND\)/);
+  expect(lines[0]).toMatch(/relay: the geo proxy did not answer .*ENOTFOUND/);
+});

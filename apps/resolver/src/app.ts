@@ -44,6 +44,8 @@ export interface ResolverDeps {
   channels?: readonly LiveChannel[];
   /** Secret for signing relay URLs; random per process by default. */
   secret?: Buffer;
+  /** One-line problem reports (e.g. the geo proxy failing). */
+  log?: (line: string) => void;
 }
 
 const sign = (secret: Buffer, s: string) =>
@@ -125,7 +127,10 @@ export function createResolverApp(deps: ResolverDeps) {
           title: 'Mako',
         });
       }
-      if (ep && deps.geoFetch && ep.availableAbroad === false) {
+      // Reshet and Kan video is geo-blocked outside Israel. With a geo proxy, offer the relayed stream for
+      // every such episode: whether it is blocked depends on where the viewer is, not on where ingest ran.
+      const geoSource = v.series.startsWith('iltv_reshet_') || v.series.startsWith('iltv_kan_');
+      if (ep && deps.geoFetch && (geoSource || ep.availableAbroad === false)) {
         const direct = ep.streams.find((s) => s.kind === 'direct' || s.kind === 'resolver');
         if (direct) streams.push(relayStream(origin, direct.url, 'דרך ישראל'));
       }
@@ -245,11 +250,20 @@ export function createResolverApp(deps: ResolverDeps) {
     let url = target;
     let r: Response | undefined;
     for (let hop = 0; hop < 5; hop++) {
-      r = await geo(url, {
-        headers: { 'user-agent': playerUA(c), ...(range ? { range } : {}) },
-        signal: AbortSignal.timeout(30_000),
-        redirect: 'manual',
-      });
+      try {
+        r = await geo(url, {
+          headers: { 'user-agent': playerUA(c), ...(range ? { range } : {}) },
+          signal: AbortSignal.timeout(30_000),
+          redirect: 'manual',
+        });
+      } catch (err) {
+        const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+        const why = cause?.code ?? cause?.message ?? (err as Error).message;
+        deps.log?.(
+          `relay: the geo proxy did not answer for ${new URL(url).host} (${why}); check geo.urls and the proxy login`,
+        );
+        return c.text(`geo proxy failed (${why}); see the resolver log`, 502);
+      }
       const location = r.status >= 300 && r.status < 400 ? r.headers.get('location') : null;
       if (!location) break;
       await r.body?.cancel();

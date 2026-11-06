@@ -34,8 +34,9 @@ Only needed **outside Israel**.
 | `urls`                       | required | One or more proxy URLs, tried in order.                                                    |
 | `usernameEnv`, `passwordEnv` | optional | Names of the `.env` variables with the proxy login. Leave out for a proxy without a login. |
 
-What goes through it: geo-blocked playlists and video relayed by the resolver (Reshet masters, Kan VOD and
-Kan live), and Kan's web pages when Kan VOD is on.
+What goes through it: the resolver's "דרך ישראל" streams, offered for every Reshet and Kan episode and for
+Kan's live channels (Reshet: only the master playlist; Kan: playlists and video), and Kan's web pages when
+Kan VOD is on. `pnpm israel-tv check-proxy` tests it.
 
 ## `browser` — for Kan pages
 
@@ -46,12 +47,15 @@ Kan live), and Kan's web pages when Kan VOD is on.
 
 ## `publisher` — where the addon is served
 
+`type` may be left out of any section (`publisher`, `browser`, `geo`): it then takes the default kind, so
+`{ "publisher": { "port": 8000 } }` is the local publisher on port 8000.
+
 `local` (default):
 
 | Option | Default       |                       |
 | ------ | ------------- | --------------------- |
 | `host` | `0.0.0.0`     | Address to listen on. |
-| `port` | `7000`        |                       |
+| `port` | `7700`        |                       |
 | `dir`  | `./data/site` | Rendered files.       |
 
 `cloudflare`:
@@ -69,11 +73,11 @@ Kan live), and Kan's web pages when Kan VOD is on.
 | Option         | Default           |                                                                                                                |
 | -------------- | ----------------- | -------------------------------------------------------------------------------------------------------------- |
 | `enabled`      | `true`            | The second addon that plays Mako and relays geo-blocked video. Run it on the network of the device that plays. |
-| `host`, `port` | `0.0.0.0`, `7001` |                                                                                                                |
+| `host`, `port` | `0.0.0.0`, `7701` |                                                                                                                |
 
 ## `admin`
 
-`host`, `port` (default `0.0.0.0`, `7002`). Serves `/status` (JSON), `POST /refresh/<series-id>` (re-read one
+`host`, `port` (default `0.0.0.0`, `7702`). Serves `/status` (JSON), `POST /refresh/<series-id>` (re-read one
 show now), `POST /run/full`, `POST /run/airing`. Answers only requests from private network addresses.
 
 ## `schedule`

@@ -18,12 +18,14 @@
 | `status`                           | Recent runs and warnings.                                                                            |
 
 While `start` runs, prefer the admin endpoints (they queue work behind the running job, so only one process
-writes the database): `curl -X POST http://<host>:7002/refresh/iltv_mako_12`.
+writes the database): `curl -X POST http://<host>:7702/refresh/iltv_mako_12`. Admin endpoints answer only
+private network addresses and refuse requests sent by web pages (cross-site), so use curl or a script. A Kan
+show's refresh makes it due for the next crawl slice and starts one.
 
 ## Status
 
-`http://<host>:7002/status` (local network) and `/status` on the addon (public copy, HTML; `/status.json`
-for JSON). Health per source:
+`http://<host>:7702/status` (local network, JSON, includes the job queue and the next scheduled runs) and
+`/status` on the addon (public copy, HTML; `/status.json` for JSON). Health per source:
 
 - **ok** — last full run fine and less than 36 hours old.
 - **warn** — partial run (some shows failed; their last good data is still served), Kan crawl backing off,
@@ -39,6 +41,11 @@ numbering conflicts, renumberings at the source, thin results and dead season li
 Back up `data/israel-tv.sqlite` (the ids and numbers live there). The addon also serves `/registry.json`
 (the id registry) as an off-machine copy. Rendered files are disposable: `publish` recreates them.
 
+A failed upload to Cloudflare shows as `publish` on `/status` (overall health `error`) and is retried after
+the next run.
+
 ## Updating
 
-Pull, `pnpm install --prod`, restart the service. Database migrations run on start.
+Pull, `pnpm install --prod`, restart the service. Database migrations run on start. (`--prod` leaves out
+the development tools, so `pnpm check` needs a full `pnpm install`.) Deploy tooling may write the deployed
+git revision to a `.revision` file in the repo root; `/status` shows it (`dev` otherwise).

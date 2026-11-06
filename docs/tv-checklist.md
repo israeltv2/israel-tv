@@ -1,8 +1,8 @@
 # TV checklist
 
 What to check on the TV/phone after installing. `<addon>` is your addon's manifest URL (local:
-`http://<host>:7000/manifest.json`; Cloudflare: `https://<worker>.<subdomain>.workers.dev/manifest.json`),
-`<resolver>` is `http://<home host>:7001/manifest.json`.
+`http://<host>:7700/manifest.json`; Cloudflare: `https://<worker>.<subdomain>.workers.dev/manifest.json`),
+`<resolver>` is `http://<home host>:7701/manifest.json`.
 
 ## Install
 
@@ -45,5 +45,5 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 
 - [ ] The evening after a new episode airs, it appears within the airing-check window (15 minutes in the
   evening, hourly otherwise) without any action.
-- [ ] For an immediate re-read of one show: `curl -X POST http://<host>:7002/refresh/<series-id>` from the
+- [ ] For an immediate re-read of one show: `curl -X POST http://<host>:7702/refresh/<series-id>` from the
   home network (the id is in the show's URL in the app, e.g. `iltv_mako_12`).

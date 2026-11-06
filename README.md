@@ -2,7 +2,7 @@
 
 Israeli TV for Stremio-compatible apps (Stremio, Nuvio, …): VOD from **Keshet 12 (Mako)**, **Reshet 13**
 and **Kan** (Kan 11, Kan Educational), plus **16 live channels**. Catalog rows per channel in Hebrew, newest
-episode first, Hebrew-aware search, and stable ids so your watch progress never moves.
+episode first, Hebrew search, and stable ids so your watch progress never moves.
 
 You run it yourself. It reads the broadcasters' public websites from your machine, slowly, and serves the
 result as a Stremio addon — on your home network, or publicly through Cloudflare's free plan.
@@ -11,78 +11,123 @@ result as a Stremio addon — on your home network, or publicly through Cloudfla
 
 | You are…                                          | You need                                                        | You get                                                                                                   |
 | ------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| **In Israel, watching at home**                   | Node 24 and `pnpm start`                                        | Everything. Addon and resolver on your network.                                                           |
+| **In Israel, watching at home**                   | Node 24.11+ and `pnpm start`                                    | Everything. Addon and resolver on your network.                                                           |
 | **Outside Israel**                                | The above, plus an HTTP(S) or SOCKS5 proxy with an Israeli exit | Reshet and Kan play through the proxy (via the resolver). Mako and most live channels need nothing extra. |
-| **Wanting it reachable from anywhere, or shared** | The above, plus a free Cloudflare account                       | The catalog on `https://<name>.<you>.workers.dev`. Mako playback still needs the resolver at home.        |
+| **Wanting it reachable from anywhere, or shared** | The above, plus a free Cloudflare account                       | The catalog on `https://<name>.<you>.workers.dev`. See [what friends can play](#sharing-with-friends).    |
 | **Wanting Kan VOD**                               | Google Chrome (or Chromium) on the machine that runs it         | Kan 11 and Kan Educational episodes. The first fill takes days (see below).                               |
 
 What each optional piece costs you if you leave it out:
 
-- **No proxy, outside Israel:** Reshet episodes and most Kan episodes do not play (they are geo-blocked
-  outside Israel). Mako, i24, Knesset, ynet, 13/14 live and the rest still work. The proxy is only for
-  people outside Israel.
+- **No proxy, outside Israel:** Reshet VOD, Kan VOD and (at times) Kan live do not play — they are
+  geo-blocked outside Israel. Mako, i24, Knesset, ynet, 13 and 14 live and the rest still work. The proxy is
+  only for people outside Israel.
 - **No Cloudflare:** the addon is reachable only on your home network (or wherever you expose it).
-- **No resolver:** Mako episodes and the Keshet 12 / 24 live channels do not play. The resolver must run on
-  the viewer's network: Mako's playback token is bound to the player that first opens it.
+- **No resolver:** Mako episodes and the Keshet 12 / 24 live channels do not play, and nothing is relayed
+  through the proxy. The resolver must run on the viewer's network: Mako's playback token is bound to the
+  player that first opens it.
 - **No browser:** no Kan VOD (Kan live channels still work).
 
 ## Quick start (in Israel, home network)
 
 ```bash
-git clone <this repo> israel-tv && cd israel-tv
+git clone https://github.com/israeltv2/israel-tv.git && cd israel-tv
 corepack enable          # gives you the pnpm version this repo pins
 pnpm install
 pnpm start
 ```
 
+No `corepack`? (Some Node installs, e.g. through Volta, leave it out.) Use `npm i -g pnpm@12.15.0`
+instead. Node must be 24.11 or newer (`node -v`).
+
+`pnpm start` prints the addresses to use, for example:
+
+```
+addon — install this in your app: http://192.168.1.20:7700/manifest.json
+resolver — install this too, at home: http://192.168.1.20:7701/manifest.json
+admin (local network only): http://192.168.1.20:7702/status
+```
+
+Add **both** manifest URLs in your app (Stremio: Addons → paste URL; Nuvio: Settings → Addons → Add). The
+first gives catalogs, metadata and the streams that need no token; the second plays Mako and relays
+geo-blocked video. (If the log shows only `127.0.0.1`, find the machine's address with
+`ipconfig getifaddr en0` on macOS or `hostname -I` on Linux.)
+
 The first start reads Mako and Reshet right away (about 30 minutes; one request per second, so the sites
-are not hammered), then every night and, for shows that are airing, every hour (every 15 minutes in the
-evening). While it runs:
-
-- Addon: `http://<this machine's IP>:7000/manifest.json`
-- Resolver: `http://<this machine's IP>:7001/manifest.json`
-- Status: `http://<this machine's IP>:7002/status` (local network only)
-
-Add **both** manifest URLs in your app (Stremio: Addons → paste URL; Nuvio: Settings → Addons → Add).
-The first one gives catalogs, metadata and the streams that need no token; the second plays Mako and
-relays geo-blocked video.
+are not hammered), then every night, and for shows that are airing every hour (every 15 minutes in the
+evening). It also starts the Kan crawl, which opens Chrome in an off-screen window every ten minutes; if you
+don't want that, set `"browser": { "type": "none" }` (see [Kan VOD](#kan-vod)).
 
 No config file is needed for this. To change anything, copy
 [`israel-tv.config.example.json`](israel-tv.config.example.json) to `israel-tv.config.json` and edit it;
-every option is described in [docs/configuration.md](docs/configuration.md).
+every option is described in [docs/configuration.md](docs/configuration.md). Secrets go in `.env` next to
+it (start from [`.env.example`](.env.example)).
 
 ## Outside Israel: add a proxy
+
+`israel-tv.config.json`:
 
 ```json
 {
   "geo": {
     "type": "http-proxy",
-    "urls": ["https://proxy.example.net:89"],
+    "urls": ["https://proxy.example.net:3128"],
     "usernameEnv": "GEO_PROXY_USERNAME",
     "passwordEnv": "GEO_PROXY_PASSWORD"
   }
 }
 ```
 
-Put the credentials in `.env` (see [`.env.example`](.env.example)); never in the config file. Several URLs
-can be listed; the next one is tried when one fails. Any proxy with an Israeli exit works. For example,
-NordVPN's "service credentials" work with its HTTPS proxies (`https://ilNN.proxy.nordvpn.com:89`); keep to
-one connection at a time with such services, they lock accounts that open many sessions quickly.
+`.env` (next to the config; never put credentials in the config file):
 
-The proxy carries only geo-blocked playlists and video (relayed by the resolver) and, if Kan VOD is on,
-Kan's web pages. Mako, Reshet and Kan catalog reading otherwise goes out directly.
+```
+GEO_PROXY_USERNAME=your-proxy-user
+GEO_PROXY_PASSWORD=your-proxy-password
+```
+
+Then `pnpm israel-tv check-proxy` should say `exits in IL ✓`. Several URLs can be listed; the next one is
+tried when one fails. Any proxy with an Israeli exit works (for example, NordVPN's HTTPS proxies take its
+"service credentials"). Keep to one connection at a time with VPN providers' proxies: some lock an account
+for a while after many sessions in a short time.
+
+What the proxy is used for:
+
+- **By the resolver:** for every Reshet and Kan episode (and Kan live), the resolver adds a "דרך ישראל"
+  stream that fetches the video through the proxy. Keep the resolver enabled and installed in your app,
+  or the proxy does nothing for playback.
+- **By the Kan crawl:** Kan's web pages, if Kan VOD is on.
+
+Everything else (reading Mako and Reshet, Mako playback, most live channels) goes out directly. If the proxy
+fails, the "דרך ישראל" stream answers 502 and the resolver's log says why.
 
 ## Reachable from anywhere: Cloudflare
 
-1. Create a free Cloudflare account and open **Workers & Pages** once, so you get a `*.workers.dev`
-   subdomain.
-2. Create an API token with **Account → Workers Scripts → Edit**. Put it and your account id in `.env`
-   as `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+1. Create a free Cloudflare account and open **Workers & Pages** once. That gives you a
+   `<subdomain>.workers.dev` subdomain (shown on that page; you can change it under _Account settings_).
+   The **Account ID** is in the right-hand column of the same page.
+2. Create an API token (_My Profile → API Tokens → Create Token_) from the **Edit Cloudflare Workers**
+   template, limited to your account. Put the token and the account id in `.env` as
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 3. In `israel-tv.config.json`: `"publisher": { "type": "cloudflare", "workerName": "israel-tv" }`.
 
 After each run the changed files are uploaded (`wrangler deploy`; static files are free and unlimited, the
-Worker only answers search, streams and `/status`). Install
-`https://israel-tv.<your-subdomain>.workers.dev/manifest.json` in your app, plus the resolver from home.
+Worker only answers search, streams, paging and `/status`). `pnpm israel-tv publish` does it by hand and
+prints the URL to install: `https://israel-tv.<subdomain>.workers.dev/manifest.json` (a brand-new
+workers.dev name can take a minute to resolve). To preview what it serves before publishing:
+`pnpm israel-tv serve` (then `http://127.0.0.1:7700/manifest.json`).
+
+A failed upload is retried after the next run and shows on `/status`.
+
+### Sharing with friends
+
+What friends who install your public addon get:
+
+- Catalogs, metadata and search for everything.
+- Live channels that need no token: Kan 11, Kan Educational, Makan 33, Reshet 13, 14, i24 (4 languages),
+  Knesset, ynet, Calcala 10. Kan's channels can be geo-blocked outside Israel.
+- Reshet and Kan episodes: only for friends inside Israel.
+- **Not** Mako episodes or the Keshet 12 / 24 live channels: those need a resolver, and the resolver needs
+  the database of the instance that collected the data. Don't expose your resolver to the internet (it has
+  no login and would relay through your proxy). Friends who want Mako run their own instance.
 
 ## Kan VOD
 
@@ -92,13 +137,15 @@ each in a fresh browser session, pausing for 45 minutes whenever the site pushes
 Kan 11 and Kan Educational takes a few days; after that, new episodes appear within hours. `/status` shows
 how many pages are still waiting.
 
-It needs Google Chrome (or set `browser.executablePath` to a Chromium). Without a browser, set
-`"browser": { "type": "none" }` and Kan VOD stays off.
+It needs Google Chrome (or set `browser.executablePath` to a Chromium), and a desktop session: the window is
+real but off-screen, because Kan's check passes far more often than headless. On a server without a
+display, run it under `xvfb-run`, or set `"browser": { "type": "none" }` and Kan VOD stays off.
 
 ## Running it as a service
 
-Example service files are in [`deploy/`](deploy): a launchd agent (macOS), a systemd unit (Linux) and a
-Docker Compose file. Data (the SQLite database and the rendered files) lives in `./data` by default.
+Example service files are in [`deploy/`](deploy): a launchd agent (macOS), a systemd unit (Linux, with the
+setup commands in its header) and a Docker Compose file (Kan off; instructions at its top). Data (the
+SQLite database and the rendered files) lives in `./data` by default.
 
 ## How it works
 
@@ -115,11 +162,15 @@ viewer's app ──▶ resolver (home) ──▶ Mako ticket / geo relay
   renumbered. If a site renumbers, the old numbers stay and `/status` says so.
 - **Failures are visible.** A failed or suspiciously thin read never replaces good data. The problem shows
   on `/status` and as a "⚠" first item in the affected catalog row.
+- **Search** matches Hebrew titles as people type them (final letters, niqqud, quotes and geresh do not
+  matter). Titles are as the broadcasters publish them, so English or transliterated searches mostly find
+  nothing.
 - **Shows opened from other catalogs** (e.g. Cinemeta) also get streams when the show was matched to TMDB/
   IMDb (optional, needs a free TMDB API key), for regular numbered seasons.
 
 More: [docs/configuration.md](docs/configuration.md), [docs/operations.md](docs/operations.md),
-[docs/decisions.md](docs/decisions.md) (measurements behind the design).
+[docs/decisions.md](docs/decisions.md) (measurements behind the design),
+[docs/tv-checklist.md](docs/tv-checklist.md).
 
 ## Development
 
@@ -130,7 +181,9 @@ pnpm israel-tv help   # the command line
 ```
 
 Tests run on recorded real responses (`packages/*/test/fixtures`); nothing in the test suite or CI talks to
-the broadcasters.
+the broadcasters. `spikes/` holds the measurement scripts behind [docs/decisions.md](docs/decisions.md);
+`.paradev/` and `CLAUDE.md` are optional setup for contributors who use those tools. None of them are
+needed to run Israel TV.
 
 ## License
 

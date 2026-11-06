@@ -5,6 +5,7 @@ const files: Record<string, unknown> = {
   'manifest.json': { id: 'community.israel-tv' },
   'catalog/series/iltv_keshet12.json': { metas: [{ id: 'iltv_mako_1' }] },
   'meta/series/iltv_mako_1.json': { meta: { id: 'iltv_mako_1' } },
+  'catalog/series/iltv_reshet13/skip-100.json': { metas: [{ id: 'iltv_reshet_101' }] },
   'search.json': [
     ['iltv_mako_1', 'series', 'iltv_keshet12', 'מאסטר שף', 'מאסטר שפ', 'https://img/p.jpg'],
     ['iltv_reshet_1', 'series', 'iltv_reshet13', 'מאסטר שף ילדים', 'מאסטר שפ ילדימ', ''],
@@ -41,6 +42,12 @@ test('search is per catalog and Hebrew-normalized (final letters)', async () => 
         posterShape: 'landscape',
       },
     ],
+  });
+});
+
+test("Stremio's skip=N URL reads the stored skip-N page", async () => {
+  expect((await get('/catalog/series/iltv_reshet13/skip=100.json')).body).toEqual({
+    metas: [{ id: 'iltv_reshet_101' }],
   });
 });
 

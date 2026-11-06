@@ -1,12 +1,19 @@
-# docker compose -f deploy/docker-compose.yml up -d
-# Put israel-tv.config.json (with "browser": { "type": "none" }) and .env in ./data first.
+# Run from the repo root:
+#   mkdir -p deploy/data
+#   cp deploy/docker.config.example.json deploy/data/israel-tv.config.json   # local publisher
+#   (or deploy/docker.cloudflare.config.example.json for the Cloudflare publisher)
+#   cp .env.example deploy/data/.env   # fill in only what your config uses; chmod 600
+#   docker compose -f deploy/docker-compose.yml up -d
+# Data (database, rendered files) lives in deploy/data.
 services:
   israel-tv:
     build: ..
     restart: unless-stopped
     ports:
-      - "7000:7000" # addon (local publisher)
-      - "7001:7001" # resolver
-      - "7002:7002" # admin (/status)
+      - "7700:7700" # addon (local publisher only; drop this line with the Cloudflare publisher)
+      - "7701:7701" # resolver
+      # Admin (/status, refresh) is bound to this host only: behind Docker's port mapping every client
+      # looks like a private address, so the "local network only" check cannot tell them apart.
+      - "127.0.0.1:7702:7702"
     volumes:
       - ./data:/data

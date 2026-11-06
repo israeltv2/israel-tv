@@ -1,15 +1,15 @@
 // israel-tv command line. Run `node apps/ingest/src/cli.ts help`.
 import { parseArgs } from 'node:util';
 import { ConfigError, parseSeriesId, type Source } from '@israel-tv/core';
-import { proxyEndpoints } from '@israel-tv/net';
+import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
 import { startDaemon } from './daemon.ts';
 import { crawlKan } from './kan.ts';
-import { checkLive, liveRender } from './live.ts';
+import { checkLive } from './live.ts';
 import { startLocalServer } from './local-server.ts';
 import { createLogger } from './log.ts';
-import { deploy, renderFromStore, writeSite } from './publish.ts';
+import { PublishError, publishSite } from './publish.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -19,11 +19,12 @@ const HELP = `israel-tv <command>
   full [--source mako] [--limit N]   Read every show of each enabled source (all seasons)
   airing [--source mako]             Re-check shows with a recent episode (current season only)
   show <series-id | source:key>      Re-read one show, e.g. iltv_mako_12 or mako:/mako-vod-keshet/uvda
-  start                              Run everything: schedules, admin, local addon server, resolver
+  start [--no-initial-run]           Run everything: schedules, admin, local addon server, resolver
   resolver                           Run only the private resolver
   publish                            Render the addon files and deploy them with the configured publisher
-  serve                              Serve the rendered files on the local network (local publisher)
+  serve [--port N]                   Serve the rendered files (also to preview a Cloudflare build locally)
   kan                                Read one Kan crawl slice now (needs a browser; see docs)
+  check-proxy                        Check that the geo proxy works and exits in Israel
   match                              Look up TMDB/IMDb ids for shows (needs tmdb in the config)
   status                             Recent runs and warnings
   help                               This text
@@ -34,10 +35,16 @@ async function main(argv: string[]): Promise<number> {
   const { positionals, values } = parseArgs({
     args: argv,
     allowPositionals: true,
-    options: { source: { type: 'string' }, limit: { type: 'string' } },
+    options: {
+      source: { type: 'string' },
+      limit: { type: 'string' },
+      help: { type: 'boolean', short: 'h' },
+      'no-initial-run': { type: 'boolean' },
+      port: { type: 'string' },
+    },
   });
   const [cmd = 'help', arg] = positionals;
-  if (cmd === 'help' || cmd === '--help') {
+  if (cmd === 'help' || values.help) {
     console.log(HELP);
     return 0;
   }
@@ -49,7 +56,7 @@ async function main(argv: string[]): Promise<number> {
     Object.entries(adapters)
       .filter(([s]) => !only || s === only)
       .map(([, make]) => make());
-  const log = (l: string) => console.log(`${new Date().toISOString().slice(11, 19)} ${l}`);
+  const log = (l: string) => console.log(`${new Date().toISOString().slice(11, 19)}Z ${l}`);
   const limit = values.limit === undefined ? undefined : Number(values.limit);
   if (limit !== undefined && !(Number.isInteger(limit) && limit > 0))
     throw new Error('--limit must be a positive whole number');
@@ -98,20 +105,17 @@ async function main(argv: string[]): Promise<number> {
         return r.status === 'ok' ? 0 : 1;
       }
       case 'publish': {
-        const t0 = Date.now();
-        const files = renderFromStore(store, config, config.sources.live ? liveRender() : []);
-        const w = writeSite(config.publisher.dir, files);
-        log(
-          `rendered ${w.total} files (${w.written} changed, ${w.deleted} removed) in ${Date.now() - t0} ms`,
-        );
-        const d = await deploy(config);
-        log(
-          `published (${config.publisher.type}): ${d.detail}${d.url ? ` ${d.url}` : ''} in ${Math.round(d.ms / 1000)} s`,
-        );
-        return 0;
+        return (await publishSite(store, config, log)) ? 0 : 1;
       }
       case 'start': {
-        startDaemon(config, store, config.log.file ? createLogger(config.log.file, config.log.maxMB) : log);
+        await startDaemon(
+          config,
+          store,
+          config.log.file ? createLogger(config.log.file, config.log.maxMB) : log,
+          {
+            initialRun: !values['no-initial-run'],
+          },
+        );
         await new Promise(() => {});
         return 0;
       }
@@ -124,7 +128,7 @@ async function main(argv: string[]): Promise<number> {
       }
       case 'serve': {
         const p = config.publisher;
-        const port = p.type === 'local' ? p.port : 7000;
+        const port = values.port ? Number(values.port) : p.type === 'local' ? p.port : 7700;
         const host = p.type === 'local' ? p.host : '127.0.0.1';
         startLocalServer(p.dir, host, port);
         log(`serving ${p.dir} on http://${host}:${port}/manifest.json`);
@@ -143,6 +147,31 @@ async function main(argv: string[]): Promise<number> {
         });
         return r.failed ? 1 : 0;
       }
+      case 'check-proxy': {
+        const proxies = proxyEndpoints(config.geo);
+        if (proxies.length === 0) {
+          console.log('geo.type is "none": no proxy configured (right inside Israel).');
+          return 0;
+        }
+        let ok = 0;
+        for (const p of proxies) {
+          try {
+            const r = await createGeoFetch([p])('https://ipinfo.io/country', {
+              signal: AbortSignal.timeout(20_000),
+            });
+            const country = (await r.text()).trim();
+            const good = r.ok && country === 'IL';
+            if (good) ok++;
+            console.log(
+              `${p.server}: ${r.ok ? `exits in ${country}` : `HTTP ${r.status}`}${good ? ' ✓' : ' ✗ (needs an Israeli exit)'}`,
+            );
+          } catch (err) {
+            const cause = (err as { cause?: { code?: string } }).cause?.code;
+            console.log(`${p.server}: ✗ ${cause ?? (err as Error).message}`);
+          }
+        }
+        return ok > 0 ? 0 : 1;
+      }
       case 'match': {
         const key = config.tmdb ? process.env[config.tmdb.apiKeyEnv] : undefined;
         if (!key) throw new Error('add "tmdb": {} to israel-tv.config.json and TMDB_API_KEY to .env');
@@ -150,6 +179,8 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case 'status': {
+        if (store.recentRuns(1).length === 0)
+          console.log('no runs yet (start with `start`, or `full` for a one-off read)');
         for (const r of store.recentRuns(10)) {
           console.log(
             `${r.startedAt} ${r.kind} ${r.scope} ${r.status} ok=${r.showsOk} failed=${r.showsFailed} +${r.newEpisodes} req=${r.requests}${r.error ? ` error=${r.error}` : ''}`,
@@ -171,7 +202,12 @@ async function main(argv: string[]): Promise<number> {
 main(process.argv.slice(2)).then(
   (code) => process.exit(code),
   (err) => {
-    console.error(err instanceof ConfigError ? err.message : (err as Error).stack);
+    // Problems the user can fix are printed plainly; anything else with its stack (or set ISRAEL_TV_DEBUG).
+    const plain =
+      err instanceof ConfigError || err instanceof PublishError || (err as Error).name === 'UserError';
+    console.error(
+      plain && !process.env.ISRAEL_TV_DEBUG ? `error: ${(err as Error).message}` : (err as Error).stack,
+    );
     process.exit(1);
   },
 );

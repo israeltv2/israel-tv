@@ -2,17 +2,18 @@
 // LAN-only admin endpoints, the local publisher and the private resolver.
 import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
+import { networkInterfaces } from 'node:os';
 import { serve } from '@hono/node-server';
 import { type Config, parseSeriesId, type Source } from '@israel-tv/core';
 import { proxyEndpoints } from '@israel-tv/net';
-import { startResolver } from '@israel-tv/resolver';
+import { resolverApp } from '@israel-tv/resolver';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
-import { crawlKan } from './kan.ts';
-import { checkLive, liveRender } from './live.ts';
-import { startLocalServer } from './local-server.ts';
-import { buildStatus, deploy, renderFromStore, writeSite } from './publish.ts';
+import { crawlKan, markKanShowDue } from './kan.ts';
+import { checkLive } from './live.ts';
+import { localAddonApp } from './local-server.ts';
+import { buildStatus, publishSite } from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -96,23 +97,7 @@ export class Daemon {
   }
 
   async publish(): Promise<void> {
-    const t0 = Date.now();
-    const files = renderFromStore(this.store, this.config, this.config.sources.live ? liveRender() : []);
-    const w = writeSite(this.config.publisher.dir, files);
-    if (w.written === 0 && w.deleted === 0) {
-      this.log('publish: nothing changed');
-      return;
-    }
-    try {
-      const d = await deploy(this.config);
-      this.log(
-        `publish: ${w.written} files changed, ${w.deleted} removed; ${d.detail} (${Math.round((Date.now() - t0) / 1000)} s)`,
-      );
-    } catch (err) {
-      const runId = this.store.startRun('publish', this.config.publisher.type);
-      this.store.finishRun(runId, { status: 'failed', error: (err as Error).message });
-      this.log(`publish failed: ${(err as Error).message}`);
-    }
+    await publishSite(this.store, this.config, this.log);
   }
 
   fullRun(): void {
@@ -141,6 +126,14 @@ export class Daemon {
     const parsed = parseSeriesId(seriesId);
     const row = this.store.getShow(seriesId);
     if (!parsed || !row) return { error: `unknown series ${seriesId}` };
+    if (parsed.source === 'kan') {
+      // Kan is read by the crawler: make the show due and start a slice now.
+      if (!this.config.sources.kan || this.config.browser.type === 'none')
+        return { error: 'Kan is turned off in the config' };
+      markKanShowDue(this.store, row.show.key);
+      this.kanCrawl();
+      return { queued: true, position: 0 };
+    }
     const make = createAdapters(this.config)[parsed.source];
     if (!make) return { error: `source ${parsed.source} is not enabled` };
     return this.enqueue(`show:${seriesId}`, async () => {
@@ -212,6 +205,11 @@ export function adminApp(d: Daemon) {
   app.use('*', async (c, next) => {
     const addr = c.env?.incoming?.socket?.remoteAddress;
     if (!isLocalAddress(addr)) return c.text('admin endpoints are for the local network only', 403);
+    // Browsers send Origin with cross-site requests; a web page must not be able to trigger runs here.
+    // (curl and scripts send none.)
+    const origin = c.req.header('origin');
+    if (origin && new URL(origin).host !== c.req.header('host'))
+      return c.text('cross-site request refused', 403);
     await next();
   });
   app.get('/', (c) => c.redirect('/status'));
@@ -221,7 +219,6 @@ export function adminApp(d: Daemon) {
     return 'error' in r ? c.json(r, 404) : c.json(r, 202);
   };
   app.post('/refresh/:id', refresh);
-  app.get('/refresh/:id', refresh);
   app.post('/run/full', (c) => {
     d.fullRun();
     return c.json(d.state(), 202);
@@ -233,30 +230,93 @@ export function adminApp(d: Daemon) {
   return app;
 }
 
-/** Start everything the config enables. */
-export function startDaemon(config: Config, store: Store, log: Log): Daemon {
+/** Listen, or fail with a message that names the port and the option that sets it. */
+export function listen(
+  fetch: (req: Request, ...rest: never[]) => Response | Promise<Response>,
+  host: string,
+  port: number,
+  option: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const server = serve({ fetch: fetch as never, hostname: host, port }, () => resolve());
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      reject(
+        new Error(
+          err.code === 'EADDRINUSE'
+            ? `port ${port} is already in use (${option} in israel-tv.config.json). Is israel-tv already running?`
+            : `cannot listen on ${host}:${port} (${option}): ${err.message}`,
+        ),
+      );
+    });
+  });
+}
+
+/** Addresses other devices on the network can use to reach this machine. */
+export function lanAddresses(host: string): string[] {
+  if (host !== '0.0.0.0' && host !== '::') return [host];
+  const out: string[] = [];
+  for (const list of Object.values(networkInterfaces())) {
+    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal) out.push(a.address);
+  }
+  return out.length ? out : ['127.0.0.1'];
+}
+
+/** Start everything the config enables. Ports are opened first, so a clash stops before any work. */
+export async function startDaemon(
+  config: Config,
+  store: Store,
+  log: Log,
+  opts: { initialRun?: boolean } = {},
+): Promise<Daemon> {
   const d = new Daemon(config, store, log);
-  d.schedule();
-  serve({ fetch: adminApp(d).fetch, hostname: config.admin.host, port: config.admin.port });
-  log(`admin: http://${config.admin.host}:${config.admin.port}/status (local network only)`);
+  const urls = (host: string, port: number, path: string) =>
+    lanAddresses(host)
+      .map((a) => `http://${a}:${port}${path}`)
+      .join('  ');
+  await listen(adminApp(d).fetch as never, config.admin.host, config.admin.port, 'admin.port');
   if (config.publisher.type === 'local') {
-    startLocalServer(config.publisher.dir, config.publisher.host, config.publisher.port);
-    log(`addon: http://${config.publisher.host}:${config.publisher.port}/manifest.json`);
+    await listen(
+      localAddonApp(config.publisher.dir).fetch as never,
+      config.publisher.host,
+      config.publisher.port,
+      'publisher.port',
+    );
   }
   if (config.resolver.enabled) {
-    startResolver(config);
-    log(`resolver: http://${config.resolver.host}:${config.resolver.port}/manifest.json`);
+    await listen(
+      resolverApp(config).fetch as never,
+      config.resolver.host,
+      config.resolver.port,
+      'resolver.port',
+    );
   }
+  log(`admin (local network only): ${urls(config.admin.host, config.admin.port, '/status')}`);
+  if (config.publisher.type === 'local') {
+    log(
+      `addon — install this in your app: ${urls(config.publisher.host, config.publisher.port, '/manifest.json')}`,
+    );
+  }
+  if (config.resolver.enabled) {
+    log(
+      `resolver — install this too, at home: ${urls(config.resolver.host, config.resolver.port, '/manifest.json')}`,
+    );
+  }
+  d.schedule();
+  // Live channels are checked right away, so /status reflects them from the start.
+  if (config.sources.live) await checkLive(store);
   // First start (or after a long stop): fill the catalog now instead of waiting for the night.
   const firstSource = (Object.keys(config.sources) as Source[]).find(
-    (s) => config.sources[s] && s !== 'live',
+    (s) => config.sources[s] && s !== 'live' && s !== 'kan',
   );
   const last = firstSource ? store.lastRun('full', firstSource) : undefined;
-  if (firstSource && (!last || Date.now() - Date.parse(last.startedAt) > 24 * 3_600_000)) {
-    log('no full run in the last 24 hours: starting one now');
+  const stale = firstSource && (!last || Date.now() - Date.parse(last.startedAt) > 24 * 3_600_000);
+  if (stale && opts.initialRun !== false) {
+    log('no full run in the last 24 hours: starting one now (about half an hour; see /status)');
     d.fullRun();
   } else {
-    void d.publish();
+    if (stale) log('no recent full run; skipped because of --no-initial-run (next one at schedule.fullRun)');
+    d.enqueue('publish', () => d.publish());
   }
+  d.kanCrawl();
   return d;
 }

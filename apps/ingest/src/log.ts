@@ -4,7 +4,7 @@
 import { appendFileSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
 export function createLogger(file: string | undefined, maxMB: number): (line: string) => void {
-  const stamp = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const stamp = () => `${new Date().toISOString().replace('T', ' ').slice(0, 19)}Z`;
   if (!file) return (line) => console.log(`${stamp()} ${line}`);
   const max = maxMB * 1024 * 1024;
   let writes = 0;

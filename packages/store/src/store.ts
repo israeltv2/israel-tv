@@ -155,6 +155,8 @@ export class Store {
     show: ScrapedShow,
     added: Assignments,
     latestAirDate: string | undefined,
+    /** Whether the added episodes are newly published (moves the show up "newest first"). */
+    fresh = true,
   ): number {
     const ts = now();
     return this.tx(() => {
@@ -176,7 +178,7 @@ export class Store {
         .where(eq(t.shows.seriesId, seriesId))
         .get();
       const latestEpisodeSeenAt =
-        added.episodes.length > 0
+        added.episodes.length > 0 && fresh
           ? ts
           : (prev?.latestEpisodeSeenAt ?? (latestAirDate ? `${latestAirDate}T00:00:00.000Z` : null));
       const values = {

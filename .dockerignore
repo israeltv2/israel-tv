@@ -1,6 +1,11 @@
 node_modules
 **/node_modules
 data
+deploy/data
 .env
 israel-tv.config.json
 .git
+.paradev
+spikes
+**/test
+CLAUDE.md

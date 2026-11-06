@@ -3,9 +3,9 @@
   "sources": { "mako": true, "reshet": true, "kan": true, "live": true },
   "geo": { "type": "none" },
   "browser": { "type": "chrome" },
-  "publisher": { "type": "local", "host": "0.0.0.0", "port": 7000 },
-  "resolver": { "enabled": true, "host": "0.0.0.0", "port": 7001 },
-  "admin": { "host": "0.0.0.0", "port": 7002 },
+  "publisher": { "type": "local", "host": "0.0.0.0", "port": 7700 },
+  "resolver": { "enabled": true, "host": "0.0.0.0", "port": 7701 },
+  "admin": { "host": "0.0.0.0", "port": 7702 },
   "schedule": {
     "timezone": "Asia/Jerusalem",
     "fullRun": "30 3 * * *",
