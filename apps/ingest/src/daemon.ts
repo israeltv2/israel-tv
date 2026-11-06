@@ -25,7 +25,7 @@ import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import type { Logger } from './log.ts';
 import { pullPublicUsage } from './public-usage.ts';
-import { activeSources, buildStatus, publishSite } from './publish.ts';
+import { activeSources, analyticsWanted, buildStatus, publishSite } from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -320,8 +320,21 @@ export class Daemon {
   }
 
   status() {
+    const notes = [
+      ...(this.config.publisher.type === 'cloudflare' && !analyticsWanted(this.store)
+        ? [
+            'Analytics Engine is not enabled on the Cloudflare account (Workers & Pages → Analytics Engine → enable); the public addon is counted from Workers Logs meanwhile',
+          ]
+        : []),
+      ...(this.events.overCap()
+        ? [
+            `events.sqlite is over its ${this.config.events.maxMB} MB cap: raw events were cut to the last week`,
+          ]
+        : []),
+    ];
     return {
       ...buildStatus(this.store, this.sources),
+      ...(notes.length ? { notes } : {}),
       ...(this.geo.proxies.length ? { geo: this.geo } : {}),
       daemon: { ...this.state(), revision: REVISION },
     };

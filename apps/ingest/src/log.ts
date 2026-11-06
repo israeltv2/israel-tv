@@ -24,10 +24,12 @@ const REDACTED = '[redacted]';
 /** Field names that hold secrets wherever they appear. */
 const SECRET_KEYS = ['token', 'password', 'pass', 'secret', 'authorization', 'cookie', 'apiKey', 'ticket'];
 
-/** Secret values from the environment: anything named like a token, password, key or secret. */
+/** Secret values from the environment: anything named like a token, password, key, secret, user or account id. */
 export function secretValues(env: NodeJS.ProcessEnv): string[] {
   return Object.entries(env)
-    .filter(([k, v]) => /(TOKEN|PASS|SECRET|KEY|USER)/i.test(k) && typeof v === 'string' && v.length >= 6)
+    .filter(
+      ([k, v]) => /(TOKEN|PASS|SECRET|KEY|USER|ACCOUNT)/i.test(k) && typeof v === 'string' && v.length >= 6,
+    )
     .map(([, v]) => v as string)
     .sort((a, b) => b.length - a.length);
 }
