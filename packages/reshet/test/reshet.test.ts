@@ -261,3 +261,53 @@ test('an episode whose Kaltura entry is gone keeps its place but offers no strea
   expect(eps.filter((e) => e.key !== dropped).every((e) => e.streams.length === 1)).toBe(true);
   expect(show.notes?.join(' ')).toMatch(/1 episodes no longer exist/);
 });
+
+test('a show split by year before stays split when one read sees a single untitled season', async () => {
+  const { splitKeys, untitledSeasonsByYear } = await import('../src/parse.ts');
+  const e = (key: string, airDate: string) => ({ key, title: key, airDate, streams: [] });
+  const stored = {
+    source: 'reshet' as const,
+    key: '/d',
+    title: 'd',
+    catalog: 'iltv_reshet13',
+    seasons: [
+      { key: '/d|s1|2025', title: '2025', episodes: [e('a', '2025-01-01')] },
+      { key: '/d|s1|2026', title: '2026', episodes: [e('b', '2026-01-01')] },
+    ],
+  };
+  const read = {
+    ...stored,
+    seasons: [
+      {
+        key: '/d|s1',
+        title: '',
+        episodes: [e('c', '2026-02-01'), e('b', '2026-01-01'), e('a', '2025-01-01')],
+      },
+    ],
+  };
+  expect([...splitKeys(stored)]).toEqual(['/d|s1']);
+  expect(untitledSeasonsByYear(read).seasons.map((s) => s.key)).toEqual(['/d|s1']); // unknown: stays single
+  const out = untitledSeasonsByYear(read, splitKeys(stored));
+  expect(out.seasons.map((s) => [s.key, s.episodes.map((x) => x.key)])).toEqual([
+    ['/d|s1|2025', ['a']],
+    ['/d|s1|2026', ['b', 'c']],
+  ]);
+  // Data already holding the split and the folded season merges, without duplicates.
+  const folded = {
+    ...stored,
+    seasons: [
+      read.seasons[0] as (typeof read.seasons)[number],
+      { ...stored.seasons[0], episodes: [] },
+      { ...stored.seasons[1], episodes: [] },
+    ],
+  };
+  expect(
+    untitledSeasonsByYear(folded as typeof stored, splitKeys(folded as typeof stored)).seasons.map((s) => [
+      s.key,
+      s.episodes.length,
+    ]),
+  ).toEqual([
+    ['/d|s1|2025', 1],
+    ['/d|s1|2026', 2],
+  ]);
+});

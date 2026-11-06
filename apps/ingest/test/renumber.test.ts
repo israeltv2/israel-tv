@@ -233,3 +233,86 @@ test('named seasons move below 101 (lowest free, list order), episodes keep thei
   expect(renumberNamedSeasons(store, join(dir, 'backups'))).toBeUndefined();
   expect(checkNumbering(store).ok).toBe(true);
 });
+
+test('incident replay: an airing read of a split daily show as one untitled season keeps it split; repair fixes folded data', async () => {
+  const { ingestShow } = await import('../src/runner.ts');
+  const { repairReshetSplit } = await import('../src/renumber.ts');
+  const { splitKeys, untitledSeasonsByYear } = await import('@israel-tv/reshet');
+  const dir = mkdtempSync(join(tmpdir(), 'split-'));
+  const store = Store.open(join(dir, 'israel-tv.sqlite'));
+  const split: ScrapedShow = {
+    source: 'reshet',
+    key: '/d',
+    title: 'd',
+    catalog: 'iltv_reshet13',
+    seasons: [
+      { key: '/d|s1|2025', title: '2025', episodes: [ep('a', 'a', '2025-01-01')] },
+      { key: '/d|s1|2026', title: '2026', episodes: [ep('b', 'b', '2026-01-01')] },
+    ],
+  };
+  const id = store.seriesIdFor('reshet', '/d');
+  store.saveShow(
+    id,
+    split,
+    {
+      seasons: [
+        { key: '/d|s1|2025', number: 1, kind: 'year' },
+        { key: '/d|s1|2026', number: 2, kind: 'year' },
+      ],
+      episodes: [
+        { key: 'a', season: 1, episode: 1 },
+        { key: 'b', season: 2, episode: 1 },
+      ],
+    },
+    '2026-01-01',
+  );
+  checkNumbering(store);
+  // The page now shows one untitled season with every episode, plus a new one.
+  const page = {
+    ...split,
+    seasons: [
+      {
+        key: '/d|s1',
+        title: '',
+        episodes: [ep('c', 'c', '2026-02-01'), ep('b', 'b', '2026-01-01'), ep('a', 'a', '2025-01-01')],
+      },
+    ],
+  };
+  const adapter = {
+    source: 'reshet' as const,
+    listShows: async () => [],
+    fetchShow: async (_: unknown, opts: { stored?: ScrapedShow }) =>
+      untitledSeasonsByYear(page, splitKeys(opts.stored)),
+  };
+  const runId = store.startRun('airing', 'reshet');
+  await ingestShow(store, adapter as never, { key: '/d', title: 'd' }, true, runId);
+  const a = store.assignments(id);
+  expect(a.seasons.map((s) => s.key).sort()).toEqual(['/d|s1|2025', '/d|s1|2026']);
+  expect(numbers(a)).toEqual({ a: '1:1', b: '2:1', c: '2:2' });
+  expect(checkNumbering(store).ok).toBe(true);
+
+  // Folded data as the deploy left it: everything in the untitled season, empty years, a stray empty 101.
+  const folded: ScrapedShow = {
+    ...split,
+    seasons: [
+      page.seasons[0] as ScrapedShow['seasons'][number],
+      ...split.seasons.map((s) => ({ ...s, episodes: [] })),
+    ],
+  };
+  store.saveShow(
+    id,
+    folded,
+    { seasons: [{ key: '/d|s1', number: 101, kind: 'named' }], episodes: [] },
+    '2026-02-01',
+    false,
+  );
+  const r = repairReshetSplit(store);
+  expect(r).toMatchObject({ shows: 1, dropped: 1 });
+  expect(store.getShow(id)?.show.seasons.map((s) => [s.key, s.episodes.length])).toEqual([
+    ['/d|s1|2025', 1],
+    ['/d|s1|2026', 2],
+  ]);
+  expect(store.assignments(id).seasons.some((s) => s.number >= 101)).toBe(false);
+  expect(checkNumbering(store).ok).toBe(true);
+  expect(repairReshetSplit(store)).toBeUndefined();
+});
