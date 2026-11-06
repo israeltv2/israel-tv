@@ -185,12 +185,14 @@ export class Daemon {
     this.kanRefresh.clear();
     crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
       .then((r) => {
-        // Nothing was read (back-off): keep the refresh requests for the next scheduled slice.
-        if (r.pages === 0) for (const k of priority) this.kanRefresh.add(k);
+        // Refreshes whose show page this slice did not read (back-off, block) wait for the next slice.
+        const read = new Set(r.readShows ?? []);
+        for (const k of priority) if (!read.has(k)) this.kanRefresh.add(k);
         if (r.newEpisodes > 0) this.enqueue('publish', () => this.publish());
         return r.pages > 0;
       })
       .catch((err) => {
+        for (const k of priority) this.kanRefresh.add(k);
         this.log(`kan crawl failed: ${(err as Error).stack ?? err}`);
         return false;
       })

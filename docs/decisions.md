@@ -324,3 +324,13 @@ IMDb/TMDB got no streams when opened from other catalogs — the resolver now an
 matched shows (numbered seasons only); publish render/write failures (disk full, permissions) did not show
 on `/status` — they are recorded as failed publishes for both publishers; status timestamps alone caused a
 deploy after every quiet airing check — files are compared without timestamps.
+
+### Code review, round 7 (2026-11-06)
+
+4 findings, all fixed: a Kan refresh was dropped when its slice was blocked before reaching the show (it is
+now kept until its show page is actually read); two series matched to the same TMDB/IMDb id were answered
+differently by the Worker and the resolver (a second match is not assigned, and an id held by two series is
+answered by neither); a Kan lobby that loads but lists no shows was accepted silently (warning, slice
+partial, retried); the "Israel only" label depended on where ingest ran — Reshet episodes on the access
+profile measured as Israel-only (3387861) are labelled wherever ingest runs, and Kan VOD, geo-blocked per
+title nearly always, is labelled Israel-only without a per-episode probe.

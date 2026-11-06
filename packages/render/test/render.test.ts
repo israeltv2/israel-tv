@@ -118,3 +118,14 @@ test('a catalog warning is the first, labelled item of its row', () => {
   expect(metas[0]).toMatchObject({ id: 'iltv_status_iltv_keshet12', name: '⚠ Mako: last full run failed' });
   expect(files.has('meta/series/iltv_status_iltv_keshet12.json')).toBe(true);
 });
+
+test('an external id held by two series is published for neither', () => {
+  const files = renderSite({
+    ...base,
+    shows: [
+      show('iltv_mako_1', '2026-11-05', { imdbId: 'tt42' }),
+      show('iltv_reshet_1', '2026-11-05', { imdbId: 'tt42' }),
+    ],
+  });
+  expect(read(files, 'ext-ids.json')).toEqual({});
+});

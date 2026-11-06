@@ -175,3 +175,25 @@ test('older template: air dates from the titles, numbers by date when the source
   expect(r.episodes.find((e) => e.key === eps[0]?.key)?.episode).toBe(36);
   expect(r.warnings.map((w) => w.code)).toContain('numbers-reversed');
 });
+
+test('the Israel-only access profile is labelled even when the check passes (ingest inside Israel)', async () => {
+  const post = async (body: unknown) => {
+    const req = (body as Record<string, { action: string; filter?: { idIn: string } }>)['2'];
+    if (req?.action === 'list')
+      return [
+        {},
+        {
+          objects: [
+            { id: 'a', accessControlId: 3387861 },
+            { id: 'b', accessControlId: 7 },
+          ],
+        },
+      ];
+    return [{}, { actions: [] }];
+  };
+  const r = await blockedEntries(['a', 'b'], new Map(), post);
+  expect([...r]).toEqual([
+    ['a', true],
+    ['b', false],
+  ]);
+});

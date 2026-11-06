@@ -30,6 +30,9 @@ function check(r: unknown, i: number): Record<string, unknown> {
  * Entry id → blocked here (true/false). Entries share access-control profiles, so each profile is
  * checked once (with one of its entries) and remembered in `profiles` across calls.
  */
+/** Kaltura access-control profiles that limit playback to Israel (measured 2026-11-06). */
+export const ISRAEL_ONLY_PROFILES: ReadonlySet<number> = new Set([3387861]);
+
 export async function blockedEntries(
   entryIds: string[],
   profiles: Map<number, boolean>,
@@ -74,7 +77,9 @@ export async function blockedEntries(
           actions.some((a) => a.objectType === 'KalturaAccessControlBlockAction'),
         );
       }
-      out.set(o.id, profiles.get(profile) ?? false);
+      // Blocked as seen from here, or on the access profile measured as Israel-only (so the label is right
+      // even when ingest runs inside Israel, where the playback check passes).
+      out.set(o.id, (profiles.get(profile) ?? false) || ISRAEL_ONLY_PROFILES.has(profile));
     }
   }
   return out;

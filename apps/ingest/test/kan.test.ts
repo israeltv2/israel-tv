@@ -36,7 +36,6 @@ const opts = (l: ReturnType<typeof loader>, pagesPerRun: number): KanCrawlOption
   pageIntervalMs: 0,
   airingWindowDays: 14,
   loader: l,
-  playsDirectly: async () => false,
 });
 
 const routes = {
