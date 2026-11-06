@@ -15,6 +15,9 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
   of rows between addons (this addon's rows vs. others) is set in Nuvio's settings (home screen / catalog
   order), not by the addon.
 
+- [ ] Away from home (phone on mobile data): add the link `israel-tv remote-url` prints (the "Israel TV · Mako (away
+  from home)" addon) and play a Mako episode and קשת 12 live. Remove it again from devices you don't own.
+
 ## Catalogs and metadata
 
 - [ ] Rows list newest-airing shows first; scrolling a row loads more (pages of 100).
@@ -40,6 +43,14 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 
 - [ ] Open a matched show from Cinemeta (e.g. ארץ נהדרת / _Eretz Nehederet_) and pick a regular season:
   Israel TV streams are offered there too.
+
+- [ ] **Kan covers:** Kan 11 and Kids/Teens tiles show their pictures (served from the addon itself).
+
+## Usage dashboard
+
+- [ ] On a laptop at home, open the link `israel-tv admin-url` prints: the page shows "This home (resolver)" with
+  the plays just made, "Playing now" while something plays, and the playback canary as pass for each source.
+- [ ] The same address from a guest device without the link answers "not found".
 
 ## Failures look like failures
 

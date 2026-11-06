@@ -102,7 +102,7 @@ empty 404. `israel-tv remote-url` prints the manifest link.
 `host`, `port` (default `0.0.0.0`, `7702`), `tokenEnv` (default `ISRAEL_TV_ADMIN_TOKEN`). Serves `/status`
 (JSON), `/usage` (the usage dashboard; JSON at `/usage.json`), `/events.json` (event queries, see
 [operations](operations.md#investigating-a-failed-play)), `POST /refresh/<series-id>` (re-read one show now),
-`POST /run/full`, `POST /run/airing`. Answers only requests from private network addresses that carry the admin
+`POST /run/full`, `POST /run/airing`, `POST /run/daily`, `POST /run/canary`. Answers only requests from private network addresses that carry the admin
 token (the `.env` variable named by `tokenEnv`; when it is not set, a token is generated on first start and
 `israel-tv admin-url` prints the link). Everything else gets 404. Never expose it outside your network.
 

@@ -454,6 +454,10 @@ export function adminApp(d: Daemon, token: string) {
     return c.json(d.state(), 202);
   });
   app.post('/run/canary', async (c) => c.json(await d.canary()));
+  app.post('/run/daily', (c) => {
+    d.daily();
+    return c.json(d.state(), 202);
+  });
   app.post('/run/airing', (c) => {
     d.airingRun();
     return c.json(d.state(), 202);
