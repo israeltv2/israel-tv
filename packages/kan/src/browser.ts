@@ -108,13 +108,25 @@ export async function createChromeLoader(
       try {
         // Heavy resources are not loaded, except the one image asked for (see `image`).
         const allowImage = new Set<string>();
+        const wantsImages = !!(opts.image || opts.images);
         await context.route('**/*', (route) => {
           const req = route.request();
-          return ['image', 'font', 'media'].includes(req.resourceType()) && !allowImage.has(req.url())
-            ? route.abort()
-            : route.continue();
+          const type = req.resourceType();
+          // A page whose images are wanted loads its images like any visitor (Kan 11 refuses image requests from a
+          // session that loads none); fonts and media stay off.
+          const blocked =
+            type === 'image'
+              ? !wantsImages && !allowImage.has(req.url())
+              : type === 'font' || type === 'media';
+          return blocked ? route.abort() : route.continue();
         });
         const page = await context.newPage();
+        // The images the page itself loaded, by URL: a wanted one is taken from here, not requested again.
+        const loaded = new Map<string, import('playwright-core').Response>();
+        if (wantsImages)
+          page.on('response', (r) => {
+            if (r.request().resourceType() === 'image') loaded.set(r.url(), r);
+          });
         const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
         for (let i = 0; i < 25 && isChallenge(await page.content()); i++) await page.waitForTimeout(1000);
         await page.waitForTimeout(1500);
@@ -131,14 +143,17 @@ export async function createChromeLoader(
         const capture = async (given: string): Promise<CapturedImage> => {
           const want = new URL(given, page.url()).toString();
           allowImage.add(want);
-          const response = page
-            .waitForResponse((r) => r.url() === want, { timeout: 30_000 })
-            .catch(() => null);
-          await page.evaluate((u) => {
-            const img = new (globalThis as unknown as { Image: new () => { src: string } }).Image();
-            img.src = u;
-          }, want);
-          const answer = await response;
+          let answer = loaded.get(want) ?? null;
+          if (answer?.status() !== 200) {
+            const response = page
+              .waitForResponse((r) => r.url() === want, { timeout: 30_000 })
+              .catch(() => null);
+            await page.evaluate((u) => {
+              const img = new (globalThis as unknown as { Image: new () => { src: string } }).Image();
+              img.src = u;
+            }, want);
+            answer = (await response) ?? answer;
+          }
           const answered = answer?.status() ?? 0;
           let got: { status: number; b64?: string; error?: string } = { status: answered };
           if (answer && answered === 200) {

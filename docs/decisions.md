@@ -886,3 +886,8 @@ for anyone; the copies fix that too.
   whenever a show still lacks its copy (each show at most once a day, so a missing poster never makes every slice
   read them), and a slice that copied images publishes. Test: every card's poster is saved in the first slice,
   before any show page, and a failed copy does not bring the lobbies back next slice.
+- **Kan 11 refuses image requests from a session that loads no images.** The first lobby copies worked on Kan
+  Kids (49) but every Kan 11 poster answered 403, while a browser loading the lobby normally got 200 for all 41
+  posters (direct and through the proxy). A page whose images are wanted now loads its images like any visitor
+  (fonts and media stay off) and the poster's bytes are taken from the page's own response. Shows that failed
+  under the old way are retried at once (a copy-method version in the crawl state), not a day later.
