@@ -17,6 +17,10 @@ test('episode titles lose what the app already shows (the live cases)', () => {
     '06.11.26',
   );
   expect(tidyEpisodeTitle('הלידה הדרמטית', 'בייבי בום')).toBe('הלידה הדרמטית');
+  // Leftover separators and SEO endings (found by the catalog audit).
+  expect(tidyEpisodeTitle('פרק 6 -', 'x')).toBe('פרק 6');
+  expect(tidyEpisodeTitle('השטיח האדום |', 'x')).toBe('השטיח האדום');
+  expect(tidyEpisodeTitle('אבודים במרוקו - שני החלקים לצפייה ישירה', 'x')).toBe('אבודים במרוקו - שני החלקים');
   expect(tidyEpisodeTitle('מקום לדאגה', 'מקום לדאגה')).toBe('מקום לדאגה'); // never empty
 });
 
