@@ -1105,3 +1105,38 @@ deliberately wrong proxy; an own copy at home with every source off). All three 
   system install; `xvfb-run` examples.
 - **Contributors:** `pnpm format`; what CI runs besides `pnpm check`; how to record a raw page (not a browser's saved
   page) and compare the data the parser reads; how parser tests use fixtures.
+
+## Round 4: the owner's dashboard
+
+**Consulted first:** three independent design drafts — the strongest case for a lean single-page app, the strongest
+case for server-rendered HTML with htmx, and a neutral critic scoring both against a framework-free page. Both the SPA
+draft and the critic recommended a small SPA (Preact, not React; uPlot, not Recharts — Recharts alone is about twice
+the whole budget; no TanStack Query for ~10 GET endpoints and one stream). The server-rendered option fails the brief's
+"typed JSON API + a separate dashboard app" (htmx wants HTML fragments), and a framework-free page grows its own
+framework by the fifth view.
+
+**Chosen:** `packages/admin-contract` (zod schemas, the only thing the daemon and the page share) + `apps/dashboard`
+(Preact 11 with htm, uPlot) + `/api/v1` in the daemon. One change from the drafts, measured against how Israel TV is
+installed: the Mac, the Docker images and anyone installing with `--prod` have no development tools, so a Vite build
+would have needed a committed or separately shipped bundle. Instead the page's TypeScript is served with the types
+stripped by Node itself (`module.stripTypeScriptTypes`, cached), and the vendor modules come straight from the installed
+packages through an import map (its hash is in the content security policy). No bundler, no build step, nothing
+generated, no tooling exposed to TypeScript 7's missing JS API. uPlot's ES module build is not minified (41 KB gzip), so
+its minified script build is loaded instead: the whole page is 36 KB of JS gzip (budget 45 KB, tested).
+
+**Security, from the critic's rules:** one gate for the page, the API and the stream (local network, token, DNS
+rebinding, cross-site origins — `Origin: null` is now refused instead of throwing); the token in the address only opens
+a page, never the API; a cookie-authenticated change needs the CSRF value (an HMAC of the token, from `/session`);
+bearer scripts are unchanged; `/events.json` validates its parameters; API answers are `no-store`; the page has a
+strict CSP (`default-src 'self'`, no inline script but the hashed import map, `frame-ancestors 'none'`); the live
+stream allows 4 at once, sends a snapshot only when something changed (checked every 3 s) and a comment every 25 s,
+and the page closes it when the tab is hidden; the canary action runs one at a time; nothing destructive.
+
+**New data:** the nightly backup is now opened and integrity-checked (a restore check, shown under System); the Worker
+versions of each deploy are kept from wrangler's output (shown under Catalog & deploys).
+
+**Tests:** every endpoint's answer parses with its schema (on a seeded events store); the gate (no token, token in the
+address, missing/wrong CSRF, `Origin: null`, cross-site, bad `/events.json` and trace parameters); the page's security
+headers, its modules, types stripped, no path escape; the stream's first frame; the size budget; and `pnpm
+e2e:dashboard` in CI — a sandbox instance in Chrome, every section at phone and desktop size in light and dark, failing
+on any page error, failed request or sideways scrolling, screenshots kept as CI artifacts.

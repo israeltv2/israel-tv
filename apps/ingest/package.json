@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "@israel-tv/addon": "workspace:*",
+    "@israel-tv/admin-contract": "workspace:*",
     "@israel-tv/core": "workspace:*",
+    "@israel-tv/dashboard": "workspace:*",
     "@israel-tv/events": "workspace:*",
     "@israel-tv/kan": "workspace:*",
     "@israel-tv/mako": "workspace:*",
@@ -20,10 +22,12 @@
     "@israel-tv/runtime": "workspace:*",
     "@israel-tv/store": "workspace:*",
     "croner": "catalog:",
-    "hono": "catalog:"
+    "hono": "catalog:",
+    "zod": "catalog:"
   },
   "license": "AGPL-3.0-only",
   "files": [
     "src"
-  ]
+  ],
+  "devDependencies": {}
 }

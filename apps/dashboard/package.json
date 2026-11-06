@@ -1,0 +1,26 @@
+{
+  "name": "@israel-tv/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/server.ts"
+  },
+  "files": [
+    "src",
+    "web"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p . && tsc -p web",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "htm": "3.1.1",
+    "preact": "11.0.1",
+    "uplot": "1.6.32"
+  },
+  "devDependencies": {
+    "@israel-tv/admin-contract": "workspace:*"
+  },
+  "license": "AGPL-3.0-only"
+}

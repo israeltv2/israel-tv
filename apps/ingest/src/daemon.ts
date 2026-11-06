@@ -1,8 +1,9 @@
 // The long-running process: scheduled runs, one job at a time (single writer), publish after each run,
 // LAN-only admin endpoints, the local publisher and the private resolver.
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
+import { ADMIN_API, CSRF_HEADER } from '@israel-tv/admin-contract';
 import {
   type Config,
   DAY_MS,
@@ -11,6 +12,7 @@ import {
   tmdbApiKey,
   type UsageEvent,
 } from '@israel-tv/core';
+import { dashboardFile, IMPORT_MAP_HASH } from '@israel-tv/dashboard';
 import type { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
 import { checkProxyAtStart, PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
@@ -18,7 +20,10 @@ import { type Logger, lanAddresses, listen } from '@israel-tv/runtime';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
-import { backupCatalog } from './backup.ts';
+import { z } from 'zod';
+import { mountAdminApi } from './admin-api.ts';
+import { csrfFor, sameSecret } from './admin-auth.ts';
+import { backupCatalog, checkBackup } from './backup.ts';
 import { type CanaryResult, canaryEvent, runCanary } from './canary.ts';
 import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive } from './live.ts';
@@ -85,11 +90,13 @@ export class Daemon {
   private running: string | undefined;
   private crons: Cron[] = [];
   private readonly sources: Source[];
-  private readonly config: Config;
-  private readonly store: Store;
+  readonly config: Config;
+  readonly store: Store;
   private readonly log: Log;
   readonly events: EventStore;
   readonly logger: Logger;
+  /** The deployed git revision (or `dev`). */
+  readonly revision = REVISION;
 
   constructor(config: Config, store: Store, events: EventStore, logger: Logger) {
     const log = logger.log;
@@ -302,7 +309,15 @@ export class Daemon {
       const now = Date.now();
       try {
         const b = backupCatalog(this.store, this.config.backup, now);
-        this.log('catalog backup', b);
+        const check = b.file ? checkBackup(b.file) : undefined;
+        this.log('catalog backup', { ...b, ...(check ? { check } : {}) });
+        if (b.file)
+          this.store.setState('backup:last', {
+            file: b.file,
+            at: new Date(now).toISOString(),
+            bytes: b.bytes,
+            check,
+          });
       } catch (err) {
         this.log(`catalog backup failed: ${(err as Error).message}`);
       }
@@ -417,12 +432,27 @@ export class Daemon {
 
 const ADMIN_COOKIE = 'iltv_admin';
 
-/** Constant-time comparison of two secrets. */
-export function sameSecret(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
+/** The host part of an Origin header; undefined for `null` or anything that is not a URL. */
+function hostOf(origin: string): string | undefined {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return undefined;
+  }
 }
+
+/** What /events.json accepts (anything else is refused, not passed on). */
+const EventsQuery = z.strictObject({
+  playId: z.string().max(80).optional(),
+  kind: z.string().max(40).optional(),
+  outcome: z.enum(['ok', 'error']).optional(),
+  since: z.string().max(40).optional(),
+  show: z.string().max(80).optional(),
+  limit: z
+    .string()
+    .regex(/^\d{1,4}$/)
+    .optional(),
+});
 
 /** The admin token: from the configured .env variable, else one generated once and kept in the database. */
 export function adminToken(config: Config, store: Store, env: NodeJS.ProcessEnv = process.env): string {
@@ -446,16 +476,23 @@ export function adminApp(d: Daemon, token: string) {
     // Browsers send Origin with cross-site requests; a web page must not be able to trigger runs here.
     // (curl and scripts send none.)
     const origin = c.req.header('origin');
-    if (origin && new URL(origin).host !== c.req.header('host'))
-      return c.text('cross-site request refused', 403);
+    if (origin && hostOf(origin) !== c.req.header('host')) return c.text('cross-site request refused', 403);
     // Owner only: a token as well (guests on the same Wi-Fi get a plain 404). A browser opens a page once with
     // ?token=…, which is moved into a cookie and taken out of the address bar.
     const bearer = /^Bearer (.+)$/.exec(c.req.header('authorization') ?? '')?.[1];
     const cookie = /(?:^|;\s*)iltv_admin=([^;]+)/.exec(c.req.header('cookie') ?? '')?.[1];
-    const query = c.req.query('token');
+    // The token in the address is accepted only to open a page (it then moves into the cookie), never on the API.
+    const query =
+      c.req.method === 'GET' && !c.req.path.startsWith(ADMIN_API) ? c.req.query('token') : undefined;
     const given = bearer ?? query ?? cookie;
     if (!given || !sameSecret(given, token)) return c.json({ error: 'not found' }, 404);
-    if (query && c.req.method === 'GET') {
+    // A change asked for with the cookie (a browser) must also carry the CSRF value the dashboard got from /session.
+    if (c.req.method !== 'GET' && !bearer) {
+      const sent = c.req.header(CSRF_HEADER);
+      if (!sent || !sameSecret(sent, csrfFor(token)))
+        return c.json({ error: 'missing or wrong CSRF value' }, 403);
+    }
+    if (query) {
       const url = new URL(c.req.url);
       url.searchParams.delete('token');
       c.header('set-cookie', `${ADMIN_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`);
@@ -463,12 +500,28 @@ export function adminApp(d: Daemon, token: string) {
     }
     await next();
   });
-  app.get('/', (c) => c.redirect('/status'));
+  app.get('/', (c) => c.redirect('/dash/'));
+  mountAdminApi(app, d, token);
+  app.get('/dash', (c) => c.redirect('/dash/'));
+  app.get('/dash/*', (c) => {
+    const f = dashboardFile(c.req.path.slice('/dash/'.length) || 'index.html');
+    if (!f) return c.json({ error: 'not found' }, 404);
+    return c.body(f.body, 200, {
+      'content-type': f.type,
+      'cache-control': f.immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+      'content-security-policy': `default-src 'self'; script-src 'self' ${IMPORT_MAP_HASH}; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'no-referrer',
+    });
+  });
   app.get('/status', (c) => c.json(d.status()));
   app.get('/usage', (c) => c.html(renderUsagePage(d.dashboard())));
   app.get('/usage.json', (c) => c.json(d.dashboard()));
   // For agents and scripts: /events.json?playId=…&kind=failure&outcome=error&since=2h&show=…&limit=100
-  app.get('/events.json', (c) => c.json(d.queryEvents(c.req.query())));
+  app.get('/events.json', (c) => {
+    const q = EventsQuery.safeParse(c.req.query());
+    return q.success ? c.json(d.queryEvents(q.data)) : c.json({ error: q.error.issues[0]?.message }, 400);
+  });
   const refresh = (c: import('hono').Context) => {
     const r = d.refresh(c.req.param('id') ?? '');
     return 'error' in r ? c.json(r, 404) : c.json(r, 202);
@@ -619,4 +672,4 @@ export async function startDaemon(
   return d;
 }
 
-export { lanAddresses, listen };
+export { csrfFor, lanAddresses, listen, sameSecret };

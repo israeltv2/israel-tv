@@ -22,7 +22,8 @@
     "hygiene": "knip && pnpm -r --filter \"./packages/*\" --filter \"./apps/*\" exec publint --strict",
     "test:strict": "node tools/test-strict.mjs",
     "smoke": "node tools/smoke.mjs",
-    "check:addresses": "node tools/check-addresses.mjs"
+    "check:addresses": "node tools/check-addresses.mjs",
+    "e2e:dashboard": "node tools/dashboard-e2e.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",
@@ -32,7 +33,8 @@
     "knip": "6.44.1",
     "publint": "0.3.25",
     "typescript": "7.0.2",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "playwright-core": "catalog:"
   },
   "license": "AGPL-3.0-only"
 }

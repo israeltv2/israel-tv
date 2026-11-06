@@ -60,12 +60,31 @@ numbering conflicts, renumberings at the source, thin results and dead season li
 
 ## Usage dashboard and events
 
-The admin page `http://<host>:7702/usage` is for the owner only: it answers on the local network only, and also
-needs the admin token (`ISRAEL_TV_ADMIN_TOKEN` in `.env`; without it, one is generated on first start).
+The dashboard `http://<this computer's address>:7702/dash/` is for the owner only: it answers on the local network
+only, and also needs the admin token (`ISRAEL_TV_ADMIN_TOKEN` in `.env`; without it, one is generated on first start).
 `pnpm israel-tv admin-url` prints the link with the token; open it once in a browser and the token moves into a
-cookie. Anyone without it gets a plain 404. Scripts send `Authorization: Bearer <token>`.
+cookie (kept 30 days). Anyone without it gets a plain 404. It works on a phone, follows the system's light or dark
+setting, and has seven sections:
 
-The page has two clearly separate views:
+- **Overview** — plays, devices a day, minutes relayed and failure rate (today, 7 and 30 days), plays per day, the
+  most played shows; and, for a Cloudflare catalog, the public link's stream requests (see the two views below).
+- **Sources** — each source's health, last good read against its expected rhythm, staleness, the daily canary (which
+  step failed and why), the proxy and its last error, the Kan reader's backlog; a button runs the canary now.
+- **Plays** — plays per day by source, time to the first playlist (median and 95th percentile), top episodes.
+- **Failures** — the last 7 days grouped by source, stage, status and reason, with a 7-day bar and a link to the
+  **trace** of the latest such play (every event of that play, in order).
+- **Live** — what is playing through the home helper now, updated as it changes (Server-Sent Events).
+- **Catalog & deploys** — shows and episodes per source, the last publish, the two Workers' current versions and the
+  rollback commands (shown, not run); a form refreshes one show.
+- **System** — revision, uptime, memory, disk, database sizes and growth, the last backup and its restore check
+  (each night's copy is opened and integrity-checked), usage events per day.
+
+The same numbers are a JSON API for scripts, `GET /api/v1/{session,overview,sources,plays,failures,trace/<playId>,
+live,deploys,system}` with `Authorization: Bearer <token>` (schemas: `packages/admin-contract`); changes are
+`POST /api/v1/actions/refresh/<series-id>` and `POST /api/v1/actions/canary` (a browser must also send the
+`x-israel-tv-csrf` value from `/session`). The older one-page view stays at `/usage` (no JavaScript needed).
+
+The usage numbers come in two clearly separate views:
 
 - **This home (resolver):** what the resolver on this network saw — plays (Mako play starts and relayed plays),
   unique clients per day, top shows, failures by reason, and what is playing now. It cannot see other people's

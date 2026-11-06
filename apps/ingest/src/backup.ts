@@ -3,6 +3,7 @@
 // files this produced (that name pattern, in the backup folder) are ever removed.
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import type { Config } from '@israel-tv/core';
 import type { Store } from '@israel-tv/store';
 
@@ -29,4 +30,22 @@ export function backupCatalog(
     }
   }
   return { file, bytes: statSync(file).size, removed };
+}
+
+/**
+ * A restore check of a backup copy: it opens on its own, passes SQLite's integrity check, and holds the series ids.
+ * Run after each nightly backup; the result shows on the dashboard.
+ */
+export function checkBackup(file: string): string {
+  const db = new DatabaseSync(file, { readOnly: true });
+  try {
+    const integrity = (db.prepare('PRAGMA integrity_check').get() as { integrity_check?: string })
+      .integrity_check;
+    const series = (db.prepare('select count(*) as n from series').get() as { n: number }).n;
+    return integrity === 'ok'
+      ? `ok: opens, integrity ok, ${series} series`
+      : `failed: integrity ${integrity}`;
+  } finally {
+    db.close();
+  }
 }

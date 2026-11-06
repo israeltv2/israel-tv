@@ -713,3 +713,14 @@ export function kanArtwork(store: Store, dir: string): Map<string, string> {
   }
   return out;
 }
+
+/** The Kan crawl's progress, for the dashboard: episode pages still to read, shows known, back-off. */
+export function kanProgress(
+  store: Store,
+): { pending: number; shows: number; backoffUntil?: string } | undefined {
+  const st = store.getState<CrawlState>(STATE_KEY);
+  if (!st) return undefined;
+  const shows = Object.values(st.shows);
+  const pending = shows.reduce((n, s) => n + s.pending.length, 0);
+  return { pending, shows: shows.length, ...(st.backoffUntil ? { backoffUntil: st.backoffUntil } : {}) };
+}
