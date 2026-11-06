@@ -891,3 +891,6 @@ for anyone; the copies fix that too.
   posters (direct and through the proxy). A page whose images are wanted now loads its images like any visitor
   (fonts and media stay off) and the poster's bytes are taken from the page's own response. Shows that failed
   under the old way are retried at once (a copy-method version in the crawl state), not a day later.
+- **Shows without a lobby card** (older programs) have only the refused share image; their copy now comes from
+  the first still or promo their own page shows (a 490×272 `?width=…&v=…` image the page loads). Copy method 3
+  retries every show still without a copy at once.

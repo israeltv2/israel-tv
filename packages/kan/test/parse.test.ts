@@ -64,3 +64,9 @@ test('lobby posters: the portrait poster on each show card, by show path', async
   // No portrait poster on the card: its first picture.
   expect(kids.get('/content/kids/ktantanim-main/p-1010382/')).toMatch(/200x200_character/);
 });
+
+test('show page image: a picture the page shows, not the share image Kan refuses', async () => {
+  const { parseShowPage } = await import('../src/parse.ts');
+  const page = parseShowPage(html('show-p-1006421'), '/content/kan/kan-11/p-1006421/');
+  expect(page.image).toMatch(/^\/media\/[^?]+\.jpg\?width=490&height=272&v=/);
+});
