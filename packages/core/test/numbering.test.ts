@@ -142,3 +142,11 @@ test('printed numbers that run against the dates are ignored (numbered by date)'
   expect([num(r, 'a')?.episode, num(r, 'b')?.episode, num(r, 'c')?.episode]).toEqual([1, 2, 3]);
   expect(r.warnings[0]?.code).toBe('numbers-reversed');
 });
+
+test('two dated episodes counted newest = 1 are numbered by date too', () => {
+  const r = assignNumbers(
+    show([season('s', 'עונה 1', [ep('new', 1, '2026-11-05'), ep('old', 2, '2026-11-04')])]),
+    EMPTY,
+  );
+  expect([num(r, 'old')?.episode, num(r, 'new')?.episode]).toEqual([1, 2]);
+});

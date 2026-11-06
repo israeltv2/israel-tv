@@ -254,16 +254,20 @@ export class Store {
         ),
       )
       .all()
-      .map((r) => this.toShowRow(r));
+      .map((r) => this.toShowRow(r))
+      .filter((r): r is ShowRow => r !== undefined);
   }
 
-  private toShowRow(r: typeof t.shows.$inferSelect): ShowRow {
+  private toShowRow(r: typeof t.shows.$inferSelect): ShowRow | undefined {
+    const parsed = ScrapedShowSchema.safeParse(JSON.parse(r.data));
+    // Data is validated before it is stored; an unreadable row (older format) is skipped, not fatal.
+    if (!parsed.success) return undefined;
     return {
       seriesId: r.seriesId,
       source: r.source as Source,
       catalog: r.catalog,
       title: r.title,
-      show: ScrapedShowSchema.parse(JSON.parse(r.data)),
+      show: parsed.data,
       latestAirDate: r.latestAirDate,
       latestEpisodeSeenAt: r.latestEpisodeSeenAt,
       lastOkAt: r.lastOkAt,
@@ -289,7 +293,8 @@ export class Store {
       .from(t.shows)
       .where(conds.length ? and(...conds) : undefined)
       .all()
-      .map((r) => this.toShowRow(r));
+      .map((r) => this.toShowRow(r))
+      .filter((r): r is ShowRow => r !== undefined);
   }
 
   countShows(source: Source, state: 'listed' | 'delisted'): number {
@@ -315,7 +320,8 @@ export class Store {
         ),
       )
       .all()
-      .map((r) => this.toShowRow(r));
+      .map((r) => this.toShowRow(r))
+      .filter((r): r is ShowRow => r !== undefined);
   }
 
   /** Source key of the episode published as season/episode of a series. */
@@ -417,7 +423,9 @@ export class Store {
       .all();
     let closed = 0;
     for (const r of running) {
-      if (r.pid !== null && isAlive(r.pid)) continue;
+      // This process has not started any run yet when this is called, so a run with its pid is a leftover
+      // from an earlier process that had the same pid (e.g. pid 1 in a container).
+      if (r.pid !== null && r.pid !== process.pid && isAlive(r.pid)) continue;
       this.db
         .update(t.runs)
         .set({ status: 'failed', error: 'interrupted (process stopped)', finishedAt: now() })
@@ -455,11 +463,13 @@ export class Store {
   /** Drop warnings and finished runs older than `days` days (the log would otherwise grow forever). */
   prune(days = 60): void {
     const before = new Date(Date.now() - days * 86_400_000).toISOString();
-    this.db.delete(t.warnings).where(sql`${t.warnings.createdAt} < ${before}`).run();
+    const oldRuns = sql`select ${t.runs.id} from ${t.runs} where ${t.runs.startedAt} < ${before} and ${t.runs.status} != 'running'`;
+    // Warnings first (they reference runs), then the runs themselves.
     this.db
-      .delete(t.runs)
-      .where(sql`${t.runs.startedAt} < ${before} and ${t.runs.status} != 'running'`)
+      .delete(t.warnings)
+      .where(sql`${t.warnings.createdAt} < ${before} or ${t.warnings.runId} in (${oldRuns})`)
       .run();
+    this.db.delete(t.runs).where(sql`${t.runs.id} in (${oldRuns})`).run();
   }
 
   /** When a show's stored data last changed (cheap; for caches). */

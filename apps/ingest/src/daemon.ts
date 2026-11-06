@@ -91,7 +91,9 @@ export class Daemon {
   /** Queue a job unless one with the same name is already waiting. */
   enqueue(name: string, run: () => Promise<void>): { queued: boolean; position: number } {
     const pos = this.queue.findIndex((j) => j.name === name);
-    if (pos >= 0 || this.running === name) return { queued: false, position: pos + 1 };
+    // Already waiting: no need to add it twice. (If it is running now, queue it once more: the running one
+    // may have started before the change that asked for it.)
+    if (pos >= 0) return { queued: false, position: pos + 1 };
     this.queue.push({ name, run });
     void this.drain();
     return { queued: true, position: this.queue.length };
@@ -177,6 +179,8 @@ export class Daemon {
     this.kanRefresh.clear();
     crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
       .then((r) => {
+        // During a back-off nothing was read: keep the refresh requests for the next slice.
+        if (r.pages === 0) for (const k of priority) this.kanRefresh.add(k);
         if (r.newEpisodes > 0) this.enqueue('publish', () => this.publish());
       })
       .catch((err) => this.log(`kan crawl failed: ${(err as Error).stack ?? err}`))

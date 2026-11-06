@@ -1,6 +1,6 @@
 // Ingest runs: full (whole index), airing (shows with a recent episode, current season only) and single show.
 // Rules: a failed or thin result never replaces the last good data; it is recorded and shown on /status.
-import { assignNumbers, daysAgo, type ScrapedShow } from '@israel-tv/core';
+import { assignNumbers, cleanShow, daysAgo, type ScrapedShow } from '@israel-tv/core';
 import type { Store } from '@israel-tv/store';
 import type { ShowEntry, SourceAdapter } from './sources.ts';
 
@@ -132,7 +132,7 @@ export async function ingestShow(
     throw new Error(why);
   }
   const fetched = new Set(scraped.seasons.filter((s) => s.episodes.length > 0).map((s) => s.key));
-  const show = dedupeEpisodes(mergePartial(prev?.show, scraped, fetched));
+  const show = cleanShow(dedupeEpisodes(mergePartial(prev?.show, scraped, fetched)));
   if (!prev && episodeCount(show) === 0) {
     if (scraped.notes?.length) {
       store.addWarnings(

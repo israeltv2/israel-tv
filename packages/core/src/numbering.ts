@@ -91,7 +91,7 @@ export function hintsRunBackwards(eps: ScrapedSeason['episodes']): boolean {
   const pts = eps
     .filter((e) => e.numberHint !== undefined && e.airDate)
     .sort((a, b) => (a.numberHint ?? 0) - (b.numberHint ?? 0));
-  if (pts.length < 3) return false;
+  if (pts.length < 2) return false;
   let up = 0;
   let down = 0;
   for (let i = 1; i < pts.length; i++) {

@@ -9,6 +9,7 @@ import {
   assignNumbers,
   type BrowserConfig,
   type Config,
+  cleanShow,
   DAY_MS,
   HOUR_MS,
   type ScrapedEpisode,
@@ -166,6 +167,7 @@ export async function crawlKan(
   let pages = 0;
   let newEpisodes = 0;
   let blocked = 0;
+  let problems = 0;
   let note = '';
 
   const origin = (url: string) => new URL(url).origin;
@@ -210,20 +212,13 @@ export async function crawlKan(
     const showBudget = waiting ? Math.ceil(opts.pagesPerRun / 2) : opts.pagesPerRun;
     // Refresh requests first, made due now; then everything else in order.
     const prio = new Set((opts.priority ?? []).filter((k) => state.shows[k]));
-    for (const k of prio) {
-      const s = state.shows[k];
-      if (s) {
-        delete s.checkedAt;
-        delete s.failedAt;
-      }
-    }
     const order = [...prio, ...Object.keys(state.shows).filter((k) => !prio.has(k))];
     for (const key of order) {
       const s = state.shows[key];
       if (!s) continue;
       if (pages >= showBudget && !prio.has(key)) break;
       const id = store.findSeriesId('kan', key);
-      if (!showDue(s, now, opts.airingWindowDays)) continue;
+      if (!prio.has(key) && !showDue(s, now, opts.airingWindowDays)) continue;
       const firstRead = !s.checkedAt;
       const path = new URL(key).pathname;
       let page: ReturnType<typeof parseShowPage>;
@@ -258,6 +253,15 @@ export async function crawlKan(
         s.lastNewAt = s.checkedAt;
         s.fresh = [...new Set([...(s.fresh ?? []), ...fresh])];
       }
+      // A show we have episodes for whose page now lists none (and has no video of its own) is a failed
+      // read — most likely a layout change — not an empty show.
+      if (page.episodes.length === 0 && !page.featured && known.size > 0 && id) {
+        problems++;
+        store.markShowFailed(id, 'kept last good data: the show page lists no episodes (layout change?)');
+        store.addWarnings(runId, id, [
+          { code: 'source-note', message: `Kan ${key}: show page lists no episodes` },
+        ]);
+      }
       // Single-video show: the video is on the show page itself.
       if (page.episodes.length === 0 && page.featured) {
         newEpisodes += saveEpisodes(store, key, s, [
@@ -286,6 +290,7 @@ export async function crawlKan(
             problem = (err as Error).message;
           }
           if (problem) {
+            problems++;
             s.failed.push(url);
             if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
             store.addWarnings(runId, store.findSeriesId('kan', key) ?? null, [
@@ -302,7 +307,15 @@ export async function crawlKan(
     }
     const pendingTotal = Object.values(state.shows).reduce((n, s) => n + s.pending.length, 0);
     note = `${pages} pages, +${newEpisodes} episodes, ${pendingTotal} episode pages still to read`;
-    store.finishRun(runId, { status: 'ok', requests: pages, newEpisodes });
+    // Pages that loaded but did not parse make the slice partial, so a layout change shows on /status.
+    store.finishRun(runId, {
+      status: problems > 0 ? 'partial' : 'ok',
+      requests: pages,
+      newEpisodes,
+      ...(problems > 0
+        ? { showsFailed: problems, error: `${problems} Kan pages could not be read (see warnings)` }
+        : {}),
+    });
   } catch (err) {
     // Blocked (challenge / proxy refusal): stop and wait well before trying again.
     state.backoffUntil = new Date(Date.now() + 45 * 60_000).toISOString();
@@ -347,12 +360,13 @@ function saveEpisodes(
     },
     batch,
   );
-  const numbering = assignNumbers(show, store.assignments(seriesId));
+  const clean = cleanShow(show);
+  const numbering = assignNumbers(clean, store.assignments(seriesId));
   if (numbering.warnings.length) store.addWarnings(runId ?? null, seriesId, numbering.warnings);
   // Newly published episodes move the show up "newest first"; the first fill's backlog does not.
   const fresh = batch.some((b) => b.url && s.fresh?.includes(b.url));
   if (s.fresh) s.fresh = s.fresh.filter((u) => !batch.some((b) => b.url === u));
-  return store.saveShow(seriesId, show, numbering.added, latestAirDate(show), fresh);
+  return store.saveShow(seriesId, clean, numbering.added, latestAirDate(clean), fresh);
 }
 
 /** Whether a Kan show is known to the crawler (by its page URL). */

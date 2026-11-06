@@ -52,3 +52,25 @@ test('proxy URLs must match the proxy type', () => {
     'http-proxy',
   );
 });
+
+test('cleanShow drops junk optional fields and rejects a show that is still invalid', async () => {
+  const { cleanShow } = await import('../src/model.ts');
+  const show = {
+    source: 'reshet' as const,
+    key: '/a',
+    title: 'A',
+    catalog: 'iltv_reshet13',
+    poster: '/relative.jpg',
+    seasons: [
+      {
+        key: 's',
+        title: '',
+        episodes: [{ key: 'e', title: 't', thumbnail: '//x/y.jpg', durationSec: 0, streams: [] }],
+      },
+    ],
+  };
+  const c = cleanShow(show as never);
+  expect(c.poster).toBeUndefined();
+  expect(c.seasons[0]?.episodes[0]).toEqual({ key: 'e', title: 't', streams: [] });
+  expect(() => cleanShow({ ...show, title: '' } as never)).toThrow(/failed validation at title/);
+});

@@ -42,7 +42,10 @@ export interface ResolverDeps {
   /** Episode data for a published video id, from the home database. */
   episode(series: string, season: number, episode: number): ScrapedEpisode | undefined;
   /** Plain fetch (Mako; no proxy needed). */
-  fetch: (url: string, init?: { headers?: Record<string, string> }) => Promise<Response>;
+  fetch: (
+    url: string,
+    init?: { headers?: Record<string, string>; redirect?: 'follow' | 'manual' },
+  ) => Promise<Response>;
   /** Fetch through the geo adapter; undefined when no geo proxy is configured. */
   geoFetch?: GeoFetch;
   channels?: readonly LiveChannel[];
@@ -186,12 +189,23 @@ export function createResolverApp(deps: ResolverDeps) {
   }
 
   async function makoMasterFor(mediaUrl: string, cdn: string, userAgent: string): Promise<Response> {
-    const master = await makoTicketedMaster(mediaUrl, cdn);
-    const r = await deps.fetch(master, {
-      headers: { 'user-agent': userAgent, referer: 'https://www.mako.co.il/' },
-    });
+    // Follow redirects by hand so every hop stays on Mako's CDNs.
+    let url = await makoTicketedMaster(mediaUrl, cdn);
+    let r: Response | undefined;
+    for (let hop = 0; hop < 5; hop++) {
+      r = await deps.fetch(url, {
+        headers: { 'user-agent': userAgent, referer: 'https://www.mako.co.il/' },
+        redirect: 'manual',
+      });
+      const location = r.status >= 300 && r.status < 400 ? r.headers.get('location') : null;
+      if (!location) break;
+      await r.body?.cancel();
+      url = makoUrl(new URL(location, url).toString());
+      r = undefined;
+    }
+    if (!r) return new Response('Mako master: too many redirects', { status: 502 });
     if (!r.ok) return new Response(`Mako master HTTP ${r.status}`, { status: r.status });
-    const body = absolutize(await r.text(), r.url || master);
+    const body = absolutize(await r.text(), url);
     return new Response(body, { headers: { 'content-type': HLS, 'cache-control': 'no-store' } });
   }
 
