@@ -287,3 +287,17 @@ A full-codebase review after the round 2 and simplify changes found 11 defects; 
 - **Reshet season keys used the season title**, so a renamed season would have moved its new episodes to
   season 101+ — keys now use Reshet's own season id (map key / position). Reshet's season and episode numbers
   were reset once more (before any viewer used them) so all keys follow the new scheme.
+
+### Code review, round 4, and security review, round 2 (2026-11-06)
+
+Security: no qualifying vulnerabilities; the one near miss (the Mako master fetch followed redirects
+without re-checking the host, reachable only if Mako itself were compromised) is closed — redirects are
+followed by hand on Mako's CDNs. Code review round 4 found 8 defects, all fixed: pruning old runs broke a
+foreign key and could stop startup (warnings are now pruned first, and pruning never blocks startup or
+publishing); a season read with exactly two dated episodes counted newest = 1 was numbered backwards (the
+check now works from two episodes; numbers were reset once more before anyone used the addon); scraped data
+is cleaned (junk image paths, zero durations) and validated before it is stored, so one bad show cannot
+make the catalog unreadable; a Kan refresh no longer hides new episodes or pauses a show for a week, is kept
+across a back-off, and a Kan show page that suddenly lists no episodes is a failed read (slices with
+unreadable pages are "partial"); after a container restart, runs of the previous process (same pid 1) are
+closed; a publish requested while one is running is no longer dropped.

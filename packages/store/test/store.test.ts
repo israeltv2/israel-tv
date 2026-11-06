@@ -65,9 +65,9 @@ test('delisted shows are kept but marked', () => {
 test('runs and stale-run cleanup', () => {
   const s = Store.open(tmp());
   const r = s.startRun('full', 'mako');
-  expect(s.closeStaleRuns()).toBe(0); // this process is alive
-  expect(s.lastRun('full', 'mako')).toMatchObject({ id: r, status: 'running' });
-  expect(s.closeStaleRuns(() => false)).toBe(1);
+  // Called at startup, before this process starts runs: a run with our own pid is a leftover (e.g. pid 1 in
+  // a container); a run of another live process is kept.
+  expect(s.closeStaleRuns(() => true)).toBe(1);
   expect(s.lastRun('full', 'mako')).toMatchObject({ id: r, status: 'failed' });
 });
 
@@ -84,4 +84,15 @@ test('a warning already recorded for the same show is not repeated', () => {
       .map((w) => w.message)
       .sort(),
   ).toEqual(['other', 'same']);
+});
+
+test('prune removes old warnings before the runs they belong to', () => {
+  const s = Store.open(tmp());
+  const r = s.startRun('full', 'mako');
+  s.finishRun(r, { status: 'ok' });
+  s.addWarnings(r, null, [{ code: 'x', message: 'y' }]);
+  s.db.$client.exec("update runs set startedAt = '2000-01-01T00:00:00.000Z'");
+  expect(() => s.prune(60)).not.toThrow();
+  expect(s.recentRuns()).toEqual([]);
+  expect(s.recentWarnings()).toEqual([]);
 });

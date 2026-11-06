@@ -53,3 +53,39 @@ export const ScrapedShow = z.strictObject({
   notes: z.array(z.string()).optional(),
 });
 export type ScrapedShow = z.infer<typeof ScrapedShow>;
+
+const isHttpUrl = (u: unknown) => typeof u === 'string' && /^https?:\/\//.test(u) && URL.canParse(u);
+
+/**
+ * Drop optional fields a source filled with junk (relative image paths, zero durations), then validate.
+ * A show that is still invalid fails with the field path, so only that show is affected.
+ */
+export function cleanShow(show: ScrapedShow): ScrapedShow {
+  const optUrl = <T extends object, K extends keyof T>(o: T, k: K): T => {
+    if (o[k] !== undefined && !isHttpUrl(o[k])) {
+      const { [k]: _, ...rest } = o;
+      return rest as T;
+    }
+    return o;
+  };
+  const cleaned: ScrapedShow = {
+    ...optUrl(optUrl(optUrl(show, 'poster'), 'background'), 'pageUrl'),
+    seasons: show.seasons.map((s) => ({
+      ...s,
+      episodes: s.episodes.map((e) => {
+        let ep = optUrl(e, 'thumbnail');
+        if (ep.durationSec !== undefined && !(Number.isInteger(ep.durationSec) && ep.durationSec > 0)) {
+          const { durationSec: _, ...rest } = ep;
+          ep = rest;
+        }
+        return { ...ep, streams: ep.streams.filter((x) => isHttpUrl(x.url)) };
+      }),
+    })),
+  };
+  const r = ScrapedShow.safeParse(cleaned);
+  if (!r.success) {
+    const i = r.error.issues[0];
+    throw new Error(`source data failed validation at ${i?.path.join('.') ?? '?'}: ${i?.message ?? ''}`);
+  }
+  return r.data;
+}
