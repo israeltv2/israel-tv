@@ -46,7 +46,7 @@ export async function runResolverOnly(config: Config): Promise<number> {
         'resolver.remote.port',
       );
       log(
-        `remote resolver (Mako away from home) served at ${config.resolver.remote.publicUrl} — \`israel-tv remote-url\` prints the link`,
+        `remote resolver (Mako away from home) served at ${config.resolver.remote.publicUrl} — \`pnpm resolver remote-url\` prints the link`,
       );
     }
   }

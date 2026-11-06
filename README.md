@@ -78,7 +78,7 @@ it (start from [`.env.example`](.env.example)).
 ## Roles
 
 Pick one; each has a minimal `israel-tv.config.example.json` and `.env.example` in [`examples/`](examples) (copy
-them next to the repo root as `israel-tv.config.json` and `.env`). The role is the config's `role`, or, when it is
+them into the repo root — the folder you run `pnpm` from — as `israel-tv.config.json` and `.env`). The role is the config's `role`, or, when it is
 not set, follows the publisher (Cloudflare: `host`; local: `local-only` — the no-config Quick start). The start
 refuses settings the role cannot use, and says what to change.
 
@@ -103,7 +103,7 @@ pnpm resolver start             # then install http://<this machine>:7701/manife
 It refuses a catalog it cannot use and says why (a mistyped `catalogUrl`, or a catalog whose host runs a version
 of Israel TV that speaks another contract version). Outside Israel, also add the `geo` block from
 [Outside Israel](#outside-israel-add-a-proxy). It has no admin page or usage dashboard; its events and logs are
-local (`pnpm logs …` from a full install, or the log). Service files: `deploy/israel-tv-resolver.service`,
+local (`pnpm resolver events`, and the log in `data/logs/current.log`). Service files: `deploy/israel-tv-resolver.service`,
 `deploy/org.israel-tv.resolver.plist`, `deploy/docker-compose.resolver.yml`.
 
 ## Outside Israel: add a proxy
@@ -232,7 +232,7 @@ Only Mako's routes are there — its manifest, stream requests and the small pla
 Mako's CDN to the player, never through your home or the tunnel. Every other path, and any request without the
 token, gets an empty 404, and each client is rate-limited. Change the token to revoke all installs. Plays through
 this link are counted on your usage page under "This home", like plays at home (a resolver-only instance keeps
-them in its event log: `pnpm logs`).
+them in its event log: `pnpm resolver events`).
 
 ## Kan VOD
 

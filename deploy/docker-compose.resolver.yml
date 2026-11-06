@@ -6,6 +6,7 @@
 #   sudo chown -R 1000:1000 deploy/resolver-data   # last: the container runs as uid 1000 and must read .env
 #   docker compose -f deploy/docker-compose.resolver.yml up -d --build
 # In your app install http://<this machine's LAN IP>:7701/manifest.json next to the public catalog.
+# Logs: deploy/resolver-data/data/logs/current.log (rotated files, from the example config's "log").
 # Check the catalog: docker compose -f deploy/docker-compose.resolver.yml exec israel-tv-resolver node apps/resolver/src/cli.ts check-catalog
 services:
   israel-tv-resolver:
