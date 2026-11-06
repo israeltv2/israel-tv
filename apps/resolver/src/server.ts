@@ -44,7 +44,7 @@ export function resolverApp(
     ...extra,
     modules: { makoAuth: config.resolver.makoAuth.enabled, geoRelay: config.resolver.geoRelay.enabled },
     branding: { ...(logo ? { logo } : {}), ...(background ? { background } : {}) },
-    ...lookups(config),
+    ...lookups(config, extra.log?.('resolver')),
     fetch: (url, init) => fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }),
     ...(proxies.length > 0 ? { geoFetch: createGeoFetch(proxies) } : {}),
   });
@@ -85,7 +85,7 @@ export function remoteResolverApp(
     {
       ...extra,
       branding: { ...(logo ? { logo } : {}), ...(background ? { background } : {}) },
-      ...lookups(config),
+      ...lookups(config, extra.log?.('resolver')),
       fetch: (url, init) => fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }),
     },
   );
@@ -95,32 +95,52 @@ export function remoteResolverApp(
  * Episode details from a published Israel TV catalog instead of the home database (for a resolver that runs
  * without ingest): the per-season play files and the external-id map, fetched and kept a while.
  */
-export function catalogLookup(catalogUrl: string, fetchImpl: typeof fetch = fetch) {
+export function catalogLookup(
+  catalogUrl: string,
+  fetchImpl: typeof fetch = fetch,
+  log: (msg: string, fields?: Record<string, unknown>) => void = () => {},
+  now: () => number = Date.now,
+) {
   const base = catalogUrl.replace(/\/+$/, '').replace(/\/manifest\.json$/, '');
-  const seasons = new Map<string, { at: number; data: Promise<SeasonPlay> }>();
-  let ext: { at: number; data: Promise<Record<string, { id: string; seasons: number[] }>> } | undefined;
-  const getJson = async <T>(path: string, empty: T): Promise<T> => {
+  /** A file as fetched: its data, or `missing` (404: nothing there), kept a while; failures are not kept. */
+  type Got<T> = { at: number; data: T };
+  const seasons = new Map<string, Got<SeasonPlay>>();
+  let ext: Got<Record<string, { id: string; seasons: number[] }>> | undefined;
+  /** The file's content; `{}` when it does not exist; undefined when the catalog could not be reached. */
+  const getJson = async <T>(path: string, empty: T): Promise<T | undefined> => {
     try {
       const r = await fetchImpl(`${base}/${path}`, { signal: AbortSignal.timeout(15_000) });
-      return r.ok ? ((await r.json()) as T) : empty;
-    } catch {
-      return empty;
+      if (r.status === 404) return empty;
+      if (!r.ok) {
+        log('catalog fetch failed', { path, status: r.status });
+        return undefined;
+      }
+      return (await r.json()) as T;
+    } catch (err) {
+      log('catalog fetch failed', { path, error: (err as Error).message });
+      return undefined;
     }
   };
   const SEASON_TTL = 10 * 60_000;
+  /** A file kept longer than this is fetched again when it lacks what was asked (e.g. a just-published episode). */
+  const RECHECK_MS = 60_000;
+  async function season(series: string, n: number, wanted: string): Promise<SeasonPlay | undefined> {
+    const key = `${series}/${n}`;
+    const hit = seasons.get(key);
+    const fresh = hit && now() - hit.at <= SEASON_TTL;
+    if (fresh && (hit.data[wanted] || now() - hit.at <= RECHECK_MS)) return hit.data;
+    const data = await getJson<SeasonPlay>(sitePaths.seasonPlay(series, n), {});
+    if (data === undefined) return hit?.data; // unreachable now: keep using what we had, if anything
+    seasons.set(key, { at: now(), data });
+    if (seasons.size > 500) seasons.delete(seasons.keys().next().value as string);
+    return data;
+  }
   return {
-    async episode(series: string, season: number, episode: number): Promise<ScrapedEpisode | undefined> {
-      const key = `${series}/${season}`;
-      let hit = seasons.get(key);
-      if (!hit || Date.now() - hit.at > SEASON_TTL) {
-        hit = { at: Date.now(), data: getJson<SeasonPlay>(sitePaths.seasonPlay(series, season), {}) };
-        seasons.set(key, hit);
-        if (seasons.size > 500) seasons.delete(seasons.keys().next().value as string);
-      }
-      const p = (await hit.data)[String(episode)];
+    async episode(series: string, n: number, episode: number): Promise<ScrapedEpisode | undefined> {
+      const p = (await season(series, n, String(episode)))?.[String(episode)];
       if (!p) return undefined;
       return {
-        key: `${series}:${season}:${episode}`,
+        key: `${series}:${n}:${episode}`,
         title: '',
         streams: p.direct ? [{ url: p.direct, kind: 'direct' }] : [],
         ...(p.mako ? { play: p.mako } : {}),
@@ -128,20 +148,26 @@ export function catalogLookup(catalogUrl: string, fetchImpl: typeof fetch = fetc
       };
     },
     async external(id: string): Promise<ExternalHit | undefined> {
-      if (!ext || Date.now() - ext.at > 60 * 60_000)
-        ext = { at: Date.now(), data: getJson(sitePaths.extIds, {}) };
-      const hit = (await ext.data)[id];
+      const stale = !ext || now() - ext.at > 60 * 60_000 || (!ext.data[id] && now() - ext.at > RECHECK_MS);
+      if (stale) {
+        const data = await getJson<Record<string, { id: string; seasons: number[] }>>(sitePaths.extIds, {});
+        if (data !== undefined) ext = { at: now(), data };
+      }
+      const hit = ext?.data[id];
       return hit ? { series: hit.id, seasons: hit.seasons } : undefined;
     },
   };
 }
 
 /** Where the resolver gets episode details: a published catalog (resolver-only role) or the home database. */
-export function lookups(config: Config): Pick<ResolverDeps, 'episode' | 'external'> {
+export function lookups(
+  config: Config,
+  log?: (msg: string, fields?: Record<string, unknown>) => void,
+): Pick<ResolverDeps, 'episode' | 'external'> {
   if (roleOf(config) === 'resolver-only') {
     if (!config.resolver.catalogUrl)
       throw new Error('resolver.catalogUrl is needed for the resolver-only role');
-    const c = catalogLookup(config.resolver.catalogUrl);
+    const c = catalogLookup(config.resolver.catalogUrl, fetch, log);
     return { episode: c.episode, external: c.external };
   }
   return { episode: episodeLookup(config.store.path), external: externalLookup(config.store.path) };
