@@ -999,6 +999,9 @@ Workers Logs line per request, for debugging.
   subpath imports `#…` add nothing yet; they are the rule if a package grows nested folders). No tsconfig `paths`.
 - **`tsc --build` / project references:** not adopted. TypeScript 7 type-checks the whole workspace in seconds per
   package; references would add config to keep in sync for no measured gain.
-- **CI:** the full suite on ubuntu-latest, macos-latest and windows-latest; lint, boundaries and hygiene once (on
+- **CI:** the full suite on ubuntu-latest and windows-latest for every pull request (macOS runners were never
+  assigned to this private repository — queued, then cancelled after 15 minutes, four runs in a row — so macOS runs
+  as a non-blocking job on `main`, and is the platform every local run and the live deployment use; it rejoins the
+  required matrix once the repository is public); lint, boundaries and hygiene once (on
   Linux); `pnpm audit --prod` on every pull request, reporting only (no bots, no automatic updates; updates are
   done on request with `pnpm up -i -r --latest`).

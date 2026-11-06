@@ -7,11 +7,13 @@ permissions:
   contents: read
 jobs:
   check:
-    # Every role must run on Windows, macOS and Linux: the whole suite runs on all three.
+    # Every role must run on Windows, macOS and Linux. Pull requests check Linux and Windows; macOS runners are
+    # not assigned to this private repository (queued, then cancelled), so macOS runs as its own job on main
+    # without blocking (and is the development and deployment platform besides). Back in this matrix when public.
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -28,6 +30,21 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
       - run: pnpm hygiene
         if: matrix.os == 'ubuntu-latest'
+      - run: pnpm test:strict
+  macos:
+    if: github.event_name == 'push'
+    runs-on: macos-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
       - run: pnpm test:strict
   audit:
     # Known vulnerabilities in dependencies: reported on every pull request, never fixed by a bot.
