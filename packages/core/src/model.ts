@@ -49,5 +49,7 @@ export const ScrapedShow = z.strictObject({
   /** Seasons in the order the source lists them. */
   seasons: z.array(ScrapedSeason),
   pageUrl: z.url().optional(),
+  /** Problems the reader worked around (e.g. a dead season link); recorded as warnings. */
+  notes: z.array(z.string()).optional(),
 });
 export type ScrapedShow = z.infer<typeof ScrapedShow>;

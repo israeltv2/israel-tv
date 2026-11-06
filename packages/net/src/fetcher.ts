@@ -96,7 +96,8 @@ export function createFetcher(opts: FetcherOptions): Fetcher {
         if (r.status === 407 && opts.proxies && opts.proxies.length > 1) {
           proxyIndex++;
           lastErr = new HttpError(url, 407);
-        } else if (r.status === 429 || r.status >= 500) {
+        } else if ((r.status === 403 || r.status === 429 || r.status >= 500) && attempt < retries) {
+          // 403 included: bot walls answer it intermittently; a short pause usually clears it.
           lastErr = new HttpError(url, r.status);
         } else {
           return r;

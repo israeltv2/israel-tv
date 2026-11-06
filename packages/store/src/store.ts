@@ -285,6 +285,21 @@ export class Store {
       .map((r) => this.toShowRow(r));
   }
 
+  /** Source key of the episode published as season/episode of a series. */
+  episodeKey(seriesId: string, season: number, episode: number): string | undefined {
+    return this.db
+      .select({ key: t.episodes.key })
+      .from(t.episodes)
+      .where(
+        and(
+          eq(t.episodes.seriesId, seriesId),
+          eq(t.episodes.season, season),
+          eq(t.episodes.episode, episode),
+        ),
+      )
+      .get()?.key;
+  }
+
   // ---- runs and warnings ----------------------------------------------------------------------------
 
   startRun(kind: RunKind, scope: string): number {

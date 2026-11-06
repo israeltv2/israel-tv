@@ -1,6 +1,6 @@
-/** Parse Mako-style `dd.mm.yy` or `dd.mm.yyyy` into `yyyy-mm-dd`; undefined when not a real date. */
+/** Parse `dd.mm.yy`, `dd.mm.yyyy` or `dd/mm/yyyy` into `yyyy-mm-dd`; undefined when not a real date. */
 export function parseDottedDate(s: string | undefined | null): string | undefined {
-  const m = /(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b/.exec(s ?? '');
+  const m = /(\d{1,2})[./](\d{1,2})[./](\d{2}|\d{4})\b/.exec(s ?? '');
   if (!m) return undefined;
   const day = Number(m[1]);
   const month = Number(m[2]);

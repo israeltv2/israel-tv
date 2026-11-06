@@ -1,6 +1,6 @@
 // Network side of the Mako reader: index, one show (all seasons), playlist.
 import type { ScrapedEpisode, ScrapedShow } from '@israel-tv/core';
-import type { Fetcher } from '@israel-tv/net';
+import { type Fetcher, HttpError } from '@israel-tv/net';
 import {
   episodesFromPage,
   MAKO_ORIGIN,
@@ -35,9 +35,16 @@ export async function fetchShow(
   const byKey = new Map<string, ScrapedEpisode[]>();
   const current = refs.find((r) => r.current);
   if (current) byKey.set(current.key, episodesFromPage(page));
+  const notes: string[] = [];
   for (const r of refs) {
     if (byKey.has(r.key) || opts.currentSeasonOnly) continue;
-    byKey.set(r.key, episodesFromPage(parseShowPage(await f.json(`${MAKO_ORIGIN}${r.key}${q}`))));
+    try {
+      byKey.set(r.key, episodesFromPage(parseShowPage(await f.json(`${MAKO_ORIGIN}${r.key}${q}`))));
+    } catch (err) {
+      // Mako sometimes lists a season whose page is gone; skip it rather than lose the whole show.
+      if (!(err instanceof HttpError && err.status === 404)) throw err;
+      notes.push(`season "${r.title}" (${r.key}) is listed but its page is gone (404)`);
+    }
   }
   const art = showArtwork(page);
   return {
@@ -50,6 +57,7 @@ export async function fetchShow(
     ...(art.background ? { background: art.background } : {}),
     seasons: seasonsFrom(refs, byKey),
     pageUrl: `${MAKO_ORIGIN}${entry.key}`,
+    ...(notes.length ? { notes } : {}),
   };
 }
 

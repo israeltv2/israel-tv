@@ -3,6 +3,8 @@ import { parseArgs } from 'node:util';
 import { ConfigError, parseSeriesId, type Source } from '@israel-tv/core';
 import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
+import { startDaemon } from './daemon.ts';
+import { checkLive, liveRender } from './live.ts';
 import { startLocalServer } from './local-server.ts';
 import { deploy, renderFromStore, writeSite } from './publish.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
@@ -13,6 +15,8 @@ const HELP = `israel-tv <command>
   full [--source mako] [--limit N]   Read every show of each enabled source (all seasons)
   airing [--source mako]             Re-check shows with a recent episode (current season only)
   show <series-id | source:key>      Re-read one show, e.g. iltv_mako_12 or mako:/mako-vod-keshet/uvda
+  start                              Run everything: schedules, admin, local addon server, resolver
+  resolver                           Run only the private resolver
   publish                            Render the addon files and deploy them with the configured publisher
   serve                              Serve the rendered files on the local network (local publisher)
   status                             Recent runs and warnings
@@ -50,6 +54,12 @@ async function main(argv: string[]): Promise<number> {
       case 'full': {
         let ok = true;
         for (const a of pick(values.source)) ok = (await runFull(store, a, opts)).status !== 'failed' && ok;
+        if (config.sources.live && (!values.source || values.source === 'live')) {
+          const r = await checkLive(store);
+          log(
+            `live: ${r.ok} channels answering${r.failed.length ? `, not answering: ${r.failed.join(', ')}` : ''}`,
+          );
+        }
         return ok ? 0 : 1;
       }
       case 'airing': {
@@ -80,7 +90,7 @@ async function main(argv: string[]): Promise<number> {
       }
       case 'publish': {
         const t0 = Date.now();
-        const files = renderFromStore(store, config, []);
+        const files = renderFromStore(store, config, config.sources.live ? liveRender() : []);
         const w = writeSite(config.publisher.dir, files);
         log(
           `rendered ${w.total} files (${w.written} changed, ${w.deleted} removed) in ${Date.now() - t0} ms`,
@@ -89,6 +99,18 @@ async function main(argv: string[]): Promise<number> {
         log(
           `published (${config.publisher.type}): ${d.detail}${d.url ? ` ${d.url}` : ''} in ${Math.round(d.ms / 1000)} s`,
         );
+        return 0;
+      }
+      case 'start': {
+        startDaemon(config, store, log);
+        await new Promise(() => {});
+        return 0;
+      }
+      case 'resolver': {
+        const { startResolver } = await import('@israel-tv/resolver');
+        startResolver(config);
+        log(`resolver: http://${config.resolver.host}:${config.resolver.port}/manifest.json`);
+        await new Promise(() => {});
         return 0;
       }
       case 'serve': {

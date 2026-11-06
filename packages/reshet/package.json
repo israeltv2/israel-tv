@@ -1,0 +1,18 @@
+{
+  "name": "@israel-tv/reshet",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@israel-tv/core": "workspace:*",
+    "@israel-tv/net": "workspace:*",
+    "zod": "4.6.7"
+  }
+}
