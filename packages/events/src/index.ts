@@ -161,7 +161,7 @@ export class EventStore {
         failures: number | null;
         minutes: number | null;
       }>(sql`select ${l.cols},
-            sum(case when kind in ('play_start', 'relay_session') then 1 else 0 end) as plays,
+            sum(case when kind = 'play_start' or (kind = 'relay_session' and outcome = 'ok') then 1 else 0 end) as plays,
             count(distinct case when kind in ('stream_request', 'play_start', 'relay_session') then client end) as clients,
             sum(case when kind = 'failure' then 1 else 0 end) as failures,
             coalesce(sum(case when kind = 'relay_session' then json_extract(detail, '$.durationMs') end), 0) / 60000.0 as minutes

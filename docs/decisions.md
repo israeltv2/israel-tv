@@ -740,3 +740,31 @@ the database). Then only catalog rows run the Worker (for the stale-row warning)
 are plain static files again. Only the very first publish of a brand-new install, before any address is known,
 still sends the manifest and metadata through the Worker to fill the address in; its next publish switches over
 by itself. The local server keeps filling in its address per request (it is reached under different LAN names).
+
+### Code review, round 2 (second pass)
+
+Four findings, fixed: a relayed play the broadcaster refused with 403 left no event (an early return meant for
+forged URLs also caught upstream 403s — only the relay's own refusals are skipped now); the public "failed"
+totals were always 0 on the Workers Logs path (failures are now counted at every level); a relay session that
+delivered nothing counted as a play (only successful sessions count); relay sessions open at a restart or at the
+nightly rollup were lost or landed in an already rolled-up day (they are written on shutdown and before the
+rollup).
+
+### Kan artwork: loaded as an image, not fetched
+
+Measured on the deployment: Kan answered 403 to the in-page `fetch()` of its share images even within the session
+that passed its check. The browser now loads the image as an image (the loader lets exactly that URL through)
+and draws it on a canvas (same site, so the canvas can be read back).
+
+### Intuitiveness review, round 2 (three fresh readers: home user, self-hoster abroad, debugging agent)
+
+All findings fixed in the docs (and two in code): the remote token must be URL-safe (`openssl rand -hex 32`;
+a base64 token with `/` never matched — the resolver now refuses such a token with that advice); a full Cloudflare
+Tunnel recipe with a config snippet, and that other tunnels share one rate limit; every admin `curl` shows the
+token and where it comes from; the `events` flags in the commands table (`--play`, `--show`), the missing
+commands (`admin-url`, `remote-url`, `restore`, `usage`) and the `pnpm logs` alias; what runs the Worker and the
+per-client limits; the optional Analytics Engine permission and switch; a Mac note (fixed address, no sleep,
+firewall prompt); headless and Docker access to the dashboard, Docker paths, ports and command forms, systemd
+command forms and `journalctl`; a section for "a catalog row says it is old"; what "none needed" means for
+debugging; that remote plays count under "This home"; and log scrubbing now covers every secret the config
+names, whatever its variable is called (it only matched names containing TOKEN, PASS, … before).

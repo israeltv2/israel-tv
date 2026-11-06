@@ -54,6 +54,11 @@ first gives catalogs, metadata and the streams that need no token; the second pl
 geo-blocked video. (If the log shows only `127.0.0.1`, find the machine's address with
 `ipconfig getifaddr en0` on macOS or `hostname -I` on Linux.)
 
+**On a Mac:** reserve the Mac's address in your router (or use `<computer-name>.local` in the addon links), so
+the links in your app keep working; set it not to sleep (_System Settings → Energy → Prevent automatic sleeping_),
+or playback and the night's reads stop; and choose _Allow_ when macOS asks whether `node` may accept incoming
+connections.
+
 The first start reads Mako and Reshet right away (about 30 minutes; one request per second, so the sites
 are not hammered), then every night, and for shows that are airing every hour (every 15 minutes in the
 evening). It also starts the Kan crawl, which opens Chrome in an off-screen window every ten minutes; if you
@@ -112,14 +117,21 @@ fails, that stream answers 502, the log says why, and the admin `/status` shows 
 1. Create a free Cloudflare account and open **Workers & Pages**. Choose your `<subdomain>.workers.dev`
    subdomain when asked (publishing fails until one exists; it can be changed later under _Account
    settings_). The **Account ID** is in the right-hand column of the same page. The free plan allows
-   100,000 Worker requests a day; catalogs and metadata are static files and do not count.
+   100,000 Worker requests a day; see below for what counts.
 2. Create an API token (_My Profile → API Tokens → Create Token_) from the **Edit Cloudflare Workers**
    template, limited to your account. Put the token and the account id in `.env` as
-   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Optional, for the public addon's usage counts: add the
+   permission **Account → Account Analytics → Read** to the token, and switch on **Workers Analytics Engine**
+   once (dashboard → _Workers & Pages_ → _Analytics Engine_ → enable; free). Without them the counts come from
+   Workers Logs, which the template's permissions already read, and `/status` says so.
 3. In `israel-tv.config.json`: `"publisher": { "type": "cloudflare", "workerName": "israel-tv" }`.
 
-After each run the changed files are uploaded (`wrangler deploy`; static files are free and unlimited, the
-Worker only answers search, streams, paging and `/status`). `pnpm israel-tv publish` does it by hand and
+After each run the changed files are uploaded (`wrangler deploy`). Metadata, images and the manifest are static
+files (free and unlimited); the Worker answers catalog rows (one request per row an app loads), search, streams
+and `/status` — those count toward the 100,000 a day, which is plenty for a household and friends. Past it,
+Cloudflare answers errors until midnight UTC. Search and stream requests are also limited per client: 60
+searches and 120 stream requests a minute (devices behind one home address share it); over it, the addon
+answers HTTP 429 for a minute. `pnpm israel-tv publish` does it by hand and
 prints the URL to install: `https://israel-tv.<subdomain>.workers.dev/manifest.json` (a brand-new
 workers.dev name can take a minute to resolve). To preview what it serves: `pnpm israel-tv serve` (or `serve --port N`; it renders the current data first; then open
 `http://127.0.0.1:7700/manifest.json`).
@@ -138,6 +150,7 @@ What friends who install your public addon get:
 - Live channels that need no token: Kan 11, Kan Educational, Makan 33, Reshet 13, 14, i24 (4 languages),
   Knesset, ynet, Calcala 10. Kan's channels can be geo-blocked outside Israel.
 - Reshet and Kan episodes: only for friends inside Israel.
+- The per-client limits above (a friend's whole household shares them).
 - **Not** Mako episodes, or the Keshet 12, 24, Eretz Nehederet and Savri Maranan live channels: those need
   a resolver, and the resolver needs the database of the instance that collected the data. Don't expose your
   resolver to the internet (it has no login and would relay through your proxy). Friends who want Mako run
@@ -149,17 +162,26 @@ play; enable Reshet (and Kan) if you want them to have episodes to watch.
 ### Mako away from home
 
 The home resolver answers only on your network, and Mako plays only through it. To watch Mako elsewhere (on a
-phone, at a friend's), you can open a narrow second door to it through a tunnel you run, such as Cloudflare
-Tunnel pointing a hostname of yours at the machine:
+phone, at a friend's), you can open a narrow second door to it through a **Cloudflare Tunnel** to the machine
+(it needs a domain of yours on Cloudflare; a workers.dev name does not work for tunnels). Other tunnels work but
+do not pass each viewer's address, so all viewers then share one rate limit.
 
-- set `resolver.remote` (`enabled`, `publicUrl` = the tunnel's address) and a long random
-  `ISRAEL_TV_REMOTE_TOKEN` in `.env` (`openssl rand -base64 32`);
-- point the tunnel at `127.0.0.1:7703` (and nothing else: never the admin port);
-- install the link `pnpm israel-tv remote-url` prints (it contains the token; keep it private).
+1. Make a token: `openssl rand -hex 32`, and put it in `.env` as `ISRAEL_TV_REMOTE_TOKEN=…` (letters and digits
+   only: it is part of a URL).
+2. In `israel-tv.config.json`:
+   `"resolver": { "remote": { "enabled": true, "publicUrl": "https://tv-remote.example.net" } }` — the tunnel's
+   `https://` address, without the token.
+3. Route that hostname to `http://127.0.0.1:7703` in the tunnel (and nothing else: never the admin port). With
+   `cloudflared`: add `- hostname: tv-remote.example.net` / `service: http://127.0.0.1:7703` to the ingress
+   list in `~/.cloudflared/config.yml` (before the catch-all), then `cloudflared tunnel route dns <tunnel>
+   tv-remote.example.net` and restart cloudflared.
+4. Restart Israel TV, then install the link `pnpm israel-tv remote-url` prints (it contains the token; keep it
+   private).
 
 Only Mako's routes are there — its manifest, stream requests and the small playlist per play; video comes from
 Mako's CDN to the player, never through your home or the tunnel. Every other path, and any request without the
-token, gets an empty 404, and each client is rate-limited. Change the token to revoke all installs.
+token, gets an empty 404, and each client is rate-limited. Change the token to revoke all installs. Plays through
+this link are counted on your usage page under "This home", like plays at home.
 
 ## Kan VOD
 
@@ -226,7 +248,8 @@ an IP address: a device is counted by a salted hash of its address that changes 
 turned back into an address or followed from one day to the next. These records stay in your own database
 (`data/events.sqlite`): 30 days in detail, a year as daily totals. The public addon only counts stream requests
 (with the same kind of hash), through your own Cloudflare account (Workers Logs keeps its lines a few days;
-Analytics Engine keeps the counts); catalog browsing is not counted at all. You can see it all on the admin page
+Analytics Engine keeps the counts); showing a show's page is not counted, and a catalog row only as a request
+count. You can see it all on the admin page
 at `/usage` (yours only: it needs the admin token). If you share your addon with friends, tell them this.
 
 ## Development

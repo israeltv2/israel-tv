@@ -83,3 +83,30 @@ test('totals are not displaced by events without a source or show, and the canar
   });
   expect(rows.filter((r) => r.source === '' && r.showId === '')).toHaveLength(1);
 });
+
+test('a relay session that delivered nothing is a failure, not a play', () => {
+  const db = EventStore.open(':memory:');
+  db.record(
+    ev({
+      kind: 'relay_session',
+      component: 'geo-relay',
+      outcome: 'error',
+      client: 'a',
+      source: 'reshet',
+      showId: 'iltv_reshet_1',
+      detail: { segments: 0 },
+    }),
+  );
+  db.record(
+    ev({
+      kind: 'relay_session',
+      component: 'geo-relay',
+      outcome: 'ok',
+      client: 'a',
+      source: 'reshet',
+      showId: 'iltv_reshet_1',
+      detail: { segments: 4, durationMs: 60_000 },
+    }),
+  );
+  expect(db.homeDay(day).find((r) => r.source === '' && r.showId === '')).toMatchObject({ plays: 1 });
+});

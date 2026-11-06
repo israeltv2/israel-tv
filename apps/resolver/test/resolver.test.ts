@@ -385,3 +385,26 @@ test('the remote resolver: Mako only, behind its token, nothing else, limited pe
     ),
   ).toThrow(/32 characters/);
 });
+
+test('a relayed play the broadcaster refuses is recorded as a failure (only forged URLs are not)', async () => {
+  const events: { kind: string; detail?: Record<string, unknown> }[] = [];
+  const app = createResolverApp({
+    episode: () => ({
+      key: 'k',
+      title: 't',
+      streams: [{ url: 'https://cdnapisec.kaltura.com/p/1/x.m3u8', kind: 'direct' }],
+    }),
+    onEvent: (e) => events.push(e),
+    geoFetch: (async () => new Response('refused', { status: 403 })) as never,
+    fetch: async () => new Response('', { status: 403 }),
+  });
+  const s = await (await app.request('http://h/stream/series/iltv_reshet_1:1:1.json')).json();
+  const relay = new URL(s.streams[0].url);
+  expect((await app.request(`${relay.pathname}${relay.search}`)).status).toBe(403);
+  expect(events.map((e) => e.kind)).toEqual(['stream_request', 'failure']);
+  expect(events[1]?.detail?.stage).toBe('relay');
+  // A forged relay URL is refused without recording anything.
+  const forged = `${relay.pathname.replace(/\/relay\/[^/]+\//, '/relay/forgedsignature000000/')}${relay.search}`;
+  expect((await app.request(forged)).status).toBe(403);
+  expect(events).toHaveLength(2);
+});

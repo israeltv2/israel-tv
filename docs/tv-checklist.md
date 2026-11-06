@@ -15,7 +15,7 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
   of rows between addons (this addon's rows vs. others) is set in Nuvio's settings (home screen / catalog
   order), not by the addon.
 
-- [ ] Away from home (phone on mobile data): add the link `israel-tv remote-url` prints (the "Israel TV · Mako (away
+- [ ] Away from home (phone on mobile data): add the link `pnpm israel-tv remote-url` prints (the "Israel TV · Mako (away
   from home)" addon) and play a Mako episode and קשת 12 live. Remove it again from devices you don't own.
 
 ## Catalogs and metadata
@@ -48,7 +48,7 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 
 ## Usage dashboard
 
-- [ ] On a laptop at home, open the link `israel-tv admin-url` prints: the page shows "This home (resolver)" with
+- [ ] On a laptop at home, open the link `pnpm israel-tv admin-url` prints: the page shows "This home (resolver)" with
   the plays just made, "Playing now" while something plays, and the playback canary as pass for each source.
 - [ ] The same address from a guest device without the link answers "not found".
 
@@ -61,5 +61,5 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 
 - [ ] The evening after a new episode airs, it appears within the airing-check window (15 minutes in the
   evening, hourly otherwise) without any action.
-- [ ] For an immediate re-read of one show: `curl -X POST http://<host>:7702/refresh/<series-id>` from the
-  home network (the id is in the show's URL in the app, e.g. `iltv_mako_12`).
+- [ ] For an immediate re-read of one show: `curl -X POST -H "Authorization: Bearer <admin token>" http://<host>:7702/refresh/<series-id>` from the
+  home network (find the series id in `https://<addon>/registry.json` (search the show's title), e.g. `iltv_mako_12`).

@@ -1,5 +1,25 @@
 {
-  "browser": { "type": "none" },
-  "store": { "path": "./israel-tv.sqlite" },
-  "publisher": { "type": "cloudflare", "workerName": "israel-tv", "dir": "./site" }
+  "browser": {
+    "type": "none"
+  },
+  "store": {
+    "path": "./israel-tv.sqlite"
+  },
+  "publisher": {
+    "type": "cloudflare",
+    "workerName": "israel-tv",
+    "dir": "./site"
+  },
+  "events": {
+    "path": "./events.sqlite"
+  },
+  "backup": {
+    "dir": "./backups"
+  },
+  "resolver": {
+    "remote": {
+      "enabled": false,
+      "host": "0.0.0.0"
+    }
+  }
 }

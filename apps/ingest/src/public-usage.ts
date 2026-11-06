@@ -115,21 +115,19 @@ async function fromWorkersLogs(
       clients: clients.get(key(a)) ?? 0,
     }));
   };
-  const failures = new Map<string, number>(
-    (await query(['source', 'series'], [{ key: 'outcome', value: 'error' }])).map((r) => [
-      r.groups.map((g) => g.value).join('|'),
-      r.plays,
-    ]),
-  );
+  const key = (r: { groups: { value: string }[] }) => r.groups.map((g) => g.value).join('|');
   const rows: DailyRow[] = [];
   for (const [levels, src, show] of [
     [['source', 'series'], true, true],
     [['source'], true, false],
     [[], false, false],
   ] as const) {
+    // Failed requests at the same level, so every level (not only per show) has its failures.
+    const failures = new Map(
+      (await query([...levels], [{ key: 'outcome', value: 'error' }])).map((r) => [key(r), r.plays]),
+    );
     for (const r of await query([...levels])) {
       const g = (k: string) => r.groups.find((x) => x.key === k)?.value ?? '';
-      const k = r.groups.map((x) => x.value).join('|');
       rows.push({
         day,
         origin: 'public',
@@ -137,7 +135,7 @@ async function fromWorkersLogs(
         showId: show ? g('series') : '',
         plays: r.plays,
         uniqueClients: r.clients,
-        failures: show ? (failures.get(k) ?? 0) : 0,
+        failures: failures.get(key(r)) ?? 0,
         minutesWatched: 0,
       });
     }
