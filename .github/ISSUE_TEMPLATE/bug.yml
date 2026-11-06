@@ -1,0 +1,39 @@
+name: Bug in Israel TV itself
+description: Setup, the home helper, your own copy, or the docs do not work as described.
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please do not include passwords, tokens, your home address or anything else personal.
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part
+      options:
+        [
+          The public link,
+          The home helper (Docker),
+          The home helper (without Docker),
+          My own copy at home,
+          My own copy on Cloudflare,
+          Docs,
+        ]
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: e.g. Windows 11 with Docker Desktop, Raspberry Pi 5, macOS 15
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did, what you expected, what happened
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or log lines (remove anything personal)
+      render: text

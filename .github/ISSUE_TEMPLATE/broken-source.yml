@@ -1,0 +1,49 @@
+name: A show or channel does not work
+description: Something is missing, old, or does not play.
+title: "[broken] "
+labels: [broken-source]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! First check the [status page](https://israel-tv.israeltv2.workers.dev/status) — it may already say what is wrong. Please do not include passwords, tokens or your home address.
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Channel
+      options: [Keshet 12 (Mako), Reshet 13, Kan 11, Kan Kids & Teens, Live channel]
+    validations:
+      required: true
+  - type: input
+    id: what
+    attributes:
+      label: Show and episode (or live channel)
+      placeholder: e.g. "מאסטר שף", season 12 episode 3
+    validations:
+      required: true
+  - type: dropdown
+    id: problem
+    attributes:
+      label: What happens
+      options: [Does not play, Missing or old, Wrong episode or number, Something else]
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where are you watching from
+      options: [Inside Israel, Outside Israel]
+    validations:
+      required: true
+  - type: checkboxes
+    id: setup
+    attributes:
+      label: What you installed
+      options:
+        - label: The public link
+        - label: The home helper
+        - label: My own copy
+  - type: textarea
+    id: details
+    attributes:
+      label: Anything else (the app's message, when it started)

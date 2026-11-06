@@ -12,7 +12,7 @@
     "lint": "biome ci --error-on-warnings .",
     "format": "biome check --write .",
     "test": "pnpm -r --no-bail test",
-    "check": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm hygiene && pnpm test",
+    "check": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm hygiene && pnpm check:addresses && pnpm test",
     "start": "node apps/ingest/src/cli.ts start",
     "israel-tv": "node apps/ingest/src/cli.ts",
     "logs": "node apps/ingest/src/cli.ts events",
@@ -21,7 +21,8 @@
     "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages",
     "hygiene": "knip && pnpm -r --filter \"./packages/*\" --filter \"./apps/*\" exec publint --strict",
     "test:strict": "node tools/test-strict.mjs",
-    "smoke": "node tools/smoke.mjs"
+    "smoke": "node tools/smoke.mjs",
+    "check:addresses": "node tools/check-addresses.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

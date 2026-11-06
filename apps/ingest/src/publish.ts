@@ -404,7 +404,7 @@ export function publishError(
   const hint = outage
     ? "This looks like a problem on Cloudflare's side; it is retried after the next run.\n"
     : `Check ${p.apiTokenEnv} and ${p.accountIdEnv} in .env, that the token may edit Workers scripts, and that ` +
-      `your workers.dev subdomain exists (README, "Reachable from anywhere").\n`;
+      `your workers.dev subdomain exists (docs/setup/host.md).\n`;
   return new PublishError(
     `Cloudflare deploy failed: ${reason}\n${hint}wrangler said:\n${lines.slice(-12).join('\n')}`,
   );

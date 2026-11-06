@@ -104,7 +104,7 @@ function warnIfShared(file: string): void {
  * Two settings that can come from the environment, for a ready-made container where writing a config file is a
  * hurdle: ISRAEL_TV_CATALOG_URL (with no config file, this instance is a resolver-only one playing from that
  * catalog) and ISRAEL_TV_PROXY (a proxy URL with an Israeli exit, credentials included, used when the config sets
- * no `geo`). A config file always wins.
+ * no `geo`), and ISRAEL_TV_BROWSER=none (an image without a browser: Kan episodes off). A config file always wins.
  */
 export function withEnvSettings(
   raw: unknown,
@@ -116,6 +116,8 @@ export function withEnvSettings(
     out.role = 'resolver-only';
     out.resolver = { ...(out.resolver as object), catalogUrl: env.ISRAEL_TV_CATALOG_URL };
   }
+  // An image without a browser says so, so Kan episodes are simply off rather than failing.
+  if (env.ISRAEL_TV_BROWSER === 'none' && out.browser === undefined) out.browser = { type: 'none' };
   if (env.ISRAEL_TV_PROXY && out.geo === undefined) {
     let scheme: string;
     try {

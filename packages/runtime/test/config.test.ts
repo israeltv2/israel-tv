@@ -50,3 +50,11 @@ test('a container can be set up from the environment; a config file wins', async
   });
   expect(() => withEnvSettings({}, { ISRAEL_TV_PROXY: 'nonsense' }, false)).toThrow(/not a URL/);
 });
+
+test('an image without a browser turns Kan episodes off, unless the config says otherwise', async () => {
+  const { withEnvSettings } = await import('../src/config.ts');
+  expect(withEnvSettings({}, { ISRAEL_TV_BROWSER: 'none' }, false)).toEqual({ browser: { type: 'none' } });
+  expect(withEnvSettings({ browser: { type: 'chrome' } }, { ISRAEL_TV_BROWSER: 'none' }, true)).toEqual({
+    browser: { type: 'chrome' },
+  });
+});
