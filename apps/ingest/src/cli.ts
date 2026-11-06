@@ -14,7 +14,14 @@ import {
 import { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
 import { checkProxy, printEvents, remoteUrl, resolverApp, runResolverOnly } from '@israel-tv/resolver';
-import { createLogger, loadConfig, registerSecretNames, stopSignal } from '@israel-tv/runtime';
+import {
+  createLogger,
+  instancePaths,
+  instanceUrls,
+  loadConfig,
+  registerSecretNames,
+  stopSignal,
+} from '@israel-tv/runtime';
 import { Store } from '@israel-tv/store';
 import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
 import { crawlKan, kanCrawlOptions } from './kan.ts';
@@ -53,6 +60,8 @@ const HELP = `israel-tv <command>
   check-proxy                        Check that the geo proxy works and exits in Israel
   match                              Look up TMDB/IMDb ids for shows (needs tmdb in the config)
   status                             Recent runs and warnings
+  paths                              Where the config, the secrets file and the data are on this computer
+  urls                               The links to install in your app (as other devices on this network see them)
   events [--play P] [--kind K] [--errors] [--since 2h] [--show S] [--limit N]
                                      Usage and diagnostics events as JSON lines, oldest first (pnpm logs …)
   usage                              The usage dashboard's figures as JSON (pnpm usage)
@@ -61,7 +70,7 @@ const HELP = `israel-tv <command>
   remote-url                         The away-from-home (Mako) resolver's manifest URL, with its token
   help                               This text
 
-Config: israel-tv.config.json in the current folder (or ISRAEL_TV_CONFIG). Secrets: .env.`;
+Config: israel-tv.config.json and .env in the config folder (\`paths\` shows it; ISRAEL_TV_HOME picks another).`;
 
 /** A problem the user can fix; printed without a stack trace. */
 class UserError extends Error {
@@ -106,8 +115,23 @@ async function main(argv: string[]): Promise<number> {
   }
   // Commands that only read local state do not need the secrets of every configured service.
   const { config } = loadConfig(process.env, {
-    needSecrets: !['status', 'serve', 'events', 'usage', 'admin-url', 'restore', 'remote-url'].includes(cmd),
+    needSecrets: ![
+      'status',
+      'serve',
+      'events',
+      'usage',
+      'admin-url',
+      'restore',
+      'remote-url',
+      'paths',
+      'urls',
+    ].includes(cmd),
   });
+  // Where things are and how to reach them: answered by the app itself, on any operating system.
+  if (cmd === 'paths' || cmd === 'urls') {
+    for (const line of cmd === 'paths' ? instancePaths(config) : instanceUrls(config)) console.log(line);
+    return 0;
+  }
   // Every secret the config names (proxy login, Cloudflare, TMDB, admin and remote tokens) is kept out of logs
   // and published files, whatever its variable is called.
   registerSecretNames([

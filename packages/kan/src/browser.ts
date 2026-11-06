@@ -1,6 +1,8 @@
 // Browser adapter for Kan pages: a real Chrome/Chromium (configurable path), one fresh context per page
 // (Kan's Cloudflare lets the first navigation of a session through), images/fonts/media blocked to keep
 // proxy connections down, optional geo proxy.
+
+import { existsSync } from 'node:fs';
 import type { BrowserConfig } from '@israel-tv/core';
 import type { ProxyEndpoint } from '@israel-tv/net';
 import { type Browser, chromium } from 'playwright-core';
@@ -76,14 +78,57 @@ async function fetchResized(arg: {
   }
 }
 
+/** A browser to try: one of Playwright's installed-browser channels, or a path. */
+export type BrowserCandidate = { channel: 'chrome' | 'msedge' } | { executablePath: string };
+
+/** Linux (and NAS / Raspberry Pi) places a distribution's Chromium usually is. */
+const LINUX_CHROMIUM = [
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/snap/bin/chromium',
+  '/usr/lib/chromium/chromium',
+];
+
+/**
+ * The browsers to try, in order: the configured path only, when set; otherwise Google Chrome where it is normally
+ * installed (any OS), then Microsoft Edge (Chromium-based, present on Windows), then a Linux Chromium.
+ */
+export function browserCandidates(
+  executablePath: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+  exists: (p: string) => boolean = existsSync,
+): BrowserCandidate[] {
+  if (executablePath) return [{ executablePath }];
+  const out: BrowserCandidate[] = [{ channel: 'chrome' }, { channel: 'msedge' }];
+  if (platform === 'linux') for (const p of LINUX_CHROMIUM) if (exists(p)) out.push({ executablePath: p });
+  return out;
+}
+
 export async function createChromeLoader(
   cfg: Extract<BrowserConfig, { type: 'chrome' }>,
   proxy: ProxyEndpoint | undefined,
 ): Promise<PageLoader> {
-  let browser: Browser;
-  try {
-    browser = await chromium.launch({
-      ...(cfg.executablePath ? { executablePath: cfg.executablePath } : { channel: 'chrome' }),
+  let browser: Browser | undefined;
+  let lastError: unknown;
+  for (const candidate of browserCandidates(cfg.executablePath)) {
+    try {
+      browser = await launch(candidate);
+      break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  if (!browser) {
+    throw new Error(
+      `could not start a browser for Kan (${((lastError as Error)?.message ?? '').split('\n')[0]}). ` +
+        'Install Google Chrome (or Microsoft Edge, or Chromium on Linux), or set browser.executablePath in the config, or set browser.type to "none" to turn Kan off.',
+    );
+  }
+  return loaderFor(browser);
+
+  function launch(candidate: BrowserCandidate) {
+    return chromium.launch({
+      ...candidate,
       headless: !cfg.headed,
       args: ['--window-position=-2400,-2400', '--window-size=1280,900', '--mute-audio'],
       ...(proxy
@@ -96,12 +141,11 @@ export async function createChromeLoader(
           }
         : {}),
     });
-  } catch (err) {
-    throw new Error(
-      `could not start the browser for Kan (${(err as Error).message.split('\n')[0]}). ` +
-        'Install Google Chrome, or set browser.executablePath in israel-tv.config.json, or set browser.type to "none" to turn Kan off.',
-    );
   }
+}
+
+/** Pages loaded in a fresh context each, with heavy resources blocked except the images asked for. */
+function loaderFor(browser: Browser): PageLoader {
   return {
     async load(url, opts = {}) {
       const context = await browser.newContext({ locale: 'he-IL', timezoneId: 'Asia/Jerusalem' });
