@@ -57,8 +57,8 @@ Setting it up takes about 15 minutes:
 
 ## Watching from abroad?
 
-Everything in the catalog shows up anywhere, and live channels like 13, 14 and i24 play anywhere. Keshet 12 plays
-anywhere with the home helper. Episodes from Reshet and Kan only play from an Israeli internet connection: the home
+Everything in the catalog shows up anywhere, and live channels like 13, 14 and i24 play anywhere. Keshet 12 plays with
+the home helper on your home network, wherever in the world your home is. Episodes from Reshet and Kan only play from an Israeli internet connection: the home
 helper can fetch them for you through a VPN or proxy service with an Israeli location (a paid service you may already
 have). Those episodes then show a source called **דרך ישראל · via Israel** next to the one marked **ישראל בלבד**
 (Israel only) — pick "via Israel". See

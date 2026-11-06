@@ -53,12 +53,16 @@ are checked by `pnpm boundaries`.
 ## Fix a broken source
 
 1. Find what changed: compare the site's current page with the recorded one in `packages/<source>/test/fixtures/`.
-   Pages are large and minified; compare the data the parser reads (for Reshet, the page's `__NEXT_DATA__` JSON; for
-   Mako, the JSON the site's API returns).
+   Pages are large and minified; compare the data the parser reads (for Reshet, the page's `__NEXT_DATA__` JSON —
+   `node -e` with `nextData()` from `packages/reshet/src/parse.ts` prints it; for Mako, the JSON the site's API
+   returns). Each source's README lists the URL patterns its fixtures come from (Reshet: `/all-shows/all-shows-list/`,
+   `/all-shows/<slug>-<id>/`, `/allshows/series/<id>/season/<n>/`): [mako](packages/mako/README.md),
+   [reshet](packages/reshet/README.md), [kan](packages/kan/README.md).
 2. **Record** the new real response as a fixture: the raw response, not a browser's saved or inspected page (use
    _View source_ and save it, or `curl -sL <url> -o packages/<source>/test/fixtures/<name>.html`; retry if the site
    answers 403 once). Unedited, except removing anything personal (pages normally contain none); never tickets or
-   tokens. Name it after what it is (`show-<slug>.html`, `<slug>-season-<n>.html`).
+   tokens. Name it after what it is (`show-<slug>.html`, `<slug>-season-<n>.html`) and note its source path in a comment in the
+   test.
 3. Add a test that parses the new fixture (a parser test calls the parser on the fixture directly, e.g.
    `parseShowPage(html('<name>'))`; a test of fetching a whole show maps the fixture to its path in the fake fetcher),
    then update the parser in `packages/<source>/src/` until the tests pass with both the old and the new fixture where

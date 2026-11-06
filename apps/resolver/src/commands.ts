@@ -73,10 +73,10 @@ export function printEvents(
  * At start, when a proxy is configured: say which (address only, never the login) and check once that it exits in
  * Israel, so a wrong proxy shows in the log at once rather than as a failed play later.
  */
-export function checkProxyAtStart(config: Config, log: (line: string) => void): void {
+export function checkProxyAtStart(config: Config, log: (line: string) => void, announce = true): void {
   const proxies = proxyEndpoints(config.geo);
   if (proxies.length === 0) return;
-  log(`geo proxy: ${proxies.map((p) => p.server).join(', ')}`);
+  if (announce) log(`geo proxy: ${proxies.map((p) => p.server).join(', ')}`);
   void checkProxy(config, (line) => log(`proxy check: ${line}`)).catch((err: Error) =>
     log(`proxy check: ${err.message}`),
   );

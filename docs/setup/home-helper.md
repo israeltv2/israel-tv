@@ -67,7 +67,7 @@ help).
 ### Watching from abroad
 
 Outside Israel, Reshet and Kan episodes (and at times the Kan live channels) only play through an Israeli internet
-connection. Keshet 12 does not need one: the helper alone plays it anywhere.
+connection. Keshet 12 does not need one: the helper alone plays it on your home network, wherever in the world your home is.
 
 You need a **proxy with an Israeli location**. Many VPN services include one: in your VPN account look for "proxy",
 "SOCKS5" or "service credentials", and note the proxy's address and port, and the proxy user name and password (often

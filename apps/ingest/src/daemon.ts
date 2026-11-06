@@ -614,7 +614,7 @@ export async function startDaemon(
       );
     d.enqueue('publish', () => d.publish());
   }
-  if (config.resolver.enabled) checkProxyAtStart(config, logger.for('geo-relay'));
+  if (config.resolver.enabled) checkProxyAtStart(config, logger.for('geo-relay'), false); // the proxies are already listed above
   d.kanCrawl();
   return d;
 }
