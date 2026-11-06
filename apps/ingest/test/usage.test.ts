@@ -154,3 +154,33 @@ test('the Worker deploys without Analytics Engine when the account has not enabl
   expect(analyticsWanted(store)).toBe(false);
   expect(analyticsWanted(store, Date.now() + 8 * 86_400_000)).toBe(true);
 });
+
+test('a failed deploy never puts the account id (or any secret) into the published status', async () => {
+  const { publishError, buildStatus } = await import('../src/publish.ts');
+  const { Store } = await import('@israel-tv/store');
+  const id = 'a2771a51611bd4b0239e4d4302f783f0';
+  const env = { CLOUDFLARE_ACCOUNT_ID: id, CLOUDFLARE_API_TOKEN: 'tok-tok-tok-123' };
+  const saved = { ...process.env };
+  Object.assign(process.env, env);
+  try {
+    const err = publishError(
+      `✘ [ERROR] A request to the Cloudflare API (/accounts/${id}/workers/scripts/israel-tv/versions) failed.\nAuthentication error [code: 10000] tok-tok-tok-123\n`,
+      1,
+      { apiTokenEnv: 'CLOUDFLARE_API_TOKEN', accountIdEnv: 'CLOUDFLARE_ACCOUNT_ID' },
+    );
+    expect(err.message).not.toContain(id);
+    expect(err.message).not.toContain('tok-tok-tok-123');
+    const store = Store.open(':memory:');
+    const run = store.startRun('publish', 'cloudflare');
+    // An error stored before this fix (raw) must not reach the status either.
+    store.finishRun(run, {
+      status: 'failed',
+      error: `Cloudflare deploy failed: (/accounts/${id}/workers) x`,
+    });
+    const status = JSON.stringify(buildStatus(store, ['mako']));
+    expect(status).toContain('last publish failed');
+    expect(status).not.toContain(id);
+  } finally {
+    process.env = saved;
+  }
+});

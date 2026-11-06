@@ -703,3 +703,13 @@ answers an empty 404. Per-client limits use the address the tunnel passes (`cf-c
 The token is in `.env`, so it is scrubbed from every log line like the other secrets, and the startup log
 names the address without it. No video can pass through the tunnel (no relay route), and the admin port is a
 different listener that the tunnel is never pointed at.
+
+### Security review, round 2
+
+One finding, fixed: a failed Cloudflare deploy's error (wrangler's message names the account id in the API path)
+was stored on the run and rendered into the public `/status` and `/status.json` by the next publish. That
+happened once on the deployment (the Analytics Engine refusal at 11:47 on 2026-11-06) until a later publish
+replaced the files. Errors are now cleaned of every secret value and of `/accounts/<id>` paths before they are
+stored, and the whole status is cleaned again before anything is published; the stored copies on the deployment
+were cleaned too. Everything else checked out (remote resolver token and allowlist, admin token, dashboard
+escaping, image paths, Worker origin, rate limits, artwork, backup/restore, deploy secrets file, relay).
