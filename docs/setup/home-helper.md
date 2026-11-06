@@ -53,7 +53,8 @@ Docker is a free program that runs ready-made apps like this one.
    - **Nuvio:** _Settings → Addons → Add addon_ → paste the link.
 
    _You should see:_ an addon called **Israel TV · home helper**. (Use the app; Stremio in a web browser cannot use a
-   home `http://` link.)
+   home `http://` link.) If it does not appear on another device (for example the TV, or Nuvio on another device), add
+   the same link there too.
 5. **Try it:** open a Keshet 12 show and play an episode. Under the episode, the source is **Israel TV · home helper**.
 
 **Keep it running.** In Docker Desktop's settings, turn on _Start Docker Desktop when you sign in_; the helper starts
@@ -108,9 +109,11 @@ abroad) and one called **דרך ישראל · via Israel** — pick that one.
 
 ### Keshet 12 away from home
 
-The helper answers only on your home network: on a phone outside the house, Keshet 12 will not play. Opening it to the
+The helper answers only on your home network: on a phone outside the house, Keshet 12 and the "via Israel" sources will
+not play (the public link's other episodes and the live channels still do). Opening it to the
 outside safely needs a domain name of your own and some technical setup, and is not part of the easy way: see
-[Away from home](resolver-only.md#away-from-home) if you or someone helping you is comfortable with that.
+[Away from home](resolver-only.md#away-from-home) if you or someone helping you is comfortable with that (it is written for
+the install without Docker).
 
 ### If something goes wrong
 

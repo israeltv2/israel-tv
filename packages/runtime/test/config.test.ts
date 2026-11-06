@@ -90,3 +90,12 @@ test('addresses to install: home network first, virtual adapters left out', asyn
   expect(homeAddresses([{ name: 'utun3', address: '100.64.0.2' }])).toEqual(['100.64.0.2']);
   expect(homeAddresses([])).toEqual(['127.0.0.1']);
 });
+
+test('a proxy address shows in the log; a login inside it does not', async () => {
+  const { secretValues } = await import('../src/log.ts');
+  expect(secretValues({ ISRAEL_TV_PROXY: 'http://proxy.example:3128' })).toEqual([]);
+  const withLogin = secretValues({ ISRAEL_TV_PROXY: 'http://someone:pa%40ss@proxy.example:3128' });
+  expect(withLogin).toContain('someone');
+  expect(withLogin).toContain('pa@ss');
+  expect(secretValues({ ISRAEL_TV_PROXY_PASSWORD: 'p@ss:w/rd#1' })).toEqual(['p@ss:w/rd#1']);
+});

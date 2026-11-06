@@ -36,15 +36,34 @@ export function registerSecretNames(names: Iterable<string>): void {
 }
 
 export function secretValues(env: NodeJS.ProcessEnv): string[] {
-  return Object.entries(env)
-    .filter(
-      ([k, v]) =>
-        (secretNames.has(k) || /(TOKEN|PASS|SECRET|KEY|USER|ACCOUNT|PROXY)/i.test(k)) &&
-        typeof v === 'string' &&
-        v.length >= 6,
-    )
-    .map(([, v]) => v as string)
-    .sort((a, b) => b.length - a.length);
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(env)) {
+    if (typeof v !== 'string' || v.length < 6) continue;
+    if (/PROXY/i.test(k) && !/(USER|PASS)/i.test(k) && !secretNames.has(k)) {
+      // A proxy address is not a secret (it helps to see it in the log); a login written into it is.
+      out.push(...proxyLogin(v));
+      continue;
+    }
+    if (secretNames.has(k) || /(TOKEN|PASS|SECRET|KEY|USER|ACCOUNT)/i.test(k)) out.push(v);
+  }
+  return out.sort((a, b) => b.length - a.length);
+}
+
+/** The login parts of a proxy URL (the whole value too, when it has one), or nothing. */
+function proxyLogin(value: string): string[] {
+  try {
+    const u = new URL(value);
+    if (!u.username && !u.password) return [];
+    return [
+      value,
+      u.username,
+      decodeURIComponent(u.username),
+      u.password,
+      decodeURIComponent(u.password),
+    ].filter((x) => x.length >= 4);
+  } catch {
+    return [value];
+  }
 }
 
 /** Replace every secret value inside strings, arrays and plain objects (a few levels deep). */
