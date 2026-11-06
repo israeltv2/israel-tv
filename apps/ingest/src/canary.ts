@@ -84,26 +84,25 @@ export async function playCheck(
     statuses.push(m.status);
     if (!m.ok) return { statuses, step: 'master', detail: `master HTTP ${m.status}` };
     let base = m.url || url;
-    let text = await m.text();
+    const text = await m.text();
     let next = firstUri(text, base);
     if (!next) return { statuses, step: 'master', detail: 'master lists nothing' };
-    // A variant playlist (one more level when the master points at another master).
-    for (let level = 0; level < 2; level++) {
-      const v = await get(next);
-      statuses.push(v.status);
-      if (!v.ok) return { statuses, step: 'variant', detail: `variant HTTP ${v.status}` };
-      base = v.url || next;
-      text = await v.text();
-      next = firstUri(text, base);
-      if (!next) return { statuses, step: 'variant', detail: 'variant lists no segments' };
-      if (!/\.m3u8(\?|$)/.test(new URL(next).pathname)) break;
+    // Variant playlists (a master may point at another master), then the first segment. What a URL is comes
+    // from its answer (a playlist starts with #EXTM3U), not from its name.
+    for (let level = 0; level < 3; level++) {
+      const r = await get(next, true);
+      statuses.push(r.status);
+      const step = level === 0 ? 'variant' : 'segment';
+      if (r.status !== 200 && r.status !== 206) return { statuses, step, detail: `${step} HTTP ${r.status}` };
+      const body = new Uint8Array(await r.arrayBuffer());
+      const head = new TextDecoder().decode(body.subarray(0, 7));
+      if (head !== '#EXTM3U')
+        return level === 0 ? { statuses, step, detail: 'variant is not a playlist' } : { statuses };
+      base = r.url || next;
+      next = firstUri(new TextDecoder().decode(body), base);
+      if (!next) return { statuses, step, detail: 'playlist lists nothing' };
     }
-    const seg = await get(next, true);
-    statuses.push(seg.status);
-    await seg.body?.cancel();
-    if (seg.status !== 206 && seg.status !== 200)
-      return { statuses, step: 'segment', detail: `segment HTTP ${seg.status}` };
-    return { statuses };
+    return { statuses, step: 'segment', detail: 'no segment within three playlist levels' };
   } catch (err) {
     const step: Step = statuses.length === 0 ? 'master' : statuses.length === 1 ? 'variant' : 'segment';
     return { statuses, step, detail: (err as Error).message };
