@@ -8,19 +8,26 @@
   },
   "scripts": {
     "typecheck": "pnpm -r --no-bail typecheck",
-    "lint": "biome check .",
+    "lint": "biome ci --error-on-warnings .",
     "format": "biome check --write .",
     "test": "pnpm -r --no-bail test",
-    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "check": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm hygiene && pnpm test",
     "start": "node apps/ingest/src/cli.ts start",
     "israel-tv": "node apps/ingest/src/cli.ts",
     "logs": "node apps/ingest/src/cli.ts events",
     "usage": "node apps/ingest/src/cli.ts usage",
-    "resolver": "node apps/resolver/src/cli.ts"
+    "resolver": "node apps/resolver/src/cli.ts",
+    "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages",
+    "hygiene": "knip && pnpm -r --filter \"./packages/*\" --filter \"./apps/*\" exec publint --strict",
+    "test:strict": "node tools/test-strict.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",
+    "@swc/core": "1.16.22",
     "@types/node": "26.6.6",
+    "dependency-cruiser": "18.7.2",
+    "knip": "6.44.1",
+    "publint": "0.3.25",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
   },

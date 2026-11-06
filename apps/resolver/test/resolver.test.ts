@@ -565,3 +565,24 @@ test('contract: a resolver refuses a catalog version it does not understand, and
   expect(await malformed.episode('iltv_mako_1', 1, 1)).toBeUndefined();
   expect(logs).toContain('catalog file does not match the resolver contract');
 });
+
+test('a full instance resolver reads the contract files from its publish folder, never the database', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { localSiteFetch, catalogLookup } = await import('../src/server.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'site-'));
+  mkdirSync(join(dir, 'play/iltv_mako_1'), { recursive: true });
+  writeFileSync(
+    join(dir, 'resolver-contract.json'),
+    JSON.stringify({ version: 1, seasonPlay: 'play/{series}/{season}.json', extIds: 'ext-ids.json' }),
+  );
+  writeFileSync(
+    join(dir, 'play/iltv_mako_1/2.json'),
+    JSON.stringify({ '3': { mako: { vcmid: 'v', channelId: 'c' } } }),
+  );
+  const f = localSiteFetch(dir);
+  expect((await f('http://local-site/../etc/passwd')).status).toBe(404);
+  const lookup = catalogLookup('http://local-site', f);
+  expect((await lookup.episode('iltv_mako_1', 2, 3))?.play).toEqual({ vcmid: 'v', channelId: 'c' });
+});

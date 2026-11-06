@@ -224,7 +224,8 @@ export class Daemon {
     const proxy = proxies[this.kanSlices++ % Math.max(proxies.length, 1)];
     const priority = [...this.kanRefresh];
     this.kanRefresh.clear();
-    crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
+    // Handled below: failures are caught and logged; the last step cannot throw.
+    void crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
       .then((r) => {
         // Refreshes asked for while this slice ran get a slice of their own right away.
         const arrived = this.kanRefresh.size > 0;
@@ -388,7 +389,7 @@ export class Daemon {
     const notes = [
       ...(this.config.publisher.type === 'cloudflare' && analyticsOff(this.store)
         ? [
-            'Analytics Engine is not enabled on the Cloudflare account (Workers & Pages → Analytics Engine → enable, then `pnpm israel-tv deploy-api`); the public addon is counted from Workers Logs meanwhile',
+            'Analytics Engine is not enabled on the Cloudflare account (Workers & Pages → Analytics Engine → enable, then `pnpm israel-tv deploy-api`); the public addon is not counted meanwhile',
           ]
         : []),
       ...(this.remoteProblem ? [this.remoteProblem] : []),

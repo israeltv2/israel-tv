@@ -115,8 +115,8 @@ ingest. WAL mode; events are written in batches. Two tables:
 
 **`daily_usage`** — per day, origin (`home` or `public`), source and show (`''` = all), the number of plays,
 unique clients, failures and minutes watched (known only for relayed plays). Kept a year. Home rows are rolled
-up nightly from the events; public rows come from Cloudflare (Workers Analytics Engine when the API token may
-read it, otherwise the same counts from Workers Logs).
+up nightly from the events; public rows come from Cloudflare's Workers Analytics Engine (a failed read shows on `/status` and the
+dashboard; the API Worker's Workers Logs lines are for debugging only).
 
 Every night (`schedule.daily`) the daemon also: backs up the catalog database (below), rolls up yesterday,
 deletes events older than 30 days and rollups older than a year, VACUUMs once a week, and checks the size cap

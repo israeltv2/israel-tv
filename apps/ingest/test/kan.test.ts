@@ -350,7 +350,7 @@ test('an outage of kankids alone is not blamed on its pages while kan.org.il wor
     expect(s.failed).toEqual([]);
     expect(s.retry ?? {}).toEqual({});
   }
-});
+}, 30_000); // 60 slices: slower on Windows runners
 
 test('a lone server error at the end of a slice is settled with the lobby, and shows on the run', async () => {
   const store = Store.open(':memory:');

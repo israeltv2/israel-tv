@@ -8,7 +8,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hono/node-server": "2.1.6",
     "@israel-tv/addon": "workspace:*",
     "@israel-tv/core": "workspace:*",
     "@israel-tv/events": "workspace:*",
@@ -20,9 +19,11 @@
     "@israel-tv/resolver": "workspace:*",
     "@israel-tv/runtime": "workspace:*",
     "@israel-tv/store": "workspace:*",
-    "croner": "11.0.0",
-    "hono": "4.13.16",
-    "zod": "4.6.7"
+    "croner": "catalog:",
+    "hono": "catalog:"
   },
-  "license": "AGPL-3.0-only"
+  "license": "AGPL-3.0-only",
+  "files": [
+    "src"
+  ]
 }

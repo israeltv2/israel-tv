@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [],
+      "project": []
+    },
+    "apps/catalog": {
+      "entry": ["src/api.ts"]
+    },
+    "spikes": {
+      "ignore": ["**"]
+    }
+  },
+  "ignoreDependencies": ["wrangler", "pino-roll", "@swc/core"],
+  "ignoreExportsUsedInFile": true
+}

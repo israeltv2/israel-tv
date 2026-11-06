@@ -1,6 +1,7 @@
 import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ConfigSchema } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { createLogger, scrub } from '@israel-tv/runtime';
@@ -12,62 +13,42 @@ import { buildDashboard, renderUsagePage } from '../src/usage-page.ts';
 const cf = () => ConfigSchema.parse({ publisher: { type: 'cloudflare', workerName: 'w', dir: '/tmp/site' } });
 const env = { CLOUDFLARE_API_TOKEN: 'tok', CLOUDFLARE_ACCOUNT_ID: 'acc' };
 
-test('public usage: Analytics Engine when readable, else Workers Logs, into the daily rollups', async () => {
+test('public usage: the day from Analytics Engine into the daily rollups; a failed read is an error', async () => {
   const events = EventStore.open(':memory:');
   const calls: string[] = [];
-  const agg = (groups: Record<string, string>, plays: number, clients: number) => ({
-    groups: Object.entries(groups).map(([key, value]) => ({ key, value })),
-    value: plays,
-    clients,
-  });
-  const fakeFetch = (async (url: string, init: { body: string }) => {
+  const answer = (q: string) =>
+    q.includes('GROUP BY blob1, blob2')
+      ? [{ source: 'mako', show: 'iltv_mako_1', plays: 5, clients: 2, failures: 1 }]
+      : q.includes('GROUP BY blob1')
+        ? [{ source: 'mako', plays: 5, clients: 2, failures: 1 }]
+        : [{ plays: 5, clients: 2, failures: 1 }];
+  const ok = (async (url: string, init: { body: string }) => {
     calls.push(url);
-    if (url.endsWith('/analytics_engine/sql')) return new Response('Authorization error', { status: 403 });
-    const q = JSON.parse(init.body) as {
-      parameters: { groupBys: { value: string }[]; filters: { key: string }[] };
-    };
-    const keys = q.parameters.groupBys.map((g) => g.value).join(',');
-    const errorsOnly = q.parameters.filters.some((f) => f.key === 'outcome');
-    const n = errorsOnly ? 1 : 5;
-    const rows =
-      keys === 'source,series'
-        ? [agg({ source: 'mako', series: 'iltv_mako_1' }, n, 2)]
-        : keys === 'source'
-          ? [agg({ source: 'mako' }, n, 2)]
-          : [agg({}, n, 2)];
-    return Response.json({
-      success: true,
-      result: {
-        calculations: [
-          { alias: 'plays', aggregates: rows.map((r) => ({ groups: r.groups, value: r.value })) },
-          { alias: 'clients', aggregates: rows.map((r) => ({ groups: r.groups, value: r.clients })) },
-        ],
-      },
-    });
+    return Response.json({ data: answer(init.body) });
   }) as unknown as typeof fetch;
-  const r = await pullPublicUsage(events, cf(), '2026-11-05', env, fakeFetch);
-  expect(r).toMatchObject({ via: 'workers-logs', rows: 3 });
-  expect(r?.note).toContain('Account Analytics: Read');
+  const r = await pullPublicUsage(events, cf(), '2026-11-05', env, ok);
+  expect(r).toMatchObject({ via: 'analytics-engine', rows: 3 });
+  expect(calls.every((c) => c.endsWith('/analytics_engine/sql'))).toBe(true);
   const rows = events.daily('2026-11-05', 'public');
   expect(rows.find((x) => x.showId === 'iltv_mako_1')).toMatchObject({
     plays: 5,
     uniqueClients: 2,
     failures: 1,
   });
-  expect(rows.find((x) => x.source === '' && x.showId === '')).toMatchObject({
-    plays: 5,
-    uniqueClients: 2,
-    failures: 1,
-  });
-  expect(calls[0]).toContain('/analytics_engine/sql');
+  expect(rows.find((x) => x.source === '' && x.showId === '')).toMatchObject({ plays: 5, uniqueClients: 2 });
+  const denied = (async () =>
+    new Response('Authorization error', { status: 403 })) as unknown as typeof fetch;
+  await expect(pullPublicUsage(events, cf(), '2026-11-05', env, denied)).rejects.toThrow(
+    /Account Analytics: Read/,
+  );
   // Local publisher, or no credentials: nothing to read.
-  expect(await pullPublicUsage(events, ConfigSchema.parse({}), '2026-11-05', env, fakeFetch)).toBeUndefined();
-  expect(await pullPublicUsage(events, cf(), '2026-11-05', {}, fakeFetch)).toBeUndefined();
+  expect(await pullPublicUsage(events, ConfigSchema.parse({}), '2026-11-05', env, ok)).toBeUndefined();
+  expect(await pullPublicUsage(events, cf(), '2026-11-05', {}, ok)).toBeUndefined();
 });
 
 test('two Workers: the public one runs only its router for dynamic paths; the API one has no public URL', async () => {
   const { apiWorkerConfig } = await import('../src/publish.ts');
-  const dir = new URL('../../catalog', import.meta.url).pathname;
+  const dir = fileURLToPath(new URL('../../catalog', import.meta.url));
   const c = workerConfig(cf().publisher as never, dir) as {
     assets: Record<string, unknown>;
     observability: unknown;
@@ -84,7 +65,7 @@ test('two Workers: the public one runs only its router for dynamic paths; the AP
     '/meta/*',
   ]);
   expect(c.services).toEqual([{ binding: 'API', service: 'w-api' }]);
-  expect(c.main.endsWith('/catalog/src/router.ts')).toBe(true);
+  expect(c.main.replaceAll('\\', '/').endsWith('/catalog/src/router.ts')).toBe(true);
   // Limits, counting and logs belong to the API Worker.
   expect(c.analytics_engine_datasets).toBeUndefined();
   expect(c.ratelimits).toBeUndefined();
@@ -92,7 +73,7 @@ test('two Workers: the public one runs only its router for dynamic paths; the AP
   expect(a.name).toBe('w-api');
   expect(a.workers_dev).toBe(false);
   expect(a.preview_urls).toBe(false);
-  expect(String(a.main).endsWith('/catalog/src/api.ts')).toBe(true);
+  expect(String(a.main).replaceAll('\\', '/').endsWith('/catalog/src/api.ts')).toBe(true);
   expect(a.analytics_engine_datasets).toEqual([{ binding: 'USAGE', dataset: 'israel_tv_usage' }]);
   expect(a.observability).toEqual({
     enabled: true,
@@ -169,7 +150,7 @@ test('account ids count as secrets too', async () => {
 
 test('the API Worker deploys without Analytics Engine when the account has not enabled it', async () => {
   const { apiWorkerConfig, analyticsOff, ANALYTICS_OFF } = await import('../src/publish.ts');
-  const dir = new URL('../../catalog', import.meta.url).pathname;
+  const dir = fileURLToPath(new URL('../../catalog', import.meta.url));
   const on = apiWorkerConfig(cf().publisher as never, dir, true) as Record<string, unknown>;
   const off = apiWorkerConfig(cf().publisher as never, dir, false) as Record<string, unknown>;
   expect(on.analytics_engine_datasets).toBeDefined();
@@ -214,7 +195,7 @@ test('a failed deploy never puts the account id (or any secret) into the publish
 test('with the public address known, image URLs are absolute and only dynamic paths run the router', async () => {
   const { renderFromStore, workerConfig } = await import('../src/publish.ts');
   const { Store } = await import('@israel-tv/store');
-  const dir = new URL('../../catalog', import.meta.url).pathname;
+  const dir = fileURLToPath(new URL('../../catalog', import.meta.url));
   const known = workerConfig(cf().publisher as never, dir, true) as { assets: Record<string, unknown> };
   expect(known.assets.run_worker_first).toEqual(['/catalog/*', '/stream/*', '/status*']);
   const config = ConfigSchema.parse({
