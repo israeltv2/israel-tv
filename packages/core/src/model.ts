@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SOURCES } from './ids.ts';
+import { cleanDescription } from './tidy.ts';
 
 /** One playable rendition as the source reports it. */
 export const ScrapedStream = z.strictObject({
@@ -68,8 +69,17 @@ export function cleanShow(show: ScrapedShow): ScrapedShow {
     }
     return o;
   };
+  // Descriptions without what sites add for search engines (cleanDescription); none rather than junk.
+  const { description: rawDescription, ...withoutDescription } = show;
+  const description = cleanDescription(rawDescription);
   const cleaned: ScrapedShow = {
-    ...optUrl(optUrl(optUrl(show, 'poster'), 'background'), 'pageUrl'),
+    ...optUrl(
+      optUrl(
+        optUrl({ ...withoutDescription, ...(description ? { description } : {}) }, 'poster'),
+        'background',
+      ),
+      'pageUrl',
+    ),
     seasons: show.seasons.map((s) => ({
       ...s,
       episodes: s.episodes.map((e) => {

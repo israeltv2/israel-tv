@@ -38,7 +38,7 @@ import {
   workerVersions,
   writeSite,
 } from './publish.ts';
-import { renumberKanReshet } from './renumber.ts';
+import { renumberKanReshet, renumberNamedSeasons } from './renumber.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -155,10 +155,20 @@ async function main(argv: string[]): Promise<number> {
     return runResolverOnly(config);
   }
   const store = Store.open(config.store.path);
+  // Recorded one-time renumbers (each runs once per database, after a backup).
   const renumber = renumberKanReshet(store, config.backup.dir);
-  const renumberLine = renumber
-    ? `one-time renumber ${renumber.id}: Kan ${renumber.kan.shows} shows (${renumber.kan.moved} of ${renumber.kan.episodes} episodes moved), Reshet ${renumber.reshet.shows} shows (${renumber.reshet.seasons} year seasons, ${renumber.reshet.moved} episodes moved), ${renumber.conflicts} clashes; backup ${renumber.backup ?? 'none (nothing to move)'}`
-    : undefined;
+  const named = renumberNamedSeasons(store, config.backup.dir);
+  const renumberLine =
+    [
+      renumber
+        ? `one-time renumber ${renumber.id}: Kan ${renumber.kan.shows} shows (${renumber.kan.moved} of ${renumber.kan.episodes} episodes moved), Reshet ${renumber.reshet.shows} shows (${renumber.reshet.seasons} year seasons, ${renumber.reshet.moved} episodes moved), ${renumber.conflicts} clashes; backup ${renumber.backup ?? 'none (nothing to move)'}`
+        : '',
+      named
+        ? `one-time renumber ${named.id}: ${named.seasons} named seasons on ${named.shows} shows moved below 101 (${named.episodes} episodes, numbers within their season kept), ${named.emptyDropped} empty ones unnumbered; backup ${named.backup ?? 'none (nothing to move)'}`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n') || undefined;
   if (renumberLine) console.log(`israel-tv: ${renumberLine}`);
   if (store.renumbered > 0)
     console.log(

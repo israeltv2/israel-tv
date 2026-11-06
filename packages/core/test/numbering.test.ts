@@ -13,7 +13,8 @@ function ep(key: string, numberHint?: number, airDate?: string): ScrapedEpisode 
     ...(airDate ? { airDate } : {}),
   };
 }
-function season(key: string, title: string, episodes: ScrapedEpisode[] = []): ScrapedSeason {
+/** A season with one episode by default (a season gets a number only once it has episodes). */
+function season(key: string, title: string, episodes: ScrapedEpisode[] = [ep(`${key}-e`)]): ScrapedSeason {
   return { key, title, episodes };
 }
 function show(seasons: ScrapedSeason[]): ScrapedShow {
@@ -26,6 +27,7 @@ describe('parseSeasonTitle', () => {
     ['עונה 12', { kind: 'numbered', number: 12 }],
     ['עונה 2025', { kind: 'year', number: 2025 }],
     ['2025', { kind: 'year', number: 2025 }],
+    ['עונת 2023', { kind: 'year', number: 2023 }],
     ['VIP 5', { kind: 'named' }],
     ['נבחרת החלומות 2', { kind: 'named' }],
     ['', { kind: 'single' }],
@@ -39,7 +41,7 @@ test('parseEpisodeHint reads Mako extraInfo and titles', () => {
   expect(parseEpisodeHint(undefined)).toBeUndefined();
 });
 
-test('mixed numbered and named seasons never collapse into season 1 (Masterchef shape)', () => {
+test('mixed numbered and named seasons: named take the lowest free numbers, in list order (Masterchef shape)', () => {
   const r = assignNumbers(
     show([
       season('vip_2022', 'VIP 2022'),
@@ -51,11 +53,11 @@ test('mixed numbered and named seasons never collapse into season 1 (Masterchef 
     EMPTY,
   );
   expect(r.seasons.map((s) => [s.key, s.number, s.kind])).toEqual([
-    ['vip_2022', 101, 'named'],
+    ['vip_2022', 1, 'named'],
     ['s11', 11, 'numbered'],
-    ['dream_team', 102, 'named'],
+    ['dream_team', 2, 'named'],
     ['s12', 12, 'numbered'],
-    ['dream_team_2', 103, 'named'],
+    ['dream_team_2', 3, 'named'],
   ]);
 });
 
@@ -84,12 +86,12 @@ test('a new year season takes the next number; stored numbers never move', () =>
   ]);
 });
 
-test('year seasons come after real season numbers; named seasons stay from 101', () => {
+test('year seasons come after real season numbers; a named season takes the lowest free number', () => {
   const r = assignNumbers(
     show([season('s1', 'עונה 1'), season('s2', 'עונה 2'), season('y', '2020'), season('vip', 'VIP')]),
     EMPTY,
   );
-  expect(r.seasons.map((s) => s.number)).toEqual([1, 2, 3, 101]);
+  expect(r.seasons.map((s) => s.number)).toEqual([1, 2, 3, 4]);
 });
 
 test('single-season show without a title is season 1', () => {
@@ -153,7 +155,7 @@ test('duplicate printed numbers: first keeps it, the other gets the next free on
 test('a new season whose number is taken becomes named instead of merging', () => {
   const first = assignNumbers(show([season('a', 'עונה 1')]), EMPTY);
   const r = assignNumbers(show([season('a', 'עונה 1'), season('b', 'עונה 1')]), first);
-  expect(r.seasons.find((s) => s.key === 'b')).toEqual({ key: 'b', number: 101, kind: 'named' });
+  expect(r.seasons.find((s) => s.key === 'b')).toEqual({ key: 'b', number: 2, kind: 'named' });
   expect(r.warnings[0]?.code).toBe('season-number-taken');
 });
 
@@ -174,4 +176,15 @@ test('two dated episodes counted newest = 1 are numbered by date too', () => {
     EMPTY,
   );
   expect([num(r, 'old')?.episode, num(r, 'new')?.episode]).toEqual([1, 2]);
+});
+
+test('a season gets a number only once it has episodes (sources list empty duplicates)', () => {
+  const r = assignNumbers(
+    show([season('s1', 'עונה 1'), season('dup', 'עונה 1', []), season('vip', 'VIP')]),
+    EMPTY,
+  );
+  expect(r.seasons.map((x) => [x.key, x.number])).toEqual([
+    ['s1', 1],
+    ['vip', 2],
+  ]);
 });

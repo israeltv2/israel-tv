@@ -38,6 +38,20 @@ table{border-collapse:collapse;width:100%;margin:8px 0 24px}td,th{border-bottom:
 <h1>Israel TV ${badge(s.health)}</h1><p>Generated ${esc(s.generatedAt)}</p>${s.publish ? `<p><strong>${esc(s.publish)}</strong></p>` : ''}${s.tmdb ? `<p>${esc(s.tmdb)}</p>` : ''}
 <h2>Sources</h2><table><tr><th>Source</th><th>Health</th><th>Shows</th><th>Episodes</th><th>Last full run</th><th>Last airing check</th><th>Notes</th></tr>${sources}</table>
 <h2>Shows failing (last good data still served)</h2><table><tr><th>Id</th><th>Show</th><th>Error</th><th>Last OK</th></tr>${failing || '<tr><td colspan="4">None</td></tr>'}</table>
+<h2>Catalog audit (what this publish contains)</h2>${
+    s.audit
+      ? `<p>${s.audit.metas} shows checked ${esc(s.audit.at)}: ${s.audit.problems.length ? `${s.audit.problems.length} kinds of problems` : 'no problems'}.</p>${
+          s.audit.problems.length
+            ? `<table><tr><th>Check</th><th>Count</th><th>Examples</th></tr>${s.audit.problems
+                .map(
+                  (p) =>
+                    `<tr><td>${esc(p.check)}</td><td>${p.count}</td><td>${esc(p.examples.join(', '))}</td></tr>`,
+                )
+                .join('')}</table>`
+            : ''
+        }`
+      : '<p>Not run yet.</p>'
+  }
 <h2>Recent warnings</h2><table><tr><th>When</th><th>Id</th><th>Code</th><th>Message</th></tr>${warnings || '<tr><td colspan="4">None</td></tr>'}</table>
 </body></html>`;
 }

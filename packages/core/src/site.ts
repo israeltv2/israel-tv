@@ -82,4 +82,6 @@ export interface StatusFile {
   }[];
   failingShows: { id: string; title: string; error: string; lastOkAt: string }[];
   warnings: { at: string; id?: string; code: string; message: string }[];
+  /** The publisher's own check of what it just published (apps/ingest catalog-audit.ts). */
+  audit?: { at: string; metas: number; problems: { check: string; count: number; examples: string[] }[] };
 }

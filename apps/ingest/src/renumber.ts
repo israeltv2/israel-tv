@@ -113,3 +113,87 @@ export function renumberKanReshet(store: Store, backupDir: string): RenumberRepo
   });
   return report;
 }
+
+// named-seasons-lowest-free-2026-11-06 (approved the same day, before going public): named seasons were numbered
+// from 101 (apps showed "Season 101"). Each one with episodes takes the lowest number no other season of its show
+// uses, in the show's list order — the rule new seasons now follow; "עונת 2023" titles become year seasons. Only
+// season numbers move: episode numbers within a season stay. Empty named seasons (Reshet lists empty duplicates)
+// lose their number; they get one if they ever have episodes.
+export const NAMED_LOWEST_FREE_2026_11 = 'named-seasons-lowest-free-2026-11-06';
+
+export interface NamedRenumberReport {
+  id: string;
+  backup?: string;
+  shows: number;
+  seasons: number;
+  episodes: number;
+  emptyDropped: number;
+}
+
+export function renumberNamedSeasons(store: Store, backupDir: string): NamedRenumberReport | undefined {
+  const done = store.getState<string[]>(MIGRATIONS_KEY) ?? [];
+  if (done.includes(NAMED_LOWEST_FREE_2026_11)) return undefined;
+  const report: NamedRenumberReport = {
+    id: NAMED_LOWEST_FREE_2026_11,
+    shows: 0,
+    seasons: 0,
+    episodes: 0,
+    emptyDropped: 0,
+  };
+  const rows = store
+    .listShows()
+    .filter((r) => store.assignments(r.seriesId).seasons.some((s) => s.kind === 'named' && s.number >= 101));
+  if (rows.length > 0) {
+    mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    report.backup = join(backupDir, `before-${NAMED_LOWEST_FREE_2026_11}.sqlite`);
+    store.backupTo(report.backup);
+  }
+  const runId = store.startRun('show', 'renumber');
+  store.transaction(() => {
+    for (const row of rows) {
+      const prev = store.assignments(row.seriesId);
+      const withEpisodes = new Set(prev.episodes.map((e) => e.season));
+      const old = prev.seasons.filter((s) => s.kind === 'named' && s.number >= 101);
+      const empty = old.filter((s) => !withEpisodes.has(s.number));
+      const moving = old.filter((s) => withEpisodes.has(s.number));
+      const base = prev.seasons.filter((s) => !old.includes(s));
+      // The new rule decides the moving seasons' numbers (the others keep theirs).
+      const r = assignNumbers(row.show, { seasons: base, episodes: [] });
+      const fresh = new Map(r.seasons.map((s) => [s.key, s]));
+      const used = new Set(base.map((s) => s.number));
+      const moved = new Map<number, number>();
+      const seasons = [...base];
+      for (const s of moving) {
+        let next = fresh.get(s.key);
+        if (!next || used.has(next.number)) {
+          // Not in the show's current data (or taken): the lowest free number.
+          let n = 1;
+          while (used.has(n)) n++;
+          next = { key: s.key, number: n, kind: 'named' };
+        }
+        used.add(next.number);
+        moved.set(s.number, next.number);
+        seasons.push({ key: s.key, number: next.number, kind: next.kind });
+      }
+      const episodes = prev.episodes.map((e) =>
+        moved.has(e.season) ? { ...e, season: moved.get(e.season) as number } : e,
+      );
+      report.shows++;
+      report.seasons += moving.length;
+      report.episodes += prev.episodes.filter((e) => moved.has(e.season)).length;
+      report.emptyDropped += empty.length;
+      store.replaceAssignments(row.seriesId, { seasons, episodes });
+    }
+    store.setState(MIGRATIONS_KEY, [
+      ...(store.getState<string[]>(MIGRATIONS_KEY) ?? []),
+      NAMED_LOWEST_FREE_2026_11,
+    ]);
+    store.setState(`${MIGRATIONS_KEY}:${NAMED_LOWEST_FREE_2026_11}`, {
+      ...report,
+      at: new Date().toISOString(),
+    });
+    sanctionNumbering(store);
+  });
+  store.finishRun(runId, { status: 'ok', showsOk: report.shows, requests: 0 });
+  return report;
+}

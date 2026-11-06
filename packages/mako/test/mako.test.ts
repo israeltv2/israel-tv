@@ -57,7 +57,7 @@ test('daily news: no printed numbers, dates come from the title', () => {
 });
 
 describe('fetchShow + numbering on recorded shows', () => {
-  test('Masterchef: named seasons get 101+, numbered keep their number; current season reused', async () => {
+  test('Masterchef: named seasons take the lowest free numbers in list order, numbered keep theirs', async () => {
     const f = fixtureFetcher({
       '/mako-vod-keshet/masterchef': 'show-masterchef',
       '/mako-vod-keshet/masterchef-s12': 'season-masterchef-s12',
@@ -70,11 +70,11 @@ describe('fetchShow + numbering on recorded shows', () => {
     expect(f.urls.length).toBe(5); // show page (= current season) + 4 older seasons
     const r = assignNumbers(show, { seasons: [], episodes: [] });
     expect(r.seasons.map((s) => [s.key.split('/').pop(), s.number])).toEqual([
-      ['masterchef-vip_2022', 101],
+      ['masterchef-vip_2022', 1],
       ['masterchef-s11', 11],
-      ['masterchef-dream_team', 102],
+      ['masterchef-dream_team', 2],
       ['masterchef-s12', 12],
-      ['masterchef-dream_team_2', 103],
+      ['masterchef-dream_team_2', 3],
     ]);
     expect(show.description).toContain('נבחרת החלומות');
   });
@@ -89,12 +89,19 @@ describe('fetchShow + numbering on recorded shows', () => {
     expect(f.urls.length).toBe(1);
     const current = show.seasons.find((s) => s.episodes.length > 0);
     expect(current?.key).toBe('/mako-vod-keshet/mkr_israel-vip5');
-    // Listed newest first at the source; numbers still come from "פרק N".
-    const r = assignNumbers(show, { seasons: [], episodes: [] });
-    expect(r.seasons.find((s) => s.key === current?.key)?.number).toBe(105);
+    // An airing check reads only shows already stored (first reads are full): the older seasons keep their numbers
+    // and the current one keeps its own. Listed newest first at the source; numbers still come from "פרק N".
+    const stored = {
+      seasons: show.seasons
+        .filter((s) => s.key !== current?.key)
+        .map((s, i) => ({ key: s.key, number: i + 1, kind: 'named' as const })),
+      episodes: [],
+    };
+    const r = assignNumbers(show, stored);
+    expect(r.seasons.find((s) => s.key === current?.key)?.number).toBe(5);
     expect(
       r.episodes
-        .filter((e) => e.season === 105)
+        .filter((e) => e.season === 5)
         .map((e) => e.episode)
         .sort((a, b) => a - b),
     ).toEqual([1, 2, 3, 4, 5, 6]);
@@ -108,7 +115,14 @@ describe('fetchShow + numbering on recorded shows', () => {
       { key: '/mako-vod-keshet/uvda', title: 'עובדה' },
       { currentSeasonOnly: true },
     );
-    const r = assignNumbers(show, { seasons: [], episodes: [] });
+    // As a full read sees it (every season with episodes; this fixture has only the current season's).
+    const full = {
+      ...show,
+      seasons: show.seasons.map((s) =>
+        s.episodes.length ? s : { ...s, episodes: [{ key: `${s.key}-e`, title: 'e', streams: [] }] },
+      ),
+    };
+    const r = assignNumbers(full, { seasons: [], episodes: [] });
     expect(page.seasons?.length).toBe(20);
     // Year seasons are numbered by position, oldest = 1 (by the year in the title, not the page url).
     const s2025 = r.seasons.find((s) => s.key.endsWith('uvda-2024'))?.number ?? 0;

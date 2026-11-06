@@ -135,3 +135,101 @@ test('the numbering guard stops a publish that would move a published episode', 
   expect(lines.join('\n')).toMatch(/numbering guard: 1 published episode numbers would move/);
   expect(store.lastRun('publish', 'local')?.status).toBe('failed');
 });
+
+test('named seasons move below 101 (lowest free, list order), episodes keep their numbers; empty ones unnumbered', async () => {
+  const { renumberNamedSeasons } = await import('../src/renumber.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'named-'));
+  const store = Store.open(join(dir, 'israel-tv.sqlite'));
+  const s = (key: string, title: string, eps: string[]) => ({
+    key,
+    title,
+    episodes: eps.map((k) => ep(k, k, '2024-01-01')),
+  });
+  // Masterchef shape: named seasons listed around 11 and 12.
+  const mc: ScrapedShow = {
+    source: 'mako',
+    key: '/mc',
+    title: 'מאסטר שף',
+    catalog: 'iltv_keshet12',
+    seasons: [
+      s('vip', 'VIP 2022', ['v1', 'v2']),
+      s('s11', 'עונה 11', ['a']),
+      s('dream', 'נבחרת החלומות', ['d1']),
+      s('s12', 'עונה 12', ['b']),
+    ],
+  };
+  const mcId = store.seriesIdFor('mako', mc.key);
+  store.saveShow(
+    mcId,
+    mc,
+    {
+      seasons: [
+        { key: 'vip', number: 101, kind: 'named' },
+        { key: 's11', number: 11, kind: 'numbered' },
+        { key: 'dream', number: 102, kind: 'named' },
+        { key: 's12', number: 12, kind: 'numbered' },
+      ],
+      episodes: [
+        { key: 'v1', season: 101, episode: 3 },
+        { key: 'v2', season: 101, episode: 7 },
+        { key: 'a', season: 11, episode: 1 },
+        { key: 'd1', season: 102, episode: 1 },
+        { key: 'b', season: 12, episode: 1 },
+      ],
+    },
+    undefined,
+  );
+  // Reshet: an empty duplicate "עונה 1" (101) and "עונת 2023/2024" seasons that were named.
+  const rs: ScrapedShow = {
+    source: 'reshet',
+    key: '/rs',
+    title: 'x',
+    catalog: 'iltv_reshet13',
+    seasons: [
+      s('r1', 'עונה 1', ['e1']),
+      s('dup', 'עונה 1', []),
+      s('y23', 'עונת 2023', ['f1']),
+      s('y24', 'עונת 2024', ['g1']),
+    ],
+  };
+  const rsId = store.seriesIdFor('reshet', rs.key);
+  store.saveShow(
+    rsId,
+    rs,
+    {
+      seasons: [
+        { key: 'r1', number: 1, kind: 'numbered' },
+        { key: 'dup', number: 101, kind: 'named' },
+        { key: 'y23', number: 102, kind: 'named' },
+        { key: 'y24', number: 103, kind: 'named' },
+      ],
+      episodes: [
+        { key: 'e1', season: 1, episode: 1 },
+        { key: 'f1', season: 102, episode: 1 },
+        { key: 'g1', season: 103, episode: 2 },
+      ],
+    },
+    undefined,
+  );
+  checkNumbering(store);
+  const r = renumberNamedSeasons(store, join(dir, 'backups'));
+  expect(r).toMatchObject({ shows: 2, seasons: 4, episodes: 5, emptyDropped: 1 });
+  expect(r?.backup && existsSync(r.backup)).toBe(true);
+  const mcA = store.assignments(mcId);
+  expect(Object.fromEntries(mcA.seasons.map((x) => [x.key, x.number]))).toEqual({
+    vip: 1,
+    s11: 11,
+    dream: 2,
+    s12: 12,
+  });
+  expect(numbers(mcA)).toEqual({ v1: '1:3', v2: '1:7', a: '11:1', d1: '2:1', b: '12:1' });
+  const rsA = store.assignments(rsId);
+  expect(Object.fromEntries(rsA.seasons.map((x) => [x.key, `${x.kind}:${x.number}`]))).toEqual({
+    r1: 'numbered:1',
+    y23: 'year:2',
+    y24: 'year:3',
+  });
+  expect(numbers(rsA)).toEqual({ e1: '1:1', f1: '2:1', g1: '3:2' });
+  expect(renumberNamedSeasons(store, join(dir, 'backups'))).toBeUndefined();
+  expect(checkNumbering(store).ok).toBe(true);
+});

@@ -313,7 +313,7 @@ test('an untitled named season adds nothing to episode titles; titles and texts 
         show: {
           ...base2.show,
           title: 'עושים שישי',
-          description: 'סוף&amp;nbsp;',
+          description: 'תכנית אקטואליה שבועית&amp;nbsp;',
           seasons: [
             {
               key: 'u',
@@ -331,5 +331,5 @@ test('an untitled named season adds nothing to episode titles; titles and texts 
   });
   const meta = read(files, 'meta/series/iltv_reshet_183.json').meta;
   expect(meta.videos[0].title).toBe('06.11.26');
-  expect(meta.description).toBe('סוף');
+  expect(meta.description).toBe('תכנית אקטואליה שבועית');
 });

@@ -25,3 +25,17 @@ test('genres for a filter: one spelling, no "תכניות" prefix, no site secti
     cleanGenres(['תכניות אקטואליה', 'אקטואליה', 'תוכניות אוכל', 'חדשות 13', 'דיגיטל 13', 'מצויירים']),
   ).toEqual(['אקטואליה', 'אוכל', 'מצוירים']);
 });
+
+test('descriptions lose what sites add for search engines (the live cases)', async () => {
+  const { cleanDescription } = await import('../src/tidy.ts');
+  expect(
+    cleanDescription('%%excerpt%% חדשות 13 | חדשות היום - תוכנית אקטואליה יומית. כל יום ב-15:00 בערוץ 13'),
+  ).toBe('חדשות היום - תוכנית אקטואליה יומית. כל יום ב-15:00 בערוץ 13');
+  expect(cleanDescription('אבי שושן מבין שהוא בבעיה. האם הוא יצליח? | "הישרדות", לצפייה ישירה')).toBe(
+    'אבי שושן מבין שהוא בבעיה. האם הוא יצליח?',
+  );
+  expect(cleanDescription('סרטיו של דרור גלוברמן לצפייה ישירה')).toBe('סרטיו של דרור גלוברמן');
+  expect(cleanDescription('ערוץ רשת 13, כל תוכניות הטלוויזיה, החדשות והכתבות לצפייה ישירה')).toBeUndefined();
+  const sentence = 'תכנית הבישול של קשת 12: כל המתכונים, הקטעים ופרקים מלאים מתכניות מבשלים עם קשת';
+  expect(cleanDescription(sentence)).toBe(sentence);
+});

@@ -157,6 +157,10 @@ test('every series row is shaped "poster", every poster is portrait and reachabl
     }
   }
   expect(checked).toBe(5);
+  // The publisher's own audit agrees, and says so on /status.
+  const audit = JSON.parse(String(files.get('status.json'))).audit;
+  expect(audit).toMatchObject({ metas: 5, problems: [] });
+  expect(String(files.get('status.html'))).toContain('Catalog audit');
   // The no-copy Kan show shows the placeholder; the landscape ones got their own portrait poster.
   const id = (key: string) =>
     store.findSeriesId(shows.find((s) => s.key === key)?.source ?? 'kan', key) ?? '';
@@ -207,4 +211,42 @@ test('hidden shows and sources leave everything published, without touching thei
   const catalogs = JSON.parse(String(files.get('manifest.json'))).catalogs.map((c: { id: string }) => c.id);
   expect(catalogs).toEqual(['iltv_keshet12']);
   expect(store.findSeriesId('mako', 'm2')).toBe('iltv_mako_2'); // still known: the same id if it comes back
+});
+
+test('the catalog audit flags what a viewer should never see', async () => {
+  const { auditSite } = await import('../src/catalog-audit.ts');
+  const meta = {
+    id: 'iltv_mako_9',
+    type: 'series',
+    name: 'שם - פרקים מלאים לצפייה ישירה',
+    poster: 'https://www.kan.org.il/p.jpg',
+    posterShape: 'landscape',
+    description: '%%excerpt%% טקסט',
+    releaseInfo: '2024–',
+    videos: [
+      { id: 'iltv_mako_9:101:1', title: 'א', season: 101, episode: 1 },
+      { id: 'iltv_mako_9:101:1', title: 'ב &amp; ג', season: 101, episode: 1 },
+    ],
+  };
+  const files = new Map<string, string | Uint8Array>([
+    ['manifest.json', '{}'],
+    [
+      'catalog/series/iltv_keshet12.json',
+      JSON.stringify({ metas: [{ ...meta, name: 'אחר', videos: undefined }] }),
+    ],
+    ['meta/series/iltv_mako_9.json', JSON.stringify({ meta })],
+  ]);
+  const checks = auditSite(files, Store.open(':memory:')).problems.map((p) => p.check);
+  for (const c of [
+    'series shown with a non-poster shape',
+    'poster refused outside Israel',
+    'season numbered 101 or more',
+    'two episodes with one number',
+    'site text in an episode title',
+    'empty name or site text in a name',
+    'site text in a description',
+    'year line not a year or a closed range',
+    'row item differs from its show page',
+  ])
+    expect(checks, c).toContain(c);
 });

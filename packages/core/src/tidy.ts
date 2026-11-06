@@ -38,3 +38,23 @@ export function tidyEpisodeTitle(title: string, showTitle: string): string {
     .trim();
   return t || raw;
 }
+
+/** A site's own generic blurb, used by some show pages as their description: not about the show. */
+const BOILERPLATE = [/^ערוץ רשת 13, כל תוכניות הטלוויזיה/];
+
+/**
+ * A show or episode description without what sites add for search engines (measured on the live data): template
+ * placeholders ("%%excerpt%%"), a site-section prefix ("חדשות 13 | …"), a trailing "| …, לצפייה ישירה" segment or
+ * "לצפייה ישירה" ending; a site's generic blurb is no description at all. Ordinary sentences stay as written.
+ */
+export function cleanDescription(raw: string | undefined | null): string | undefined {
+  if (!raw) return undefined;
+  let t = tidyText(raw).replace(/%%[a-z_]+%%/gi, ' ');
+  t = tidyText(t)
+    .replace(/^(?:חדשות 13|רשת 13|ערוץ 13|קשת 12|N12)\s*\|\s*/, '')
+    .replace(/\s*\|[^|]*לצפייה ישירה[^|]*$/, '')
+    .replace(/\s*[-–,]?\s*(?:פרקים מלאים\s*)?לצפייה ישירה\s*$/, '')
+    .trim();
+  if (t.length < 10 || BOILERPLATE.some((r) => r.test(t))) return undefined;
+  return t;
+}

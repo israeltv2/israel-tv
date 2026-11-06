@@ -3,6 +3,7 @@ import {
   CATALOG_PAGE_SIZE,
   CATALOGS,
   CONTRACT,
+  cleanDescription,
   cleanGenres,
   type EpisodeAssignment,
   type EpisodePlay,
@@ -110,7 +111,8 @@ export function releaseInfo(s: RenderShow): string | undefined {
 function preview(s: RenderShow): MetaPreview {
   const p: MetaPreview = { id: s.seriesId, type: 'series', name: tidyText(s.title), posterShape: SHAPE };
   if (s.show.poster) p.poster = s.show.poster;
-  if (s.show.description) p.description = tidyText(s.show.description);
+  const description = cleanDescription(s.show.description);
+  if (description) p.description = description;
   const year = releaseInfo(s);
   if (year) p.releaseInfo = year;
   const genres = cleanGenres(s.show.genres);

@@ -239,3 +239,10 @@ export async function measurePosters(
 function hash(s: string): string {
   return createHash('sha256').update(s).digest('hex').slice(0, 16);
 }
+
+/** What is known of a remote poster's shape: measured portrait, measured not portrait, or not measured (yet). */
+export function remotePosterShape(store: Store, url: string): 'portrait' | 'not portrait' | 'unmeasured' {
+  const m = store.getState<PosterState>(STATE_KEY)?.[url];
+  if (!m || !('w' in m)) return 'unmeasured';
+  return isPortrait(m) ? 'portrait' : 'not portrait';
+}

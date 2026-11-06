@@ -21,10 +21,11 @@ import {
   type StatusFile,
   sitePaths,
 } from '@israel-tv/core';
-import { type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
+import { type RenderShow, renderSite, renderStatusHtml, type SiteFiles } from '@israel-tv/render';
 import { brandImage, channelLogo } from '@israel-tv/resolver';
 import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
+import { auditSite } from './catalog-audit.ts';
 import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
 import { checkNumbering } from './numbering-guard.ts';
@@ -307,6 +308,12 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     },
     catalogWarnings: catalogWarnings(status),
   });
+  // The publisher's own audit of these files, published on /status with them.
+  const audit = auditSite(files, store);
+  store.setState('catalog:audit', audit);
+  const audited = { ...status, audit };
+  files.set(sitePaths.status, JSON.stringify(audited));
+  files.set(sitePaths.statusPage, renderStatusHtml(audited));
   // With the public address known, write it into every file now: no file then needs the Worker for it.
   const base = publicBase(config, store);
   if (base) {
