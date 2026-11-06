@@ -1239,6 +1239,29 @@ Not changed, by design or waiting for the owner:
 
 - **Kan rows look thin:** 1,914 episode pages were still queued across 168 shows (polite pace, 5 pages per 10
   minutes); they fill over the coming days.
-- **Kan episode order** follows Kan's page ids, so a show can list "פרק 4" before "פרק 1"; and **Reshet daily shows**
-  whose source gives untitled seasons sit in season 101. Both need stored numbers changed: the owner decides.
+- **Kan episode order** and **Reshet daily shows in season 101**: renumbered the same day with the owner's approval
+  (next section).
 - **Israel-only notes** appear only where Kaltura marks the episode geo-blocked; some Reshet episodes play abroad.
+
+## Kan and Reshet renumbered once; numbering frozen (2026-11-06)
+
+Owner-approved, before going public, while there were almost no viewers. One pass (`kan-titles+reshet-years-
+2026-11-06`, apps/ingest/src/renumber.ts): a backup of the database first, then one transaction, logged at start-up
+and recorded in the database so it never runs twice.
+
+- **Kan:** episodes take the number in Kan's own title ("פרק 4 - …" → 4); episodes without one (trailers, specials)
+  follow in air-date order (page order when undated), after the numbered ones; never two with the same number in a
+  season — a clash is numbered after the others and listed as a warning on `/status`. New Kan episodes follow the
+  same rule (the crawler passes the title's number).
+- **Reshet:** an untitled season listed among others (Reshet's daily shows, which then sat in season 101) becomes
+  one season per air year, numbered by position, oldest = 1 — the same rule as Mako's year seasons — with its
+  episodes in air-date order within the year (printed numbers ignored there). A show whose only season is untitled
+  stays one season. New episodes are read the same way (`untitledSeasonsByYear`).
+
+**Frozen from here on.** Episode numbers only ever get added. Two guards hold that:
+
+- `packages/core/test/numbering-frozen.test.ts` fixes the numbers a set of inputs covering every rule must get; a
+  rule change that numbers them differently fails CI.
+- The publisher's numbering guard (apps/ingest/src/numbering-guard.ts) keeps every published episode's number and
+  refuses to publish when one would move or vanish, saying which on `/status`. Only a recorded migration (with a
+  backup and the owner's approval) re-takes that history.

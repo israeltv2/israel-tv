@@ -207,3 +207,34 @@ test('a show has its own blurb from the page', () => {
   expect(parseShowPage(html('show-kitchen-nightmares')).description).toMatch(/^השף אסף גרניט/);
   expect(parseShowPage(html('show-kitchen-nightmares')).description).not.toMatch(/&quot;|&amp;/);
 });
+
+test('untitled seasons among several become one season per air year, episodes by date, no printed numbers', async () => {
+  const { untitledSeasonsByYear } = await import('../src/parse.ts');
+  const e = (key: string, airDate: string) => ({ key, title: key, airDate, numberHint: 3, streams: [] });
+  const show = {
+    source: 'reshet' as const,
+    key: '/d',
+    title: 'd',
+    catalog: 'iltv_reshet13',
+    seasons: [
+      { key: 'a', title: 'עונה 2', episodes: [e('t1', '2023-01-01')] },
+      {
+        key: 'b',
+        title: '',
+        episodes: [e('x2', '2025-05-01'), e('x1', '2024-02-01'), e('x0', '2024-01-01')],
+      },
+      { key: 'c', title: '', episodes: [] },
+    ],
+  };
+  const out = untitledSeasonsByYear(show);
+  expect(out.seasons.map((s) => [s.key, s.title, s.episodes.map((x) => x.key)])).toEqual([
+    ['a', 'עונה 2', ['t1']],
+    ['b|2024', '2024', ['x0', 'x1']],
+    ['b|2025', '2025', ['x2']],
+  ]);
+  expect(out.seasons[1]?.episodes[0]?.numberHint).toBeUndefined();
+  expect(out.seasons[0]?.episodes[0]?.numberHint).toBe(3);
+  // A show whose only season is untitled stays one season.
+  const single = { ...show, seasons: [show.seasons[1] as (typeof show.seasons)[number]] };
+  expect(untitledSeasonsByYear(single)).toBe(single);
+});

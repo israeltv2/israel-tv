@@ -27,6 +27,7 @@ import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
+import { checkNumbering } from './numbering-guard.ts';
 import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster } from './posters.ts';
 import { emptyShowsKey, episodeCount } from './runner.ts';
 import { ALIASES_KEY } from './tmdb.ts';
@@ -779,6 +780,15 @@ export async function publishSite(
   const t0 = Date.now();
   const kind = config.publisher.type;
   let w: ReturnType<typeof writeSite>;
+  // Published episode numbers never move: refuse to publish when one would (see numbering-guard.ts).
+  const guard = checkNumbering(store);
+  if (!guard.ok) {
+    const runId = store.startRun('publish', kind);
+    const error = `numbering guard: ${guard.moved} published episode numbers would move (${guard.examples.join('; ')}); nothing published — restore the database from the last backup, or record a migration`;
+    store.finishRun(runId, { status: 'failed', error });
+    log(`publish refused: ${error}`);
+    return false;
+  }
   // Posters not measured yet are fetched once each, so the render knows their shape.
   await measurePosters(
     store,

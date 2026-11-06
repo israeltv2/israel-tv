@@ -9,6 +9,8 @@ import {
   parseDottedDate,
   parseEpisodeHint,
   type ScrapedEpisode,
+  type ScrapedSeason,
+  type ScrapedShow,
   tidyText,
 } from '@israel-tv/core';
 import { z } from 'zod';
@@ -288,4 +290,39 @@ export function parseShowPage(html: string): ParsedShowPage {
 export function parseSeasonPage(html: string): ScrapedEpisode[] {
   const d = ShowPageData.parse(nextData(html));
   return oldSeason(d.props.pageProps.program?.episodes ?? []);
+}
+
+/**
+ * Reshet lists some daily shows as untitled seasons next to others (often an empty one), which would make them
+ * "named" seasons from 101. Each untitled season among several becomes one season per air year ("2024"), so it is
+ * numbered like any year season (by position, oldest = 1), with its episodes in air-date order and no printed
+ * numbers (a daily show's "פרק N" counts within a year at most). Empty untitled seasons are dropped. A show whose
+ * only season is untitled stays a single season.
+ */
+export function untitledSeasonsByYear(show: ScrapedShow): ScrapedShow {
+  if (show.seasons.length <= 1 || !show.seasons.some((s) => s.title.trim() === '')) return show;
+  const seasons: ScrapedSeason[] = [];
+  for (const s of show.seasons) {
+    if (s.title.trim() !== '') {
+      seasons.push(s);
+      continue;
+    }
+    const years = [
+      ...new Set(s.episodes.map((e) => e.airDate?.slice(0, 4)).filter((y): y is string => !!y)),
+    ].sort();
+    const last = years.at(-1);
+    const byYear = new Map<string, ScrapedSeason['episodes']>();
+    for (const e of s.episodes) {
+      const y = e.airDate?.slice(0, 4) ?? last;
+      if (!y) continue;
+      const { numberHint: _, ...rest } = e;
+      byYear.set(y, [...(byYear.get(y) ?? []), rest]);
+    }
+    for (const y of [...byYear.keys()].sort()) {
+      const eps = (byYear.get(y) ?? []).map((e, i) => ({ e, i }));
+      eps.sort((a, b) => (a.e.airDate ?? '').localeCompare(b.e.airDate ?? '') || a.i - b.i);
+      seasons.push({ key: `${s.key}|${y}`, title: y, episodes: eps.map(({ e }) => e) });
+    }
+  }
+  return { ...show, seasons };
 }

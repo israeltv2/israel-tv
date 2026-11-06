@@ -8,6 +8,7 @@ import {
   parseShowPage,
   RESHET_ORIGIN,
   type ReshetIndexEntry,
+  untitledSeasonsByYear,
 } from './parse.ts';
 
 export const RESHET_CATALOG = 'iltv_reshet13';
@@ -79,7 +80,7 @@ export async function fetchShow(
     title: single ? '' : x.s.title,
     episodes: x.episodes,
   }));
-  return {
+  return untitledSeasonsByYear({
     source: 'reshet',
     key: entry.key,
     title: entry.title,
@@ -90,5 +91,5 @@ export async function fetchShow(
     seasons: out,
     pageUrl: `${RESHET_ORIGIN}${entry.key}`,
     ...(notes.length ? { notes } : {}),
-  };
+  });
 }

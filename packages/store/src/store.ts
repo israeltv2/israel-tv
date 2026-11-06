@@ -49,6 +49,9 @@ export type RunKind = (typeof t.runs.$inferSelect)['kind'];
 export type RunStatus = (typeof t.runs.$inferSelect)['status'];
 export type RunRow = typeof t.runs.$inferSelect;
 export type WarningRow = typeof t.warnings.$inferSelect;
+/** kv key of the numbering guard's history (see apps/ingest/src/numbering-guard.ts). */
+export const NUMBERING_HISTORY = 'numbering:history';
+
 export class Store {
   readonly db;
   /** Called when a run finishes (the daemon records it as a usage/diagnostics event). */
@@ -118,6 +121,8 @@ export class Store {
       c.exec('ROLLBACK');
       throw err;
     }
+    // A sanctioned move: the numbering guard's history is re-taken from what is stored now.
+    this.setState(NUMBERING_HISTORY, this.numberingNow());
     return old.length;
   }
 
@@ -170,8 +175,32 @@ export class Store {
     this.db.$client.close();
   }
 
+  /** Run `fn` in one transaction; an inner call joins the outer one (all or nothing). */
+  transaction<T>(fn: () => T): T {
+    return this.tx(fn);
+  }
+
+  private depth = 0;
+
   private tx<T>(fn: () => T): T {
     const c = this.db.$client;
+    if (this.depth > 0) {
+      this.depth++;
+      try {
+        return fn();
+      } finally {
+        this.depth--;
+      }
+    }
+    this.depth = 1;
+    try {
+      return this.txOuter(c, fn);
+    } finally {
+      this.depth = 0;
+    }
+  }
+
+  private txOuter<T>(c: DatabaseSync, fn: () => T): T {
     c.exec('BEGIN IMMEDIATE');
     try {
       const r = fn();
@@ -223,6 +252,36 @@ export class Store {
       .where(eq(t.episodes.seriesId, seriesId))
       .all();
     return { seasons, episodes };
+  }
+
+  /**
+   * Replace a series' season and episode numbers. Only for a recorded one-time migration (see apps/ingest
+   * renumber.ts): everything else only ever adds numbers. The caller re-takes the numbering snapshot after.
+   */
+  replaceAssignments(seriesId: string, a: Assignments): void {
+    const ts = now();
+    this.tx(() => {
+      this.db.delete(t.episodes).where(eq(t.episodes.seriesId, seriesId)).run();
+      this.db.delete(t.seasons).where(eq(t.seasons.seriesId, seriesId)).run();
+      for (const x of a.seasons)
+        this.db
+          .insert(t.seasons)
+          .values({ seriesId, ...x, createdAt: ts })
+          .run();
+      for (const x of a.episodes)
+        this.db
+          .insert(t.episodes)
+          .values({ seriesId, ...x, createdAt: ts })
+          .run();
+    });
+  }
+
+  /** Every episode's published number: `seriesId|key` → `season:episode` (the numbering guard's history). */
+  numberingNow(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const e of this.db.select().from(t.episodes).all())
+      out[`${e.seriesId}|${e.key}`] = `${e.season}:${e.episode}`;
+    return out;
   }
 
   /** Whole registry, for the public backup file. */

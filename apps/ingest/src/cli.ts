@@ -38,6 +38,7 @@ import {
   workerVersions,
   writeSite,
 } from './publish.ts';
+import { renumberKanReshet } from './renumber.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
@@ -154,6 +155,11 @@ async function main(argv: string[]): Promise<number> {
     return runResolverOnly(config);
   }
   const store = Store.open(config.store.path);
+  const renumber = renumberKanReshet(store, config.backup.dir);
+  if (renumber)
+    console.log(
+      `israel-tv: one-time renumber ${renumber.id}: Kan ${renumber.kan.shows} shows (${renumber.kan.moved} of ${renumber.kan.episodes} episodes moved), Reshet ${renumber.reshet.shows} shows (${renumber.reshet.seasons} year seasons, ${renumber.reshet.moved} episodes moved), ${renumber.conflicts} clashes; backup ${renumber.backup ?? 'none (nothing to move)'}`,
+    );
   if (store.renumbered > 0)
     console.log(
       `israel-tv: ${store.renumbered} year-titled seasons renumbered by position (once; see docs/decisions.md)`,
