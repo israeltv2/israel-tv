@@ -89,6 +89,13 @@ come from Workers Logs).
 | `host`, `port`     | `0.0.0.0`, `7701` |                                                                                                                              |
 | `makoAuth.enabled` | `true`            | Mako playback (a fresh ticket and the ~1 KB playlist per play; video comes from Mako's CDN).                                 |
 | `geoRelay.enabled` | `true`            | Geo-blocked Reshet/Kan video through the `geo` proxy, only when refused from this network. The only part that carries video. |
+| `remote.*`         | off               | Mako away from home through your own tunnel (see below).                                                                     |
+
+`remote`: `enabled` (default `false`), `host`/`port` (default `127.0.0.1`, `7703`: for a tunnel connector on the
+same machine), `publicUrl` (the tunnel's address), `tokenEnv` (default `ISRAEL_TV_REMOTE_TOKEN`: the secret
+path token, 32 characters or more, in `.env`), `playsPerMinute` (30) and `requestsPerMinute` (240) per client.
+Serves only Mako's routes under `/<token>/…` (no relay, nothing of the admin page); everything else answers an
+empty 404. `israel-tv remote-url` prints the manifest link.
 
 ## `admin`
 
