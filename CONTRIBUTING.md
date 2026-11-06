@@ -83,6 +83,9 @@ registered in `apps/ingest`. Open an issue first to agree on the approach.
   copy code from other addons.
 - **Be polite to the sites:** at most one request a second; never contact them from tests or CI.
 - **Failures are visible:** keep the last good data and report the problem on `/status`; never silently drop shows.
+- **Episode numbers never move:** apps keep watch progress by them. The numbering rules are frozen
+  (`packages/core/test/numbering-frozen.test.ts`), and the publisher refuses to publish if a published number would
+  move. A change that must move episodes needs a recorded one-time migration and the maintainer's approval.
 - **Privacy:** no personal data, real names, home addresses, IPs or secrets in code, fixtures, docs or commits. Secrets
   live in `.env`, outside the repository.
 - **No funding links** of any kind.

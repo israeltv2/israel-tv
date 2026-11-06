@@ -15,6 +15,7 @@ import {
   cleanShow,
   DAY_MS,
   HOUR_MS,
+  parseEpisodeHint,
   type ScrapedEpisode,
   type ScrapedSeason,
   type ScrapedShow,
@@ -178,6 +179,8 @@ export function toEpisode(e: ReturnType<typeof parseEpisodePage> & object): Scra
   return {
     key: kanEpisodeKey(e),
     title: e.title,
+    // Kan's own number ("פרק 4 - …"); episodes without one are numbered by air date after the others.
+    ...(parseEpisodeHint(e.title) ? { numberHint: parseEpisodeHint(e.title) } : {}),
     ...(e.description ? { description: e.description } : {}),
     ...(e.poster ? { thumbnail: e.poster } : {}),
     ...(e.published ? { airDate: e.published } : {}),
