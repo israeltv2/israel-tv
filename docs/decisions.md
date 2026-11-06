@@ -653,6 +653,8 @@ count toward the free plan's 100,000 a day; a household browses a few hundred); 
 Search and stream requests are limited per client: 120 stream requests and 60 searches a minute. That is enough
 for a family whose devices all share one home address (opening an episode is one stream request) and stops a
 runaway client or a scraper. The key is the salted daily client hash, so no address goes into the limiter
-either. Cloudflare's Workers rate-limiting binding does the counting; when the Worker runs without it, an
-in-memory window per Worker instance stands in (weaker, since each instance counts on its own). Over the limit:
+either. Two counters, and a request over either is refused: Cloudflare's Workers rate-limiting binding (available on the
+free plan; it counts across locations but is deliberately permissive while it syncs — measured: of about 430
+stream requests in a minute from one address, only the last few got 429) and an in-memory one-minute window in
+each Worker instance, which stops a burst at once. Over the limit:
 HTTP 429 with `retry-after: 60` and a plain message. Catalog browsing and metadata are not limited (static files).

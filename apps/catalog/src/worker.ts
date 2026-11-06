@@ -58,8 +58,12 @@ export default {
     const address = request.headers.get('cf-connecting-ip');
     const client = salt && address ? await clientHash(salt, address) : undefined;
     if (kind) {
-      const limiter = (kind === 'stream' ? env.RATE_STREAM : env.RATE_SEARCH) ?? fallback[kind];
-      const { success } = await limiter.limit({ key: client ?? address ?? 'unknown' });
+      // Cloudflare's limiter counts across locations but lets bursts through while it syncs; the in-memory
+      // window stops a burst at once within this instance. A request over either is refused.
+      const key = client ?? address ?? 'unknown';
+      const shared = kind === 'stream' ? env.RATE_STREAM : env.RATE_SEARCH;
+      const local = (await fallback[kind].limit({ key })).success;
+      const success = local && (shared ? (await shared.limit({ key })).success : true);
       if (!success) {
         console.log(
           JSON.stringify({
