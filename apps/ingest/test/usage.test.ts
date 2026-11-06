@@ -184,3 +184,25 @@ test('a failed deploy never puts the account id (or any secret) into the publish
     process.env = saved;
   }
 });
+
+test('with the public address known, image URLs are absolute and only catalog rows run the Worker', async () => {
+  const { renderFromStore, workerConfig } = await import('../src/publish.ts');
+  const { Store } = await import('@israel-tv/store');
+  const dir = new URL('../../catalog', import.meta.url).pathname;
+  const known = workerConfig(cf().publisher as never, dir, true, true) as { assets: Record<string, unknown> };
+  expect(known.assets.run_worker_first).toEqual(['/catalog/*']);
+  const config = ConfigSchema.parse({
+    publisher: {
+      type: 'cloudflare',
+      workerName: 'w',
+      dir: '/tmp/site',
+      publicUrl: 'https://tv.example.net/',
+    },
+    sources: { mako: false, reshet: false, kan: false, live: true },
+  });
+  const files = renderFromStore(Store.open(':memory:'), config);
+  const manifest = String(files.get('manifest.json'));
+  expect(manifest).toContain('"logo":"https://tv.example.net/logo.png"');
+  for (const [path, content] of files)
+    if (typeof content === 'string') expect(content, path).not.toContain('{{israel-tv-origin}}');
+});

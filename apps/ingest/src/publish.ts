@@ -246,7 +246,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     }
   }
   const live = config.sources.live ? liveRender(logos) : [];
-  return renderSite({
+  const files = renderSite({
     version: VERSION,
     assets,
     sources: activeSources(config),
@@ -268,6 +268,15 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     },
     catalogWarnings: catalogWarnings(status),
   });
+  // With the public address known, write it into every file now: no file then needs the Worker for it.
+  const base = publicBase(config, store);
+  if (base) {
+    for (const [path, content] of files) {
+      if (typeof content === 'string' && content.includes(ORIGIN_TOKEN))
+        files.set(path, content.replaceAll(ORIGIN_TOKEN, base));
+    }
+  }
+  return files;
 }
 
 function groupBy<T>(list: T[], key: (x: T) => string): Map<string, T[]> {
@@ -415,9 +424,10 @@ const WORKER_SOURCES = ['apps/catalog/src', 'packages/addon/src', 'packages/core
 export function workerFingerprint(
   p: Extract<PublisherConfig, { type: 'cloudflare' }>,
   analytics = true,
+  originKnown = false,
 ): string {
   const h = createHash('sha256');
-  h.update(JSON.stringify(workerConfig(p, join(REPO_ROOT, 'apps/catalog'), analytics)));
+  h.update(JSON.stringify(workerConfig(p, join(REPO_ROOT, 'apps/catalog'), analytics, originKnown)));
   for (const dir of WORKER_SOURCES) {
     const abs = join(REPO_ROOT, dir);
     if (!existsSync(abs)) continue;
@@ -438,6 +448,8 @@ export function workerConfig(
   p: Extract<PublisherConfig, { type: 'cloudflare' }>,
   catalogDir: string,
   analytics = true,
+  /** The publish wrote absolute image URLs (it knew the addon's address), so only rows need the Worker. */
+  originKnown = false,
 ): unknown {
   const text = readFileSync(join(catalogDir, 'wrangler.jsonc'), 'utf8')
     .split('\n')
@@ -451,9 +463,10 @@ export function workerConfig(
     assets: {
       ...base.assets,
       directory: p.dir,
-      // Static files are served without running the Worker (browsing is free and not counted), except the
-      // ones that carry image URLs relative to the addon's address, which the Worker fills in.
-      run_worker_first: ['/manifest.json', '/catalog/*', '/meta/*'],
+      // Static files are served without running the Worker (browsing is free and not counted), except catalog
+      // rows (the Worker adds a warning to a row that has not been updated). Only on a first publish, before the
+      // addon's address is known, do the files carrying image URLs also go through it to get the address filled in.
+      run_worker_first: originKnown ? ['/catalog/*'] : ['/manifest.json', '/catalog/*', '/meta/*'],
     },
     // The Worker logs its own events (no addresses); Cloudflare's invocation logs would keep request metadata.
     observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false } },
@@ -473,6 +486,7 @@ async function deployCloudflare(
   env: NodeJS.ProcessEnv,
   salt?: string,
   analytics = true,
+  originKnown = false,
 ): Promise<DeployResult> {
   const t0 = Date.now();
   const cwd = join(REPO_ROOT, 'apps/catalog');
@@ -500,7 +514,7 @@ async function deployCloudflare(
     FORCE_COLOR: '0',
   };
   const configPath = join(wranglerHome, 'wrangler.json');
-  writeFileSync(configPath, JSON.stringify(workerConfig(p, cwd, analytics), null, 2));
+  writeFileSync(configPath, JSON.stringify(workerConfig(p, cwd, analytics, originKnown), null, 2));
   const args = ['deploy', '--config', configPath, '--name', p.workerName, '--assets', p.dir];
   // The client-hash salt goes up as a Worker secret, through a file only this user can read, removed after.
   const secretsPath = join(wranglerHome, 'secrets.json');
@@ -545,10 +559,24 @@ export async function deploy(
   env: NodeJS.ProcessEnv = process.env,
   salt?: string,
   analytics = true,
+  originKnown = false,
 ): Promise<DeployResult> {
   const p = config.publisher;
   if (p.type === 'local') return { ms: 0, detail: `served from ${p.dir} by the local server` };
-  return deployCloudflare(p, env, salt, analytics);
+  return deployCloudflare(p, env, salt, analytics, originKnown);
+}
+
+const PUBLISHED_URL = 'publish:url';
+
+/**
+ * The public addon's own address, when known: `publisher.publicUrl`, else the address the last successful
+ * Cloudflare deploy reported. Image URLs are then written absolute at publish time, so metadata stays plain
+ * static files. (The local server fills in its address per request instead.)
+ */
+export function publicBase(config: Config, store: Store): string | undefined {
+  if (config.publisher.type !== 'cloudflare') return undefined;
+  const url = config.publisher.publicUrl ?? store.getState<string>(PUBLISHED_URL) ?? undefined;
+  return url?.replace(/\/+$/, '');
 }
 
 /** Set while Cloudflare refuses the Analytics Engine binding (not enabled on the account); retried weekly. */
@@ -589,8 +617,11 @@ export async function publishSite(
   const retry = store.lastRun('publish', kind)?.status === 'failed';
   // A new version of the Worker (its code or its config) is deployed even when no data changed.
   let analytics = analyticsWanted(store);
+  const originKnown = publicBase(config, store) !== undefined;
   const worker =
-    config.publisher.type === 'cloudflare' ? workerFingerprint(config.publisher, analytics) : undefined;
+    config.publisher.type === 'cloudflare'
+      ? workerFingerprint(config.publisher, analytics, originKnown)
+      : undefined;
   const workerChanged = worker !== undefined && store.getState<string>(WORKER_DEPLOYED) !== worker;
   if (w.changed.length === 0 && w.deleted === 0 && !retry && !workerChanged) {
     log('publish: nothing changed');
@@ -600,7 +631,7 @@ export async function publishSite(
   try {
     let d: DeployResult;
     try {
-      d = await deploy(config, process.env, salt, analytics);
+      d = await deploy(config, process.env, salt, analytics, originKnown);
       if (analytics) store.setState(ANALYTICS_OFF, null);
     } catch (err) {
       // Analytics Engine is a one-time opt-in on the Cloudflare account: deploy without it meanwhile.
@@ -610,11 +641,14 @@ export async function publishSite(
       log(
         'publish: Analytics Engine is not enabled on the Cloudflare account; deploying without it (see /status)',
       );
-      d = await deploy(config, process.env, salt, false);
+      d = await deploy(config, process.env, salt, false, originKnown);
     }
     store.finishRun(runId, { status: 'ok' });
     if (worker && config.publisher.type === 'cloudflare')
-      store.setState(WORKER_DEPLOYED, workerFingerprint(config.publisher, analytics));
+      store.setState(WORKER_DEPLOYED, workerFingerprint(config.publisher, analytics, originKnown));
+    // The first deploy tells us the public address: the next publish writes it into the files.
+    if (d.url && config.publisher.type === 'cloudflare' && !config.publisher.publicUrl)
+      store.setState(PUBLISHED_URL, d.url);
     log(
       `publish: ${w.written} of ${w.total} files changed, ${w.deleted} removed; ${d.detail}${d.url ? ` → ${d.url}/manifest.json` : ''} (${Math.round((Date.now() - t0) / 1000)} s)`,
     );
