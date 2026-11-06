@@ -70,3 +70,17 @@ test('show page image: a picture the page shows, not the share image Kan refuses
   const page = parseShowPage(html('show-p-1006421'), '/content/kan/kan-11/p-1006421/');
   expect(page.image).toMatch(/^\/media\/[^?]+\.jpg\?width=490&height=272&v=/);
 });
+
+test('browsers tried for Kan: the configured one only; else Chrome, Edge, then a Linux Chromium', async () => {
+  const { browserCandidates } = await import('../src/browser.ts');
+  expect(browserCandidates('/opt/chrome')).toEqual([{ executablePath: '/opt/chrome' }]);
+  expect(browserCandidates(undefined, 'win32', () => true)).toEqual([
+    { channel: 'chrome' },
+    { channel: 'msedge' },
+  ]);
+  expect(browserCandidates(undefined, 'linux', (p) => p === '/usr/bin/chromium')).toEqual([
+    { channel: 'chrome' },
+    { channel: 'msedge' },
+    { executablePath: '/usr/bin/chromium' },
+  ]);
+});

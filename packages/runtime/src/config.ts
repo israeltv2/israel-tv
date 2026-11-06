@@ -1,12 +1,40 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join, resolve, sep } from 'node:path';
 import { type Config, ConfigError, checkSecrets, parseConfig, roleOf } from '@israel-tv/core';
 
 export const DEFAULT_CONFIG_FILE = 'israel-tv.config.json';
 
+/** The platform's usual folder for an app's own files (config, `.env` and data together, so it moves as one). */
+export function platformHome(
+  env: Record<string, string | undefined> = process.env,
+  platform: NodeJS.Platform = process.platform,
+  home: string = homedir(),
+): string {
+  if (platform === 'win32') return join(env.LOCALAPPDATA ?? join(home, 'AppData', 'Local'), 'israel-tv');
+  if (platform === 'darwin') return join(home, 'Library', 'Application Support', 'israel-tv');
+  return join(env.XDG_CONFIG_HOME || join(home, '.config'), 'israel-tv');
+}
+
 /**
- * Load `israel-tv.config.json` (or the file in ISRAEL_TV_CONFIG). A missing file means "all defaults",
- * which is a working setup inside Israel. Relative paths in the config are resolved from its folder.
+ * Where this instance's config file is, and why: ISRAEL_TV_CONFIG (an explicit file), else ISRAEL_TV_HOME (a
+ * folder), else an israel-tv.config.json in the current folder, else the platform's usual folder.
+ */
+export function configLocation(
+  env: Record<string, string | undefined> = process.env,
+  cwd: string = process.cwd(),
+): { file: string; why: string } {
+  if (env.ISRAEL_TV_CONFIG) return { file: resolve(env.ISRAEL_TV_CONFIG), why: 'ISRAEL_TV_CONFIG' };
+  if (env.ISRAEL_TV_HOME)
+    return { file: join(resolve(env.ISRAEL_TV_HOME), DEFAULT_CONFIG_FILE), why: 'ISRAEL_TV_HOME' };
+  const here = join(cwd, DEFAULT_CONFIG_FILE);
+  if (existsSync(here)) return { file: here, why: 'the current folder' };
+  return { file: join(platformHome(env), DEFAULT_CONFIG_FILE), why: "this computer's usual app folder" };
+}
+
+/**
+ * Load the config (see configLocation). A missing file means "all defaults", which is a working setup inside
+ * Israel. Relative paths in the config, and the `.env` file, are taken from the config's folder.
  */
 export function loadConfig(
   env: Record<string, string | undefined> = process.env,
@@ -15,7 +43,7 @@ export function loadConfig(
   config: Config;
   file: string | undefined;
 } {
-  const file = resolve(env.ISRAEL_TV_CONFIG ?? DEFAULT_CONFIG_FILE);
+  const { file } = configLocation(env);
   let raw: unknown = {};
   let found: string | undefined;
   if (existsSync(file)) {
@@ -28,13 +56,13 @@ export function loadConfig(
   } else if (env.ISRAEL_TV_CONFIG) {
     throw new ConfigError(`ISRAEL_TV_CONFIG points to ${file}, which does not exist.`);
   }
-  // Secrets: .env next to the config file (or in the current folder). Existing variables win.
-  const envFile = resolve(found ? resolve(found, '..') : process.cwd(), '.env');
+  // Secrets: .env next to the config file. Existing variables win.
+  const base = dirname(file);
+  const envFile = join(base, '.env');
   if (env === process.env && existsSync(envFile)) process.loadEnvFile(envFile);
   const config = parseConfig(raw, found ?? DEFAULT_CONFIG_FILE);
   checkRole(config);
   if (opts.needSecrets !== false) checkSecrets(config, env, envFile);
-  const base = found ? resolve(found, '..') : process.cwd();
   config.store.path = resolve(base, config.store.path);
   config.publisher.dir = resolve(base, config.publisher.dir);
   config.branding.dir = resolve(base, config.branding.dir);

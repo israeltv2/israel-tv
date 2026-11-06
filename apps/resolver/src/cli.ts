@@ -3,7 +3,7 @@
 // plays, from someone's published catalog.
 import { parseArgs } from 'node:util';
 import { ConfigError, roleOf, secretOwners } from '@israel-tv/core';
-import { loadConfig, registerSecretNames } from '@israel-tv/runtime';
+import { instancePaths, instanceUrls, loadConfig, registerSecretNames } from '@israel-tv/runtime';
 import { checkProxy, printEvents, remoteUrl } from './commands.ts';
 import { checkCatalog } from './server.ts';
 import { runResolverOnly } from './standalone.ts';
@@ -13,11 +13,13 @@ const HELP = `israel-tv-resolver <command>
   start            Run the home resolver (and the remote one, when enabled) from resolver.catalogUrl
   check-catalog    Check that resolver.catalogUrl is an Israel TV catalog this resolver understands
   check-proxy      Check that the geo proxy (outside Israel) exits in Israel
+  paths            Where the config, the secrets file and the data are on this computer
+  urls             The link to install in your app (as other devices on this network see it)
   remote-url       Print the away-from-home install link (resolver.remote)
   events           Recent plays and failures: --errors, --play <id>, --kind <k>, --since 2h, --show <id>, --limit <n>
   help             This text
 
-Config: israel-tv.config.json with "role": "resolver-only" (see examples/resolver-only). Secrets: .env.`;
+Config: israel-tv.config.json with "role": "resolver-only" and .env, in the config folder (\`paths\` shows it).`;
 
 async function main(argv: string[]): Promise<number> {
   const { positionals, values } = parseArgs({
@@ -39,6 +41,10 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
   const { config } = loadConfig(process.env, { needSecrets: cmd === 'start' });
+  if (cmd === 'paths' || cmd === 'urls') {
+    for (const line of cmd === 'paths' ? instancePaths(config) : instanceUrls(config)) console.log(line);
+    return 0;
+  }
   if (roleOf(config) !== 'resolver-only')
     throw new ConfigError(
       'this is the resolver-only entry point: set "role": "resolver-only" in the config (a full instance runs its resolver with `pnpm start`)',

@@ -3,3 +3,4 @@
 export * from './config.ts';
 export * from './log.ts';
 export * from './serve.ts';
+export * from './where.ts';
