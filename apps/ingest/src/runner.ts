@@ -39,7 +39,11 @@ export function dedupeEpisodes(show: ScrapedShow): ScrapedShow {
     ...show,
     seasons: show.seasons.map((s) => ({
       ...s,
-      episodes: s.episodes.filter((e) => (seen.has(e.key) ? false : (seen.add(e.key), true))),
+      episodes: s.episodes.filter((e) => {
+        if (seen.has(e.key)) return false;
+        seen.add(e.key);
+        return true;
+      }),
     })),
   };
 }
