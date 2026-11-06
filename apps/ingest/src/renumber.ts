@@ -102,6 +102,7 @@ export function renumberKanReshet(store: Store, backupDir: string): RenumberRepo
       store.saveShow(row.seriesId, show, { seasons: [], episodes: [] }, latestAirDate(show), false);
     }
     store.setState(MIGRATIONS_KEY, [...done, KAN_RESHET_2026_11]);
+    store.setState(`${MIGRATIONS_KEY}:${KAN_RESHET_2026_11}`, { ...report, at: new Date().toISOString() });
     sanctionNumbering(store);
   });
   store.finishRun(runId, {

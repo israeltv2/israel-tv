@@ -156,10 +156,10 @@ async function main(argv: string[]): Promise<number> {
   }
   const store = Store.open(config.store.path);
   const renumber = renumberKanReshet(store, config.backup.dir);
-  if (renumber)
-    console.log(
-      `israel-tv: one-time renumber ${renumber.id}: Kan ${renumber.kan.shows} shows (${renumber.kan.moved} of ${renumber.kan.episodes} episodes moved), Reshet ${renumber.reshet.shows} shows (${renumber.reshet.seasons} year seasons, ${renumber.reshet.moved} episodes moved), ${renumber.conflicts} clashes; backup ${renumber.backup ?? 'none (nothing to move)'}`,
-    );
+  const renumberLine = renumber
+    ? `one-time renumber ${renumber.id}: Kan ${renumber.kan.shows} shows (${renumber.kan.moved} of ${renumber.kan.episodes} episodes moved), Reshet ${renumber.reshet.shows} shows (${renumber.reshet.seasons} year seasons, ${renumber.reshet.moved} episodes moved), ${renumber.conflicts} clashes; backup ${renumber.backup ?? 'none (nothing to move)'}`
+    : undefined;
+  if (renumberLine) console.log(`israel-tv: ${renumberLine}`);
   if (store.renumbered > 0)
     console.log(
       `israel-tv: ${store.renumbered} year-titled seasons renumbered by position (once; see docs/decisions.md)`,
@@ -264,6 +264,8 @@ async function main(argv: string[]): Promise<number> {
       }
       case 'start': {
         const logger = createLogger(config.log);
+        // One-time migrations are in the service's own log too, not only on the console.
+        if (renumberLine) logger.log(renumberLine);
         const events = EventStore.open(config.events.path);
         const daemon = await startDaemon(config, store, events, logger, {
           initialRun: !values['no-initial-run'],
