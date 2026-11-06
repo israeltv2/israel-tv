@@ -201,10 +201,40 @@ test('a single-video show stays healthy when its page is read again', async () =
       return url === key ? { status: 200, html: single, challenged: false } : loader(routes).load(url);
     },
   };
+  // First read: the page embeds a video and lists no episodes — not saved yet (could be a premiere).
+  await crawlKan(store, { ...opts(l as never, 3), priority: [key] });
+  expect(store.listShows({ source: 'kan' })).toHaveLength(0);
+  // A day later it still looks the same: now it is a single-video show.
+  const state = store.getState<{ shows: Record<string, { featuredSeenAt?: string }> }>('kan:crawl');
+  const st = state?.shows[key];
+  if (!state || !st) throw new Error('no crawl state');
+  st.featuredSeenAt = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  store.setState('kan:crawl', state);
   await crawlKan(store, { ...opts(l as never, 3), priority: [key] });
   const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
   expect(store.assignments(id).episodes.length).toBe(1);
+  // Read again: still healthy, still one episode.
   await crawlKan(store, { ...opts(l as never, 3), priority: [key] });
   expect(store.getShow(id)?.lastError).toBeNull();
   expect(store.assignments(id).episodes.length).toBe(1);
+});
+
+test('a known Kan show whose page disappears shows as failing', async () => {
+  const store = Store.open(':memory:');
+  const l = loader(routes);
+  const eps = () =>
+    store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes)).length;
+  for (let i = 0; i < 80 && eps() < 9; i++) await crawlKan(store, opts(l, 10));
+  const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
+  const gone = {
+    ...l,
+    async load(url: string) {
+      return url.endsWith('/p-1006421/') ? { status: 404, html: '', challenged: false } : l.load(url);
+    },
+  };
+  await crawlKan(store, {
+    ...opts(gone as never, 3),
+    priority: ['https://www.kan.org.il/content/kan/kan-11/p-1006421/'],
+  });
+  expect(store.getShow(id)?.lastError).toMatch(/404/);
 });

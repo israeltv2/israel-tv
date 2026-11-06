@@ -66,7 +66,9 @@ export function buildStatus(
     } else if (last.status === 'partial') {
       health = 'warn';
       notes.push(
-        `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`,
+        last.showsFailed > 0
+          ? `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`
+          : `last run partial: ${last.error ?? 'stopped early'}`,
       );
     }
     // Time since the last good run; for a source that never had one, since its first attempt.
