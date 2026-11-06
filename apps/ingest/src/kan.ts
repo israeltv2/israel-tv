@@ -94,19 +94,7 @@ export interface KanCrawlOptions {
   priority?: string[];
   /** Test seam. */
   loader?: PageLoader;
-  /** Test seam: whether a Redge URL plays from here without the proxy. */
-  playsDirectly?: (hls: string) => Promise<boolean>;
   log?: (line: string) => void;
-}
-
-async function defaultPlaysDirectly(url: string): Promise<boolean> {
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    await r.body?.cancel();
-    return r.ok;
-  } catch {
-    return false;
-  }
 }
 
 export function showDue(s: ShowState, now: number, windowDays: number): boolean {
@@ -116,16 +104,14 @@ export function showDue(s: ShowState, now: number, windowDays: number): boolean 
   return age > (airing ? 6 : 7 * 24) * HOUR;
 }
 
-export function toEpisode(
-  e: ReturnType<typeof parseEpisodePage> & object,
-  availableAbroad: boolean | undefined,
-): ScrapedEpisode {
+/** Kan VOD is geo-blocked outside Israel per title, nearly always (measured): labelled Israel-only. */
+export function toEpisode(e: ReturnType<typeof parseEpisodePage> & object): ScrapedEpisode {
   return {
     key: `kan:${e.id}`,
     title: e.title,
     ...(e.description ? { description: e.description } : {}),
     ...(e.poster ? { thumbnail: e.poster } : {}),
-    ...(availableAbroad !== undefined ? { availableAbroad } : {}),
+    availableAbroad: false,
     streams: [{ url: e.hls, kind: 'direct' }],
   };
 }
@@ -151,7 +137,7 @@ export function mergeEpisodes(
 export async function crawlKan(
   store: Store,
   opts: KanCrawlOptions,
-): Promise<{ pages: number; newEpisodes: number; note: string; failed?: boolean }> {
+): Promise<{ pages: number; newEpisodes: number; note: string; failed?: boolean; readShows?: string[] }> {
   const log = opts.log ?? (() => {});
   const now = Date.now();
   const state = store.getState<CrawlState>(STATE_KEY) ?? { shows: {} };
@@ -163,11 +149,11 @@ export async function crawlKan(
 
   const runId = store.startRun('crawl', 'kan');
   let loader: PageLoader | undefined = opts.loader;
-  const playsDirectly = opts.playsDirectly ?? defaultPlaysDirectly;
   let pages = 0;
   let newEpisodes = 0;
   let blocked = 0;
   let problems = 0;
+  const readShows: string[] = [];
   let note = '';
 
   const origin = (url: string) => new URL(url).origin;
@@ -200,16 +186,26 @@ export async function crawlKan(
     // 1. Lobbies, once a day.
     if (!state.lobbiesAt || now - Date.parse(state.lobbiesAt) > 24 * HOUR) {
       const byUrl = new Map<string, string>();
+      let lobbyEmpty = false;
       for (const l of KAN_LOBBIES) {
         if (!byUrl.has(l.url) && pages >= opts.pagesPerRun) break;
         const html = byUrl.get(l.url) ?? (await load(l.url));
         byUrl.set(l.url, html);
-        for (const path of parseLobby(html, l.origin, l.channelPath)) {
+        const paths = parseLobby(html, l.origin, l.channelPath);
+        if (paths.length === 0) {
+          // A lobby that loads but lists no shows is a layout change: say so and try again next slice.
+          problems++;
+          lobbyEmpty = true;
+          store.addWarnings(runId, null, [
+            { code: 'source-note', message: `Kan lobby ${l.url} (${l.channelPath}) lists no shows` },
+          ]);
+        }
+        for (const path of paths) {
           const key = `${l.origin}${path}`;
           state.shows[key] ??= { origin: l.origin, catalog: l.catalog, pending: [], failed: [] };
         }
       }
-      if (byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size)
+      if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size)
         state.lobbiesAt = new Date(now).toISOString();
       log(`kan: ${Object.keys(state.shows).length} shows known`);
     }
@@ -244,6 +240,7 @@ export async function crawlKan(
         continue;
       }
       s.checkedAt = new Date().toISOString();
+      readShows.push(key);
       if (page.title) s.title = page.title;
       if (page.description) s.description = page.description;
       if (page.image) s.image = page.image;
@@ -275,7 +272,7 @@ export async function crawlKan(
       // Single-video show: the video is on the show page itself.
       if (page.episodes.length === 0 && page.featured) {
         newEpisodes += saveEpisodes(store, key, s, [
-          { episode: toEpisode(page.featured, await playsDirectly(page.featured.hls)), season: undefined },
+          { episode: toEpisode(page.featured), season: undefined },
         ]);
       }
     }
@@ -292,8 +289,7 @@ export async function crawlKan(
           let problem: string | undefined;
           try {
             const e = parseEpisodePage(await load(url), origin(url));
-            if (e)
-              batch.push({ episode: toEpisode(e, await playsDirectly(e.hls)), season: e.seasonNumber, url });
+            if (e) batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
             else problem = 'no video player config on the page (layout changed?)';
           } catch (err) {
             if (blocked > 0) throw err;
@@ -341,7 +337,7 @@ export async function crawlKan(
     if (!opts.loader) await loader?.close();
   }
   log(`kan: ${note}`);
-  return { pages, newEpisodes, note, ...(note.startsWith('stopped:') ? { failed: true } : {}) };
+  return { pages, newEpisodes, note, readShows, ...(note.startsWith('stopped:') ? { failed: true } : {}) };
 }
 
 function saveEpisodes(

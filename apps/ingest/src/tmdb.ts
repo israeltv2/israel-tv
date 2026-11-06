@@ -64,7 +64,19 @@ export async function matchShows(
         imdbId = ext.imdb_id && /^tt\d+$/.test(ext.imdb_id) ? ext.imdb_id : null;
         matched++;
       }
-      store.setExternalIds(row.seriesId, { tmdbId: hit?.id ?? null, imdbId });
+      // One TMDB/IMDb id must lead to one of our series; a second match is left unassigned and reported.
+      const taken = hit ? store.seriesWithExternalIds(hit.id, imdbId).filter((x) => x !== row.seriesId) : [];
+      if (taken.length > 0) {
+        store.addWarnings(runId, row.seriesId, [
+          {
+            code: 'tmdb-duplicate',
+            message: `${row.title}: TMDB ${hit?.id} already matched to ${taken.join(', ')}; not assigned`,
+          },
+        ]);
+        store.setExternalIds(row.seriesId, { tmdbId: null, imdbId: null });
+      } else {
+        store.setExternalIds(row.seriesId, { tmdbId: hit?.id ?? null, imdbId });
+      }
       checked++;
       await sleep(opts.delayMs ?? 250);
     }

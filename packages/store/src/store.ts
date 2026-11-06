@@ -333,15 +333,31 @@ export class Store {
       .filter((r): r is ShowRow => r !== undefined);
   }
 
+  /** Series already holding a TMDB id or IMDb id. */
+  seriesWithExternalIds(tmdbId: number, imdbId: string | null): string[] {
+    return this.db
+      .select({ id: t.shows.seriesId })
+      .from(t.shows)
+      .where(
+        imdbId
+          ? sql`${t.shows.tmdbId} = ${tmdbId} or ${t.shows.imdbId} = ${imdbId}`
+          : eq(t.shows.tmdbId, tmdbId),
+      )
+      .all()
+      .map((r) => r.id);
+  }
+
   /** Our series for an IMDb (`tt…`) or TMDB (`tmdb:…`) id, with its numbered seasons. */
   externalSeries(id: string): { series: string; seasons: number[] } | undefined {
-    const row = id.startsWith('tmdb:')
+    const rows = id.startsWith('tmdb:')
       ? this.db
           .select({ id: t.shows.seriesId })
           .from(t.shows)
           .where(eq(t.shows.tmdbId, Number(id.slice(5))))
-          .get()
-      : this.db.select({ id: t.shows.seriesId }).from(t.shows).where(eq(t.shows.imdbId, id)).get();
+          .all()
+      : this.db.select({ id: t.shows.seriesId }).from(t.shows).where(eq(t.shows.imdbId, id)).all();
+    // An id held by two series is ambiguous: answer nothing rather than pick one.
+    const row = rows.length === 1 ? rows[0] : undefined;
     if (!row) return undefined;
     const seasons = this.db
       .select({ number: t.seasons.number })

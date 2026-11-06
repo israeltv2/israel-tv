@@ -200,6 +200,13 @@ export function renderSite(input: RenderInput): SiteFiles {
     search.push([s.seriesId, 'series', s.catalog, s.title, normalizeForSearch(s.title), s.show.poster ?? '']);
   }
 
+  const counts = new Map<string, number>();
+  for (const s of input.shows) {
+    for (const k of [s.imdbId, s.tmdbId ? `tmdb:${s.tmdbId}` : null])
+      if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  const shared = new Set([...counts].filter(([, n]) => n > 1).map(([k]) => k));
+
   // Meta and streams for every show ever published (delisted ones too, so watch history still opens).
   for (const s of input.shows) {
     if (s.episodes.length === 0) continue;
@@ -211,8 +218,10 @@ export function renderSite(input: RenderInput): SiteFiles {
       .filter((a) => a.kind === 'numbered' || a.kind === 'single')
       .map((a) => a.number);
     if (numbered.length > 0) {
-      if (s.imdbId) extIds[s.imdbId] = { id: s.seriesId, seasons: numbered };
-      if (s.tmdbId) extIds[`tmdb:${s.tmdbId}`] = { id: s.seriesId, seasons: numbered };
+      // An id held by two series is ambiguous: publish neither.
+      if (s.imdbId && !shared.has(s.imdbId)) extIds[s.imdbId] = { id: s.seriesId, seasons: numbered };
+      const tmdb = s.tmdbId ? `tmdb:${s.tmdbId}` : undefined;
+      if (tmdb && !shared.has(tmdb)) extIds[tmdb] = { id: s.seriesId, seasons: numbered };
     }
   }
 
