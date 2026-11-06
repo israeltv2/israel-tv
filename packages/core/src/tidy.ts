@@ -35,6 +35,9 @@ export function tidyEpisodeTitle(title: string, showTitle: string): string {
   t = t
     .replace(new RegExp(`^עונה\\s*\\d+(?:${SEP}|$)`), '')
     .replace(/\s*[-–]?\s*(?:ה)?(?:תכנית|תוכנית) המלאה\s*$/, '')
+    .replace(/\s*[-–,]?\s*לצפייה ישירה\s*$/, '')
+    .replace(/\s*[|\-–·:,]+\s*$/, '')
+    .replace(/^\s*[|\-–·:,]+\s*/, '')
     .trim();
   return t || raw;
 }
