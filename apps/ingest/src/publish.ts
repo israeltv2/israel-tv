@@ -1,6 +1,7 @@
 // Publish: render the site from the store, write only changed files, then hand the folder to the
 // configured publisher (local: nothing more to do; cloudflare: wrangler deploy with an API token).
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -330,6 +331,25 @@ export interface DeployResult {
 }
 
 /** Run `wrangler deploy` for the catalog Worker with the site folder as its static assets. */
+const WORKER_DEPLOYED = 'publish:worker-fingerprint';
+/** Source folders the Worker is built from (the Worker, the addon app and core). */
+const WORKER_SOURCES = ['apps/catalog/src', 'packages/addon/src', 'packages/core/src'];
+
+/** A fingerprint of the Worker's code and config, to deploy a new version even when no data changed. */
+export function workerFingerprint(p: Extract<PublisherConfig, { type: 'cloudflare' }>): string {
+  const h = createHash('sha256');
+  h.update(JSON.stringify(workerConfig(p, join(REPO_ROOT, 'apps/catalog'))));
+  for (const dir of WORKER_SOURCES) {
+    const abs = join(REPO_ROOT, dir);
+    if (!existsSync(abs)) continue;
+    for (const f of readdirSync(abs, { recursive: true }).map(String).sort()) {
+      const file = join(abs, f);
+      if (statSync(file).isFile()) h.update(f).update(readFileSync(file));
+    }
+  }
+  return h.digest('hex');
+}
+
 /**
  * The Worker's wrangler config for this deploy: the checked-in one, plus Worker-first routing when request
  * logs are on, and Cloudflare's own invocation logs off (they would keep request metadata; the Worker logs
@@ -462,7 +482,10 @@ export async function publishSite(
     return false;
   }
   const retry = store.lastRun('publish', kind)?.status === 'failed';
-  if (w.changed.length === 0 && w.deleted === 0 && !retry) {
+  // A new version of the Worker (its code or its config) is deployed even when no data changed.
+  const worker = config.publisher.type === 'cloudflare' ? workerFingerprint(config.publisher) : undefined;
+  const workerChanged = worker !== undefined && store.getState<string>(WORKER_DEPLOYED) !== worker;
+  if (w.changed.length === 0 && w.deleted === 0 && !retry && !workerChanged) {
     log('publish: nothing changed');
     return true;
   }
@@ -470,6 +493,7 @@ export async function publishSite(
   try {
     const d = await deploy(config, process.env, store.clientSalt());
     store.finishRun(runId, { status: 'ok' });
+    if (worker) store.setState(WORKER_DEPLOYED, worker);
     log(
       `publish: ${w.written} of ${w.total} files changed, ${w.deleted} removed; ${d.detail}${d.url ? ` → ${d.url}/manifest.json` : ''} (${Math.round((Date.now() - t0) / 1000)} s)`,
     );

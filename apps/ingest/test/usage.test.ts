@@ -81,3 +81,10 @@ test('the usage page escapes everything it shows', () => {
   expect(html).not.toContain('<script>');
   expect(html).toContain('&#60;script&#62;');
 });
+
+test('the Worker fingerprint follows its config', async () => {
+  const { workerFingerprint } = await import('../src/publish.ts');
+  const a = workerFingerprint(cf().publisher as never);
+  expect(workerFingerprint(cf().publisher as never)).toBe(a);
+  expect(workerFingerprint(cf(false).publisher as never)).not.toBe(a);
+});
