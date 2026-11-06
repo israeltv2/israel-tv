@@ -1,7 +1,7 @@
 // The usage and diagnostics database (events.sqlite): append-only events, written in batches; nightly daily
 // rollups; pruning, a weekly VACUUM and a size cap. Kept apart from the catalog database.
 import { randomBytes } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
@@ -39,8 +39,9 @@ export class EventStore {
 
   private constructor(path: string, readOnly: boolean) {
     this.path = path;
-    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     const client = new DatabaseSync(path, { readOnly });
+    if (!readOnly) ownerOnly(path);
     if (!readOnly) {
       client.exec('PRAGMA journal_mode = WAL');
       client.exec('PRAGMA synchronous = NORMAL');
@@ -336,4 +337,10 @@ export function queryEvents(events: EventStore, q: Record<string, string | undef
     ...(since ? { since } : {}),
     limit: Math.min(Number(q.limit) || 100, 1000),
   });
+}
+
+/** The database and its journal files readable by their owner only (they hold ids, and the usage salt). */
+function ownerOnly(path: string): void {
+  if (process.platform === 'win32' || path === ':memory:') return;
+  for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) chmodSync(f, 0o600);
 }

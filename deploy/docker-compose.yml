@@ -9,11 +9,11 @@
 # Commands inside the container, e.g. the admin link (the token is generated on first start unless .env sets
 # ISRAEL_TV_ADMIN_TOKEN):
 #   docker compose -f deploy/docker-compose.yml exec israel-tv node apps/ingest/src/cli.ts admin-url
-# It prints the container's address: open http://127.0.0.1:7702/usage?token=… on this machine instead, or from
-# another machine through `ssh -L 7702:127.0.0.1:7702 <this server>`. Same pattern for check-proxy, status,
+# It prints http://<this computer's address>:7702/dash/?token=…: the admin port is bound to 127.0.0.1 here, so open it
+# with 127.0.0.1 on this machine, or from another machine through `ssh -L 7702:127.0.0.1:7702 <this server>`. Same pattern for check-proxy, status,
 # remote-url; for restore, stop the service first and use `docker compose run --rm israel-tv node apps/ingest/src/cli.ts restore <url>`.
-# Inside Docker the startup log shows the container's address (172.x); in your app install
-# http://<this machine's LAN IP>:7701/manifest.json (and :7700 for the local publisher) instead, and open
+# Inside Docker the startup log shows <this computer's address>; in your app install
+# http://<this computer's address>:7701/manifest.json (and :7700 for the local publisher) instead, and open
 # the admin page at http://127.0.0.1:7702/status on this machine.
 services:
   israel-tv:

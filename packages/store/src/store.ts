@@ -1,6 +1,6 @@
 // SQLite store (node:sqlite + Drizzle): the catalog database. Only ingest (and its commands) open it; the
 // resolver never does (it reads the published contract files).
-import { mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
@@ -56,8 +56,9 @@ export class Store {
 
   private constructor(path: string, readOnly: boolean) {
     this.path = path;
-    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     const client = new DatabaseSync(path, { readOnly });
+    if (!readOnly) ownerOnly(path);
     client.exec('PRAGMA busy_timeout = 5000');
     if (!readOnly) {
       client.exec('PRAGMA journal_mode = WAL');
@@ -115,6 +116,7 @@ export class Store {
   /** A consistent copy of the whole database at `file` (which must not exist). */
   backupTo(file: string): void {
     this.db.$client.prepare('VACUUM INTO ?').run(file);
+    ownerOnly(file);
   }
 
   close(): void {
@@ -569,4 +571,10 @@ export class Store {
   recentWarnings(limit = 50): WarningRow[] {
     return this.db.select().from(t.warnings).orderBy(desc(t.warnings.id)).limit(limit).all();
   }
+}
+
+/** The database and its journal files readable by their owner only (they hold ids, and the usage salt). */
+function ownerOnly(path: string): void {
+  if (process.platform === 'win32' || path === ':memory:') return;
+  for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) chmodSync(f, 0o600);
 }

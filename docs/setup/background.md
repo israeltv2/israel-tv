@@ -17,6 +17,8 @@ Any system with Docker (Windows and macOS with Docker Desktop, Linux, NAS). Imag
   docker run -d --name israel-tv --restart unless-stopped -p 7700:7700 -p 7701:7701 -p 7702:7702 -v israel-tv-data:/data ghcr.io/israeltv2/israel-tv
   ```
 
+  Your links: `docker logs israel-tv` (the first lines). The dashboard: `docker exec israel-tv node
+  apps/ingest/src/cli.ts admin-url`, with your computer's address in place of `<this computer's address>`.
   Settings, if you need any: copy them into the container's folder and restart it —
   `docker cp israel-tv.config.json israel-tv:/data/`, `docker cp .env israel-tv:/data/`, `docker restart israel-tv`.
 - From the repository instead: [`deploy/docker-compose.yml`](../../deploy/docker-compose.yml) and
@@ -39,7 +41,7 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolv
 After an update or a settings change, restart it with the same script and `-Restart` (`-Stop` stops it, `-Remove`
 removes it; add `-Resolver` for the helper). **Logs:** the newest `israel-tv.*.log` in the config folder's `data\logs`;
 to follow it: `Get-ChildItem "$env:LOCALAPPDATA\israel-tv\data\logs\israel-tv*.log" | Sort-Object LastWriteTime | Select-Object -Last 1 | Get-Content -Wait -Tail 50`. If the
-links do not work at all, the reason is in `task-output.txt` in the config folder (a settings error or a taken port).
+links do not work at all, the reason is in `task-output.txt` (`task-output-resolver.txt` for the helper) in the config folder (a settings error or a taken port).
 Before installing the task, run it once by hand (`pnpm start`, or `pnpm resolver start`) to see that it works.
 
 So your TV can reach it: set your home network to Private (_Settings → Network & internet → your connection →

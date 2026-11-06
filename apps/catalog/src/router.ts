@@ -29,6 +29,9 @@ const unavailable = (why: string) =>
   });
 
 export async function route(request: Request, env: RouterEnv): Promise<Response> {
+  // The addon is read-only: anything but GET and HEAD is refused here, before it costs the API anything.
+  if (request.method !== 'GET' && request.method !== 'HEAD')
+    return new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } });
   const headers: Record<string, string> = {};
   for (const h of PASSED_HEADERS) {
     const v = request.headers.get(h);
