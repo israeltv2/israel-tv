@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { type Config, ConfigError, checkSecrets, parseConfig } from '@israel-tv/core';
 
 export const DEFAULT_CONFIG_FILE = 'israel-tv.config.json';
@@ -29,10 +29,22 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const envFile = resolve(found ? resolve(found, '..') : process.cwd(), '.env');
   if (env === process.env && existsSync(envFile)) process.loadEnvFile(envFile);
   const config = parseConfig(raw, found ?? DEFAULT_CONFIG_FILE);
-  checkSecrets(config, env);
+  checkSecrets(config, env, envFile);
   const base = found ? resolve(found, '..') : process.cwd();
   config.store.path = resolve(base, config.store.path);
   config.publisher.dir = resolve(base, config.publisher.dir);
   if (config.log.file) config.log.file = resolve(base, config.log.file);
+  // The publish folder is emptied of stale files on every publish: it must not hold the database or log.
+  const inside = (p: string) => p === config.publisher.dir || p.startsWith(config.publisher.dir + sep);
+  for (const [name, p] of [
+    ['store.path', config.store.path],
+    ['log.file', config.log.file],
+  ] as const) {
+    if (p && inside(p)) {
+      throw new ConfigError(
+        `${name} (${p}) is inside publisher.dir (${config.publisher.dir}); use separate folders.`,
+      );
+    }
+  }
   return { config, file: found };
 }

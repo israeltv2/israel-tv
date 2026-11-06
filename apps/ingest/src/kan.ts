@@ -62,6 +62,8 @@ interface ShowState {
   failed: string[];
   /** Last time a re-read of the show page found new episode links (not set by the first read). */
   lastNewAt?: string;
+  /** Episode pages found as new on a re-read (newly published), as opposed to the first fill's backlog. */
+  fresh?: string[];
 }
 
 interface CrawlState {
@@ -229,7 +231,11 @@ export async function crawlKan(
         .map((e) => `${s.origin}${e.path}`)
         .filter((u) => !known.has(`kan:${/(\d+)\/$/.exec(u)?.[1]}`));
       // "Airing" means the show page revealed links we had never seen, not an old backlog or retries.
-      if (!firstRead && s.pending.some((u) => !seenBefore.has(u))) s.lastNewAt = s.checkedAt;
+      const fresh = firstRead ? [] : s.pending.filter((u) => !seenBefore.has(u));
+      if (fresh.length > 0) {
+        s.lastNewAt = s.checkedAt;
+        s.fresh = [...new Set([...(s.fresh ?? []), ...fresh])];
+      }
       // Single-video show: the video is on the show page itself.
       if (page.episodes.length === 0 && page.featured) {
         newEpisodes += saveEpisodes(store, key, s, [
@@ -243,14 +249,15 @@ export async function crawlKan(
       .filter(([, s]) => s.pending.length > 0)
       .sort(([, a], [, b]) => (b.checkedAt ?? '').localeCompare(a.checkedAt ?? ''));
     for (const [key, s] of queue) {
-      const batch: { episode: ScrapedEpisode; season: number | undefined }[] = [];
+      const batch: { episode: ScrapedEpisode; season: number | undefined; url?: string }[] = [];
       try {
         while (s.pending.length > 0 && pages < opts.pagesPerRun) {
           const url = s.pending[0] as string;
           let problem: string | undefined;
           try {
             const e = parseEpisodePage(await load(url), origin(url));
-            if (e) batch.push({ episode: toEpisode(e, await playsDirectly(e.hls)), season: e.seasonNumber });
+            if (e)
+              batch.push({ episode: toEpisode(e, await playsDirectly(e.hls)), season: e.seasonNumber, url });
             else problem = 'no video player config on the page (layout changed?)';
           } catch (err) {
             if (blocked > 0) throw err;
@@ -266,7 +273,7 @@ export async function crawlKan(
         }
       } finally {
         // Episodes read before a block are kept, never re-read.
-        if (batch.length > 0) newEpisodes += saveEpisodes(store, key, s, batch);
+        if (batch.length > 0) newEpisodes += saveEpisodes(store, key, s, batch, runId);
       }
       if (pages >= opts.pagesPerRun) break;
     }
@@ -295,7 +302,8 @@ function saveEpisodes(
   store: Store,
   key: string,
   s: ShowState,
-  batch: { episode: ScrapedEpisode; season: number | undefined }[],
+  batch: { episode: ScrapedEpisode; season: number | undefined; url?: string }[],
+  runId?: number,
 ): number {
   const seriesId = store.seriesIdFor('kan', key);
   const prev = store.getShow(seriesId)?.show;
@@ -317,5 +325,20 @@ function saveEpisodes(
     batch,
   );
   const numbering = assignNumbers(show, store.assignments(seriesId));
-  return store.saveShow(seriesId, show, numbering.added, latestAirDate(show));
+  if (numbering.warnings.length) store.addWarnings(runId ?? null, seriesId, numbering.warnings);
+  // Newly published episodes move the show up "newest first"; the first fill's backlog does not.
+  const fresh = batch.some((b) => b.url && s.fresh?.includes(b.url));
+  if (s.fresh) s.fresh = s.fresh.filter((u) => !batch.some((b) => b.url === u));
+  return store.saveShow(seriesId, show, numbering.added, latestAirDate(show), fresh);
+}
+
+/** Make one Kan show due now (single-show refresh); the next crawl slice reads it first. */
+export function markKanShowDue(store: Store, key: string): boolean {
+  const state = store.getState<CrawlState>(STATE_KEY);
+  const s = state?.shows[key];
+  if (!state || !s) return false;
+  delete s.checkedAt;
+  delete state.backoffUntil;
+  store.setState(STATE_KEY, state);
+  return true;
 }

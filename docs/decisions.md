@@ -140,3 +140,66 @@ Misses are retried after 30 days.
   index with less than 80% of the previous shows is rejected, and a season that reads empty keeps its
   episodes. Failures show on `/status` and as a labelled first item in the affected catalog row.
 - D1 stays the documented fallback behind the same publish step; it was not needed (search CPU 0–2 ms).
+
+## Reviews
+
+### Code and security review, round 1 (2026-11-06)
+
+Code review (high) found 10 issues in the Kan crawler and status (episodes lost on a block, a browser
+launch failure leaving a run open, "airing" never expiring, a lobby budget bug, failures not shown) — all
+fixed. Security review: no finding at the exploitability bar; hardened anyway: the relay re-checks the host on
+every redirect, Mako media/ticket URLs must be https on Mako's CDNs, the local server's path check includes
+the separator.
+
+### Live data, first deploy (2026-11-06)
+
+The first full run on the deployment machine failed 41 Reshet shows: 21 list the same Kaltura entry twice
+(now de-duplicated before numbering) and 15 have a show page with an empty article grid (no VOD; now read as
+a show without episodes, not a layout change). Cloudflare's static assets redirect a literal `=` in a file
+name, so later catalog pages are stored as `skip-N` and served by the Worker.
+
+### Intuitiveness review, round 1 (2026-11-06)
+
+Three fresh agents, each with only an export of the repository: (1) in Israel, home only, no Cloudflare;
+(2) outside Israel with a generic authenticated proxy (mocked); (3) a public Cloudflare instance (mocked
+credentials). Each followed the README from zero and ran what could run.
+
+Real friction found, and what changed:
+
+- `.env.example` was missing (the `.env.*` ignore rule caught it) — committed.
+- `corepack` is absent on some Node installs — README gives the `npm i -g pnpm@12.15.0` fallback and the
+  exact Node minimum.
+- Writing `"publisher": { "port": … }` failed for lack of `type` — every section's `type` now defaults.
+- The default port 7000 is taken by macOS AirPlay — defaults moved to 7700/7701/7702.
+- `start` printed `0.0.0.0` URLs, crashed on a busy port after it had begun publishing, and `--help` threw —
+  ports are opened first with a message naming the option, the log prints LAN addresses, `--help` works.
+- A `--limit` test run suppressed the real first fill; live channels showed "warn" until the night —
+  limited runs are recorded apart; live channels are checked on start; `start --no-initial-run` exists.
+- Proxy setup: what it is for, that the resolver must be installed, and how a failure looks were unclear;
+  invalid proxy URLs were accepted — README section rewritten, `check-proxy` command, per-type URL
+  validation, missing-secret errors name the option and the `.env` path, a proxy failure gives a 502 and
+  one log line. The relay is now offered for every Reshet/Kan episode when a proxy is configured (whether an
+  episode is blocked depends on the viewer's location, not on where ingest ran).
+- What friends of a public instance can play was not said — "Sharing with friends" section; manifest
+  description lists only enabled sources.
+- Cloudflare steps were thin; a failed deploy printed colour codes and a stack and never showed on
+  `/status` — exact token template and where the account id/subdomain are, plain error with a hint, failed
+  publishes recorded, retried and shown; `serve --port` previews a Cloudflare build.
+- systemd/Docker examples were not usable as is — setup commands in the unit's header, Docker runs as
+  `node`, compose paths explicit, admin port bound to the host only (behind Docker's port mapping every
+  client looks local), a Cloudflare variant of the Docker config.
+- `CLAUDE.md`, `.paradev/` and `spikes/` looked like personal leftovers — kept (contributor tooling and the
+  measurement scripts behind this file), now labelled as such in the README and `CLAUDE.md`; excluded
+  from the Docker image.
+
+Not changed: live channel logos (none published by a stable source), English search (titles are Hebrew).
+
+### Code review, round 2 (2026-11-06)
+
+10 more findings, all fixed: the early stop for blocked runs now counts consecutive blocks for every
+source; a show's first save and the Kan backlog no longer count as "new" for newest-first ordering; admin
+refuses cross-site requests (a web page could trigger runs) and refresh is POST only; startup publish goes
+through the queue; `writeSite` never cleans a folder it did not create, and the config refuses a publish
+folder that holds the database or log; no backoff sleep after the last retry; a Kaltura API failure no
+longer fails Reshet shows; Kan shows can be refreshed one at a time; Kan numbering warnings are recorded;
+status timestamps alone no longer trigger a deploy.

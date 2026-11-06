@@ -4,7 +4,7 @@ import { join, normalize, sep } from 'node:path';
 import { serve } from '@hono/node-server';
 import { createAddonApp } from '@israel-tv/addon';
 
-export function startLocalServer(dir: string, host: string, port: number) {
+export function localAddonApp(dir: string) {
   const root = normalize(dir);
   const app = createAddonApp(
     {
@@ -20,5 +20,9 @@ export function startLocalServer(dir: string, host: string, port: number) {
     },
     { cacheMs: 5_000 },
   );
-  return serve({ fetch: app.fetch, hostname: host, port });
+  return app;
+}
+
+export function startLocalServer(dir: string, host: string, port: number) {
+  return serve({ fetch: localAddonApp(dir).fetch, hostname: host, port });
 }

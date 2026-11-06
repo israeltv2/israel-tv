@@ -108,7 +108,7 @@ export function createFetcher(opts: FetcherOptions): Fetcher {
       } finally {
         done();
       }
-      await sleep(Math.min(30_000, 2000 * 2 ** attempt));
+      if (attempt < retries) await sleep(Math.min(30_000, 2000 * 2 ** attempt));
     }
     throw lastErr;
   }

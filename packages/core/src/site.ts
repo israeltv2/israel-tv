@@ -41,6 +41,8 @@ export type Health = 'ok' | 'warn' | 'error';
 export interface StatusFile {
   generatedAt: string;
   health: Health;
+  /** Set when the last publish failed (the public copy may be out of date). */
+  publish?: string;
   sources: {
     source: string;
     health: Health;

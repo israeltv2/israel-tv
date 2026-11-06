@@ -163,3 +163,20 @@ test('an episode listed twice by the source is stored once', async () => {
   const r = await runFull(store, adapter(entries('/a'), { '/a': s }), opts);
   expect(r).toMatchObject({ status: 'ok', newEpisodes: 2 });
 });
+
+test('admin refuses cross-site requests from web pages', async () => {
+  const { adminApp, Daemon } = await import('../src/daemon.ts');
+  const { parseConfig } = await import('@israel-tv/core');
+  const app = adminApp(new Daemon(parseConfig({}), Store.open(':memory:'), () => {}));
+  const env = { incoming: { socket: { remoteAddress: '192.168.1.5' } } };
+  const viaPage = await app.request(
+    '/run/full',
+    { method: 'POST', headers: { origin: 'http://evil.example', host: '192.168.1.10:7702' } },
+    env,
+  );
+  expect(viaPage.status).toBe(403);
+  const status = await app.request('/status', {}, env);
+  expect(status.status).toBe(200);
+  const outside = await app.request('/status', {}, { incoming: { socket: { remoteAddress: '8.8.8.8' } } });
+  expect(outside.status).toBe(403);
+});

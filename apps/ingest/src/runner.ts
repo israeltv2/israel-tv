@@ -25,6 +25,17 @@ export interface RunSummary {
   changed: string[];
 }
 
+/** A failure that means the site is refusing us (bot wall, rate limit), not a problem with one show. */
+export function isBlock(err: unknown): boolean {
+  const e = err as { name?: string; status?: number; message?: string };
+  return (
+    e.name === 'BlockedError' ||
+    e.status === 403 ||
+    e.status === 429 ||
+    /blocked by|HTTP 403|HTTP 429|no __NEXT_DATA__/.test(e.message ?? '')
+  );
+}
+
 export function latestAirDate(show: ScrapedShow): string | undefined {
   let max: string | undefined;
   for (const s of show.seasons)
@@ -129,7 +140,14 @@ export async function ingestShow(
   }
   const numbering = assignNumbers(show, store.assignments(seriesId));
   if (numbering.warnings.length) store.addWarnings(runId, seriesId, numbering.warnings);
-  const newEpisodes = store.saveShow(seriesId, show, numbering.added, latestAirDate(show));
+  // A show's first save is not "new episodes": only later additions move it up the newest-first order.
+  const newEpisodes = store.saveShow(
+    seriesId,
+    show,
+    numbering.added,
+    latestAirDate(show),
+    prev !== undefined,
+  );
   const changed = !prev || JSON.stringify(prev.show) !== JSON.stringify(show);
   return { kind: 'saved', seriesId, newEpisodes, changed };
 }
@@ -149,6 +167,7 @@ async function runShows(
   let showsFailed = 0;
   let newEpisodes = 0;
   let empty = 0;
+  let consecutiveBlocks = 0;
   const changed: string[] = [];
   const errors: string[] = [];
   const list = opts.limit ? entries.slice(0, opts.limit) : entries;
@@ -156,6 +175,7 @@ async function runShows(
     try {
       const r = await ingestShow(store, adapter, entry, currentSeasonOnly, runId);
       showsOk++;
+      consecutiveBlocks = 0;
       if (r.kind === 'empty') {
         empty++;
         continue;
@@ -168,9 +188,14 @@ async function runShows(
       const msg = `${entry.title}: ${(err as Error).message}`;
       errors.push(msg);
       log(`[${i + 1}/${list.length}] FAILED ${msg}`);
-      // A blocked site will block the next request too: stop early instead of hammering it.
-      if ((err as Error).name === 'BlockedError' || /blocked by/.test((err as Error).message)) {
-        if (showsFailed >= 3 && showsOk === 0) break;
+      // A blocking site keeps blocking: after three blocks in a row, stop instead of hammering it.
+      consecutiveBlocks = isBlock(err) ? consecutiveBlocks + 1 : 0;
+      if (consecutiveBlocks >= 3) {
+        errors.push(
+          `stopped after ${consecutiveBlocks} blocked requests in a row; the rest waits for the next run`,
+        );
+        log(`stopping ${adapter.source}: blocked ${consecutiveBlocks} times in a row`);
+        break;
       }
     }
   }
@@ -205,7 +230,8 @@ async function runShows(
 /** Whole source: index, then every show with all seasons. */
 export async function runFull(store: Store, adapter: SourceAdapter, opts: RunOptions): Promise<RunSummary> {
   const t0 = Date.now();
-  const runId = store.startRun('full', adapter.source);
+  // A run limited to a few shows (testing) is recorded apart, so it never counts as the source's full run.
+  const runId = store.startRun('full', opts.limit ? `${adapter.source}:limited` : adapter.source);
   let entries: ShowEntry[];
   try {
     entries = await adapter.listShows();

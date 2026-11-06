@@ -2,12 +2,13 @@
 // configured publisher (local: nothing more to do; cloudflare: wrangler deploy with an API token).
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Config, Health, PublisherConfig, Source, StatusFile } from '@israel-tv/core';
 import { type LiveChannelRender, type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
 import type { Store } from '@israel-tv/store';
+import { liveRender } from './live.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const VERSION = '1.0.0';
@@ -81,6 +82,11 @@ export function buildStatus(store: Store, sources: Source[], now = Date.now()): 
       notes,
     });
   }
+  const lastPublish = store.lastRun('publish', 'cloudflare');
+  const publishNote =
+    lastPublish?.status === 'failed'
+      ? `last publish failed (${lastPublish.startedAt}): ${(lastPublish.error ?? '').split('\n')[0]}`
+      : undefined;
   const failingShows = all
     .filter((s) => s.lastError && s.state === 'listed')
     .map((s) => ({ id: s.seriesId, title: s.title, error: s.lastError ?? '', lastOkAt: s.lastOkAt }));
@@ -90,12 +96,20 @@ export function buildStatus(store: Store, sources: Source[], now = Date.now()): 
     message: w.message,
     ...(w.seriesId ? { id: w.seriesId } : {}),
   }));
-  const worst: Health = out.some((s) => s.health === 'error')
-    ? 'error'
-    : out.some((s) => s.health === 'warn') || failingShows.length > 0
-      ? 'warn'
-      : 'ok';
-  return { generatedAt: new Date(now).toISOString(), health: worst, sources: out, failingShows, warnings };
+  const worst: Health =
+    out.some((s) => s.health === 'error') || publishNote
+      ? 'error'
+      : out.some((s) => s.health === 'warn') || failingShows.length > 0
+        ? 'warn'
+        : 'ok';
+  return {
+    generatedAt: new Date(now).toISOString(),
+    health: worst,
+    ...(publishNote ? { publish: publishNote } : {}),
+    sources: out,
+    failingShows,
+    warnings,
+  };
 }
 
 export function catalogWarnings(status: StatusFile): Record<string, string> {
@@ -131,6 +145,7 @@ export function renderFromStore(store: Store, config: Config, live: LiveChannelR
   });
   return renderSite({
     version: VERSION,
+    sources,
     shows,
     live,
     status,
@@ -166,36 +181,64 @@ function* walk(dir: string): Generator<string> {
 
 const hash = (s: string | Buffer) => createHash('sha1').update(s).digest('hex');
 
-/** Write the site to `dir`, touching only files whose content changed; delete files no longer rendered. */
+const MARKER = '.israel-tv-site';
+
+/** Status files carry a timestamp; compare them without it so a quiet run changes nothing. */
+const comparable = (path: string, content: string | Buffer) =>
+  path === 'status.json' || path === 'status.html'
+    ? String(content)
+        .replace(/"generatedAt":"[^"]*"/, '')
+        .replace(/<p>Generated [^<]*<\/p>/, '')
+    : content;
+
+/**
+ * Write the site to `dir`, touching only files whose content changed, and delete files no longer
+ * rendered. The folder is marked as ours on first write; a non-empty folder without the mark is never
+ * cleaned (so a misconfigured `publisher.dir` cannot delete other files).
+ */
 export function writeSite(
   dir: string,
   files: SiteFiles,
-): { written: number; deleted: number; total: number } {
+): { written: number; deleted: number; total: number; changed: string[] } {
   mkdirSync(dir, { recursive: true });
+  const marked = existsSync(join(dir, MARKER));
+  if (!marked && readdirSync(dir).length > 0) {
+    throw new Error(
+      `${dir} is not empty and was not created by israel-tv; set publisher.dir to an empty or new folder`,
+    );
+  }
+  if (!marked)
+    writeFileSync(join(dir, MARKER), 'Rendered addon files. Everything here is replaced on each publish.\n');
   const all = new Map(files);
   all.set('_headers', HEADERS_FILE);
-  let written = 0;
+  all.set('.assetsignore', `${MARKER}\n`);
   let deleted = 0;
+  const changed: string[] = [];
   for (const [path, content] of all) {
     const p = join(dir, path);
     let same = false;
     try {
-      same = hash(readFileSync(p)) === hash(content);
+      same = hash(comparable(path, readFileSync(p))) === hash(comparable(path, content));
     } catch {}
     if (!same) {
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, content);
-      written++;
+      changed.push(path);
     }
   }
   for (const p of walk(dir)) {
     const rel = relative(dir, p).split('\\').join('/');
-    if (!all.has(rel)) {
+    if (rel !== MARKER && !all.has(rel)) {
       rmSync(p);
       deleted++;
     }
   }
-  return { written, deleted, total: all.size };
+  return { written: changed.length, deleted, total: all.size, changed };
+}
+
+/** A publishing problem the user can fix (credentials, permissions); printed without a stack trace. */
+export class PublishError extends Error {
+  override name = 'PublishError';
 }
 
 export interface DeployResult {
@@ -219,6 +262,7 @@ async function deployCloudflare(
     CLOUDFLARE_API_TOKEN: env[p.apiTokenEnv],
     WRANGLER_SEND_METRICS: 'false',
     NO_COLOR: '1',
+    FORCE_COLOR: '0',
   };
   const args = ['deploy', '--name', p.workerName, '--assets', p.dir];
   const output = await new Promise<string>((resolve, reject) => {
@@ -246,4 +290,37 @@ export async function deploy(config: Config, env: NodeJS.ProcessEnv = process.en
   const p = config.publisher;
   if (p.type === 'local') return { ms: 0, detail: `served from ${p.dir} by the local server` };
   return deployCloudflare(p, env);
+}
+
+/**
+ * Render, write the changed files and deploy them. A deploy that failed last time is retried even when
+ * nothing changed since. Every attempt is recorded, so a failing publish shows on /status.
+ */
+export async function publishSite(
+  store: Store,
+  config: Config,
+  log: (line: string) => void,
+): Promise<boolean> {
+  const t0 = Date.now();
+  const kind = config.publisher.type;
+  const files = renderFromStore(store, config, config.sources.live ? liveRender() : []);
+  const w = writeSite(config.publisher.dir, files);
+  const retry = store.lastRun('publish', kind)?.status === 'failed';
+  if (w.changed.length === 0 && w.deleted === 0 && !retry) {
+    log('publish: nothing changed');
+    return true;
+  }
+  const runId = store.startRun('publish', kind);
+  try {
+    const d = await deploy(config);
+    store.finishRun(runId, { status: 'ok' });
+    log(
+      `publish: ${w.written} of ${w.total} files changed, ${w.deleted} removed; ${d.detail}${d.url ? ` → ${d.url}/manifest.json` : ''} (${Math.round((Date.now() - t0) / 1000)} s)`,
+    );
+    return true;
+  } catch (err) {
+    store.finishRun(runId, { status: 'failed', error: (err as Error).message });
+    log(`publish failed: ${(err as Error).message}`);
+    return false;
+  }
 }

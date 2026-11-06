@@ -4,17 +4,42 @@
 import { z } from 'zod';
 
 const port = z.number().int().min(1).max(65535);
+
+/** Let a section leave out `type` and get the default kind, e.g. `{ "publisher": { "port": 8000 } }`. */
+const withDefaultType = (type: string) => (v: unknown) =>
+  v && typeof v === 'object' && !Array.isArray(v) && !('type' in v) ? { type, ...v } : v;
 const envName = z.string().regex(/^[A-Z_][A-Z0-9_]*$/, 'must be an environment variable name like MY_SECRET');
 
 const GeoNone = z.strictObject({ type: z.literal('none') });
-const GeoProxy = z.strictObject({
-  /** `http-proxy` covers both http:// and https:// proxy URLs. */
-  type: z.enum(['http-proxy', 'socks5']),
-  /** One or more proxy URLs with an Israeli exit, tried in order (the next is used when one fails). */
-  urls: z.array(z.url()).min(1),
+const proxyUrl = (protocols: string[], example: string) =>
+  z.string().refine(
+    (u) => {
+      try {
+        const url = new URL(u);
+        return protocols.includes(url.protocol) && url.hostname !== '';
+      } catch {
+        return false;
+      }
+    },
+    `must be a full proxy URL starting with ${protocols.map((p) => `${p}//`).join(' or ')} (e.g. ${example})`,
+  );
+
+const GeoProxyFields = {
   /** Env var names holding the proxy credentials. Leave both out for a proxy without a login. */
   usernameEnv: envName.optional(),
   passwordEnv: envName.optional(),
+};
+const GeoHttp = z.strictObject({
+  /** An http:// or https:// proxy. */
+  type: z.literal('http-proxy'),
+  /** One or more proxy URLs with an Israeli exit, tried in order (the next is used when one fails). */
+  urls: z.array(proxyUrl(['http:', 'https:'], 'https://proxy.example.net:3128')).min(1),
+  ...GeoProxyFields,
+});
+const GeoSocks = z.strictObject({
+  type: z.literal('socks5'),
+  urls: z.array(proxyUrl(['socks5:'], 'socks5://proxy.example.net:1080')).min(1),
+  ...GeoProxyFields,
 });
 
 const BrowserNone = z.strictObject({ type: z.literal('none') });
@@ -29,7 +54,7 @@ const BrowserChrome = z.strictObject({
 const PublisherLocal = z.strictObject({
   type: z.literal('local'),
   host: z.string().default('0.0.0.0'),
-  port: port.default(7000),
+  port: port.default(7700),
   /** Directory the rendered addon files are written to and served from. */
   dir: z.string().default('./data/site'),
 });
@@ -60,20 +85,26 @@ export const ConfigSchema = z.strictObject({
     })
     .prefault({}),
   /** How to reach Israel-only content. `none` is right when this runs inside Israel. */
-  geo: z.discriminatedUnion('type', [GeoNone, GeoProxy]).prefault({ type: 'none' }),
+  geo: z
+    .preprocess(withDefaultType('none'), z.discriminatedUnion('type', [GeoNone, GeoHttp, GeoSocks]))
+    .prefault({ type: 'none' }),
   /** A real browser is needed only for Kan pages (Cloudflare challenge). `none` turns Kan VOD off. */
-  browser: z.discriminatedUnion('type', [BrowserNone, BrowserChrome]).prefault({ type: 'chrome' }),
-  publisher: z.discriminatedUnion('type', [PublisherLocal, PublisherCloudflare]).prefault({ type: 'local' }),
+  browser: z
+    .preprocess(withDefaultType('chrome'), z.discriminatedUnion('type', [BrowserNone, BrowserChrome]))
+    .prefault({ type: 'chrome' }),
+  publisher: z
+    .preprocess(withDefaultType('local'), z.discriminatedUnion('type', [PublisherLocal, PublisherCloudflare]))
+    .prefault({ type: 'local' }),
   /** Private stream resolver for Mako (and Kan relaying via the geo proxy). Run it on the viewer's network. */
   resolver: z
     .strictObject({
       enabled: z.boolean().default(true),
       host: z.string().default('0.0.0.0'),
-      port: port.default(7001),
+      port: port.default(7701),
     })
     .prefault({}),
   /** Admin endpoints (/status, /refresh/<id>). Keep on the local network. */
-  admin: z.strictObject({ host: z.string().default('0.0.0.0'), port: port.default(7002) }).prefault({}),
+  admin: z.strictObject({ host: z.string().default('0.0.0.0'), port: port.default(7702) }).prefault({}),
   schedule: z
     .strictObject({
       timezone: z.string().default('Asia/Jerusalem'),
@@ -137,12 +168,32 @@ export function requiredSecrets(config: Config): string[] {
   return names;
 }
 
-export function checkSecrets(config: Config, env: Record<string, string | undefined>): void {
-  const missing = requiredSecrets(config).filter((n) => !env[n]);
+/** Which option needs each secret, for error messages. */
+export function secretOwners(config: Config): { option: string; name: string }[] {
+  const out: { option: string; name: string }[] = [];
+  if (config.geo.type !== 'none') {
+    if (config.geo.usernameEnv) out.push({ option: 'geo.usernameEnv', name: config.geo.usernameEnv });
+    if (config.geo.passwordEnv) out.push({ option: 'geo.passwordEnv', name: config.geo.passwordEnv });
+  }
+  if (config.publisher.type === 'cloudflare') {
+    out.push({ option: 'publisher.accountIdEnv', name: config.publisher.accountIdEnv });
+    out.push({ option: 'publisher.apiTokenEnv', name: config.publisher.apiTokenEnv });
+  }
+  if (config.tmdb) out.push({ option: 'tmdb.apiKeyEnv', name: config.tmdb.apiKeyEnv });
+  return out;
+}
+
+export function checkSecrets(
+  config: Config,
+  env: Record<string, string | undefined>,
+  envFile?: string,
+): void {
+  const missing = secretOwners(config).filter((s) => !env[s.name]);
   if (missing.length > 0) {
     throw new ConfigError(
-      `Missing secrets in the environment: ${missing.join(', ')}.\n` +
-        'Put them in .env (see .env.example), or remove the option that needs them from israel-tv.config.json.',
+      `Missing secrets: ${missing.map((m) => `${m.name} (needed by ${m.option})`).join(', ')}.\n` +
+        `Add them to ${envFile ?? '.env next to israel-tv.config.json'} (see .env.example), ` +
+        'or remove the option that needs them from the config.',
     );
   }
 }
