@@ -6,6 +6,7 @@ COPY --chown=node:node . .
 RUN CI=true pnpm install --prod --frozen-lockfile && mkdir -p /data && chown -R node:node /data /app
 USER node
 ENV ISRAEL_TV_IN_CONTAINER=1 \
+    ISRAEL_TV_BROWSER=none \
     ISRAEL_TV_HOME=/data
 VOLUME /data
 EXPOSE 7700 7701 7702

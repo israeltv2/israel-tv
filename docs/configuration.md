@@ -17,7 +17,7 @@ Relative paths are relative to the config file's folder.
 
 ## `role`
 
-`host`, `local-only` or `resolver-only` — see the README's [Roles](../README.md#roles). When not set, it follows
+`host`, `local-only` or `resolver-only` — see [Choose your setup](setup/README.md). When not set, it follows
 the publisher (Cloudflare: `host`; local: `local-only`). The start refuses settings the role cannot use, and says
 what to change. `resolver-only` needs
 `resolver.catalogUrl` (the public catalog's manifest URL) and runs only the resolver (and `resolver.remote` when

@@ -1,0 +1,34 @@
+# Israel TV
+
+> A free addon that brings Israeli TV — Keshet 12 (Mako), Reshet 13, Kan 11, Kan Kids & Teens and 16 live channels —
+> into the Stremio and Nuvio apps. Most people only install the public link
+> https://israel-tv.israeltv2.workers.dev/manifest.json. Keshet 12, and Israel-only episodes when abroad, need a small
+> self-hosted "home helper" (the resolver) on the viewer's own network. Anyone can also run the whole thing
+> (at home, or on a free Cloudflare account). TypeScript/Node 24 monorepo, AGPL-3.0, no accounts, hosts no video.
+
+## Setting it up for someone
+
+- [Guide for AI assistants](docs/setup/for-agents.md): questions to ask first, exact commands, how to verify, what never to do
+- [Home helper with Docker](docs/setup/home-helper.md): the simplest path, with abroad (proxy) steps
+- [Choose your setup](docs/setup/README.md): which role fits; links to every guide
+
+## Setup guides
+
+- [Home helper without Docker (resolver-only)](docs/setup/resolver-only.md)
+- [Own copy at home (local-only)](docs/setup/local-only.md)
+- [Own copy on Cloudflare (host)](docs/setup/host.md)
+- [Run in the background, per system](docs/setup/background.md)
+
+## Reference
+
+- [How it works](docs/architecture.md): the three parts and why each exists
+- [Configuration](docs/configuration.md): every setting
+- [Operations](docs/operations.md): status, logs, investigating a failed play, backups, rollbacks, updating
+- [Catalog ↔ resolver contract](docs/contract.md)
+- [Privacy](docs/privacy.md)
+
+## Optional
+
+- [Contributing](CONTRIBUTING.md)
+- [Decisions and measurements](docs/decisions.md)
+- [TV checklist](docs/tv-checklist.md)

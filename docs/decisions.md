@@ -1045,3 +1045,30 @@ Workers Logs line per request, for debugging.
   them public is part of publishing the project (with the repository); until then `docker run` works for the
   account only. Checked before publishing: the helper image runs, answers its manifest, and plays a Mako episode
   (master playlist 200) from the public catalog (local build, arm64).
+
+### The public README and docs
+
+The front page is for viewers (owner's final intent): install link first, what you get, Keshet 12 and abroad in a few
+sentences, a short FAQ, then one paragraph each for how it works, running your own copy, contributing, privacy and the
+license — everything else one link away (`docs/setup/*` per role and per system, `docs/architecture.md`, the app and
+package READMEs, `CONTRIBUTING.md`, `llms.txt` + the assistants' guide).
+
+Three independent drafts (a non-technical viewer abroad, an experienced Stremio user, a contributor) and well-regarded
+READMEs (Immich, Jellyfin, Uptime Kuma, Home Assistant, AIOStreams, MediaFusion) agreed on what was adopted:
+
+- **First screen:** one-line pitch, beta badge, a real screenshot (Stremio Web with the public link installed), the
+  install link with a one-click Stremio link and the Nuvio steps.
+- **The Keshet 12 caveat above the fold** (the main surprise for new users), in the "what you get" table: per channel,
+  in Israel and abroad, and which need the home helper.
+- **Plain words:** "install link", "home helper", "only plays from Israel"; no "manifest", "resolver", "Worker",
+  "token", "pnpm" on viewer pages (they appear on the technical pages, explained).
+- **Steps with what you should see** on the home-helper page, one action each, Docker first.
+- **For experienced addon users:** works alongside other addons; streams for shows opened from Cinemeta where seasons
+  match.
+- **For contributors:** one path (README → CONTRIBUTING → the package's README), task recipes ("fix a broken source",
+  "add a channel"), "no accounts or credentials needed", the project structure moved out of the README into
+  CONTRIBUTING.md, issue forms (a "broken source" form linked from the FAQ) and a pull request template.
+- Not adopted: a separate docs website (the repository's Markdown is enough for now).
+
+`pnpm check:addresses` (CI) fails on private network addresses in tracked files; extra personal patterns can be given
+through an environment variable so they are never written into the repository.
