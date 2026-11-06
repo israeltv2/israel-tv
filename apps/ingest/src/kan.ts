@@ -80,6 +80,8 @@ interface CrawlState {
   lobbiesAt?: string;
   backoffUntil?: string;
   shows: Record<string, ShowState>;
+  /** Per site, the last episode page that loaded with a player: the yardstick for a failing episode page. */
+  goodEpisode?: Record<string, string>;
 }
 
 const STATE_KEY = 'kan:crawl';
@@ -176,10 +178,14 @@ export async function crawlKan(
   /** Server errors in a row, per site (kan.org.il and kankids.org.il fail independently). */
   const serverErrors = new Map<string, number>();
   /**
-   * Pages that answered a server error. Each is charged once another page of the same site loads normally;
-   * at the end of a slice, an open one is settled by loading its site's lobby.
+   * Pages that answered a server error. Each is charged only once a page of the same site and kind loads
+   * normally (show pages compare with show pages or the lobby, episode pages with episode pages: Kan's episode
+   * pages can fail while the rest of the site works). At the end of a slice an open one is settled by loading a
+   * comparable page; with nothing to compare against it stays uncharged and the run says so.
    */
-  let suspects: { site: string; charge: () => void }[] = [];
+  type Kind = 'listing' | 'episode';
+  let suspects: { site: string; kind: Kind; charge: () => void }[] = [];
+  let unsettled = 0;
   const isServerError = (err: unknown) => (err as { serverError?: boolean }).serverError === true;
   const readShows: string[] = [];
   /** Shows whose page was read or failed without a block (a refresh of them is done either way). */
@@ -187,7 +193,7 @@ export async function crawlKan(
   let note = '';
 
   const origin = (url: string) => new URL(url).origin;
-  const load = async (url: string) => {
+  const load = async (url: string, kind: Kind = 'listing') => {
     if (pages > 0) await sleep(opts.pageIntervalMs);
     pages++;
     let r: Awaited<ReturnType<PageLoader['load']>>;
@@ -220,8 +226,8 @@ export async function crawlKan(
     serverErrors.delete(site);
     blocked = 0;
     // The site answered normally, so its pages that answered a server error are broken by themselves.
-    const proven = suspects.filter((x) => x.site === site);
-    suspects = suspects.filter((x) => x.site !== site);
+    const proven = suspects.filter((x) => x.site === site && x.kind === kind);
+    suspects = suspects.filter((x) => !proven.includes(x));
     for (const x of proven) x.charge();
     if (r.status >= 400) throw new Error(`${url}: HTTP ${r.status}`);
     return r.html;
@@ -234,8 +240,25 @@ export async function crawlKan(
       let lobbyEmpty = false;
       for (const l of KAN_LOBBIES) {
         if (!byUrl.has(l.url) && pages >= opts.pagesPerRun) break;
-        const html = byUrl.get(l.url) ?? (await load(l.url));
-        byUrl.set(l.url, html);
+        let html = byUrl.get(l.url);
+        if (html === undefined) {
+          try {
+            html = await load(l.url);
+          } catch (err) {
+            // One lobby failing (its site down, or the page moved) must not stop the other site or the known
+            // shows: note it, keep going, and read the lobbies again next slice.
+            if (blocked > 0) throw err;
+            problems++;
+            lobbyEmpty = true;
+            store.addWarnings(runId, null, [
+              { code: 'source-note', message: `Kan lobby ${l.url}: ${(err as Error).message}` },
+            ]);
+            byUrl.set(l.url, '');
+            continue;
+          }
+          byUrl.set(l.url, html);
+        }
+        if (html === '') continue; // this lobby failed above
         const paths = parseLobby(html, l.origin, l.channelPath);
         if (paths.length === 0) {
           // A lobby that loads but lists no shows is a layout change: say so and try again next slice.
@@ -289,7 +312,8 @@ export async function crawlKan(
         if (blocked > 0) throw err;
         attemptedShows.push(key);
         const message = (err as Error).message;
-        if (isServerError(err)) suspects.push({ site: origin(key), charge: () => chargeShow(message) });
+        if (isServerError(err))
+          suspects.push({ site: origin(key), kind: 'listing', charge: () => chargeShow(message) });
         else chargeShow(message);
         continue;
       }
@@ -373,16 +397,22 @@ export async function crawlKan(
             return true;
           };
           try {
-            const e = parseEpisodePage(await load(url), origin(url));
-            if (e) batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
-            else problem = 'no video player config on the page (layout changed?)';
+            const e = parseEpisodePage(await load(url, 'episode'), origin(url));
+            if (e) {
+              batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
+              state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
+            } else problem = 'no video player config on the page (layout changed?)';
           } catch (err) {
             if (blocked > 0) throw err;
             if (isServerError(err)) {
               // Compare with the next page of this site (or its lobby at the end of the slice): if that loads,
               // this one is charged; if it also fails, the site is down.
               const message = (err as Error).message;
-              suspects.push({ site: origin(url), charge: () => void chargeEpisode(message) });
+              suspects.push({
+                site: origin(url),
+                kind: 'episode',
+                charge: () => void chargeEpisode(message),
+              });
               break;
             }
             problem = (err as Error).message;
@@ -400,16 +430,18 @@ export async function crawlKan(
       }
       if (pages >= opts.pagesPerRun) break;
     }
-    // 4. Settle pages that answered a server error with nothing of their site loading after them.
-    for (const site of new Set(suspects.map((x) => x.site))) {
-      const lobby = KAN_LOBBIES.find((l) => l.origin === site)?.url;
-      if (!lobby) continue;
+    // 4. Settle pages that answered a server error with nothing comparable loading after them.
+    for (const { site, kind } of [...new Map(suspects.map((x) => [`${x.site} ${x.kind}`, x])).values()]) {
+      const yardstick =
+        kind === 'episode' ? state.goodEpisode?.[site] : KAN_LOBBIES.find((l) => l.origin === site)?.url;
+      if (!yardstick) continue;
       try {
-        await load(lobby);
+        await load(yardstick, kind);
       } catch (err) {
         if (blocked > 0) throw err;
       }
     }
+    unsettled = suspects.length;
     const shows = Object.values(state.shows);
     const pendingTotal = shows.reduce((n, s) => n + s.pending.length, 0);
     // Shows paused on an episode page that failed: visible on /status for as long as they wait.
@@ -418,6 +450,9 @@ export async function crawlKan(
     const issues = [
       ...(problems > 0 ? [`${problems} Kan pages could not be read`] : []),
       ...(waitingShows > 0 ? [`${waitingShows} Kan shows wait to retry an episode page`] : []),
+      ...(unsettled > 0
+        ? [`${unsettled} Kan pages answered a server error (not yet known whose fault)`]
+        : []),
     ];
     // Pages that loaded but did not parse make the slice partial, so a layout change shows on /status.
     store.finishRun(runId, {

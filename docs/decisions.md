@@ -431,3 +431,12 @@ green; (2) a page of kan.org.il loading was taken as proof that kankids.org.il w
 site, and a suspect still open at the end of a slice is settled by loading its site's lobby (loads → the page is
 charged; fails → the site is down, back off). That replaced the three-day fallback. Every try is now a warning,
 and a Kan run is `partial` while any show waits to retry an episode page.
+
+### Code review, round 19 (2026-11-06)
+
+Two findings, fixed: (1) the round 18 lobby probe compared a failing _episode_ page with the lobby, which can load
+while every episode page fails, so an episode-only outage could still use up a new episode's tries. Suspects are
+now compared like with like: show pages with show pages or the lobby, episode pages with episode pages (at the end
+of a slice, the last episode page of that site that loaded). With nothing comparable, the page stays uncharged
+and the run is `partial` saying so. (2) A failing lobby stopped every slice, on both sites; a lobby that fails is
+now a warning, skipped, and read again next slice, while known shows carry on.
