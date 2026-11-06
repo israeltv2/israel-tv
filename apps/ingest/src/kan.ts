@@ -86,6 +86,8 @@ interface ShowState {
   artTriedAt?: string;
   /** Episode pages that failed and will be tried again before reading past them. */
   retry?: Record<string, { n: number; at: string }>;
+  /** Pages of episodes we have without an air date (read before dates were kept), re-read when time is left. */
+  undated?: string[];
 }
 
 /**
@@ -175,6 +177,7 @@ export function toEpisode(e: ReturnType<typeof parseEpisodePage> & object): Scra
     title: e.title,
     ...(e.description ? { description: e.description } : {}),
     ...(e.poster ? { thumbnail: e.poster } : {}),
+    ...(e.published ? { airDate: e.published } : {}),
     availableAbroad: false,
     streams: [{ url: e.hls, kind: 'direct' }],
   };
@@ -468,6 +471,18 @@ export async function crawlKan(
         id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
       );
       const seenBefore = new Set([...s.pending, ...s.failed]);
+      const dated = new Set(
+        id
+          ? (store
+              .getShow(id)
+              ?.show.seasons.flatMap((x) => x.episodes.filter((e) => e.airDate).map((e) => e.key)) ?? [])
+          : [],
+      );
+      const pageKey = (u: string) => kanEpisodeKey({ id: String(/(\d+)\/$/.exec(u)?.[1]) });
+      s.undated = page.episodes
+        .map((e) => `${s.origin}${e.path}`)
+        .filter((u) => known.has(pageKey(u)) && !dated.has(pageKey(u)));
+      if (s.undated.length === 0) delete s.undated;
       // Pages given up on (after several tries) stay given up: they never re-enter the ordered queue, where
       // they would hold back newer episodes and, if they ever loaded, be numbered after them.
       const gaveUp = new Set(s.failed);
@@ -552,6 +567,24 @@ export async function crawlKan(
       }
       if (pages >= opts.pagesPerRun) break;
     }
+    // 3b. With pages left in the slice, the air dates of episodes read before dates were kept. Low priority: a
+    //     page that fails is dropped from this list (no retries, no warnings); an outage still stops the slice.
+    for (const [key, s] of Object.entries(state.shows)) {
+      if (pages >= opts.pagesPerRun) break;
+      const dates = new Map<string, string>();
+      while (s.undated?.length && pages < opts.pagesPerRun) {
+        const url = s.undated.shift() as string;
+        try {
+          const e = parseEpisodePage(await load(url, 'episode'), origin(url));
+          if (e?.published) dates.set(kanEpisodeKey(e), e.published);
+        } catch (err) {
+          rethrowOutage(err);
+        }
+      }
+      if (s.undated?.length === 0) delete s.undated;
+      if (dates.size > 0) dateEpisodes(store, key, dates);
+    }
+
     // 4. Settle pages that answered a server error with nothing comparable loading after them.
     for (const { site, kind } of [...new Map(suspects.map((x) => [`${x.site} ${x.kind}`, x])).values()]) {
       const yardstick =
@@ -641,6 +674,24 @@ function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[
   const fresh = batch.some((b) => s.fresh?.includes(b.url));
   if (s.fresh) s.fresh = s.fresh.filter((u) => !batch.some((b) => b.url === u));
   return store.saveShow(seriesId, clean, numbering.added, latestAirDate(clean), fresh);
+}
+
+/** Add air dates to episodes we already have (numbers and everything else unchanged). */
+function dateEpisodes(store: Store, key: string, dates: Map<string, string>): void {
+  const seriesId = store.findSeriesId('kan', key);
+  const row = seriesId ? store.getShow(seriesId) : undefined;
+  if (!seriesId || !row) return;
+  const show: ScrapedShow = {
+    ...row.show,
+    seasons: row.show.seasons.map((x) => ({
+      ...x,
+      episodes: x.episodes.map((e) => {
+        const d = dates.get(e.key);
+        return d && !e.airDate ? { ...e, airDate: d } : e;
+      }),
+    })),
+  };
+  store.saveShow(seriesId, show, { seasons: [], episodes: [] }, latestAirDate(show), false);
 }
 
 /** Whether a Kan show is known to the crawler (by its page URL). */

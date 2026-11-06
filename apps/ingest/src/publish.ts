@@ -23,7 +23,7 @@ import {
 } from '@israel-tv/core';
 import { type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
 import { brandImage, channelLogo } from '@israel-tv/resolver';
-import { scrub, secretValues } from '@israel-tv/runtime';
+import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
@@ -31,7 +31,6 @@ import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster }
 import { emptyShowsKey, episodeCount } from './runner.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const VERSION = '1.0.0';
 
 /** How each source is read, for judging its health. Kan is read in small crawl slices that may back off. */
 const READS: Record<Source, { kind: RunKind; failedIs: Health; lastGood: 'latest' | 'any' }> = {
@@ -276,7 +275,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   }
   const live = config.sources.live ? liveRender(logos) : [];
   const files = renderSite({
-    version: VERSION,
+    version: RELEASE_VERSION,
     assets,
     sources: activeSources(config),
     shows,

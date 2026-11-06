@@ -74,8 +74,9 @@ nothing does not deploy at all.
   not the 25–50k a per-episode playlist fetch would cost.
 - **One show** = 1 request plus 1 per older season. **Airing check** = 1 request per show (the show page
   carries the current season's episodes).
-- **Season numbers:** `עונה N` → N; year titles (`עונה 2025`, `2025`) → the year, read from the title (a
-  page URL can disagree: `uvda-2024` is titled `עונה 2025`); anything else ("VIP 5", "נבחרת החלומות") →
+- **Season numbers:** `עונה N` → N; year titles (`עונה 2025`, `2025`) → numbered by position, oldest = 1,
+  after the show's real season numbers, ordered by the year in the title (a page URL can disagree: `uvda-2024`
+  is titled `עונה 2025`) — until 2026-11-06 they took the year itself (see below); anything else ("VIP 5", "נבחרת החלומות") →
   stable numbers from 101 in the order first seen. Measured on the full run: 610 numbered, 83 year,
   24 named, 167 single-season.
 - **Episode numbers:** the printed `פרק N`; otherwise the next number after the season's highest, in air-date
@@ -115,8 +116,8 @@ ticket and are played through the resolver.
 ## TMDB / IMDb (2026-11-06)
 
 Exact matches only: an Israeli show (origin IL or Hebrew) whose Hebrew or original title normalizes to ours,
-and exactly one such result. On 510 Mako shows: 128 matched, 62 with an IMDb id. Only numbered seasons are
-answered for `tt…`/`tmdb:…` ids, because year and named seasons do not line up with TMDB's numbering.
+and exactly one such result. On 510 Mako shows: 128 matched, 62 with an IMDb id. Numbered and year seasons
+(1, 2, … by position) are answered for `tt…`/`tmdb:…` ids; named seasons (101+) never line up with TMDB's.
 Misses are retried after 30 days.
 
 ## Kan VOD (2026-11-06)
@@ -1163,3 +1164,25 @@ darkened fill of itself, 400x600 JPEG, pure JS (`jpeg-js`) so every platform can
 poster on a host that refuses viewers outside Israel (Kan's own site) is never published: our copy, or a placeholder
 (`assets/branding/poster-placeholder.jpg`, replaceable in `branding.dir`) until the copy exists; backgrounds and
 thumbnails on such hosts are dropped. A test fails if a series row is not `poster` or its poster is not portrait.
+
+## Show metadata: year seasons, years, genres, IMDb ids, version (2026-11-06)
+
+Measured on the live catalog against another addon's output for the same shows:
+
+- **Year seasons were numbered with the year** (`iltv_mako_54` had seasons 2024 and 2026; 21 Mako shows, 83
+  seasons), so apps showed "Season 2024" and TMDB matching could not line up. They are numbered by position now,
+  oldest = 1, after any real season numbers (a show with seasons 1, 2 and 2020 gets 3; named ones stay 101+). New
+  year seasons take the next number; stored numbers never move again. The one-time move of the stored ones (with
+  their episodes) runs when the database opens and logs how many moved; it also applies to older data restored
+  later. Done before going public, while there are almost no viewers: watch progress on those 21 shows restarts.
+- **Episode titles** no longer start with the season's year ("2024 · …"); named seasons keep their label, since
+  their numbers (101+) say nothing.
+- **releaseInfo** is the first-aired year, `2024–2026` for a show that ended, `2024–` while it runs (an episode in
+  the last 180 days); it was the latest year for every show. Kan episodes now keep their page's publication day as
+  the air date; those read earlier get it when a slice has pages to spare (no retries, no warnings).
+- **Genres** where sources give them: Mako's show page schema, Reshet's Kaltura `Genre` tags (older template); Kan
+  gives none. Cleaned (no repeats, at most 5). Each row offers its genres as a filter (`genre` extra; the Worker
+  filters the search index, which now carries them).
+- **imdb_id** on catalog items and metas when the match is known, for Trakt and other addons.
+- **Version:** the manifests show the release (root `package.json`, which release-please bumps), not `1.0.0`. The
+  description is one plain sentence about what is in it and what limits playing.

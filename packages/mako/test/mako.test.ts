@@ -3,7 +3,7 @@ import { assignNumbers } from '@israel-tv/core';
 import type { Fetcher } from '@israel-tv/net';
 import { describe, expect, test } from 'vitest';
 import { fetchIndex, fetchPlaylist, fetchShow } from '../src/client.ts';
-import { episodesFromPage, parseIndex, parseShowPage } from '../src/parse.ts';
+import { episodesFromPage, parseIndex, parseShowPage, showArtwork } from '../src/parse.ts';
 
 const fx = (name: string): unknown =>
   JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8'));
@@ -110,8 +110,13 @@ describe('fetchShow + numbering on recorded shows', () => {
     );
     const r = assignNumbers(show, { seasons: [], episodes: [] });
     expect(page.seasons?.length).toBe(20);
-    expect(r.seasons.find((s) => s.key.endsWith('uvda-2024'))?.number).toBe(2025);
-    expect(r.seasons.find((s) => s.key.endsWith('uvda-swords_of_iron'))?.number).toBe(2024);
+    // Year seasons are numbered by position, oldest = 1 (by the year in the title, not the page url).
+    const s2025 = r.seasons.find((s) => s.key.endsWith('uvda-2024'))?.number ?? 0;
+    const s2024 = r.seasons.find((s) => s.key.endsWith('uvda-swords_of_iron'))?.number ?? 0;
+    expect(s2025).toBe(s2024 + 1);
+    const years = r.seasons.filter((s) => s.kind === 'year').map((s) => s.number);
+    expect([...years].sort((a, b) => a - b)).toEqual(years.map((_, i) => i + 1));
+    expect(Math.max(...r.seasons.map((s) => s.number))).toBeLessThan(1900);
   });
 });
 
@@ -165,4 +170,9 @@ test('daily-show seasons with a bare date in extraInfo are dated and numbered ol
   const latest = r.episodes.find((e) => e.key === eps[0]?.key);
   expect(first?.episode).toBe(1); // "פותחים את שנת 2026", 01.01.26
   expect(latest?.episode).toBe(212);
+});
+
+test('genres come from the show page schema, cleaned of repeats', () => {
+  expect(showArtwork(parseShowPage(fx('show-masterchef'))).genres).toEqual(['בישול', 'ריאליטי']);
+  expect(showArtwork(parseShowPage(fx('show-main-newscast'))).genres).toEqual(['אקטואליה', 'חדשות']);
 });

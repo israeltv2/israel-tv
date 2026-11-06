@@ -154,6 +154,10 @@ async function main(argv: string[]): Promise<number> {
     return runResolverOnly(config);
   }
   const store = Store.open(config.store.path);
+  if (store.renumbered > 0)
+    console.log(
+      `israel-tv: ${store.renumbered} year-titled seasons renumbered by position (once; see docs/decisions.md)`,
+    );
   store.closeStaleRuns();
   const adapters = createAdapters(config);
   if (values.source !== undefined) {

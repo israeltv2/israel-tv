@@ -19,6 +19,7 @@ import {
   type UsageEvent,
 } from '@israel-tv/core';
 import type { GeoFetch } from '@israel-tv/net';
+import { RELEASE_VERSION } from '@israel-tv/runtime';
 import { type Context, Hono } from 'hono';
 import type { Fetch, Log, ModuleContext, Play } from './context.ts';
 import { geoRelay } from './geo-relay.ts';
@@ -112,11 +113,11 @@ export function createResolverApp(deps: ResolverDeps) {
   app.get('/manifest.json', (c) =>
     c.json({
       id: deps.manifest?.id ?? 'community.israel-tv.resolver',
-      version: '1.0.0',
+      version: RELEASE_VERSION,
       name: deps.manifest?.name ?? 'Israel TV · home helper',
       description:
         deps.manifest?.description ??
-        'Plays Mako (Keshet 12) episodes and live channels, and relays geo-blocked Reshet/Kan video through your configured proxy when it is refused where you are. Runs on your home network.',
+        'Plays Keshet 12 and live channels from your own computer, and Reshet and Kan where they are refused.',
       resources: [
         {
           name: 'stream',

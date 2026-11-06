@@ -110,13 +110,32 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
   const added: Assignments = { seasons: [], episodes: [] };
   const usedSeasonNumbers = new Set(previous.seasons.map((s) => s.number));
 
-  // Seasons: numbered and year titles take their own number; named ones are allocated in source order.
+  // Seasons: numbered titles take their own number; year titles ("2024") are numbered by position, oldest
+  // first, after the show's real season numbers (so apps and TMDB see 1, 2, … like the broadcaster's order);
+  // named ones are allocated from NAMED_SEASON_BASE in source order.
   const single = show.seasons.length === 1 && show.seasons[0]?.title.trim() === '';
+  const parsedOf = (season: ScrapedSeason) =>
+    single ? { kind: 'single' as const, number: 1 } : parseSeasonTitle(season.title);
+  const regular = (n: number) => n < NAMED_SEASON_BASE;
+  const reserved = new Set(
+    show.seasons.flatMap((x) => {
+      const p = parsedOf(x);
+      return p.kind === 'numbered' && p.number !== undefined && !seasons.has(x.key) ? [p.number] : [];
+    }),
+  );
+  const yearNumber = new Map<string, number>();
+  let nextYear = Math.max(0, ...[...usedSeasonNumbers, ...reserved].filter(regular)) + 1;
+  for (const { key } of show.seasons
+    .filter((x) => !seasons.has(x.key) && parsedOf(x).kind === 'year')
+    .sort((a, b) => (parsedOf(a).number ?? 0) - (parsedOf(b).number ?? 0))) {
+    yearNumber.set(key, nextYear);
+    nextYear++;
+  }
   for (const season of show.seasons) {
     if (seasons.has(season.key)) continue;
-    const parsed = single ? { kind: 'single' as const, number: 1 } : parseSeasonTitle(season.title);
+    const parsed = parsedOf(season);
     let kind: SeasonKind = parsed.kind === 'single' && !single ? 'named' : parsed.kind;
-    let number = parsed.number;
+    let number = kind === 'year' ? yearNumber.get(season.key) : parsed.number;
     if (number !== undefined && usedSeasonNumbers.has(number)) {
       warnings.push({
         code: 'season-number-taken',

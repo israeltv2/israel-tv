@@ -89,3 +89,10 @@ export function cleanShow(show: ScrapedShow): ScrapedShow {
   }
   return r.data;
 }
+
+/** Genres as a source gives them, cleaned: trimmed, no empties or repeats, at most 5. */
+export function cleanGenres(list: readonly (string | null | undefined)[] | null | undefined): string[] {
+  return [
+    ...new Set((list ?? []).map((g) => (g ?? '').trim()).filter((g) => g.length > 0 && g.length <= 40)),
+  ].slice(0, 5);
+}

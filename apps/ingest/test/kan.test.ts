@@ -562,3 +562,27 @@ test('lobby posters are copied from the lobby read itself, and a failed copy wai
   expect(bad.first).toBeGreaterThan(0);
   expect(bad.second).toBe(0); // not every slice: the failed copies are tried again the next day
 });
+
+test('Kan episodes carry their publication day as the air date; older ones get it later, numbers unchanged', async () => {
+  const store = Store.open(':memory:');
+  const l = loader(routes);
+  for (let i = 0; i < 80 && kanEpisodes(store).length < 9; i++) await crawlKan(store, opts(l, 10));
+  expect(kanEpisodes(store).every((e) => e.airDate === '2026-03-04')).toBe(true);
+  // As if read before dates were kept.
+  const row = store.listShows({ source: 'kan' })[0];
+  if (!row) throw new Error('no show');
+  const before = store.assignments(row.seriesId);
+  const undated = {
+    ...row.show,
+    seasons: row.show.seasons.map((x) => ({ ...x, episodes: x.episodes.map(({ airDate: _, ...e }) => e) })),
+  };
+  store.saveShow(row.seriesId, undated, { seasons: [], episodes: [] }, undefined, false);
+  expect(kanEpisodes(store).some((e) => e.airDate)).toBe(false);
+  const state = store.getState<{ shows: Record<string, { checkedAt?: string }> }>('kan:crawl');
+  for (const s of Object.values(state?.shows ?? {})) if (s.checkedAt) s.checkedAt = '2026-01-01T00:00:00Z';
+  store.setState('kan:crawl', state);
+  for (let i = 0; i < 10 && !kanEpisodes(store).every((e) => e.airDate); i++)
+    await crawlKan(store, opts(l, 10));
+  expect(kanEpisodes(store).every((e) => e.airDate === '2026-03-04')).toBe(true);
+  expect(store.assignments(row.seriesId)).toEqual(before);
+});
