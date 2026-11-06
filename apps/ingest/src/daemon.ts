@@ -185,11 +185,14 @@ export class Daemon {
     this.kanRefresh.clear();
     crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
       .then((r) => {
-        // Refreshes whose show page this slice did not read (back-off, block) wait for the next slice.
-        const read = new Set(r.readShows ?? []);
-        for (const k of priority) if (!read.has(k)) this.kanRefresh.add(k);
+        // Refreshes asked for while this slice ran get a slice of their own right away.
+        const arrived = this.kanRefresh.size > 0;
+        // Refreshes this slice never got to (back-off, block) wait for the next scheduled slice; one whose
+        // page was tried and failed is done (it shows on /status) and is not retried in a loop.
+        const attempted = new Set(r.attemptedShows ?? []);
+        for (const k of priority) if (!attempted.has(k)) this.kanRefresh.add(k);
         if (r.newEpisodes > 0) this.enqueue('publish', () => this.publish());
-        return r.pages > 0;
+        return arrived && r.pages > 0;
       })
       .catch((err) => {
         for (const k of priority) this.kanRefresh.add(k);
@@ -198,9 +201,9 @@ export class Daemon {
       })
       .then((read) => {
         this.kanRunning = false;
-        // A refresh asked for during a slice that did read pages gets its own slice right away; after a
-        // slice that read nothing (back-off) the next scheduled slice takes it, so this never spins.
-        if (read && this.kanRefresh.size > 0) setTimeout(() => this.kanCrawl(), 0);
+        // Only refreshes that arrived during a slice that read pages start a slice right away, so this
+        // can never spin; the rest wait for the scheduled slices.
+        if (read) setTimeout(() => this.kanCrawl(), 0);
       });
   }
 
@@ -366,9 +369,12 @@ export async function startDaemon(
   if (config.sources.live) d.enqueue('live', async () => void (await checkLive(store)));
   // First start (or after a long stop): fill the catalog now instead of waiting for the night.
   // Sources read by full runs (Mako, Reshet), in order.
-  const firstSource = Object.keys(createAdapters(config))[0] as Source | undefined;
-  const last = firstSource ? store.lastRun('full', firstSource) : undefined;
-  const stale = firstSource && (!last || Date.now() - Date.parse(last.startedAt) > DAY_MS);
+  // Stale when any source read by full runs has had no good run in a day (e.g. the first run was stopped).
+  const fullSources = Object.keys(createAdapters(config)) as Source[];
+  const stale = fullSources.some((src) => {
+    const good = store.lastGoodRun('full', src);
+    return !good || Date.now() - Date.parse(good.startedAt) > DAY_MS;
+  });
   if (stale && opts.initialRun !== false) {
     log('no full run in the last 24 hours: starting one now (about half an hour; see /status)');
     d.fullRun();

@@ -138,3 +138,26 @@ test('a browser that cannot load pages at all makes the slice back off without m
   expect(state?.backoffUntil).toBeDefined();
   expect(Object.values(state?.shows ?? {}).some((s) => s.failedAt)).toBe(false);
 });
+
+test('a refreshed show whose page fails without a block counts as attempted (no refresh loop)', async () => {
+  const store = Store.open(':memory:');
+  const l = loader(routes);
+  await crawlKan(store, opts(l, 2)); // lobbies
+  const dead = 'https://www.kan.org.il/content/kan/kan-11/p-1003359/'; // not routed: 404
+  const r = await crawlKan(store, { ...opts(l, 1), priority: [dead] });
+  expect(r.attemptedShows).toContain(dead);
+  expect(r.failed).toBeUndefined();
+});
+
+test('a video embedded in a show page is keyed by its stable Kan video id', async () => {
+  const { kanEpisodeKey } = await import('../src/kan.ts');
+  expect(
+    kanEpisodeKey({ id: '1006639', hls: 'https://r.il.cdn-redge.media/x/kancdn/vod/2173543/L/a.m3u8' }),
+  ).toBe('kan:1006639');
+  expect(
+    kanEpisodeKey({
+      id: 'h5b9ddce0bdef4bc8929337f2519979ba',
+      hls: 'https://r.il.cdn-redge.media/x/kancdn/vod/2171294/L/a.m3u8',
+    }),
+  ).toBe('kan:vod-2171294');
+});

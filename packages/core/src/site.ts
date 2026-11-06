@@ -43,6 +43,8 @@ export interface StatusFile {
   health: Health;
   /** Set when the last publish failed (the public copy may be out of date). */
   publish?: string;
+  /** Set when the last TMDB matching run failed (e.g. a revoked API key). */
+  tmdb?: string;
   sources: {
     source: string;
     health: Health;

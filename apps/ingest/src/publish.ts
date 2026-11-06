@@ -102,6 +102,11 @@ export function buildStatus(
       notes,
     });
   }
+  const lastMatch = store.lastRun('match', 'tmdb');
+  const matchNote =
+    lastMatch?.status === 'failed'
+      ? `last TMDB matching failed (${lastMatch.startedAt}): ${lastMatch.error ?? ''}`
+      : undefined;
   const lastPublish = store.lastRun('publish', 'cloudflare') ?? store.lastRun('publish', 'local');
   const publishNote =
     lastPublish?.status === 'failed'
@@ -119,13 +124,14 @@ export function buildStatus(
   const worst: Health =
     out.some((s) => s.health === 'error') || publishNote
       ? 'error'
-      : out.some((s) => s.health === 'warn') || failingShows.length > 0
+      : out.some((s) => s.health === 'warn') || failingShows.length > 0 || matchNote
         ? 'warn'
         : 'ok';
   return {
     generatedAt: new Date(now).toISOString(),
     health: worst,
     ...(publishNote ? { publish: publishNote } : {}),
+    ...(matchNote ? { tmdb: matchNote } : {}),
     sources: out,
     failingShows,
     warnings,
