@@ -82,7 +82,9 @@ export function makoAuth(d: MakoAuthDeps) {
       throw new Error('Mako entitlement returned no ticket');
     }
     ticket('ok', r.status);
-    return `${makoUrl(t.url ?? mediaUrl)}?${decodeURIComponent(t.ticket)}`;
+    // An empty `url` means the media URL itself; one that already has a query gets the ticket appended to it.
+    const base = makoUrl(t.url || mediaUrl);
+    return `${base}${base.includes('?') ? '&' : '?'}${decodeURIComponent(t.ticket)}`;
   }
 
   async function masterFor(
