@@ -34,9 +34,11 @@ async function fetchResized(arg: {
   src: string;
   width: number;
 }): Promise<{ status: number; b64?: string; error?: string }> {
-  // Browser APIs (this runs inside the page), typed here without pulling the DOM types into Node code.
+  // Browser APIs (this runs inside the page), typed here without pulling the DOM types into Node code. The image
+  // is loaded as an image (Kan refuses the same URL to a script's fetch) from the page's own site, so the canvas
+  // it is drawn on can be read back.
   const g = globalThis as unknown as {
-    createImageBitmap(b: Blob): Promise<{ width: number; height: number }>;
+    Image: new () => { src: string; decode(): Promise<void>; naturalWidth: number; naturalHeight: number };
     OffscreenCanvas: new (
       w: number,
       h: number,
@@ -46,20 +48,20 @@ async function fetchResized(arg: {
     };
   };
   try {
-    const r = await fetch(arg.src, { credentials: 'include' });
-    if (!r.ok) return { status: r.status };
-    const bmp = await g.createImageBitmap(await r.blob());
-    const w = Math.min(arg.width, bmp.width);
-    const h = Math.round((bmp.height * w) / bmp.width);
+    const img = new g.Image();
+    img.src = arg.src;
+    await img.decode();
+    const w = Math.min(arg.width, img.naturalWidth);
+    const h = Math.round((img.naturalHeight * w) / img.naturalWidth);
     const canvas = new g.OffscreenCanvas(w, h);
-    canvas.getContext('2d')?.drawImage(bmp, 0, 0, w, h);
+    canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
     const bytes = new Uint8Array(
       await (await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.82 })).arrayBuffer(),
     );
     let bin = '';
     for (let i = 0; i < bytes.length; i += 0x8000)
       bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return { status: r.status, b64: btoa(bin) };
+    return { status: 200, b64: btoa(bin) };
   } catch (err) {
     return { status: 0, error: String(err) };
   }
@@ -95,11 +97,14 @@ export async function createChromeLoader(
     async load(url, opts = {}) {
       const context = await browser.newContext({ locale: 'he-IL', timezoneId: 'Asia/Jerusalem' });
       try {
-        await context.route('**/*', (route) =>
-          ['image', 'font', 'media'].includes(route.request().resourceType())
+        // Heavy resources are not loaded, except the one image asked for (see `image`).
+        let allowImage: string | undefined;
+        await context.route('**/*', (route) => {
+          const req = route.request();
+          return ['image', 'font', 'media'].includes(req.resourceType()) && req.url() !== allowImage
             ? route.abort()
-            : route.continue(),
-        );
+            : route.continue();
+        });
         const page = await context.newPage();
         const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
         for (let i = 0; i < 25 && isChallenge(await page.content()); i++) await page.waitForTimeout(1000);
@@ -108,7 +113,13 @@ export async function createChromeLoader(
         const challenged = isChallenge(html);
         const src = !challenged && opts.image ? opts.image(html) : undefined;
         if (!src) return { status: res?.status() ?? 0, html, challenged };
-        const got = await page.evaluate(fetchResized, { src, width: opts.imageWidth ?? 960 });
+        allowImage = new URL(src, page.url()).toString();
+        const response = page
+          .waitForResponse((r) => r.url() === allowImage, { timeout: 30_000 })
+          .catch(() => undefined);
+        const got = await page.evaluate(fetchResized, { src: allowImage, width: opts.imageWidth ?? 960 });
+        const answered = (await response)?.status();
+        if (answered !== undefined) got.status = got.b64 ? answered : answered === 200 ? 0 : answered;
         return {
           status: res?.status() ?? 0,
           html,

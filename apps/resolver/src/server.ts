@@ -69,6 +69,10 @@ export function remoteResolverApp(
   if (!r.publicUrl) return { error: 'resolver.remote.publicUrl is not set' };
   if (!token || token.length < 32)
     return { error: `${r.tokenEnv} must be set in .env (32 characters or more)` };
+  if (!/^[A-Za-z0-9_-]+$/.test(token))
+    return {
+      error: `${r.tokenEnv} may only use letters, digits, - and _ (make one with: openssl rand -hex 32)`,
+    };
   const logo = brandImage(config.branding.dir, 'resolver-logo');
   const background = brandImage(config.branding.dir, 'background');
   return createRemoteResolverApp(

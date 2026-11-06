@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { ConfigError, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
+import { ConfigError, parseSeriesId, type Source, secretOwners, tmdbApiKey } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
@@ -11,7 +11,7 @@ import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
 import { crawlKan, kanCrawlOptions } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
-import { createLogger } from './log.ts';
+import { createLogger, registerSecretNames } from './log.ts';
 import {
   activeSources,
   buildStatus,
@@ -23,7 +23,7 @@ import {
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
-import { buildDashboard, queryEvents } from './usage-page.ts';
+import { buildDashboard, latestCanary, queryEvents } from './usage-page.ts';
 
 const HELP = `israel-tv <command>
 
@@ -93,6 +93,13 @@ async function main(argv: string[]): Promise<number> {
   const { config } = loadConfig(process.env, {
     needSecrets: !['status', 'serve', 'events', 'usage', 'admin-url', 'restore', 'remote-url'].includes(cmd),
   });
+  // Every secret the config names (proxy login, Cloudflare, TMDB, admin and remote tokens) is kept out of logs
+  // and published files, whatever its variable is called.
+  registerSecretNames([
+    ...secretOwners(config).map((o) => o.name),
+    config.admin.tokenEnv,
+    config.resolver.remote.tokenEnv,
+  ]);
   const store = Store.open(config.store.path);
   store.closeStaleRuns();
   const adapters = createAdapters(config);
@@ -174,8 +181,12 @@ async function main(argv: string[]): Promise<number> {
       case 'start': {
         const logger = createLogger(config.log);
         const events = EventStore.open(config.events.path);
-        await startDaemon(config, store, events, logger, { initialRun: !values['no-initial-run'] });
+        const daemon = await startDaemon(config, store, events, logger, {
+          initialRun: !values['no-initial-run'],
+        });
         await stopSignal(logger.log);
+        // Relay sessions still open are written before the database closes.
+        daemon.sessions.flush(true);
         events.close();
         logger.flush();
         return 0;
@@ -297,7 +308,7 @@ async function main(argv: string[]): Promise<number> {
               notes: s.notes,
               ...(s.lastFullRun ? { lastFullRun: s.lastFullRun.at } : {}),
             })),
-            canary: [],
+            canary: latestCanary(events),
           });
           console.log(JSON.stringify(dash, null, 2));
         } finally {

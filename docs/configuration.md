@@ -40,9 +40,7 @@ Only needed **outside Israel**.
 | `urls`                       | required | One or more proxy URLs, tried in order.                                                    |
 | `usernameEnv`, `passwordEnv` | optional | Names of the `.env` variables with the proxy login. Leave out for a proxy without a login. |
 
-What goes through it: the resolver's "דרך ישראל" streams, offered for every Reshet and Kan episode and for
-Kan's live channels (Reshet: only the master playlist; Kan: playlists and video), and Kan's web pages when
-Kan VOD is on. `pnpm israel-tv check-proxy` tests it.
+What goes through it: the resolver's "דרך ישראל" streams, offered only when the direct stream is refused from your network (checked about every 6 hours per show). `pnpm israel-tv check-proxy` tests it.
 
 ## `browser` — for Kan pages
 
@@ -147,5 +145,6 @@ from another catalog (e.g. Cinemeta) also gets streams.
 
 `{ "file": "./data/israel-tv.log", "maxMB": 20, "keep": 10, "level": "info" }`: JSON log lines (pino) in rotated
 files next to `file` (a new file each day or at `maxMB`, keeping `keep` files; `current.log` points at the
-newest). Without `file`, the log goes to standard output (readable lines on a terminal, JSON otherwise). Secret
-values from `.env` never appear in it.
+newest). Without `file`, the log goes to standard output (readable lines on a terminal, JSON otherwise). The
+values of the secrets the config names, and of anything in `.env` named like a token, password, key or secret,
+never appear in it.

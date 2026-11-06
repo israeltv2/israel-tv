@@ -28,12 +28,13 @@ test('public usage: Analytics Engine when readable, else Workers Logs, into the 
     };
     const keys = q.parameters.groupBys.map((g) => g.value).join(',');
     const errorsOnly = q.parameters.filters.some((f) => f.key === 'outcome');
+    const n = errorsOnly ? 1 : 5;
     const rows =
       keys === 'source,series'
-        ? [agg({ source: 'mako', series: 'iltv_mako_1' }, errorsOnly ? 1 : 5, 2)]
+        ? [agg({ source: 'mako', series: 'iltv_mako_1' }, n, 2)]
         : keys === 'source'
-          ? [agg({ source: 'mako' }, 5, 2)]
-          : [agg({}, 5, 2)];
+          ? [agg({ source: 'mako' }, n, 2)]
+          : [agg({}, n, 2)];
     return Response.json({
       success: true,
       result: {
@@ -53,7 +54,11 @@ test('public usage: Analytics Engine when readable, else Workers Logs, into the 
     uniqueClients: 2,
     failures: 1,
   });
-  expect(rows.find((x) => x.source === '' && x.showId === '')).toMatchObject({ plays: 5, uniqueClients: 2 });
+  expect(rows.find((x) => x.source === '' && x.showId === '')).toMatchObject({
+    plays: 5,
+    uniqueClients: 2,
+    failures: 1,
+  });
   expect(calls[0]).toContain('/analytics_engine/sql');
   // Local publisher, or no credentials: nothing to read.
   expect(await pullPublicUsage(events, ConfigSchema.parse({}), '2026-11-05', env, fakeFetch)).toBeUndefined();

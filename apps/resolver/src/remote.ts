@@ -57,6 +57,10 @@ export function createRemoteResolverApp(
   now: () => number = Date.now,
 ) {
   if (o.token.length < 32) throw new Error('the remote resolver token must be at least 32 characters');
+  if (!/^[A-Za-z0-9_-]+$/.test(o.token))
+    throw new Error(
+      'the remote resolver token may only use letters, digits, - and _ (it is part of a URL path)',
+    );
   const base = `${o.publicUrl.replace(/\/+$/, '')}/${o.token}`;
   const clientOf = (headers: Headers) => headers.get('cf-connecting-ip') ?? 'unknown';
   const inner = createResolverApp({

@@ -91,22 +91,31 @@ export function geoRelay(d: GeoRelayDeps) {
     };
   }
 
-  async function relay(c: Context, playId: string | undefined, note: { error?: string }): Promise<Response> {
+  async function relay(
+    c: Context,
+    playId: string | undefined,
+    note: { error?: string; rejected?: boolean },
+  ): Promise<Response> {
     const fail = (msg: string, status: 400 | 403 | 502) => {
       note.error = msg;
       return c.text(msg, status);
     };
+    /** A refusal of the request itself (forged or not ours): not a play, so not recorded. */
+    const reject = (msg: string, status: 400 | 403) => {
+      note.rejected = true;
+      return fail(msg, status);
+    };
     const sig = c.req.param('sig') ?? '';
     const enc = (c.req.param('file') ?? '').replace(/\.(m3u8|ts|bin)$/, '');
-    if (!verify(d.secret, enc, sig)) return fail('bad signature', 403);
+    if (!verify(d.secret, enc, sig)) return reject('bad signature', 403);
     const target = Buffer.from(enc, 'base64url').toString();
     let host: string;
     try {
       host = new URL(target).hostname;
     } catch {
-      return fail('bad url', 400);
+      return reject('bad url', 400);
     }
-    if (!isRelayHost(host)) return fail('host not allowed', 403);
+    if (!isRelayHost(host)) return reject('host not allowed', 403);
     const range = c.req.header('range');
     // Follow redirects by hand so every hop is checked: a hop to a host that is not geo-gated goes back
     // to the player as a plain redirect; nothing else is fetched through the proxy.
@@ -166,9 +175,9 @@ export function geoRelay(d: GeoRelayDeps) {
     app.get('/relay/:sig/:file', async (c) => {
       const t0 = Date.now();
       const playId = c.req.query('p');
-      const note: { error?: string } = {};
+      const note: { error?: string; rejected?: boolean } = {};
       const res = await relay(c, playId, note);
-      if (!playId || res.status === 403) return res;
+      if (!playId || note.rejected) return res;
       const playlist = /mpegurl/i.test(res.headers.get('content-type') ?? '');
       const info = d.sessions.info(playId);
       d.sessions.relay(playId, info, {

@@ -8,6 +8,9 @@
 #   cp .env.example .env && chmod 600 .env                   # fill in only what the config uses
 #   chown -R israeltv: /opt/israel-tv     # (to update later: sudo -u israeltv git pull, then pnpm install --prod)
 #   cp deploy/israel-tv.service /etc/systemd/system/ && systemctl enable --now israel-tv
+# Commands run as the service user from its folder, so they use the same config and database:
+#   cd /opt/israel-tv && sudo -u israeltv ISRAEL_TV_CONFIG=/opt/israel-tv/israel-tv.config.json node apps/ingest/src/cli.ts admin-url
+#   (likewise status, check-proxy, remote-url). Logs: journalctl -u israel-tv -f
 # Node must be 24.11 or newer (distribution packages are often older: install it from nodejs.org or
 # NodeSource). If `which node` is not /usr/bin/node, change ExecStart and PATH below
 # (publishing to Cloudflare runs wrangler, which needs node on PATH).

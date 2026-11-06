@@ -25,6 +25,24 @@ export function queryEvents(events: EventStore, q: Record<string, string | undef
   });
 }
 
+/** The latest playback canary result per source (last 3 days). */
+export function latestCanary(events: EventStore): Dashboard['canary'] {
+  const since = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  const latest = new Map<string, Dashboard['canary'][number]>();
+  for (const e of events.events({ kind: 'canary', since, limit: 100 })) {
+    if (!e.source || latest.has(e.source)) continue;
+    const d = e.detail ? (JSON.parse(e.detail) as { step?: string; reason?: string; statuses?: string }) : {};
+    latest.set(e.source, {
+      source: e.source,
+      outcome: e.outcome,
+      at: e.ts,
+      ...(d.step ? { step: d.step } : {}),
+      detail: [d.statuses, d.reason, e.episodeId ?? e.showId].filter(Boolean).join(' · '),
+    });
+  }
+  return [...latest.values()];
+}
+
 export interface Totals {
   plays: number;
   failures: number;

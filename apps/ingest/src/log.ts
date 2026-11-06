@@ -24,11 +24,24 @@ const REDACTED = '[redacted]';
 /** Field names that hold secrets wherever they appear. */
 const SECRET_KEYS = ['token', 'password', 'pass', 'secret', 'authorization', 'cookie', 'apiKey', 'ticket'];
 
-/** Secret values from the environment: anything named like a token, password, key, secret, user or account id. */
+/**
+ * Secret values from the environment: every variable the config names as a secret, and anything named like a
+ * token, password, key, secret, user or account id.
+ */
+/** Variables the config names as secrets (whatever they are called), registered when the config is loaded. */
+const secretNames = new Set<string>();
+
+export function registerSecretNames(names: Iterable<string>): void {
+  for (const n of names) secretNames.add(n);
+}
+
 export function secretValues(env: NodeJS.ProcessEnv): string[] {
   return Object.entries(env)
     .filter(
-      ([k, v]) => /(TOKEN|PASS|SECRET|KEY|USER|ACCOUNT)/i.test(k) && typeof v === 'string' && v.length >= 6,
+      ([k, v]) =>
+        (secretNames.has(k) || /(TOKEN|PASS|SECRET|KEY|USER|ACCOUNT)/i.test(k)) &&
+        typeof v === 'string' &&
+        v.length >= 6,
     )
     .map(([, v]) => v as string)
     .sort((a, b) => b.length - a.length);

@@ -30,7 +30,7 @@ import { activeSources, analyticsWanted, buildStatus, publishSite } from './publ
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
-import { buildDashboard, type Dashboard, queryEvents, renderUsagePage } from './usage-page.ts';
+import { buildDashboard, latestCanary, queryEvents, renderUsagePage } from './usage-page.ts';
 
 type Log = (msg: string, fields?: Record<string, unknown>) => void;
 
@@ -279,6 +279,8 @@ export class Daemon {
       } catch (err) {
         this.log(`catalog backup failed: ${(err as Error).message}`);
       }
+      // Relay sessions still open are written now, so they land in the day being rolled up.
+      this.sessions.flush(true);
       const m = this.events.maintain(now, this.config.events.maxMB * 1024 * 1024);
       this.log('usage events maintained', m);
       await this.canary();
@@ -311,22 +313,7 @@ export class Daemon {
 
   /** The latest canary result per source (last 3 days). */
   canaryStatus() {
-    const since = new Date(Date.now() - 3 * 86_400_000).toISOString();
-    const latest = new Map<string, Dashboard['canary'][number]>();
-    for (const e of this.events.events({ kind: 'canary', since, limit: 100 })) {
-      if (!e.source || latest.has(e.source)) continue;
-      const d = e.detail
-        ? (JSON.parse(e.detail) as { step?: string; reason?: string; statuses?: string })
-        : {};
-      latest.set(e.source, {
-        source: e.source,
-        outcome: e.outcome,
-        at: e.ts,
-        ...(d.step ? { step: d.step } : {}),
-        detail: [d.statuses, d.reason, e.episodeId ?? e.showId].filter(Boolean).join(' · '),
-      });
-    }
-    return [...latest.values()];
+    return latestCanary(this.events);
   }
 
   dashboard() {
@@ -442,7 +429,7 @@ export function adminApp(d: Daemon, token: string) {
   app.get('/status', (c) => c.json(d.status()));
   app.get('/usage', (c) => c.html(renderUsagePage(d.dashboard())));
   app.get('/usage.json', (c) => c.json(d.dashboard()));
-  // For agents and scripts: /events.json?corr=…&kind=play&outcome=error&since=2h&series=…&limit=100
+  // For agents and scripts: /events.json?playId=…&kind=failure&outcome=error&since=2h&show=…&limit=100
   app.get('/events.json', (c) => c.json(d.queryEvents(c.req.query())));
   const refresh = (c: import('hono').Context) => {
     const r = d.refresh(c.req.param('id') ?? '');
