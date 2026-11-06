@@ -813,3 +813,15 @@ for up to 10 minutes — failures are no longer kept (they are logged, and the l
 catalog is unreachable), and a file older than a minute that lacks the episode asked for is fetched again; and a
 resolver-only instance never pruned, rolled up or capped its usage events — it now runs the same daily
 housekeeping (and once at start).
+
+### Analytics Engine: why the SQL API says "Authorization error"
+
+Checked 2026-11-06 after the owner added Account → Account Analytics → Read: the GraphQL Analytics API answers
+with the token (the account's Worker requests), so the permission is in place and is the one Cloudflare's docs
+name for the SQL API. The SQL API still answers "Authorization error", even to `SHOW TABLES`. The account has not
+enabled Workers Analytics Engine: deploying a Worker with an Analytics Engine binding is refused with "You need to
+enable Analytics Engine. Head to the Cloudflare Dashboard to enable", and no dataset can exist before that. This
+is a one-time switch in the Cloudflare dashboard (free on the Workers free plan), for the owner. Nothing else is
+needed: the next publish (it retries weekly) adds the binding, the Worker starts writing data points, and the daily
+job reads them. Until then the public counts keep coming from Workers Logs (same numbers, counted by Cloudflare);
+the GraphQL API is no substitute (it only has request totals per Worker, not per show).

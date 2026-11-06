@@ -435,6 +435,11 @@ test('resolver-only: episode details come from the published catalog, with no da
       '1': { direct: 'https://cdnapisec.kaltura.com/p/1/x.m3u8', israelOnly: true },
     },
     'ext-ids.json': { tt123: { id: 'iltv_mako_1', seasons: [2] } },
+    'resolver-contract.json': {
+      version: 1,
+      seasonPlay: 'play/{series}/{season}.json',
+      extIds: 'ext-ids.json',
+    },
   };
   const fakeFetch = (async (url: string) => {
     calls.push(url);
@@ -478,12 +483,21 @@ test('a resolver-only instance can tell a catalog it cannot use (a typo, or one 
         'manifest.json': { catalogs: [{ id: 'iltv_keshet12', type: 'series' }] },
         'catalog/series/iltv_keshet12.json': { metas: [{ id: 'iltv_stale_x' }, { id: 'iltv_mako_4' }] },
         'meta/series/iltv_mako_4.json': { meta: { videos: [{ season: 2026 }] } },
-        ...(withPlay ? { 'play/iltv_mako_4/2026.json': { '1': {} } } : {}),
+        ...(withPlay
+          ? {
+              'play/iltv_mako_4/2026.json': { '1': {} },
+              'resolver-contract.json': {
+                version: 1,
+                seasonPlay: 'play/{series}/{season}.json',
+                extIds: 'ext-ids.json',
+              },
+            }
+          : {}),
       };
       return p in files ? Response.json(files[p]) : new Response('', { status: 404 });
     }) as unknown as typeof fetch;
   expect(await checkCatalog('https://c.example/manifest.json', site(true))).toBeUndefined();
-  expect(await checkCatalog('https://c.example/manifest.json', site(false))).toMatch(/no play files/);
+  expect(await checkCatalog('https://c.example/manifest.json', site(false))).toMatch(/no resolver contract/);
   expect(await checkCatalog('https://wrong.example/', site(true))).toMatch(/no Israel TV manifest/);
 });
 
@@ -491,8 +505,10 @@ test('resolver-only: a failed catalog fetch is not kept, and a just-published ep
   const { catalogLookup } = await import('../src/server.ts');
   let t = 0;
   let mode: 'down' | 'old' | 'new' = 'down';
-  const fakeFetch = (async () => {
+  const fakeFetch = (async (url: string) => {
     if (mode === 'down') throw new Error('network down');
+    if (url.endsWith('resolver-contract.json'))
+      return Response.json({ version: 1, seasonPlay: 'play/{series}/{season}.json', extIds: 'ext-ids.json' });
     return Response.json(
       mode === 'old'
         ? { '4': { mako: { vcmid: 'a', channelId: 'c' } } }
@@ -518,4 +534,34 @@ test('resolver-only: a failed catalog fetch is not kept, and a just-published ep
   mode = 'down';
   t = 20 * 60_000;
   expect(await c.episode('iltv_mako_1', 1, 4)).toBeDefined(); // unreachable: the last good copy is used
+});
+
+test('contract: a resolver refuses a catalog version it does not understand, and files that do not fit', async () => {
+  const { catalogLookup, contractProblem } = await import('../src/server.ts');
+  const { RESOLVER_CONTRACT_VERSION } = await import('@israel-tv/core');
+  expect(contractProblem({ version: RESOLVER_CONTRACT_VERSION, seasonPlay: '', extIds: '' })).toBeUndefined();
+  expect(contractProblem({ version: RESOLVER_CONTRACT_VERSION + 1, seasonPlay: '', extIds: '' })).toMatch(
+    /update this resolver/,
+  );
+  expect(contractProblem(undefined)).toMatch(/no resolver contract/);
+  const logs: string[] = [];
+  const serve = (contractVersion: number, play: unknown) =>
+    (async (url: string) =>
+      url.endsWith('resolver-contract.json')
+        ? Response.json({ version: contractVersion, seasonPlay: 'x', extIds: 'y' })
+        : Response.json(play)) as unknown as typeof fetch;
+  const newer = catalogLookup(
+    'https://c.example',
+    serve(RESOLVER_CONTRACT_VERSION + 1, { '1': { mako: { vcmid: 'v', channelId: 'c' } } }),
+    (m) => logs.push(m),
+  );
+  expect(await newer.episode('iltv_mako_1', 1, 1)).toBeUndefined();
+  expect(logs.some((l) => l.startsWith('catalog refused'))).toBe(true);
+  const malformed = catalogLookup(
+    'https://c.example',
+    serve(RESOLVER_CONTRACT_VERSION, { '1': { mako: { vcmid: 42 } } }),
+    (m) => logs.push(m),
+  );
+  expect(await malformed.episode('iltv_mako_1', 1, 1)).toBeUndefined();
+  expect(logs).toContain('catalog file does not match the resolver contract');
 });

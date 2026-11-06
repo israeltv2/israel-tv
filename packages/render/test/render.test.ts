@@ -170,3 +170,14 @@ test('play files carry what a resolver needs per episode', () => {
   const play = read(files, `play/iltv_mako_1/${season}.json`);
   expect(Object.values(play)[0]).toMatchObject({ mako: { vcmid: 'v', channelId: 'c' } });
 });
+
+test('contract: what the catalog publishes for resolvers fits the versioned contract', async () => {
+  const { CONTRACT, ContractSchema, SeasonPlaySchema, ExtIdsSchema } = await import('@israel-tv/core');
+  const s = show('iltv_mako_1', '2026-11-05');
+  const mako = s.show.seasons[0]?.episodes[0];
+  if (mako) mako.play = { vcmid: 'v', channelId: 'c', galleryChannelId: 'g' };
+  const files = renderSite({ ...base, shows: [s] });
+  expect(ContractSchema.parse(read(files, 'resolver-contract.json'))).toEqual(CONTRACT);
+  for (const [path] of files) if (path.startsWith('play/')) SeasonPlaySchema.parse(read(files, path));
+  ExtIdsSchema.parse(read(files, 'ext-ids.json'));
+});

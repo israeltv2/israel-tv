@@ -1,5 +1,6 @@
 export * from './catalogs.ts';
 export * from './config.ts';
+export * from './contract.ts';
 export * from './dates.ts';
 export * from './events.ts';
 export * from './freshness.ts';
