@@ -647,3 +647,12 @@ updated since …), and the item's own page explains it. Because the Worker comp
 machine is down and cannot publish. At home, `/status` also flags a catalog not published for 36 hours (on top
 of the existing per-source 36-hour check and its "⚠" item). Cost: catalog row requests now run the Worker (they
 count toward the free plan's 100,000 a day; a household browses a few hundred); metadata stays static files.
+
+### Abuse protection on the public addon
+
+Search and stream requests are limited per client: 120 stream requests and 60 searches a minute. That is enough
+for a family whose devices all share one home address (opening an episode is one stream request) and stops a
+runaway client or a scraper. The key is the salted daily client hash, so no address goes into the limiter
+either. Cloudflare's Workers rate-limiting binding does the counting; when the Worker runs without it, an
+in-memory window per Worker instance stands in (weaker, since each instance counts on its own). Over the limit:
+HTTP 429 with `retry-after: 60` and a plain message. Catalog browsing and metadata are not limited (static files).
