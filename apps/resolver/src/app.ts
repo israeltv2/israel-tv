@@ -14,6 +14,7 @@ import {
   newPlayId,
   parseSeriesId,
   parseVideoId,
+  rtl,
   type ScrapedEpisode,
   type Stream,
   streamName,
@@ -210,8 +211,8 @@ export function createResolverApp(deps: ResolverDeps) {
               play(),
               `${ch.id}|${l.url}`,
               l.url,
-              `${l.title} · דרך החיבור הישראלי שלך`,
-              ch.name,
+              rtl(`${l.title} · דרך החיבור הישראלי שלך`),
+              rtl(ch.name),
             );
             notes.push(r.note);
             if (r.stream) streams.push(r.stream);

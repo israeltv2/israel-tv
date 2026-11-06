@@ -17,6 +17,7 @@ import {
   type MetaPreview,
   normalizeForSearch,
   ORIGIN_TOKEN,
+  rtl,
   type ScrapedShow,
   type SearchRow,
   type SeasonAssignment,
@@ -109,10 +110,10 @@ export function releaseInfo(s: RenderShow): string | undefined {
 }
 
 function preview(s: RenderShow): MetaPreview {
-  const p: MetaPreview = { id: s.seriesId, type: 'series', name: tidyText(s.title), posterShape: SHAPE };
+  const p: MetaPreview = { id: s.seriesId, type: 'series', name: rtl(tidyText(s.title)), posterShape: SHAPE };
   if (s.show.poster) p.poster = s.show.poster;
   const description = cleanDescription(s.show.description);
-  if (description) p.description = description;
+  if (description) p.description = rtl(description);
   const year = releaseInfo(s);
   if (year) p.releaseInfo = year;
   const genres = cleanGenres(s.show.genres);
@@ -141,13 +142,13 @@ function videosFor(s: RenderShow): Video[] {
       const base = (ep.title && tidyEpisodeTitle(ep.title, s.title)) || `פרק ${a.episode}`;
       const v: Video = {
         id: videoId(s.seriesId, a.season, a.episode),
-        title: label ? `${label} · ${base}` : base,
+        title: rtl(label ? `${label} · ${base}` : base),
         season: a.season,
         episode: a.episode,
       };
       if (ep.airDate) v.released = `${ep.airDate}T00:00:00.000Z`;
       if (ep.thumbnail) v.thumbnail = ep.thumbnail;
-      if (ep.description) v.overview = tidyText(ep.description);
+      if (ep.description) v.overview = rtl(tidyText(ep.description));
       videos.push(v);
     }
   }
@@ -204,13 +205,15 @@ function seasonStreamFiles(s: RenderShow): Map<number, SeasonStreams> {
       file[String(a.episode)] = direct.map((x) => ({
         url: x.url,
         name: streamName(s.show.source, x.url),
-        title: [
-          (ep.title && tidyEpisodeTitle(ep.title, s.title)) || `פרק ${a.episode}`,
-          x.label,
-          ep.availableAbroad === false ? ISRAEL_ONLY : undefined,
-        ]
-          .filter(Boolean)
-          .join(' · '),
+        title: rtl(
+          [
+            (ep.title && tidyEpisodeTitle(ep.title, s.title)) || `פרק ${a.episode}`,
+            x.label,
+            ep.availableAbroad === false ? ISRAEL_ONLY : undefined,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        ),
         behaviorHints: { bingeGroup: `iltv-${s.seriesId}` },
       }));
       out.set(a.season, file);
@@ -303,7 +306,7 @@ export function renderSite(input: RenderInput): SiteFiles {
       s.seriesId,
       'series',
       s.catalog,
-      tidyText(s.title),
+      rtl(tidyText(s.title)),
       normalizeForSearch([s.title, ...(s.aliases ?? [])].join(' | ')),
       s.show.poster ?? '',
       ...(genres.length ? [genres] : []),
@@ -341,9 +344,9 @@ export function renderSite(input: RenderInput): SiteFiles {
   if (input.live.length > 0) {
     const row: MetaPreview[] = [];
     for (const ch of input.live) {
-      const p: MetaPreview = { id: ch.id, type: 'tv', name: ch.name, posterShape: 'square' };
+      const p: MetaPreview = { id: ch.id, type: 'tv', name: rtl(ch.name), posterShape: 'square' };
       if (ch.logo) p.poster = ch.logo;
-      if (ch.description) p.description = ch.description;
+      if (ch.description) p.description = rtl(ch.description);
       row.push(p);
       // The channel's logo is a square tile: shown as its logo; the page's backdrop is the addon's own picture.
       const backdrop = input.assets?.has(sitePaths.background)
@@ -355,12 +358,21 @@ export function renderSite(input: RenderInput): SiteFiles {
         ...(backdrop ? { background: backdrop } : {}),
       };
       files.set(sitePaths.meta('tv', ch.id), json({ meta }));
-      files.set(sitePaths.liveStreams(ch.id), json({ streams: ch.streams }));
+      files.set(
+        sitePaths.liveStreams(ch.id),
+        json({
+          streams: ch.streams.map((x) => ({
+            ...x,
+            ...(x.name ? { name: rtl(x.name) } : {}),
+            ...(x.title ? { title: rtl(x.title) } : {}),
+          })),
+        }),
+      );
       search.push([
         ch.id,
         'tv',
         'iltv_live',
-        ch.name,
+        rtl(ch.name),
         normalizeForSearch([ch.name, ...(LIVE_ALIASES[ch.id] ?? [])].join(' | ')),
         ch.logo ?? '',
       ]);
@@ -376,8 +388,8 @@ export function renderSite(input: RenderInput): SiteFiles {
     const item: MetaPreview = {
       id,
       type: def.type,
-      name: `⚠ ${text}`,
-      description: `${text}\nפרטים: /status`,
+      name: rtl(`⚠ ${text}`),
+      description: rtl(`${text}\nפרטים: /status`),
     };
     rows.set(catalog, [item, ...(rows.get(catalog) ?? [])]);
     files.set(sitePaths.meta(def.type, id), json({ meta: { ...item, videos: [] } }));

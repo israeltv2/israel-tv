@@ -1,3 +1,5 @@
+import { rtl } from './tidy.ts';
+
 // What a stream says in the app's stream list: its source and best quality as the name ("רשת 13 · 720p"), and
 // in the title what to expect (the episode, and plainly when it plays only from Israel).
 
@@ -28,5 +30,5 @@ export function streamQuality(source: string, url: string): string | undefined {
 export function streamName(source: string, url = ''): string {
   const label = SOURCE_LABELS[source] ?? 'Israel TV';
   const q = streamQuality(source, url);
-  return q ? `${label} · ${q}` : label;
+  return rtl(q ? `${label} · ${q}` : label);
 }

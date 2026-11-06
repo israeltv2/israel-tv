@@ -5,6 +5,7 @@
 import {
   type LiveChannel,
   parseVideoId,
+  rtl,
   type ScrapedEpisode,
   SOURCE_LABELS,
   type Stream,
@@ -47,15 +48,15 @@ export function makoAuth(d: MakoAuthDeps) {
       return [
         {
           url: withPlayId(`${origin}/play/mako/${encodeURIComponent(target.video)}.m3u8`, play.playId),
-          name: SOURCE_LABELS.mako ?? 'קשת 12',
+          name: rtl(SOURCE_LABELS.mako ?? 'קשת 12'),
           title: 'דרך העוזר הביתי',
         },
       ];
     }
     return (target.channel?.mako ?? []).map((m, i) => ({
       url: withPlayId(`${origin}/play/mako-live/${target.channel?.id}/${i}.m3u8`, play.playId),
-      name: target.channel?.name ?? 'קשת 12',
-      title: `${m.title} · דרך העוזר הביתי`,
+      name: rtl(target.channel?.name ?? 'קשת 12'),
+      title: rtl(`${m.title} · דרך העוזר הביתי`),
     }));
   }
 

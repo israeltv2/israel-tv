@@ -90,10 +90,10 @@ test('a row that has not been updated for too long says so first, even with the 
   const app = createAddonApp({ read: async (p) => files[p] });
   const row = await (await app.request('/catalog/series/iltv_keshet12.json')).json();
   expect(row.metas[0].id).toBe('iltv_stale_iltv_keshet12');
-  expect(row.metas[0].name).toMatch(/^⚠ הקטלוג לא עודכן מאז/);
+  expect(row.metas[0].name).toMatch(/^\u200F?⚠ הקטלוג לא עודכן מאז/);
   expect(row.metas[1].id).toBe('iltv_mako_1');
   const meta = await (await app.request('/meta/series/iltv_stale_iltv_keshet12.json')).json();
-  expect(meta.meta.name).toMatch(/^⚠/);
+  expect(meta.meta.name).toMatch(/^\u200F?⚠/);
   // Fresh catalog, but the row's source has had no good read in two days: that row warns.
   files['freshness.json'] = JSON.stringify({
     publishedAt: new Date().toISOString(),
