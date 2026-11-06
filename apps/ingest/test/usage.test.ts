@@ -1,6 +1,7 @@
 import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ConfigSchema } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { createLogger, scrub } from '@israel-tv/runtime';
@@ -47,7 +48,7 @@ test('public usage: the day from Analytics Engine into the daily rollups; a fail
 
 test('two Workers: the public one runs only its router for dynamic paths; the API one has no public URL', async () => {
   const { apiWorkerConfig } = await import('../src/publish.ts');
-  const dir = new URL('../../catalog', import.meta.url).pathname;
+  const dir = fileURLToPath(new URL('../../catalog', import.meta.url));
   const c = workerConfig(cf().publisher as never, dir) as {
     assets: Record<string, unknown>;
     observability: unknown;
@@ -149,7 +150,7 @@ test('account ids count as secrets too', async () => {
 
 test('the API Worker deploys without Analytics Engine when the account has not enabled it', async () => {
   const { apiWorkerConfig, analyticsOff, ANALYTICS_OFF } = await import('../src/publish.ts');
-  const dir = new URL('../../catalog', import.meta.url).pathname;
+  const dir = fileURLToPath(new URL('../../catalog', import.meta.url));
   const on = apiWorkerConfig(cf().publisher as never, dir, true) as Record<string, unknown>;
   const off = apiWorkerConfig(cf().publisher as never, dir, false) as Record<string, unknown>;
   expect(on.analytics_engine_datasets).toBeDefined();
@@ -194,7 +195,7 @@ test('a failed deploy never puts the account id (or any secret) into the publish
 test('with the public address known, image URLs are absolute and only dynamic paths run the router', async () => {
   const { renderFromStore, workerConfig } = await import('../src/publish.ts');
   const { Store } = await import('@israel-tv/store');
-  const dir = new URL('../../catalog', import.meta.url).pathname;
+  const dir = fileURLToPath(new URL('../../catalog', import.meta.url));
   const known = workerConfig(cf().publisher as never, dir, true) as { assets: Record<string, unknown> };
   expect(known.assets.run_worker_first).toEqual(['/catalog/*', '/stream/*', '/status*']);
   const config = ConfigSchema.parse({
