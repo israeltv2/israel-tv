@@ -4,10 +4,16 @@ import { request as httpsRequest } from 'node:https';
 import { type Dispatcher, ProxyAgent, Socks5ProxyAgent, fetch as undiciFetch } from 'undici';
 import { explainNetError, type ProxyEndpoint, proxyUrlWithAuth } from './geo.ts';
 
-export type GeoFetch = (
+export type GeoFetch = ((
   url: string,
   init?: { headers?: Record<string, string>; signal?: AbortSignal; redirect?: 'follow' | 'manual' },
-) => Promise<Response>;
+) => Promise<Response>) & {
+  /**
+   * Move on to the next configured exit (when there is more than one) and say which it is now; for a refusal
+   * that may be the exit's fault (a CDN that does not take this exit as Israeli). Undefined with one or none.
+   */
+  rotate?: () => string | undefined;
+};
 
 function agentFor(p: ProxyEndpoint): Dispatcher {
   const url = new URL(p.server);
@@ -28,7 +34,7 @@ export function createGeoFetch(proxies: ProxyEndpoint[]): GeoFetch {
   }
   const agents = proxies.map(agentFor);
   let current = 0;
-  return async (url, init) => {
+  const geoFetch: GeoFetch = async (url, init) => {
     let lastErr: unknown;
     for (let i = 0; i < agents.length; i++) {
       const idx = (current + i) % agents.length;
@@ -62,6 +68,12 @@ export function createGeoFetch(proxies: ProxyEndpoint[]): GeoFetch {
     }
     throw lastErr;
   };
+  if (agents.length > 1)
+    geoFetch.rotate = () => {
+      current = (current + 1) % agents.length;
+      return proxies[current]?.server;
+    };
+  return geoFetch;
 }
 
 /** Status line a proxy gives to a CONNECT for the target's host (HTTP proxies only). */

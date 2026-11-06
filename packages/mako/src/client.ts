@@ -3,6 +3,8 @@ import type { ScrapedEpisode, ScrapedShow } from '@israel-tv/core';
 import { type Fetcher, HttpError } from '@israel-tv/net';
 import {
   episodesFromPage,
+  featuredEpisode,
+  featuredOnly,
   MAKO_ORIGIN,
   type MakoIndexEntry,
   parseIndex,
@@ -11,7 +13,7 @@ import {
   seasonsFrom,
   showArtwork,
 } from './parse.ts';
-import { PlaylistResponse } from './schema.ts';
+import { PlaylistResponse, type ShowPage } from './schema.ts';
 
 export const MAKO_CATALOG = 'iltv_keshet12';
 const q = '?platform=responsive';
@@ -33,13 +35,28 @@ export async function fetchShow(
   const page = parseShowPage(await f.json(`${MAKO_ORIGIN}${entry.key}${q}`));
   const refs = seasonRefs(page);
   const byKey = new Map<string, ScrapedEpisode[]>();
-  const current = refs.find((r) => r.current);
-  if (current) byKey.set(current.key, episodesFromPage(page));
   const notes: string[] = [];
+  /** A page's episodes; a page with no list but one featured video (films, specials) gives that video. */
+  const episodesOf = async (p: ShowPage): Promise<ScrapedEpisode[]> => {
+    const listed = episodesFromPage(p);
+    const vod = listed.length === 0 ? featuredOnly(p) : undefined;
+    if (!vod) return listed;
+    let raw: unknown;
+    if (vod.pageUrl?.startsWith('/'))
+      try {
+        raw = await f.json(`${MAKO_ORIGIN}${vod.pageUrl}${q}`);
+      } catch (err) {
+        if (!(err instanceof HttpError)) throw err;
+        notes.push(`the featured video's page answered HTTP ${err.status}; titled after the show`);
+      }
+    return [featuredEpisode(p, vod, entry.title, raw)];
+  };
+  const current = refs.find((r) => r.current);
+  if (current) byKey.set(current.key, await episodesOf(page));
   for (const r of refs) {
     if (byKey.has(r.key) || opts.currentSeasonOnly) continue;
     try {
-      byKey.set(r.key, episodesFromPage(parseShowPage(await f.json(`${MAKO_ORIGIN}${r.key}${q}`))));
+      byKey.set(r.key, await episodesOf(parseShowPage(await f.json(`${MAKO_ORIGIN}${r.key}${q}`))));
     } catch (err) {
       // Mako sometimes lists a season whose page is gone; skip it rather than lose the whole show.
       if (!(err instanceof HttpError && err.status === 404)) throw err;

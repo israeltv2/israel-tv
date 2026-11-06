@@ -10,13 +10,22 @@ export function latestCanary(events: EventStore): Dashboard['canary'] {
   const latest = new Map<string, Dashboard['canary'][number]>();
   for (const e of events.events({ kind: 'canary', since, limit: 100 })) {
     if (!e.source || latest.has(e.source)) continue;
-    const d = e.detail ? (JSON.parse(e.detail) as { step?: string; reason?: string; statuses?: string }) : {};
+    const d = e.detail
+      ? (JSON.parse(e.detail) as {
+          step?: string;
+          reason?: string;
+          statuses?: string;
+          unavailable?: { episodeId: string; step?: string; detail?: string }[];
+        })
+      : {};
+    const unavailable = (d.unavailable ?? []).map((u) => `${u.episodeId}${u.detail ? ` (${u.detail})` : ''}`);
     latest.set(e.source, {
       source: e.source,
       outcome: e.outcome,
       at: e.ts,
       ...(d.step ? { step: d.step } : {}),
       detail: [d.statuses, d.reason, e.episodeId ?? e.showId].filter(Boolean).join(' · '),
+      ...(unavailable.length ? { unavailable } : {}),
     });
   }
   return [...latest.values()];
@@ -54,7 +63,15 @@ export interface Dashboard {
     topShows: ShowLine[];
   };
   ingest: { source: string; health: string; notes: string[]; lastFullRun?: string }[];
-  canary: { source: string; outcome: string; at: string; step?: string; detail?: string }[];
+  canary: {
+    source: string;
+    outcome: string;
+    at: string;
+    step?: string;
+    detail?: string;
+    /** Titles that would not play while the source did ("episode unavailable", not "source broken"). */
+    unavailable?: string[];
+  }[];
   data: {
     eventsPerDay: { day: string; n: number }[];
     sizeMB: number;

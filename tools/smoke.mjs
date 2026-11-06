@@ -47,7 +47,7 @@ const start = (cli, dir) => {
 const waitFor = async (url, what) => {
   for (let i = 0; i < 60; i++) {
     try {
-      const r = await fetch(url);
+      const r = await fetch(url, { headers: { 'x-israel-tv-probe': 'test' } });
       if (r.ok) {
         const m = await r.json();
         console.log(`ok   ${what}: ${url} → ${m.name ?? m.id}`);

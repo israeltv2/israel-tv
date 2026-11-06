@@ -1,0 +1,181 @@
+{
+ "lastUpdate": "Fri, 06 Nov 2026 00:05:04 +0200",
+ "timestamp": 1793916304700,
+ "pageType": "Subvertical",
+ "channelId": "69f5841fc537b910VgnVCM200000650a10acRCRD",
+ "sch": "69f5841fc537b910",
+ "channelName": "2026",
+ "pageUrl": "/mako-vod-channel2-news/main_newscast_captions-2026",
+ "domoPageView": {
+  "content_type": "channel",
+  "channel_id": "69f5841fc537b910VgnVCM200000650a10acRCRD",
+  "page_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026",
+  "channel_depth": 3,
+  "item_id": "69f5841fc537b910VgnVCM200000650a10acRCRD",
+  "is_blocked_content": {
+   "israel": 0,
+   "international": 0
+  }
+ },
+ "preload": true,
+ "makoCatDFP": {
+  "cust_params": {
+   "location_sub_campaign": "%LOCATION_SUB_CAMPAIGN%",
+   "payinguser": "%IS_PAYING_USER%",
+   "video_from_time": "%VIDEO_FROM_TIME%",
+   "bundleId": "%PRODUCT_BUNDLE_ID%",
+   "pushTags": "%PUSH_TAGS%",
+   "language": "%LANGUAGE%",
+   "locale": "%LOCALE%",
+   "deviceid": "%DEVICE_ID%",
+   "version": "%VERSION%",
+   "devicetype": "%DEVICE_TYPE%",
+   "MAKOPAGE": "%GUID%",
+   "advertiserId": "%ADVERTISER_ID%",
+   "carrier": "%CARRIER%",
+   "LEVEL4": "mainnewscastcaptions",
+   "osVersion": "%OS_VERSION%",
+   "LEVEL5": "2026",
+   "paidContent": "%IS_PAID_CONTENT%",
+   "appid": "%APP_ID%",
+   "makoHN": "%HOUSE_NUMBERS%",
+   "random_number": "%RANDOM_NUMBER%",
+   "osType": "%OS_TYPE%",
+   "deviceModel": "%DEVICE_MODEL%",
+   "pushTrigger": "%PUSH_TRIGGER%"
+  },
+  "iu": "/242748299/mako/vod/vod_news/"
+ },
+ "seo": {
+  "title": "המהדורה המרכזית מונגש ללקויי שמיעה - לצפייה ישירה | 12+",
+  "description": "המהדורה המרכזית מונגש ללקויי שמיעה - לצפייה ישירה. יונית לוי ודני קושמרו עם חדשות הערב ב-20:00. כולל כתוביות סמויות – מונגש גם לקהל חירש וכבדי שמיעה",
+  "type": "tv_show",
+  "image": "https://img.mako.co.il/2025/06/24/MainNews_HD_01_autoOrient_i.jpg",
+  "canonical": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions",
+  "schema": {
+   "@context": "https://schema.org",
+   "@type": "TvSeries",
+   "name": "המהדורה המרכזית כ.סמויות",
+   "description": "המהדורה המרכזית מונגש ללקויי שמיעה - לצפייה ישירה. יונית לוי ודני קושמרו עם חדשות הערב ב-20:00. כולל כתוביות סמויות – מונגש גם לקהל חירש וכבדי שמיעה",
+   "image": "https://img.mako.co.il/2025/06/24/MainNews_HD_01_autoOrient_i.jpg",
+   "url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions",
+   "genre": [
+    "חדשות",
+    "חדשות"
+   ],
+   "provider": {
+    "@type": "Organization",
+    "name": "החדשות"
+   },
+   "publisher": {
+    "@type": "NewsMediaOrganization",
+    "name": "שידורי קשת"
+   }
+  }
+ },
+ "vod": {
+  "channelId": "34a47f20b4271a10VgnVCM100000700a10acRCRD",
+  "itemVcmId": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD",
+  "galleryChannelId": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD",
+  "programId": "fad47a8b6eb97910VgnVCM100000700a10acRCRD",
+  "mostCurrent": true,
+  "domoClick": {
+   "content_type": "vod",
+   "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+   "channel_depth": -1,
+   "click_type": "link",
+   "clicked_item_id": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD",
+   "clicked_channel_id": "69f5841fc537b910VgnVCM200000650a10acRCRD",
+   "referring_component": "080b8750-hero-41d9-refc-e6bfe67f099c"
+  },
+  "domoPlay": {
+   "content_type": "vod",
+   "channel_id": "69f5841fc537b910VgnVCM200000650a10acRCRD",
+   "channel_depth": 3,
+   "item_id": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD"
+  },
+  "pageUrl": "/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+  "aINT": false,
+  "aIL": true,
+  "iPromoType": "Program"
+ },
+ "hero": {
+  "extraInfo": "2 עונות",
+  "itemVcmId": "e162a86533c97910VgnVCM200000650a10acRCRD",
+  "channelId": "fad47a8b6eb97910VgnVCM100000700a10acRCRD",
+  "logo": "https://img.mako.co.il/2021/11/28/Merkazit_logo.png",
+  "logoAltText": "לוגו מהדורה מרכזית",
+  "description": "יונית לוי ודני קושמרו עם חדשות הערב ב-20:00. כולל כתוביות סמויות – מונגש גם לקהל חירש וכבדי שמיעה",
+  "pics": [
+   {
+    "picUrl": "https://img.mako.co.il/2025/06/24/MainNews_HD_01.jpg",
+    "altText": "המהדורה המרכזית כ. סמויות"
+   }
+  ],
+  "mobilePics": [
+   {
+    "picUrl": "https://img.mako.co.il/2025/06/24/MainNews__01__E_NoLogo.jpg",
+    "altText": "המהדורה המרכזית כ. סמויות"
+   }
+  ],
+  "buttonText": "מהדורה אחרונה",
+  "makoRefComp": "Specific_Episode"
+ },
+ "seasons": [
+  {
+   "current": false,
+   "seasonTitle": "2025",
+   "pageUrl": "/mako-vod-channel2-news/main_newscast_captions-2025",
+   "domoClick": {
+    "content_type": "channel",
+    "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2025",
+    "channel_depth": -1,
+    "click_type": "link",
+    "clicked_item_id": "72aec0a14fb97910VgnVCM100000700a10acRCRD",
+    "clicked_channel_id": "72aec0a14fb97910VgnVCM100000700a10acRCRD",
+    "referring_component": "9ced3b0e-page-navi-refc-eb3fe7b8e0de"
+   }
+  },
+  {
+   "current": true,
+   "seasonTitle": "2026",
+   "pageUrl": "/mako-vod-channel2-news/main_newscast_captions-2026",
+   "domoClick": {
+    "content_type": "channel",
+    "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026",
+    "channel_depth": -1,
+    "click_type": "link",
+    "clicked_item_id": "69f5841fc537b910VgnVCM200000650a10acRCRD",
+    "clicked_channel_id": "69f5841fc537b910VgnVCM200000650a10acRCRD",
+    "referring_component": "9ced3b0e-page-navi-refc-eb3fe7b8e0de"
+   }
+  }
+ ],
+ "menu": [],
+ "historyObject": {
+  "pageUrl": "/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+  "title": "",
+  "programId": "fad47a8b6eb97910VgnVCM100000700a10acRCRD",
+  "domoClick": {
+   "content_type": "vod",
+   "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+   "channel_depth": 4,
+   "click_type": "link",
+   "clicked_item_id": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD",
+   "clicked_channel_id": "34a47f20b4271a10VgnVCM100000700a10acRCRD",
+   "referring_component": "ERROR_NO_REFERRER"
+  },
+  "picUrl": "https://img.mako.co.il/2026/11/05/Mahadura_Merkazit_051126_VOD_autoOrient_i.jpg",
+  "hero": {
+   "title": "המהדורה המרכזית כ.סמויות",
+   "extraInfo": "05.11.26",
+   "picUrl": "https://img.mako.co.il/2025/06/24/MainNews_HD_01.jpg",
+   "logo": "https://img.mako.co.il/2021/11/28/Merkazit_logo.png",
+   "subtitle": "ליברמן מסיר את הווטו לממשלה עם החרדים",
+   "description": ""
+  },
+  "buttonText": "להמשך צפייה",
+  "sch": "34a47f20b4271a10",
+  "seasonUrl": "/mako-vod-channel2-news/main_newscast_captions-2026"
+ }
+}

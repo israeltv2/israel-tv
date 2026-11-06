@@ -177,10 +177,13 @@ export function plays(d: Daemon, now = Date.now()): Plays {
     (r) => r.source !== '' && r.showId === '',
   );
   const since7 = new Date(now - 7 * DAY_MS).toISOString();
-  const starts = d.events.events({ kind: 'play_start', since: since7, limit: 5000 });
+  const starts = d.events.events({ kind: 'play_start', since: since7, limit: 5000, viewersOnly: true });
   const byEpisode = new Map<string, number>();
   for (const e of starts) if (e.episodeId) byEpisode.set(e.episodeId, (byEpisode.get(e.episodeId) ?? 0) + 1);
-  const latency = [...starts, ...d.events.events({ kind: 'relay_session', since: since7, limit: 5000 })]
+  const latency = [
+    ...starts,
+    ...d.events.events({ kind: 'relay_session', since: since7, limit: 5000, viewersOnly: true }),
+  ]
     .map((e) => e.latencyMs)
     .filter((n): n is number => typeof n === 'number')
     .sort((a, b) => a - b);
@@ -205,7 +208,7 @@ export function failures(d: Daemon, now = Date.now()): Failures {
   const since = new Date(now - 7 * DAY_MS).toISOString();
   const week = days(7, now);
   const groups = new Map<string, Failures['groups'][number]>();
-  for (const e of d.events.events({ kind: 'failure', since, limit: 5000 })) {
+  for (const e of d.events.events({ kind: 'failure', since, limit: 5000, viewersOnly: true })) {
     const detail = e.detail ? (JSON.parse(e.detail) as { stage?: string; reason?: string }) : {};
     const stage = detail.stage ?? e.component;
     const reason = (detail.reason ?? '').slice(0, 120);

@@ -32,7 +32,15 @@ import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { pullPublicUsage } from './public-usage.ts';
 import { activeSources, analyticsOff, buildStatus, cleanSecrets, publishSite } from './publish.ts';
-import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
+import {
+  type BlockedRetry,
+  type RunOptions,
+  retryKey,
+  runAiring,
+  runBlockedRetry,
+  runFull,
+  runOne,
+} from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
 import { buildDashboard, latestCanary, queryEvents, renderUsagePage } from './usage-page.ts';
@@ -176,7 +184,37 @@ export class Daemon {
       if (key) await matchShows(this.store, key, { log: this.log });
       this.store.prune();
       await this.publish();
+      this.scheduleRetries();
     });
+  }
+
+  private retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /**
+   * Shows a source's last full run was refused (bot protection) are read again later the same night, after
+   * growing pauses (runner.ts BLOCK_RETRIES); each retry that reads something publishes.
+   */
+  scheduleRetries(): void {
+    const adapters = createAdapters(this.config);
+    for (const source of this.sources) {
+      const make = adapters[source];
+      const st = this.store.getState<BlockedRetry | null>(retryKey(source));
+      clearTimeout(this.retryTimers.get(source));
+      this.retryTimers.delete(source);
+      if (!make || !st?.nextAt || st.pending.length === 0) continue;
+      if (this.store.lastRun('full', source)?.id !== st.runId) continue;
+      const wait = Math.max(0, Date.parse(st.nextAt) - Date.now());
+      const timer = setTimeout(() => {
+        this.retryTimers.delete(source);
+        this.enqueue(`retry:${source}`, async () => {
+          const r = await runBlockedRetry(this.store, make(), this.runOpts);
+          if (r && r.recovered.length > 0) this.requestPublish();
+          this.scheduleRetries();
+        });
+      }, wait);
+      timer.unref?.();
+      this.retryTimers.set(source, timer);
+    }
   }
 
   airingRun(): void {
@@ -449,6 +487,7 @@ export class Daemon {
 
   stop(): void {
     for (const c of this.crons) c.stop();
+    for (const t of this.retryTimers.values()) clearTimeout(t);
   }
 }
 
@@ -667,6 +706,8 @@ export async function startDaemon(
   }
   store.prune();
   d.schedule();
+  // Retries of shows the last full run was refused, if any are still due (e.g. after a restart).
+  d.scheduleRetries();
   // Relay sessions end after a quiet minute or two.
   setInterval(() => d.sessions.flush(), 30_000).unref();
   // Live channels are checked right away (as a job, not holding startup), so /status reflects them.

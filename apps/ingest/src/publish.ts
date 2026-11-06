@@ -30,7 +30,7 @@ import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
 import { checkNumbering } from './numbering-guard.ts';
 import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster } from './posters.ts';
-import { emptyShowsKey, episodeCount } from './runner.ts';
+import { BLOCK_RETRIES, type BlockedRetry, emptyShowsKey, episodeCount, retryKey } from './runner.ts';
 import { ALIASES_KEY } from './tmdb.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -76,12 +76,40 @@ export function buildStatus(
       health = read.failedIs;
       notes.push(`last full run failed: ${last.error ?? 'unknown error'}`);
     } else if (last.status === 'partial') {
-      health = 'warn';
-      notes.push(
-        last.showsFailed > 0
-          ? `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`
-          : `last run partial: ${last.error ?? 'stopped early'}`,
-      );
+      // Shows refused by the site's bot protection are retried later the same night: only shows still refused
+      // after every retry, or failures of another kind, make the source amber.
+      const retry = store.getState<BlockedRetry | null>(retryKey(source));
+      const r = retry?.runId === last.id ? retry : undefined;
+      if (r) {
+        const names = (list: string[]) =>
+          list.slice(0, 5).join(', ') + (list.length > 5 ? ` +${list.length - 5} more` : '');
+        const total = r.pending.length + r.recovered.length;
+        if (r.pending.length === 0)
+          notes.push(
+            `${total} ${total === 1 ? 'show was' : 'shows were'} refused by the site's bot protection in the full run and read on a retry`,
+          );
+        else if (r.nextAt)
+          notes.push(
+            `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} refused by the site's bot protection, retry ${r.attempts + 1} of ${BLOCK_RETRIES} at ${r.nextAt.slice(11, 16)} UTC: ${names(r.pending.map((p) => p.title))}`,
+          );
+        else {
+          health = 'warn';
+          notes.push(
+            `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} still refused by the site's bot protection after ${r.attempts} retries: ${names(r.pending.map((p) => p.title))}`,
+          );
+        }
+        if (r.others > 0) {
+          health = 'warn';
+          notes.push(`last full run: ${r.others} ${r.others === 1 ? 'show' : 'shows'} failed (not blocked)`);
+        }
+      } else {
+        health = 'warn';
+        notes.push(
+          last.showsFailed > 0
+            ? `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`
+            : `last run partial: ${last.error ?? 'stopped early'}`,
+        );
+      }
     }
     // Time since the last good run; for a source that never had one, since its first attempt.
     const everGood = store.lastGoodRun(read.kind, source);
@@ -98,13 +126,13 @@ export function buildStatus(
       health = 'error';
       notes.push('no shows');
     }
+    // Listed by the site with nothing to watch: a count here, the titles in `emptyShows` (an expandable list).
     const empty = store.getState<string[]>(emptyShowsKey(source)) ?? [];
-    if (empty.length > 0) {
-      const names = empty.slice(0, 10).join(', ') + (empty.length > 10 ? `, +${empty.length - 10} more` : '');
+    if (empty.length > 0)
       notes.push(
-        `${empty.length} shows listed by the site have no episodes on their page, so they are not in the catalog: ${names}`,
+        `${empty.length} ${empty.length === 1 ? 'show' : 'shows'} listed by the site with nothing to watch (not in the catalog)`,
       );
-    }
+    const retry = store.getState<BlockedRetry | null>(retryKey(source));
     out.push({
       source,
       health,
@@ -121,6 +149,17 @@ export function buildStatus(
         : {}),
       ...(airing ? { lastAiringRun: { at: airing.startedAt, status: airing.status } } : {}),
       notes,
+      ...(empty.length ? { emptyShows: empty } : {}),
+      ...(retry && retry.runId === last?.id
+        ? {
+            blocked: {
+              pending: retry.pending.map((p) => p.title),
+              recovered: retry.recovered,
+              attempts: retry.attempts,
+              ...(retry.nextAt ? { nextAt: retry.nextAt } : {}),
+            },
+          }
+        : {}),
     });
   }
   const lastMatch = store.lastRun('match', 'tmdb');

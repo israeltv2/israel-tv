@@ -27,7 +27,7 @@ export interface RouterEnvelope {
   method: string;
   /** The public URL as the viewer asked it. */
   url: string;
-  /** Request headers worth passing on (user agent, accept, the canary marker). */
+  /** Request headers worth passing on (user agent, accept, the probe/canary markers). */
   headers: Record<string, string>;
   /** The viewer's address (CF-Connecting-IP), for per-client limits and the salted daily hash. */
   client?: string;
@@ -37,7 +37,13 @@ export interface RouterEnvelope {
 }
 
 /** Headers the router passes on. */
-export const PASSED_HEADERS = ['user-agent', 'accept', 'accept-language', 'x-israel-tv-canary'];
+export const PASSED_HEADERS = [
+  'user-agent',
+  'accept',
+  'accept-language',
+  'x-israel-tv-canary',
+  'x-israel-tv-probe',
+];
 
 /** A site path a router may read for the API: relative, no `..`, no scheme. */
 export function safeSitePath(path: string): boolean {

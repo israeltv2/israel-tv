@@ -14,6 +14,7 @@ import {
   newPlayId,
   parseSeriesId,
   parseVideoId,
+  probePrefix,
   rtl,
   type ScrapedEpisode,
   type Stream,
@@ -159,8 +160,9 @@ export function createResolverApp(deps: ResolverDeps) {
     const id = decodeURIComponent(c.req.param('file')).replace(/\.json$/, '');
     const origin = base(c);
     const t0 = Date.now();
-    // The daily playback canary marks its requests: its plays are not usage (rollups and "playing now" skip them).
-    const playId = c.req.header('x-israel-tv-canary') === '1' ? `canary-${newPlayId()}` : newPlayId();
+    // The canary and other internal checks mark their requests: their plays are not usage (rollups, failures and
+    // "playing now" skip them).
+    const playId = `${probePrefix((h) => c.req.header(h))}${newPlayId()}`;
     const client = await context('mako-auth').clientOf(c);
     const streams: Stream[] = [];
     let info: PlayInfo = {};

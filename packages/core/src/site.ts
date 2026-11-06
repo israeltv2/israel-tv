@@ -79,6 +79,10 @@ export interface StatusFile {
     lastFullRun?: { at: string; status: string; error?: string };
     lastAiringRun?: { at: string; status: string };
     notes: string[];
+    /** Titles the site lists with nothing to watch (from the last complete full read), kept out of the catalog. */
+    emptyShows?: string[];
+    /** Shows the last full run was refused (bot protection) and their retries later that night. */
+    blocked?: { pending: string[]; recovered: string[]; attempts: number; nextAt?: string };
   }[];
   failingShows: { id: string; title: string; error: string; lastOkAt: string }[];
   warnings: { at: string; id?: string; code: string; message: string }[];

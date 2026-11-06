@@ -82,7 +82,52 @@ test('a listed show without episodes is never dropped silently: warned, and name
   const status = buildStatus(store, ['mako'], Date.now());
   const mako = status.sources.find((x) => x.source === 'mako');
   expect(mako?.health).toBe('ok');
-  expect(mako?.notes.join(' ')).toContain('1 shows listed by the site have no episodes on their page');
+  expect(mako?.notes.join(' ')).toContain('1 show listed by the site with nothing to watch');
+  expect(mako?.emptyShows).toEqual(['/empty']);
+});
+
+test('shows refused by bot protection are retried later that night; amber only if still refused after every retry', async () => {
+  const { BlockedError } = await import('@israel-tv/net');
+  const { runBlockedRetry, retryKey } = await import('../src/runner.ts');
+  const store = Store.open(':memory:');
+  let blocking = true;
+  const shows = {
+    '/a': show('/a', [{ key: 's1', title: 'עונה 1', n: 3 }]),
+    '/b': show('/b', [{ key: 's1', title: 'עונה 1', n: 2 }]),
+  };
+  const make = () => {
+    const a = adapter(entries('/a', '/b'), shows);
+    const fetchShow = a.fetchShow.bind(a);
+    a.fetchShow = async (e, o) => {
+      if (e.key === '/b' && blocking)
+        throw new BlockedError('https://www.mako.co.il/b', 200, 'page matches /radware/i');
+      return fetchShow(e, o);
+    };
+    return a;
+  };
+  const t0 = Date.parse('2026-11-07T01:00:00Z');
+  const full = await runFull(store, make(), { ...opts, now: t0 });
+  expect(full).toMatchObject({ status: 'partial', blocked: [{ key: '/b' }] });
+  let mako = buildStatus(store, ['mako'], t0).sources[0];
+  expect(mako?.health).toBe('ok');
+  expect(mako?.notes.join(' ')).toMatch(
+    /1 show refused by the site's bot protection, retry 1 of 3 at 01:30 UTC: \/b/,
+  );
+  // Still blocked on every retry: amber, and named.
+  for (let i = 0; i < 3; i++) await runBlockedRetry(store, make(), { ...opts, now: t0 });
+  expect(store.getState<{ attempts: number; nextAt?: string }>(retryKey('mako'))).toMatchObject({
+    attempts: 3,
+  });
+  mako = buildStatus(store, ['mako'], t0).sources[0];
+  expect(mako?.health).toBe('warn');
+  expect(mako?.notes.join(' ')).toContain("still refused by the site's bot protection after 3 retries: /b");
+  // A new full run where the retry reads it: green.
+  await runFull(store, make(), { ...opts, now: t0 });
+  blocking = false;
+  await runBlockedRetry(store, make(), { ...opts, now: t0 });
+  mako = buildStatus(store, ['mako'], t0).sources[0];
+  expect(mako).toMatchObject({ health: 'ok', blocked: { pending: [], recovered: ['/b'], attempts: 1 } });
+  expect(store.findSeriesId('mako', '/b')).toBeDefined();
 });
 
 test('a failing show keeps its last good data and is marked', async () => {

@@ -5,7 +5,7 @@
 // stream request; the home daemon reads the daily counts back. Deployed from code releases only
 // (`israel-tv deploy-api`), never by a catalog publish.
 import { createAddonApp } from '@israel-tv/addon';
-import { clientHash, parseSeriesId } from '@israel-tv/core/edge';
+import { CANARY_HEADER, clientHash, PROBE_HEADER, parseSeriesId } from '@israel-tv/core/edge';
 import {
   ENVELOPE_PATH,
   NEED_HEADER,
@@ -149,6 +149,8 @@ export default {
       (async () => {
         const what = describeRequest(url);
         const outcome = res.status < 400 ? 'ok' : 'error';
+        // The project's own checks (canary, tests, audits) are logged but not counted as usage.
+        const probe = !!(request.headers.get(PROBE_HEADER) || request.headers.get(CANARY_HEADER));
         const ms = Date.now() - t0;
         console.log(
           JSON.stringify({
@@ -160,9 +162,10 @@ export default {
             ms,
             ray: request.headers.get('cf-ray') ?? undefined,
             client,
+            ...(probe ? { probe: true } : {}),
           }),
         );
-        if (what.route === 'stream')
+        if (what.route === 'stream' && !probe)
           env.USAGE?.writeDataPoint({
             blobs: [what.source ?? '', what.series ?? '', what.video ?? '', client ?? '', outcome],
             doubles: [1, ms],

@@ -1,6 +1,6 @@
 // What the Cloudflare Workers and the addon app use from core, without the config and contract schemas (zod): the
 // Workers stay small (the full core would add ~760 KB of zod to the API Worker). Checked by `pnpm boundaries`.
-export { clientHash } from './events.ts';
+export { CANARY_HEADER, clientHash, PROBE_HEADER } from './events.ts';
 export {
   type Freshness,
   STALE_ID_PREFIX,

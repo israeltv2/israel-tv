@@ -1,7 +1,7 @@
 // Plays and relay sessions in memory, keyed by playId: what is playing now (for the usage dashboard), and one
 // `relay_session` event per relay session (duration, bytes, segments, errors) when it goes quiet — never one
 // per segment.
-import type { UsageEvent } from '@israel-tv/core';
+import { isInternalPlay, type UsageEvent } from '@israel-tv/core';
 
 export interface PlayInfo {
   source?: string;
@@ -147,7 +147,7 @@ export class PlaySessions {
   active(): ActiveSession[] {
     this.flush();
     return [...this.sessions.values()]
-      .filter((s) => !s.playId.startsWith('canary-'))
+      .filter((s) => !isInternalPlay(s.playId))
       .map((s) => ({
         kind: s.kind,
         playId: s.playId,

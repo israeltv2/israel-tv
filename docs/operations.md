@@ -159,10 +159,25 @@ Once a day (`schedule.daily`) the daemon plays one title per source end to end, 
 the newest episode of the most recently aired, healthy Mako, Reshet and Kan show, and one live channel. It asks
 the home resolver for the stream (Mako through mako-auth; Reshet and Kan direct or through geo-relay, as the
 title needs), then fetches the master playlist, a variant playlist and the first bytes of the first segment —
-200, 200, 206 is a pass. Each result is a `canary` event; `/status` (`canary`) and the dashboard show the latest
-per source, with the failing step (`pick`: no recent playable title; `stream`: nothing offered; `master`,
-`variant`, `segment`) and the statuses. Run it now with
+200, 200, 206 is a pass. One title that will not play does not make its source red: when a title fails on its own
+(nothing offered, or a 4xx from the CDN) the canary tries the newest episode of the next recent show, up to three
+titles; the source passes if one plays, and the ones that did not are listed as `unavailable` ("episode
+unavailable", not "source broken"). A source is red only when none of its titles plays or a failure is not the
+title's (5xx, network). Failed titles are skipped as first picks for a day. A relayed title (Kan, geo-blocked
+Reshet) that fails is checked once more 20 seconds later: the relay itself already moves to the next proxy exit
+when a CDN refuses one, since a refusal can be the exit's fault. Each result is a `canary` event; `/status`
+(`canary`) and the dashboard show the latest per source, with the failing step (`pick`: no recent playable title;
+`stream`: nothing offered; `master`, `variant`, `segment`), the statuses and any unavailable titles. Its requests
+carry `x-israel-tv-probe: canary`, so its plays never count as usage or failures. Run it now with
 `curl -X POST -H "Authorization: Bearer $T" http://<host>:7702/run/canary`.
+
+### Shows the site refused (bot protection)
+
+Mako and Reshet sometimes answer a show page with a bot-protection page in the nightly full read. Those shows are
+not lost: their last good data stays, and the daemon reads just those shows again later the same night, after 30
+minutes, 1 hour and 2 hours. The source stays green while retries are pending or once they succeed; it turns amber
+only for shows still refused after the third retry (named on `/status`, and in `blocked` per source). Other
+failures in the run are not retried and show as before.
 
 ### A catalog row says it is old
 
@@ -221,9 +236,14 @@ the app is usually the app's own cache (see docs/tv-checklist.md).
    relayed title, from the public addon for a direct one (Reshet and Kan in Israel) — and fetch the play URL, a
    variant playlist and a segment with one User-Agent; a working play gives 200, 200, 206:
 
+   Mark your own checks with the `x-israel-tv-probe` header (any value, e.g. `test`; the canary sends `canary`):
+   their plays get a `probe-…` id and stay out of usage, failures and "playing now", but you can still follow
+   them by play id.
+
    ```bash
-   curl -s http://<host>:7701/stream/series/<video-id>.json | jq -r '.streams[].url'   # resolver
-   curl -s <addon>/stream/series/<video-id>.json | jq -r '.streams[].url'      # public addon
+   P='x-israel-tv-probe: test'
+   curl -s -H "$P" http://<host>:7701/stream/series/<video-id>.json | jq -r '.streams[].url'   # resolver
+   curl -s -H "$P" <addon>/stream/series/<video-id>.json | jq -r '.streams[].url'      # public addon
    UA='Mozilla/5.0 (Linux; Android 12) ExoPlayer'
    curl -s -A "$UA" '<stream url>'            # master: note the first non-# line (a variant)
    curl -s -A "$UA" '<variant url>'           # variant: note the first segment

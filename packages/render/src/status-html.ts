@@ -13,7 +13,11 @@ export function renderStatusHtml(s: StatusFile): string {
       ) => `<tr><td>${esc(x.source)}</td><td>${badge(x.health)}</td><td>${x.shows}</td><td>${x.episodes}</td>
 <td>${x.lastFullRun ? `${esc(x.lastFullRun.at)} ${esc(x.lastFullRun.status)}${x.lastFullRun.error ? `<br><small>${esc(x.lastFullRun.error)}</small>` : ''}` : '—'}</td>
 <td>${x.lastAiringRun ? `${esc(x.lastAiringRun.at)} ${esc(x.lastAiringRun.status)}` : '—'}</td>
-<td>${x.notes.map(esc).join('<br>')}</td></tr>`,
+<td>${x.notes.map(esc).join('<br>')}${
+        x.emptyShows?.length
+          ? `<details><summary>${x.emptyShows.length} listed with nothing to watch</summary><bdi dir="auto">${x.emptyShows.map(esc).join('<br>')}</bdi></details>`
+          : ''
+      }</td></tr>`,
     )
     .join('');
   const failing = s.failingShows
