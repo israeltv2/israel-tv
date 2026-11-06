@@ -72,6 +72,12 @@ const PublisherCloudflare = z.strictObject({
   dir: z.string().default('./data/site'),
   /** Public base URL once deployed (used in /status links). Optional. */
   publicUrl: z.url().optional(),
+  /**
+   * Log every catalog, meta and stream request (no addresses: a salted daily hash) for the usage dashboard.
+   * The Worker then answers those requests itself, so they count toward the free plan's 100,000 Worker
+   * requests a day (catalogs and metadata are otherwise free static files).
+   */
+  requestLogs: z.boolean().default(true),
 });
 
 export const ConfigSchema = z.strictObject({

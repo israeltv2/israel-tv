@@ -53,7 +53,9 @@ describe('Mako', () => {
     const calls: Call[] = [];
     const app = createResolverApp({ episode, fetch: makoNet(calls) });
     const s = await (await app.request('http://home.lan:7001/stream/series/iltv_mako_1:2:3.json')).json();
-    expect(s.streams[0].url).toBe('http://home.lan:7001/play/mako/iltv_mako_1%3A2%3A3.m3u8');
+    expect(s.streams[0].url).toMatch(
+      /^http:\/\/home\.lan:7001\/play\/mako\/iltv_mako_1%3A2%3A3\.m3u8\?c=[\w-]+$/,
+    );
 
     const r = await app.request('/play/mako/iltv_mako_1%3A2%3A3.m3u8', {
       headers: { 'user-agent': 'NuvioTV/1 ExoPlayer' },
@@ -90,7 +92,7 @@ describe('Mako', () => {
       ],
     });
     const s = await (await app.request('http://h/stream/tv/iltv_live_keshet12.json')).json();
-    expect(s.streams.map((x: { url: string }) => x.url)).toEqual([
+    expect(s.streams.map((x: { url: string }) => x.url.split('?')[0])).toEqual([
       'http://h/play/mako-live/iltv_live_keshet12/0.m3u8',
     ]);
     const r = await app.request('/play/mako-live/iltv_live_keshet12/0.m3u8');
@@ -222,7 +224,32 @@ test('a Mako show opened from Cinemeta (IMDb id) plays through the resolver, num
     external: (id) => (id === 'tt0385411' ? { series: 'iltv_mako_1', seasons: [2] } : undefined),
   });
   const ok = await (await app.request('http://h/stream/series/tt0385411:2:3.json')).json();
-  expect(ok.streams[0].url).toBe('http://h/play/mako/iltv_mako_1%3A2%3A3.m3u8');
+  expect(ok.streams[0].url.split('?')[0]).toBe('http://h/play/mako/iltv_mako_1%3A2%3A3.m3u8');
   const named = await (await app.request('http://h/stream/series/tt0385411:101:1.json')).json();
   expect(named.streams).toEqual([]);
+});
+
+test('a play is recorded: stream, ticket and play events share one correlation id; relay sessions too', async () => {
+  const events: { kind: string; corr?: string; outcome: string; upstream?: string; video?: string }[] = [];
+  const app = createResolverApp({
+    episode: () => ({ key: 'k', title: 't', streams: [], play: { vcmid: 'v', channelId: 'c' } }),
+    onEvent: (e) => events.push(e),
+    fetch: async (url) => {
+      if (url.includes('playlist'))
+        return Response.json({ media: [{ url: 'https://x.akamaized.net/m.m3u8', cdn: 'AKAMAI' }] });
+      if (url.includes('entitlement')) return Response.json({ tickets: [{ ticket: 'hdnea%3Dx' }] });
+      return new Response('#EXTM3U\nv.m3u8\n', { status: 403 });
+    },
+  });
+  const s = await (await app.request('http://h/stream/series/iltv_mako_1:2:3.json')).json();
+  const play = new URL(s.streams[0].url);
+  const r = await app.request(`${play.pathname}${play.search}`);
+  expect(r.status).toBe(403);
+  const corr = play.searchParams.get('c');
+  expect(events.map((e) => e.kind)).toEqual(['stream', 'ticket', 'play']);
+  expect(events.every((e) => e.corr === corr)).toBe(true);
+  const p = events[2];
+  expect(p).toMatchObject({ outcome: 'error', video: 'iltv_mako_1:2:3' });
+  expect(p?.upstream).toContain('ticket 200');
+  expect(p?.upstream).toContain('master 403');
 });

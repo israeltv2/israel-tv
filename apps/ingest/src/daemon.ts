@@ -4,9 +4,16 @@ import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { serve } from '@hono/node-server';
-import { type Config, DAY_MS, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
+import {
+  type Config,
+  DAY_MS,
+  parseSeriesId,
+  type Source,
+  tmdbApiKey,
+  type UsageEvent,
+} from '@israel-tv/core';
 import { proxyEndpoints } from '@israel-tv/net';
-import { resolverApp } from '@israel-tv/resolver';
+import { PlaySessions, resolverApp } from '@israel-tv/resolver';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
@@ -17,6 +24,8 @@ import { activeSources, buildStatus, publishSite } from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
+import { queryEvents, renderUsagePage } from './usage-page.ts';
+import { pullWorkerEvents } from './worker-events.ts';
 
 type Log = (line: string) => void;
 
@@ -229,6 +238,44 @@ export class Daemon {
   /** Last outcome of relaying through the geo proxy (resolver), for /status. */
   geo: { proxies: string[]; lastOkAt?: string; lastErrorAt?: string; lastError?: string } = { proxies: [] };
 
+  /** Play and relay sessions of the resolver (what is playing now). */
+  readonly sessions = new PlaySessions((e) => this.record(e));
+
+  /** Record a usage/diagnostics event: in the database (for the dashboard and queries) and the log. */
+  record(e: UsageEvent): void {
+    try {
+      this.store.addEvents([e]);
+    } catch (err) {
+      this.log(`could not record an event: ${(err as Error).message}`);
+    }
+    this.log(`event ${JSON.stringify(e)}`);
+  }
+
+  /** Pull the public Worker's request events (Workers Logs) into the database. */
+  async pullWorkerEvents(): Promise<void> {
+    try {
+      await pullWorkerEvents(this.store, this.config);
+    } catch (err) {
+      this.log(`pulling the Worker's request events failed: ${(err as Error).message}`);
+    }
+  }
+
+  usage() {
+    return { ...this.store.usage(), active: this.sessions.active() };
+  }
+
+  usagePage(): string {
+    const titles = new Map<string, string>();
+    return renderUsagePage(this.store.usage(), this.sessions.active(), (series) => {
+      if (!titles.has(series)) titles.set(series, this.store.getShow(series)?.title ?? '');
+      return titles.get(series) || undefined;
+    });
+  }
+
+  events(q: Record<string, string | undefined>) {
+    return queryEvents(this.store, q);
+  }
+
   noteRelay(r: { ok: boolean; error?: string }): void {
     const at = new Date().toISOString();
     if (r.ok) this.geo.lastOkAt = at;
@@ -268,6 +315,10 @@ export function adminApp(d: Daemon) {
   });
   app.get('/', (c) => c.redirect('/status'));
   app.get('/status', (c) => c.json(d.status()));
+  app.get('/usage', (c) => c.html(d.usagePage()));
+  app.get('/usage.json', (c) => c.json(d.usage()));
+  // For agents and scripts: /events.json?corr=…&kind=play&outcome=error&since=2h&series=…&limit=100
+  app.get('/events.json', (c) => c.json(d.events(c.req.query())));
   const refresh = (c: import('hono').Context) => {
     const r = d.refresh(c.req.param('id') ?? '');
     return 'error' in r ? c.json(r, 404) : c.json(r, 202);
@@ -338,7 +389,11 @@ export async function startDaemon(
   }
   if (config.resolver.enabled) {
     await listen(
-      resolverApp(config, process.env, log, (r) => d.noteRelay(r)).fetch as never,
+      resolverApp(config, process.env, log, (r) => d.noteRelay(r), {
+        onEvent: (e) => d.record(e),
+        sessions: d.sessions,
+        salt: store.clientSalt(),
+      }).fetch as never,
       config.resolver.host,
       config.resolver.port,
       'resolver.port',
@@ -365,6 +420,12 @@ export async function startDaemon(
   }
   store.prune();
   d.schedule();
+  // Relay sessions end after a quiet minute or two; the public Worker's events are pulled every 10 minutes.
+  setInterval(() => d.sessions.flush(), 30_000).unref();
+  if (config.publisher.type === 'cloudflare' && config.publisher.requestLogs) {
+    setInterval(() => void d.pullWorkerEvents(), 10 * 60_000).unref();
+    void d.pullWorkerEvents();
+  }
   // Live channels are checked right away (as a job, not holding startup), so /status reflects them.
   if (config.sources.live) d.enqueue('live', async () => void (await checkLive(store)));
   // First start (or after a long stop): fill the catalog now instead of waiting for the night.

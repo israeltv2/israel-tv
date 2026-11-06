@@ -186,6 +186,17 @@ More: [docs/configuration.md](docs/configuration.md), [docs/operations.md](docs/
 [docs/decisions.md](docs/decisions.md) (measurements behind the design),
 [docs/tv-checklist.md](docs/tv-checklist.md).
 
+## Privacy
+
+Israel TV keeps a record of how it is used so problems can be found and fixed: which shows and episodes were
+asked for and played, what failed and why, and how many different devices used it each day. It never stores
+an IP address: a device is counted by a salted hash of its address that changes every day, so it cannot be
+turned back into an address or followed from one day to the next. Records are kept 30 days, in your own
+database (the public addon's request records pass through your Cloudflare account's Workers Logs, kept there a
+few days). You can see it all on the admin page at `/usage`, and turn the public addon's request records off
+with `"requestLogs": false` (see [configuration](docs/configuration.md#publisher--where-the-addon-is-served)).
+If you share your addon with friends, tell them this.
+
 ## Development
 
 ```bash

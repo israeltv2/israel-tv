@@ -330,9 +330,33 @@ export interface DeployResult {
 }
 
 /** Run `wrangler deploy` for the catalog Worker with the site folder as its static assets. */
+/**
+ * The Worker's wrangler config for this deploy: the checked-in one, plus Worker-first routing when request
+ * logs are on, and Cloudflare's own invocation logs off (they would keep request metadata; the Worker logs
+ * its own events without addresses).
+ */
+export function workerConfig(
+  p: Extract<PublisherConfig, { type: 'cloudflare' }>,
+  catalogDir: string,
+): unknown {
+  const text = readFileSync(join(catalogDir, 'wrangler.jsonc'), 'utf8')
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('//'))
+    .join('\n');
+  const base = JSON.parse(text) as { assets: Record<string, unknown>; main: string };
+  return {
+    ...base,
+    name: p.workerName,
+    main: join(catalogDir, base.main),
+    assets: { ...base.assets, directory: p.dir, ...(p.requestLogs ? { run_worker_first: true } : {}) },
+    observability: { enabled: true, logs: { enabled: true, invocation_logs: false } },
+  };
+}
+
 async function deployCloudflare(
   p: Extract<PublisherConfig, { type: 'cloudflare' }>,
   env: NodeJS.ProcessEnv,
+  salt?: string,
 ): Promise<DeployResult> {
   const t0 = Date.now();
   const cwd = join(REPO_ROOT, 'apps/catalog');
@@ -359,7 +383,30 @@ async function deployCloudflare(
     NO_COLOR: '1',
     FORCE_COLOR: '0',
   };
-  const args = ['deploy', '--name', p.workerName, '--assets', p.dir];
+  const configPath = join(wranglerHome, 'wrangler.json');
+  writeFileSync(configPath, JSON.stringify(workerConfig(p, cwd), null, 2));
+  const args = ['deploy', '--config', configPath, '--name', p.workerName, '--assets', p.dir];
+  // The client-hash salt goes up as a Worker secret, through a file only this user can read, removed after.
+  const secretsPath = join(wranglerHome, 'secrets.json');
+  if (salt && p.requestLogs) {
+    writeFileSync(secretsPath, JSON.stringify({ CLIENT_SALT: salt }), { mode: 0o600 });
+    args.push('--secrets-file', secretsPath);
+  }
+  try {
+    return await runWrangler(wrangler, args, cwd, childEnv, p, t0);
+  } finally {
+    rmSync(secretsPath, { force: true });
+  }
+}
+
+async function runWrangler(
+  wrangler: string,
+  args: string[],
+  cwd: string,
+  childEnv: NodeJS.ProcessEnv,
+  p: { apiTokenEnv: string; accountIdEnv: string },
+  t0: number,
+): Promise<DeployResult> {
   const output = await new Promise<string>((resolve, reject) => {
     const child = spawn(wrangler, args, { cwd, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
@@ -377,10 +424,14 @@ async function deployCloudflare(
   return { ms: Date.now() - t0, detail: uploaded, ...(url ? { url } : {}) };
 }
 
-export async function deploy(config: Config, env: NodeJS.ProcessEnv = process.env): Promise<DeployResult> {
+export async function deploy(
+  config: Config,
+  env: NodeJS.ProcessEnv = process.env,
+  salt?: string,
+): Promise<DeployResult> {
   const p = config.publisher;
   if (p.type === 'local') return { ms: 0, detail: `served from ${p.dir} by the local server` };
-  return deployCloudflare(p, env);
+  return deployCloudflare(p, env, salt);
 }
 
 /**
@@ -417,7 +468,7 @@ export async function publishSite(
   }
   const runId = store.startRun('publish', kind);
   try {
-    const d = await deploy(config);
+    const d = await deploy(config, process.env, store.clientSalt());
     store.finishRun(runId, { status: 'ok' });
     log(
       `publish: ${w.written} of ${w.total} files changed, ${w.deleted} removed; ${d.detail}${d.url ? ` → ${d.url}/manifest.json` : ''} (${Math.round((Date.now() - t0) / 1000)} s)`,

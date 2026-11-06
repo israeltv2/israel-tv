@@ -14,6 +14,7 @@ import { PublishError, publishSite, renderFromStore, writeSite } from './publish
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { matchShows } from './tmdb.ts';
+import { queryEvents } from './usage-page.ts';
 
 const HELP = `israel-tv <command>
 
@@ -28,6 +29,8 @@ const HELP = `israel-tv <command>
   check-proxy                        Check that the geo proxy works and exits in Israel
   match                              Look up TMDB/IMDb ids for shows (needs tmdb in the config)
   status                             Recent runs and warnings
+  events [--corr C] [--kind K] [--errors] [--since 2h] [--series S] [--limit N]
+                                     Usage and diagnostics events as JSON lines, oldest first (see docs/operations.md)
   help                               This text
 
 Config: israel-tv.config.json in the current folder (or ISRAEL_TV_CONFIG). Secrets: .env.`;
@@ -47,6 +50,11 @@ function parseCli(argv: string[]) {
       help: { type: 'boolean', short: 'h' },
       'no-initial-run': { type: 'boolean' },
       port: { type: 'string' },
+      corr: { type: 'string' },
+      kind: { type: 'string' },
+      errors: { type: 'boolean' },
+      since: { type: 'string' },
+      series: { type: 'string' },
     },
   });
 }
@@ -59,7 +67,7 @@ async function main(argv: string[]): Promise<number> {
     // Node's message adds a hint about positional arguments that does not apply here; keep the first sentence.
     const first = (err as Error).message.split('. ')[0];
     throw new UserError(
-      `${first}. Options: --source, --limit, --no-initial-run, --port. Run \`pnpm israel-tv help\` for more.`,
+      `${first}. Options: --source, --limit, --no-initial-run, --port (and for events: --corr, --kind, --errors, --since, --series). Run \`pnpm israel-tv help\` for more.`,
     );
   }
   const { positionals, values } = parsed;
@@ -69,7 +77,7 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
   // Commands that only read local state do not need the secrets of every configured service.
-  const { config } = loadConfig(process.env, { needSecrets: !['status', 'serve'].includes(cmd) });
+  const { config } = loadConfig(process.env, { needSecrets: !['status', 'serve', 'events'].includes(cmd) });
   const store = Store.open(config.store.path);
   store.closeStaleRuns();
   const adapters = createAdapters(config);
@@ -234,6 +242,19 @@ async function main(argv: string[]): Promise<number> {
         }
         for (const w of store.recentWarnings(10))
           console.log(`warning ${w.seriesId ?? ''} ${w.code}: ${w.message}`);
+        return 0;
+      }
+      case 'events': {
+        const rows = queryEvents(store, {
+          ...(values.corr ? { corr: values.corr } : {}),
+          ...(values.kind ? { kind: values.kind } : {}),
+          ...(values.errors ? { outcome: 'error' } : {}),
+          ...(values.since ? { since: values.since } : {}),
+          ...(values.series ? { series: values.series } : {}),
+          ...(values.limit ? { limit: values.limit } : {}),
+        });
+        for (const r of rows.reverse())
+          console.log(JSON.stringify(Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null))));
         return 0;
       }
       default:

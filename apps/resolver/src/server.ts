@@ -2,7 +2,7 @@
 import type { Config, ScrapedEpisode } from '@israel-tv/core';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
-import { createResolverApp } from './app.ts';
+import { createResolverApp, type ResolverDeps } from './app.ts';
 
 export function episodeLookup(storePath: string) {
   let store: Store | undefined;
@@ -32,9 +32,11 @@ export function resolverApp(
   env: NodeJS.ProcessEnv = process.env,
   log: (l: string) => void = console.log,
   onRelay?: (r: { ok: boolean; error?: string }) => void,
+  extra: Pick<ResolverDeps, 'onEvent' | 'sessions' | 'salt' | 'clientAddress'> = {},
 ) {
   const proxies = proxyEndpoints(config.geo, env);
   return createResolverApp({
+    ...extra,
     log,
     ...(onRelay ? { onRelay } : {}),
     episode: episodeLookup(config.store.path),

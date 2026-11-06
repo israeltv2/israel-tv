@@ -1,6 +1,7 @@
 export * from './catalogs.ts';
 export * from './config.ts';
 export * from './dates.ts';
+export * from './events.ts';
 export * from './hebrew.ts';
 export * from './ids.ts';
 export * from './live.ts';
