@@ -19,7 +19,8 @@
     "resolver": "node apps/resolver/src/cli.ts",
     "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages",
     "hygiene": "knip && pnpm -r --filter \"./packages/*\" --filter \"./apps/*\" exec publint --strict",
-    "test:strict": "node tools/test-strict.mjs"
+    "test:strict": "node tools/test-strict.mjs",
+    "smoke": "node tools/smoke.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

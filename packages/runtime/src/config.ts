@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { type Config, ConfigError, checkSecrets, parseConfig, roleOf } from '@israel-tv/core';
@@ -59,7 +59,10 @@ export function loadConfig(
   // Secrets: .env next to the config file. Existing variables win.
   const base = dirname(file);
   const envFile = join(base, '.env');
-  if (env === process.env && existsSync(envFile)) process.loadEnvFile(envFile);
+  if (env === process.env && existsSync(envFile)) {
+    process.loadEnvFile(envFile);
+    warnIfShared(envFile);
+  }
   const config = parseConfig(raw, found ?? DEFAULT_CONFIG_FILE);
   checkRole(config);
   if (opts.needSecrets !== false) checkSecrets(config, env, envFile);
@@ -82,6 +85,19 @@ export function loadConfig(
     }
   }
   return { config, file: found };
+}
+
+/**
+ * The secrets file should be readable by its owner only. On macOS and Linux, say so when it is not (Windows keeps
+ * per-user folders private by default; the config folder is under the user's own AppData).
+ */
+function warnIfShared(file: string): void {
+  if (process.platform === 'win32') return;
+  const mode = statSync(file).mode & 0o077;
+  if (mode)
+    console.error(
+      `warning: ${file} can be read by other users of this computer; make it private: chmod 600 "${file}"`,
+    );
 }
 
 /** Each role only uses (and so only needs) its own settings; say so plainly when the config mixes them. */
