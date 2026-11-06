@@ -1,0 +1,81 @@
+name: release
+# Releases: release-please keeps a release pull request open from the conventional commits on main; merging it
+# tags the version and writes the changelog. A published release builds the images (amd64 + arm64) to GHCR and
+# checks the home-helper image from a clean machine.
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+  images:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: israel-tv-resolver
+            file: Dockerfile.resolver
+          - image: israel-tv
+            file: Dockerfile
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+  verify:
+    # The published home helper, from a clean machine: pull, run as a viewer would, fetch its manifest, check the
+    # public catalog through it.
+    needs: images
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run the published home helper
+        run: |
+          image=ghcr.io/${{ github.repository_owner }}/israel-tv-resolver:${GITHUB_REF_NAME#v}
+          docker run -d --name helper -p 7701:7701 "$image"
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:7701/manifest.json && break; sleep 2; done
+          curl -sf http://127.0.0.1:7701/manifest.json | grep -q '"stream"'
+          docker exec helper node apps/resolver/src/cli.ts check-catalog

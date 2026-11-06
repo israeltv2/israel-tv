@@ -1,11 +1,18 @@
-# Israel TV's resolver on its own (role "resolver-only"): only the resolver and the packages it uses are installed
-# (no browser, no scrapers, no Cloudflare tooling). Config, .env and data live in /data.
+# The home helper (Israel TV's resolver, role "resolver-only") as a ready image. Only the resolver and what it uses
+# are installed (no browser, no scrapers, no Cloudflare tooling). Data and an optional config live in /data.
+#   In Israel:  docker run -d --name israel-tv-helper --restart unless-stopped -p 7701:7701 -v israel-tv:/data ghcr.io/israeltv2/israel-tv-resolver
+#   Abroad:     add  -e ISRAEL_TV_PROXY=http://user:password@proxy.example.net:3128  (a proxy with an Israeli exit)
+# It plays from the public Israel TV catalog unless ISRAEL_TV_CATALOG_URL (or a config file in /data) says otherwise.
 FROM node:24-bookworm-slim
 WORKDIR /app
 RUN corepack enable
 COPY --chown=node:node . .
 RUN CI=true pnpm install --prod --frozen-lockfile --filter "@israel-tv/resolver..." && mkdir -p /data && chown -R node:node /data /app
 USER node
-ENV ISRAEL_TV_CONFIG=/data/israel-tv.config.json
+ENV ISRAEL_TV_IN_CONTAINER=1 \
+    ISRAEL_TV_HOME=/data \
+    ISRAEL_TV_CATALOG_URL=https://israel-tv.israeltv2.workers.dev/manifest.json
+VOLUME /data
 EXPOSE 7701 7703
+HEALTHCHECK --interval=60s --timeout=5s CMD node -e "fetch('http://127.0.0.1:7701/manifest.json').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 CMD ["node", "apps/resolver/src/cli.ts", "start"]

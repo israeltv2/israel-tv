@@ -1027,3 +1027,21 @@ Workers Logs line per request, for debugging.
   the four ready files).
 - **Checked on CI:** the whole suite and `pnpm smoke` on Linux and Windows: a local-only instance (every source off,
   so no site is contacted) and a resolver-only instance playing from it start, and both manifests answer.
+
+### Releases and ready images
+
+- **Versions:** release-please (lighter than changesets: no file per change; it reads the conventional commit
+  messages already on main and keeps one release pull request open; merging it tags the version and writes
+  `CHANGELOG.md`). Pull requests are squash-merged with their title as the commit message, so CI checks that
+  titles follow Conventional Commits (a plain shell check, no third-party action). First version: 0.1.0 (beta).
+- **Images:** a published release builds two images for linux/amd64 and linux/arm64 (PCs, NAS boxes, Raspberry
+  Pi) to GHCR under the project account: `israel-tv-resolver` (the home helper; only the resolver's packages, no
+  browser) and `israel-tv` (a full instance without a browser). The helper image needs no config: it plays from the
+  public catalog (`ISRAEL_TV_CATALOG_URL`, overridable), and abroad takes a proxy as one variable
+  (`ISRAEL_TV_PROXY`, treated as a secret everywhere). Inside a container the app prints "this computer's address"
+  instead of the container's own address. A job then pulls the published helper image on a clean runner, runs it
+  as a viewer would, fetches its manifest and checks the public catalog through it.
+- **Owner's call:** GHCR packages of a private repository are private. The images contain the source, so making
+  them public is part of publishing the project (with the repository); until then `docker run` works for the
+  account only. Checked before publishing: the helper image runs, answers its manifest, and plays a Mako episode
+  (master playlist 200) from the public catalog (local build, arm64).

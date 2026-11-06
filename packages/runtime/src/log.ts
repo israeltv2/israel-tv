@@ -39,7 +39,7 @@ export function secretValues(env: NodeJS.ProcessEnv): string[] {
   return Object.entries(env)
     .filter(
       ([k, v]) =>
-        (secretNames.has(k) || /(TOKEN|PASS|SECRET|KEY|USER|ACCOUNT)/i.test(k)) &&
+        (secretNames.has(k) || /(TOKEN|PASS|SECRET|KEY|USER|ACCOUNT|PROXY)/i.test(k)) &&
         typeof v === 'string' &&
         v.length >= 6,
     )

@@ -25,7 +25,9 @@ export function listen(
 }
 
 /** Addresses other devices on the network can use to reach this machine. */
-export function lanAddresses(host: string): string[] {
+export function lanAddresses(host: string, env: Record<string, string | undefined> = process.env): string[] {
+  // Inside a container, its own addresses are not the computer's: say so instead of printing a wrong one.
+  if (env.ISRAEL_TV_IN_CONTAINER) return ["<this computer's address>"];
   if (host !== '0.0.0.0' && host !== '::') return [host];
   const out: string[] = [];
   for (const list of Object.values(networkInterfaces())) {
