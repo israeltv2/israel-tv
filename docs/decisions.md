@@ -894,3 +894,10 @@ for anyone; the copies fix that too.
 - **Shows without a lobby card** (older programs) have only the refused share image; their copy now comes from
   the first still or promo their own page shows (a 490×272 `?width=…&v=…` image the page loads). Copy method 3
   retries every show still without a copy at once.
+
+### License: AGPL-3.0-only
+
+Owner decision: the project is AGPL-3.0-only (© Israel TV contributors), so anyone who runs a modified copy as a
+service must publish their changes. The license text is the unmodified official one. No funding, sponsor or
+donation links of any kind will be added (they would identify the people behind the project), and Mako playback
+stays self-hosted per household: there is no public resolver.

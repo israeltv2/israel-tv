@@ -15,5 +15,6 @@
     "@israel-tv/net": "workspace:*",
     "playwright-core": "1.65.0",
     "zod": "4.6.7"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }
