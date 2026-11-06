@@ -88,10 +88,15 @@ interface ShowState {
   retry?: Record<string, { n: number; at: string }>;
 }
 
+/** Bumped when the way show images are copied changes (2: from the lobby, with the page's own images loaded). */
+const ART_METHOD = 2;
+
 interface CrawlState {
   lobbiesAt?: string;
   /** Lobbies have been read since posters were taken from them (an older state reads them once more). */
   lobbyPosters?: true;
+  /** The way show images are copied; a newer way tries every show still without a copy again at once. */
+  artMethod?: number;
   backoffUntil?: string;
   shows: Record<string, ShowState>;
   /** Per site, the last episode page that loaded with a player: the yardstick for a failing episode page. */
@@ -206,6 +211,10 @@ export async function crawlKan(
   const log = opts.log ?? (() => {});
   const now = Date.now();
   const state = store.getState<CrawlState>(STATE_KEY) ?? { shows: {} };
+  if (opts.artworkDir && state.artMethod !== ART_METHOD) {
+    for (const s of Object.values(state.shows)) if (!s.art) delete s.artTriedAt;
+    state.artMethod = ART_METHOD;
+  }
   if (state.backoffUntil && Date.parse(state.backoffUntil) > now) {
     return { pages: 0, newEpisodes: 0, note: `backing off until ${state.backoffUntil}` };
   }
