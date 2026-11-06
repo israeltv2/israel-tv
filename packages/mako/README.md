@@ -39,7 +39,7 @@ pnpm --filter @israel-tv/mako typecheck
 Tests run on recorded JSON responses in `test/fixtures/` (`index.json`, `show-*.json`, `season-*.json`,
 `playlist-*.json`); a fixture `Fetcher` in `test/mako.test.ts` maps each request path to a fixture and fails on
 any path it does not know, so tests never contact Mako. To add or refresh a fixture, save the real response of
-`https://www.mako.co.il/<path>?platform=responsive` unedited as `test/fixtures/<name>.json`, map its path in the
+`https://www.mako.co.il/<path>?platform=responsive` unedited (except removing anything personal; responses normally contain none) as `test/fixtures/<name>.json`, map its path in the
 test's `fixtureFetcher({ ... })`, and assert on it. To try a real read once: `pnpm israel-tv full --source mako
 --limit 5`.
 

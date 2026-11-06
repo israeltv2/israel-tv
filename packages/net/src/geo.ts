@@ -52,8 +52,10 @@ export function explainNetError(err: unknown): string {
   const text = `${e.message ?? ''} ${e.cause?.message ?? ''}`;
   if (/\b407\b/.test(text) || e.cause?.statusCode === 407)
     return 'the proxy rejected the login (407): check the username and password variables in .env';
-  if (code === 'ENOTFOUND') return 'proxy host not found: check the host name in geo.urls';
-  if (code === 'ECONNREFUSED') return 'nothing is listening on that proxy port: check the port in geo.urls';
+  if (code === 'ENOTFOUND')
+    return 'proxy host not found: check the proxy host name (geo.urls, or ISRAEL_TV_PROXY)';
+  if (code === 'ECONNREFUSED')
+    return 'nothing is listening on that proxy port: check the proxy port (geo.urls, or ISRAEL_TV_PROXY)';
   if (/TIMEOUT/i.test(code) || /timed? ?out/i.test(text)) return 'the proxy did not answer in time';
   if (/WRONG_VERSION_NUMBER|wrong version number/i.test(`${code} ${text}`))
     return 'this proxy speaks plain HTTP: write the URL with http:// instead of https://';
@@ -62,5 +64,5 @@ export function explainNetError(err: unknown): string {
   const detail = code || e.cause?.message || e.message;
   return detail && !/^Request was cancelled|^fetch failed$/.test(detail)
     ? detail
-    : 'the proxy refused or dropped the connection: check geo.urls, the login, and that the provider allows this server';
+    : 'the proxy refused or dropped the connection: check the proxy address (geo.urls or ISRAEL_TV_PROXY), the login, and that the provider allows this server';
 }

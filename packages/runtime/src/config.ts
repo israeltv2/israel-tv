@@ -127,7 +127,13 @@ export function withEnvSettings(
         'ISRAEL_TV_PROXY is not a URL (e.g. http://user:password@proxy.example.net:3128)',
       );
     }
-    out.geo = { type: scheme.startsWith('socks') ? 'socks5' : 'http-proxy', urls: [env.ISRAEL_TV_PROXY] };
+    out.geo = {
+      type: scheme.startsWith('socks') ? 'socks5' : 'http-proxy',
+      urls: [env.ISRAEL_TV_PROXY],
+      // The login can also come separately (any characters, and from an --env-file).
+      ...(env.ISRAEL_TV_PROXY_USER ? { usernameEnv: 'ISRAEL_TV_PROXY_USER' } : {}),
+      ...(env.ISRAEL_TV_PROXY_PASSWORD ? { passwordEnv: 'ISRAEL_TV_PROXY_PASSWORD' } : {}),
+    };
   }
   return out;
 }

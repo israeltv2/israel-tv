@@ -58,3 +58,35 @@ test('an image without a browser turns Kan episodes off, unless the config says 
     browser: { type: 'chrome' },
   });
 });
+
+test('the proxy login can come separately (any characters, from an env file)', async () => {
+  const { withEnvSettings } = await import('../src/config.ts');
+  const env = {
+    ISRAEL_TV_PROXY: 'socks5://proxy.example:1080',
+    ISRAEL_TV_PROXY_USER: 'u',
+    ISRAEL_TV_PROXY_PASSWORD: 'p@:/#',
+  };
+  expect(withEnvSettings({}, env, false)).toEqual({
+    geo: {
+      type: 'socks5',
+      urls: ['socks5://proxy.example:1080'],
+      usernameEnv: 'ISRAEL_TV_PROXY_USER',
+      passwordEnv: 'ISRAEL_TV_PROXY_PASSWORD',
+    },
+  });
+});
+
+test('addresses to install: home network first, virtual adapters left out', async () => {
+  const { homeAddresses } = await import('../src/serve.ts');
+  expect(
+    homeAddresses([
+      { name: 'vEthernet (WSL)', address: '172.28.0.1' },
+      { name: 'docker0', address: '172.17.0.1' },
+      { name: 'Wi-Fi', address: '192.168.7.4' },
+      { name: 'Ethernet 2', address: '169.254.3.3' },
+      { name: 'en0', address: '10.1.2.3' },
+    ]),
+  ).toEqual(['192.168.7.4', '10.1.2.3']);
+  expect(homeAddresses([{ name: 'utun3', address: '100.64.0.2' }])).toEqual(['100.64.0.2']);
+  expect(homeAddresses([])).toEqual(['127.0.0.1']);
+});

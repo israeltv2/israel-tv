@@ -35,6 +35,39 @@ jobs:
       - run: pnpm test:strict
       # Start local-only and resolver-only and fetch their manifests (no broadcaster site contacted).
       - run: pnpm smoke
+  windows-task:
+    # The Windows background task, for real: install it for the helper, fetch the manifest it serves, stop it (no
+    # process may keep the port), remove it.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter "@israel-tv/resolver..."
+      - name: Install, check, stop and remove the task
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:LOCALAPPDATA 'israel-tv'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          '{"role":"resolver-only","resolver":{"catalogUrl":"https://israel-tv.israeltv2.workers.dev/manifest.json"}}' |
+            Set-Content -Encoding utf8NoBOM (Join-Path $dir 'israel-tv.config.json')
+          powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolver
+          $ok = $false
+          foreach ($i in 1..60) {
+            try { $m = Invoke-RestMethod http://127.0.0.1:7701/manifest.json; if ($m.name) { $ok = $true; break } } catch {}
+            Start-Sleep 2
+          }
+          if (-not $ok) { Get-ChildItem $dir -Recurse | Out-String | Write-Host; throw 'the task did not serve the manifest' }
+          Write-Host "served: $($m.name)"
+          Get-ChildItem (Join-Path $dir 'data\logs') | Out-String | Write-Host
+          Stop-ScheduledTask 'Israel TV resolver'
+          Start-Sleep 5
+          $still = Get-NetTCPConnection -LocalPort 7701 -State Listen -ErrorAction SilentlyContinue
+          if ($still) { throw "port 7701 still in use after stopping the task (pid $($still.OwningProcess))" }
+          powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolver -Remove
   macos:
     if: github.event_name == 'push'
     runs-on: macos-latest

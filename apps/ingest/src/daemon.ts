@@ -13,7 +13,7 @@ import {
 } from '@israel-tv/core';
 import type { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
-import { PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
+import { checkProxyAtStart, PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
 import { type Logger, lanAddresses, listen } from '@israel-tv/runtime';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
@@ -614,6 +614,7 @@ export async function startDaemon(
       );
     d.enqueue('publish', () => d.publish());
   }
+  if (config.resolver.enabled) checkProxyAtStart(config, logger.for('geo-relay'));
   d.kanCrawl();
   return d;
 }

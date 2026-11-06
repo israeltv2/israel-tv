@@ -1072,3 +1072,36 @@ READMEs (Immich, Jellyfin, Uptime Kuma, Home Assistant, AIOStreams, MediaFusion)
 
 `pnpm check:addresses` (CI) fails on private network addresses in tracked files; extra personal patterns can be given
 through an environment variable so they are never written into the repository.
+
+### Docs review, round 1 (seven fresh agents)
+
+Four personas read the docs (a non-technical viewer abroad, an experienced Stremio user, a Windows user, a would-be
+contributor) and three assistants followed `for-agents.md` in a sandbox (the helper via Docker in Israel; abroad with a
+deliberately wrong proxy; an own copy at home with every source off). All three setups worked; the contributor ran
+`pnpm check`, `test:strict` and `smoke` green from CONTRIBUTING.md alone; no secret reached any output. Fixed:
+
+- **Viewers:** an honest "what the link alone gives you" in and outside Israel right under Install; Keshet 12 has no
+  play option until the helper is added; install from a phone signed in to the same account (no typing on a TV); the
+  Stremio button is an https link (GitHub drops `stremio://` links); which computer works (a laptop only while awake
+  and home); Docker Desktop's WSL/restart; how to open a terminal; the address with a NAS/Linux path and no angle
+  brackets; Windows network "Private" and sleep settings; "via Israel" vs "Israel only" sources; Keshet 12 away from
+  home is not part of the easy way; one name everywhere — the addon is now called "Israel TV · home helper".
+- **Abroad:** the proxy login goes in an env file (`ISRAEL_TV_PROXY_USER` / `_PASSWORD`, any characters, nothing on
+  the command line or in shell history), `socks5://` is accepted, and updating keeps it. The proxy check names the
+  real setting (`ISRAEL_TV_PROXY` or `geo.urls`); the helper now logs the proxy (address only) and checks its Israeli
+  exit once at start, so a wrong proxy shows at once.
+- **Stremio users:** the manifest's description no longer suggests the public link plays Mako; the README says which
+  ids it answers (`iltv_`, and `tt`/`tmdb:` only for matched shows with regular seasons) and that it never touches
+  movies; maintenance status.
+- **Windows:** `Set-ExecutionPolicy` and `npm i -g pnpm` before installing; creating the config files with Notepad under
+  the right name; the task now runs hidden (`conhost --headless`) in a loop that restarts the app 30 s after any stop
+  (Task Scheduler's own restart covers only failures to launch), with logs in the config folder; a CI job installs the
+  task on a Windows runner, fetches the manifest it serves, stops it and checks no process keeps the port.
+- **Logs:** a log file is now the default (`data/logs` in the config folder), mirrored to a terminal or a container's
+  output when there is one and never to a service's own output.
+- **Addresses:** `urls`/`start` drop virtual adapters (WSL, Docker, VMs, VPNs, link-local) and list home-network
+  ranges first.
+- **Linux:** a per-user systemd unit that uses your own clone and config folder (plus linger), next to the separate
+  system install; `xvfb-run` examples.
+- **Contributors:** `pnpm format`; what CI runs besides `pnpm check`; how to record a raw page (not a browser's saved
+  page) and compare the data the parser reads; how parser tests use fixtures.

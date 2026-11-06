@@ -20,10 +20,12 @@ Node.js 24.11+, git, and pnpm (`corepack enable`, or `npm i -g pnpm@12.15.0`):
 ```bash
 git clone https://github.com/israeltv2/israel-tv.git && cd israel-tv
 pnpm install
-pnpm check           # typecheck, lint, boundaries, hygiene, tests — what CI runs
+pnpm check           # typecheck, lint, boundaries, hygiene, address check, tests
+pnpm format          # fixes formatting and what the linter can fix
 ```
 
-Run it locally with `pnpm start --no-initial-run` (or `pnpm smoke` to start the roles that need no account and fetch
+CI also runs `pnpm test:strict` (the tests, failing on any deprecated Node API) and `pnpm smoke`, and checks the pull
+request title. Run it locally with `pnpm start --no-initial-run` (or `pnpm smoke` to start the roles that need no account and fetch
 their manifests). `pnpm israel-tv help` lists the commands.
 
 ## Project structure
@@ -50,12 +52,17 @@ are checked by `pnpm boundaries`.
 
 ## Fix a broken source
 
-1. Find what changed: open the show's page on the broadcaster's site in a browser and compare with the recorded page
-   in `packages/<source>/test/fixtures/`.
-2. **Record** the new real response as a fixture (unedited, trimmed only of anything personal; never tickets or
-   tokens) — see the source package's README for how.
-3. Update the parser in `packages/<source>/src/` until the tests pass with both the old and the new fixture where the
-   site serves both.
+1. Find what changed: compare the site's current page with the recorded one in `packages/<source>/test/fixtures/`.
+   Pages are large and minified; compare the data the parser reads (for Reshet, the page's `__NEXT_DATA__` JSON; for
+   Mako, the JSON the site's API returns).
+2. **Record** the new real response as a fixture: the raw response, not a browser's saved or inspected page (use
+   _View source_ and save it, or `curl -sL <url> -o packages/<source>/test/fixtures/<name>.html`; retry if the site
+   answers 403 once). Unedited, except removing anything personal (pages normally contain none); never tickets or
+   tokens. Name it after what it is (`show-<slug>.html`, `<slug>-season-<n>.html`).
+3. Add a test that parses the new fixture (a parser test calls the parser on the fixture directly, e.g.
+   `parseShowPage(html('<name>'))`; a test of fetching a whole show maps the fixture to its path in the fake fetcher),
+   then update the parser in `packages/<source>/src/` until the tests pass with both the old and the new fixture where
+   the site serves both.
 4. `pnpm check`. Ids and numbers come from the source, never from list position: existing episodes must keep theirs.
 
 ## Add a channel

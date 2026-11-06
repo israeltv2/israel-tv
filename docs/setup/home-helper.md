@@ -1,75 +1,116 @@
 # Set up the home helper
 
 The home helper is a small program that plays **Keshet 12 (Mako)** for you, and — if you live outside Israel — the
-episodes that only play from Israel. It runs on a computer at home that stays on (a PC, a Mac, a NAS or a
-Raspberry Pi), and you add it to your app as a second link, next to the [Israel TV link](../../README.md#install).
+episodes that only play from Israel. It runs on a computer at home that stays on, and you add it to your app as a
+second link, next to the [Israel TV link](../../README.md#install).
 
-It takes about 10 minutes. Pick one way:
+**Which computer?** Any computer that stays switched on and connected at home: a desktop PC or Mac, a storage box
+(NAS) or a small always-on computer like a Raspberry Pi. A laptop works only while it is open, awake and at home —
+Keshet 12 stops when it sleeps or leaves the house.
+
+It takes about 15 minutes. Pick one way:
 
 - **[The easy way: Docker](#the-easy-way-docker)** — copy one command.
-- **[Ask an AI assistant](for-agents.md)** — give it [this guide for assistants](for-agents.md) and it walks you
-  through.
+- **Ask an AI assistant to do it** — one that can use your computer's terminal (not a chat on your phone): give it
+  [this guide for assistants](for-agents.md).
 - **[Without Docker](resolver-only.md)** — for people who are comfortable with a terminal.
 
 ## The easy way: Docker
 
 Docker is a free program that runs ready-made apps like this one.
 
-1. **Install Docker.** Windows and Mac: download **Docker Desktop** from [docker.com](https://www.docker.com/products/docker-desktop/),
-   install it and open it once. A NAS usually has Docker in its app store ("Container Manager" on Synology).
-   _You should see:_ the Docker Desktop window, with a green "running" sign at the bottom.
-2. **Start the home helper.** Open _PowerShell_ (Windows) or _Terminal_ (Mac), paste this line and press Enter:
+1. **Install Docker.** Windows and Mac: download **Docker Desktop** from
+   [docker.com](https://www.docker.com/products/docker-desktop/) and install it. On Windows it may ask to install
+   "WSL" and to restart — say yes. You can skip signing in. A NAS usually has Docker in its app store ("Container
+   Manager" on Synology).
+   _You should see:_ Docker Desktop open, with "Engine running" at the bottom.
+2. **Start the home helper.** Open a terminal — Windows: click Start, type **PowerShell**, open it; Mac: open
+   **Terminal** (in Applications → Utilities); NAS: its terminal or SSH. Paste this whole line and press Enter:
 
    ```
    docker run -d --name israel-tv-helper --restart unless-stopped -p 7701:7701 -v israel-tv:/data ghcr.io/israeltv2/israel-tv-resolver
    ```
 
-   _You should see:_ a minute of downloading, then one long line of letters and numbers. That is all.
-3. **Find this computer's address on your home network.** Windows: _Settings → Network & internet → (your
-   connection) → Properties_, the line **IPv4 address**. Mac: _System Settings → Wi-Fi → Details_ (or
-   _Network → Ethernet → Details_), the line **IP address**. It is four numbers with dots between them.
-4. **Add the helper to your app**, the same way you added Israel TV, with this link — put your computer's address
-   in place of `<address>`:
+   _You should see:_ a minute of downloading, then one long line of letters and numbers. That is all. (If it says
+   `docker` is not recognized, Docker Desktop is not running yet: open it and try again.)
+3. **Find this computer's address on your home network** — four numbers with dots, usually starting with `192.168.`
+   or `10.`:
+   - Windows: _Settings → Network & internet → Wi-Fi (or Ethernet) → your network's properties_, the line
+     **IPv4 address**. If you see several, use the one of your Wi-Fi or Ethernet connection.
+   - Mac: _System Settings → Wi-Fi → Details_ (or _Network → Ethernet → Details_), the line **IP address**.
+   - NAS or Linux: the NAS's admin page shows it, and so does your router's list of connected devices.
+4. **Add the helper to your app.** Easiest from your phone or computer, signed in to the same Stremio account as your
+   TV — it then appears on the TV too. Use this link, with your computer's address in place of `ADDRESS`:
 
    ```
-   http://<address>:7701/manifest.json
+   http://ADDRESS:7701/manifest.json
    ```
 
-   _You should see:_ an addon called **Israel TV · home resolver**.
-5. **Try it:** open a Keshet 12 show and play an episode. It plays from the helper's link.
+   For example, if the address is `192.168.` followed by two more numbers, the link starts `http://192.168.`.
+   _You should see:_ an addon called **Israel TV · home helper**. (Use the Stremio or Nuvio app; Stremio in a web
+   browser cannot use a home `http://` link.)
+5. **Try it:** open a Keshet 12 show and play an episode. Under the episode, the source is **Israel TV · home helper**.
 
-Keep that computer on and awake: in Docker Desktop's settings, turn on _Start Docker Desktop when you sign in_.
-The helper starts by itself whenever Docker does. If the computer's address changes after a restart of your router,
-update the link in the app — or ask your router to always give that computer the same address (often called
-"DHCP reservation").
+**Keep it running.** In Docker Desktop's settings, turn on _Start Docker Desktop when you sign in_; the helper starts
+whenever Docker does. Keep the computer awake: Windows _Settings → System → Power → Screen and sleep → when plugged
+in, put my device to sleep after: Never_; Mac _System Settings → Energy → Prevent automatic sleeping_. After a restart
+(for example a system update), sign in once so Docker starts.
+
+**Windows only:** when Windows asks whether to allow Docker on networks, choose **Allow** (private networks), and make
+sure your home network is set to Private: _Settings → Network & internet → your connection → Network profile type:
+Private_. Otherwise your TV cannot reach the helper.
+
+If the computer's address changes (for example after the router restarts), update the link in the app — or ask your
+router to always give that computer the same address (often called "DHCP reservation"; whoever set up your router can
+help).
 
 ### Watching from abroad
 
-Outside Israel, Reshet and Kan episodes only play through an Israeli internet connection. Many VPN services also
-offer a **proxy** with an Israeli location — look for "proxy", "SOCKS5" or "service credentials" in your VPN
-account. You need its address and your proxy user name and password. Then start the helper with one more part
-(stop the old one first with `docker rm -f israel-tv-helper`):
+Outside Israel, Reshet and Kan episodes (and at times the Kan live channels) only play through an Israeli internet
+connection. Keshet 12 does not need one: the helper alone plays it anywhere.
 
-```
-docker run -d --name israel-tv-helper --restart unless-stopped -p 7701:7701 -v israel-tv:/data -e ISRAEL_TV_PROXY=http://USER:PASSWORD@PROXY-ADDRESS:PORT ghcr.io/israeltv2/israel-tv-resolver
-```
+You need a **proxy with an Israeli location**. Many VPN services include one: in your VPN account look for "proxy",
+"SOCKS5" or "service credentials", and note the proxy's address and port, and the proxy user name and password (often
+different from your app login).
 
-Check it: `docker exec israel-tv-helper node apps/resolver/src/cli.ts check-proxy` should end with
-`exits in IL ✓` (if not, it says why). Episodes that only play from Israel then get a second choice called
-**"דרך ישראל · via Israel"** — pick that one.
+1. Create a small text file called `israel-tv.env` next to where you run commands (in Notepad on Windows choose
+   _Save as type: All files_ so it does not become `.txt`), with these three lines — your own values, typed by you:
+
+   ```
+   ISRAEL_TV_PROXY=http://PROXY-ADDRESS:PORT
+   ISRAEL_TV_PROXY_USER=your proxy user name
+   ISRAEL_TV_PROXY_PASSWORD=your proxy password
+   ```
+
+   If your provider calls it SOCKS5, write `socks5://` instead of `http://`.
+2. Remove the helper you started before (your settings are kept): `docker rm -f israel-tv-helper`
+3. Start it again with the file:
+
+   ```
+   docker run -d --name israel-tv-helper --restart unless-stopped -p 7701:7701 -v israel-tv:/data --env-file israel-tv.env ghcr.io/israeltv2/israel-tv-resolver
+   ```
+
+4. Check it: `docker exec israel-tv-helper node apps/resolver/src/cli.ts check-proxy`. _You should see:_ a line ending
+   with `exits in IL ✓` ("goes out through Israel"). If not, it says what to fix.
+
+Episodes that only play from Israel then show two sources: one marked **ישראל בלבד** (Israel only — it will not play
+abroad) and one called **דרך ישראל · via Israel** — pick that one.
 
 ### Keshet 12 away from home
 
-The helper answers only on your home network. To watch Keshet 12 on your phone elsewhere, you can open a narrow,
-private door to it — this needs a domain name of your own on Cloudflare: see
-[Away from home](resolver-only.md#away-from-home).
+The helper answers only on your home network: on a phone outside the house, Keshet 12 will not play. Opening it to the
+outside safely needs a domain name of your own and some technical setup, and is not part of the easy way: see
+[Away from home](resolver-only.md#away-from-home) if you or someone helping you is comfortable with that.
 
 ### If something goes wrong
 
-- **The app says it cannot reach the helper:** the computer is off or asleep, Docker is not running, or the address
-  changed (step 3). On Windows, allow Docker when the firewall asks.
-- **Keshet 12 shows no play button:** add the helper's link (step 4); the main Israel TV link alone cannot play it.
-- **Updating:** `docker rm -f israel-tv-helper`, `docker pull ghcr.io/israeltv2/israel-tv-resolver`, then step 2
-  again (your settings are kept in the `israel-tv` volume).
-- **What it is doing:** `docker logs israel-tv-helper`.
+- **The app cannot reach the helper:** the computer is off or asleep, Docker is not running, the address changed
+  (step 3), or on Windows the network is not Private (see above).
+- **Keshet 12 shows no play option:** add the helper's link (step 4); the main Israel TV link alone cannot play it.
+- **`docker: Error … denied` or `not found` when starting:** the image name was mistyped — copy the line again.
+- **Updating** (now and then, or when an issue says so): `docker pull ghcr.io/israeltv2/israel-tv-resolver`, then
+  `docker rm -f israel-tv-helper`, then the same `docker run` line you used before (abroad: the one with
+  `--env-file`). Your settings are kept.
+- **What it is doing:** `docker logs israel-tv-helper` — send this when you report a problem (it never contains your
+  proxy password).
 - Still stuck? [Open an issue](https://github.com/israeltv2/israel-tv/issues/new/choose).

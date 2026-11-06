@@ -1,0 +1,22 @@
+# systemd user unit: runs Israel TV from your own clone, with your own config folder (`pnpm israel-tv paths`).
+#   1. Set the two paths below (your clone, and the folder holding node: `dirname "$(command -v node)"`).
+#   2. mkdir -p ~/.config/systemd/user && cp deploy/israel-tv.user.service ~/.config/systemd/user/israel-tv.service
+#   3. systemctl --user daemon-reload && systemctl --user enable --now israel-tv
+#   4. Once, so it runs without you signed in:  loginctl enable-linger "$USER"
+# The helper alone: use apps/resolver/src/cli.ts in ExecStart. Restart after a change: systemctl --user restart israel-tv
+# Logs: the config folder's data/logs/current.log. Status: systemctl --user status israel-tv
+[Unit]
+Description=Israel TV
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/israel-tv
+Environment=PATH=%h/.local/node/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node apps/ingest/src/cli.ts start
+# Kan episodes on a machine without a screen (needs the xvfb package):
+# ExecStart=/usr/bin/xvfb-run -a /usr/bin/env node apps/ingest/src/cli.ts start
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

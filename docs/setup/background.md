@@ -27,17 +27,24 @@ volume. Logs: `docker logs <name>`.
 
 ## Windows
 
-A ready script registers a Task Scheduler task that starts at logon and restarts after a crash — in PowerShell, from
-the repository folder:
+A ready script registers a Task Scheduler task that starts at sign-in, runs without a window, and starts the app
+again 30 seconds after it stops for any reason. In PowerShell, from the repository folder (stop any copy you started by
+hand first, with Ctrl-C):
 
 ```
 powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1             # full instance
 powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1 -Resolver   # helper
 ```
 
-Remove it with `-Remove` (and `-Resolver` for the helper). Restart after an update or a settings change:
-`schtasks /End /TN "Israel TV"` then `schtasks /Run /TN "Israel TV"` (or `"Israel TV resolver"`). When Windows asks
-whether Node may use the network, allow it on private networks. The task runs while you are signed in.
+Remove it with `-Remove` (and `-Resolver` for the helper). After an update or a settings change, restart it:
+`Stop-ScheduledTask "Israel TV"; Start-ScheduledTask "Israel TV"` (or `"Israel TV resolver"`). Logs: the config folder's
+`data\logs\current.log`.
+
+So your TV can reach it: set your home network to Private (_Settings → Network & internet → your connection →
+Network profile type: Private_), and when Windows asks whether Node may use the network, allow private networks (if
+you closed that prompt: _Windows Security → Firewall → Allow an app through firewall → Node.js → Private_). Keep the PC
+awake when plugged in (_Settings → System → Power → Screen and sleep_). The task runs while you are signed in: after a
+Windows Update restart, sign in once.
 
 ## macOS
 
@@ -50,11 +57,21 @@ choose _Allow_ when macOS asks whether `node` may accept incoming connections.
 
 ## Linux
 
-A systemd unit: [`deploy/israel-tv.service`](../../deploy/israel-tv.service) (full instance) or
-[`deploy/israel-tv-resolver.service`](../../deploy/israel-tv-resolver.service) (helper); the setup commands are in each
-file's header. Restart: `systemctl restart israel-tv` (or `israel-tv-resolver`). Logs: in the config folder's
-`data/logs/` (`tail -f …/current.log`). Kan episodes need a browser and a display: run under `xvfb-run`, or turn
-Kan off.
+Two ready systemd units:
+
+- **For you, with your clone and config folder** (simplest):
+  [`deploy/israel-tv.user.service`](../../deploy/israel-tv.user.service) — copy it to `~/.config/systemd/user/`, set the
+  two paths at its top, then `systemctl --user daemon-reload && systemctl --user enable --now israel-tv`, and once
+  `loginctl enable-linger $USER` so it runs without you signed in. For the helper alone, change `apps/ingest` to
+  `apps/resolver` in its `ExecStart`. Restart: `systemctl --user restart israel-tv`.
+- **A separate system install** under its own user in `/opt/israel-tv` (a server):
+  [`deploy/israel-tv.service`](../../deploy/israel-tv.service) or
+  [`deploy/israel-tv-resolver.service`](../../deploy/israel-tv-resolver.service); the steps are in each file's header.
+  Its config is `/opt/israel-tv/israel-tv.config.json`, not your own folder.
+
+Logs: the config folder's `data/logs/current.log` (`tail -f`). Kan episodes need a browser and a display: on a machine
+without a screen, wrap the start in `xvfb-run -a` (an example line is in the unit), or turn Kan off with
+`"browser": { "type": "none" }`.
 
 ## Updating (from the repository)
 

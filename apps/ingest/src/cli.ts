@@ -268,7 +268,7 @@ async function main(argv: string[]): Promise<number> {
       case 'resolver': {
         await listen(
           resolverApp(config, {
-            log: (component) => createLogger({ ...config.log, file: undefined }).for(component),
+            log: (component) => createLogger({ ...config.log, file: '' }).for(component),
           }).fetch as never,
           config.resolver.host,
           config.resolver.port,

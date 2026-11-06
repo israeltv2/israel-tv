@@ -14,6 +14,15 @@ needed.
 
 ## Install and start
 
+**On Windows** (PowerShell): first allow `pnpm` to run, once — `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+— and install it with `npm i -g pnpm@12.15.0` (instead of `corepack enable`, which needs an administrator window
+there). On macOS and Linux `corepack enable` may need `sudo` when Node was installed system-wide; `npm i -g
+pnpm@12.15.0` is the alternative.
+
+**Creating the config file:** the config folder may not exist yet. Windows: `mkdir "$env:LOCALAPPDATA\israel-tv"
+-Force; notepad "$env:LOCALAPPDATA\israel-tv\israel-tv.config.json"` (Notepad offers to create it; keep the name
+exactly, not `.txt`). macOS/Linux: `mkdir -p` the folder `paths` shows, then edit the file there. The same for `.env`.
+
 ```bash
 git clone https://github.com/israeltv2/israel-tv.git
 cd israel-tv
@@ -22,11 +31,12 @@ pnpm install
 pnpm start
 ```
 
-No settings are needed. `pnpm start` prints the links to add in your app (also `pnpm israel-tv urls` any time):
+No settings are needed. In a terminal, `pnpm start` shows the links to add in your app among its first lines; the
+clean way to see them, any time, is `pnpm israel-tv urls`:
 
 ```
-addon — install this in your app: http://<this computer's address>:7700/manifest.json
-resolver — install this too, at home: http://<this computer's address>:7701/manifest.json
+Addon (catalog):   http://<this computer's address>:7700/manifest.json
+Home helper (resolver): http://<this computer's address>:7701/manifest.json
 ```
 
 Add **both** in your app. The first gives the rows, show pages, search and the streams that need nothing else; the
@@ -71,5 +81,6 @@ your app keep working, and set the computer not to sleep.
 ## Troubleshoot
 
 - `pnpm israel-tv status` — recent runs and warnings; the admin page shows the same with more detail.
-- `pnpm logs --errors` — recent failures; `pnpm logs --play <id>` follows one play.
+- `pnpm logs --errors` — recent failures; `pnpm logs --play <id>` follows one play. The full log is in the config
+  folder's `data/logs/current.log`.
 - [Operations](../operations.md) covers investigating a failed play, backups and updating.

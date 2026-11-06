@@ -29,11 +29,25 @@ export function lanAddresses(host: string, env: Record<string, string | undefine
   // Inside a container, its own addresses are not the computer's: say so instead of printing a wrong one.
   if (env.ISRAEL_TV_IN_CONTAINER) return ["<this computer's address>"];
   if (host !== '0.0.0.0' && host !== '::') return [host];
-  const out: string[] = [];
-  for (const list of Object.values(networkInterfaces())) {
-    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal) out.push(a.address);
+  const all: { name: string; address: string }[] = [];
+  for (const [name, list] of Object.entries(networkInterfaces())) {
+    for (const a of list ?? [])
+      if (a.family === 'IPv4' && !a.internal) all.push({ name, address: a.address });
   }
-  return out.length ? out : ['127.0.0.1'];
+  return homeAddresses(all);
+}
+
+/** Adapters that are not the home network: WSL/Hyper-V, Docker, VMs, VPNs, link-local. */
+const VIRTUAL =
+  /^(vethernet|docker|br-|veth|virbr|vmnet|vboxnet|utun|tun|tap|wg|tailscale|zt|llw|awdl|bridge|anpi|ham)/i;
+const PRIVATE = /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/;
+
+/** The addresses other devices at home can reach: virtual adapters dropped, private home ranges first. */
+export function homeAddresses(all: { name: string; address: string }[]): string[] {
+  const real = all.filter((a) => !VIRTUAL.test(a.name) && !a.address.startsWith('169.254.'));
+  const pick = (real.length ? real : all).map((a) => a.address);
+  const ordered = [...pick.filter((a) => PRIVATE.test(a)), ...pick.filter((a) => !PRIVATE.test(a))];
+  return ordered.length ? ordered : ['127.0.0.1'];
 }
 
 /** Resolves on Ctrl-C or a service manager's stop. */
