@@ -31,6 +31,8 @@ jobs:
       - run: pnpm hygiene
         if: matrix.os == 'ubuntu-latest'
       - run: pnpm test:strict
+      # Start local-only and resolver-only and fetch their manifests (no broadcaster site contacted).
+      - run: pnpm smoke
   macos:
     if: github.event_name == 'push'
     runs-on: macos-latest

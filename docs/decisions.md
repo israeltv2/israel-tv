@@ -1005,3 +1005,25 @@ Workers Logs line per request, for debugging.
   required matrix once the repository is public); lint, boundaries and hygiene once (on
   Linux); `pnpm audit --prod` on every pull request, reporting only (no bots, no automatic updates; updates are
   done on request with `pnpm up -i -r --latest`).
+
+### Any operating system
+
+- **One folder per instance** holds the config, `.env` and the data (easy to back up or move as one). Found in this
+  order: `ISRAEL_TV_CONFIG` (a file; the home Mac's service sets it, unchanged), `ISRAEL_TV_HOME` (a folder), an
+  `israel-tv.config.json` in the current folder (setups run from the repo keep working), else the platform's
+  usual app folder: `%LOCALAPPDATA%\israel-tv` (Windows: local, not roaming, since it holds databases),
+  `~/Library/Application Support/israel-tv` (macOS), `$XDG_CONFIG_HOME/israel-tv` or `~/.config/israel-tv`
+  (Linux). `israel-tv paths` prints where everything is; `israel-tv urls` prints the links to install as other
+  devices on the network see them (the start-up log prints them too), so no guide asks anyone to run an
+  operating-system command to find an address or a folder. Both work in the resolver's own command line.
+- **Secrets file:** on macOS and Linux a warning names `chmod 600` when `.env` is readable by other users; on
+  Windows the folder is under the user's own AppData, private by default.
+- **Kan's browser:** Google Chrome where it is normally installed (any OS), then Microsoft Edge (Chromium-based,
+  on every Windows), then a distribution Chromium on Linux, NAS boxes and Raspberry Pi; `browser.executablePath`
+  overrides. The error names all three.
+- **Background service on Windows:** `deploy/windows/install-task.ps1` registers a Task Scheduler task at logon
+  (restart on failure, no time limit; `-Resolver` for the resolver alone, `-Remove` to undo). No extra software;
+  a cross-platform `service install` command was not added (four service systems to drive for little gain over
+  the four ready files).
+- **Checked on CI:** the whole suite and `pnpm smoke` on Linux and Windows: a local-only instance (every source off,
+  so no site is contacted) and a resolver-only instance playing from it start, and both manifests answer.
