@@ -13,6 +13,7 @@ import { startLocalServer } from './local-server.ts';
 import { buildStatus, deploy, renderFromStore, writeSite } from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
+import { matchShows } from './tmdb.ts';
 
 type Log = (line: string) => void;
 
@@ -117,6 +118,8 @@ export class Daemon {
       const adapters = createAdapters(this.config);
       for (const make of Object.values(adapters)) await runFull(this.store, make(), this.runOpts);
       if (this.config.sources.live) await checkLive(this.store);
+      const key = this.config.tmdb ? process.env[this.config.tmdb.apiKeyEnv] : undefined;
+      if (key) await matchShows(this.store, key, { log: this.log });
       await this.publish();
     });
   }

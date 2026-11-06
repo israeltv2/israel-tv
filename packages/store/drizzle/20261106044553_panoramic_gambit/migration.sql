@@ -1,0 +1,1 @@
+ALTER TABLE `shows` ADD `tmdbCheckedAt` text;

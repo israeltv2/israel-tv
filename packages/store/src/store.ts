@@ -230,7 +230,26 @@ export class Store {
   }
 
   setExternalIds(seriesId: string, ids: { tmdbId: number | null; imdbId: string | null }): void {
-    this.db.update(t.shows).set(ids).where(eq(t.shows.seriesId, seriesId)).run();
+    this.db
+      .update(t.shows)
+      .set({ ...ids, tmdbCheckedAt: now() })
+      .where(eq(t.shows.seriesId, seriesId))
+      .run();
+  }
+
+  /** Listed shows never looked up on TMDB, or looked up (without a match) before `before`. */
+  showsToMatch(before: string): ShowRow[] {
+    return this.db
+      .select()
+      .from(t.shows)
+      .where(
+        and(
+          eq(t.shows.state, 'listed'),
+          sql`${t.shows.tmdbId} is null and (${t.shows.tmdbCheckedAt} is null or ${t.shows.tmdbCheckedAt} < ${before})`,
+        ),
+      )
+      .all()
+      .map((r) => this.toShowRow(r));
   }
 
   private toShowRow(r: typeof t.shows.$inferSelect): ShowRow {

@@ -10,6 +10,7 @@ import { createLogger } from './log.ts';
 import { deploy, renderFromStore, writeSite } from './publish.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
+import { matchShows } from './tmdb.ts';
 
 const HELP = `israel-tv <command>
 
@@ -20,6 +21,7 @@ const HELP = `israel-tv <command>
   resolver                           Run only the private resolver
   publish                            Render the addon files and deploy them with the configured publisher
   serve                              Serve the rendered files on the local network (local publisher)
+  match                              Look up TMDB/IMDb ids for shows (needs tmdb in the config)
   status                             Recent runs and warnings
   help                               This text
 
@@ -121,6 +123,12 @@ async function main(argv: string[]): Promise<number> {
         startLocalServer(p.dir, host, port);
         log(`serving ${p.dir} on http://${host}:${port}/manifest.json`);
         await new Promise(() => {});
+        return 0;
+      }
+      case 'match': {
+        const key = config.tmdb ? process.env[config.tmdb.apiKeyEnv] : undefined;
+        if (!key) throw new Error('add "tmdb": {} to israel-tv.config.json and TMDB_API_KEY to .env');
+        await matchShows(store, key, { log });
         return 0;
       }
       case 'status': {
