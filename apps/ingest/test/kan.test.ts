@@ -161,3 +161,32 @@ test('a video embedded in a show page is keyed by its stable Kan video id', asyn
     }),
   ).toBe('kan:vod-2171294');
 });
+
+test('a known show whose page lists no episodes is a failed read, even with a player on the page', async () => {
+  const store = Store.open(':memory:');
+  const l = loader(routes);
+  for (
+    let i = 0;
+    i < 60 &&
+    store.listShows({ source: 'kan' }).flatMap((s) => s.show.seasons.flatMap((x) => x.episodes)).length < 9;
+    i++
+  ) {
+    await crawlKan(store, opts(l, 10));
+  }
+  const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
+  const before = store.assignments(id).episodes.length;
+  // Same show page with its episode links gone (layout change), still embedding a player.
+  const changed = fx('show-p-1006421').replace(/href="[^"]*p-1006421\/s1\/\d+\/"/g, 'href="#"');
+  const l2 = {
+    ...l,
+    async load(url: string) {
+      return url.endsWith('/p-1006421/') ? { status: 200, html: changed, challenged: false } : l.load(url);
+    },
+  };
+  await crawlKan(store, {
+    ...opts(l2 as never, 3),
+    priority: ['https://www.kan.org.il/content/kan/kan-11/p-1006421/'],
+  });
+  expect(store.assignments(id).episodes.length).toBe(before);
+  expect(store.getShow(id)?.lastError).toMatch(/lists no episodes/);
+});

@@ -56,10 +56,11 @@ export interface KanShowPage {
   featured?: KanEpisode;
 }
 
-/** Episode links of a show page: `<show>/<id>/` or `<show>/s<season>/<id>/`. */
+/** Episode links of a show page: `<show>/<id>/` or `<show>/<season>/<id>/`. */
 export function parseShowPage(html: string, showPath: string, origin: string = KAN_ORIGIN): KanShowPage {
   const esc = showPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`href="(?:https://[^"/]+)?(${esc}(?:s[\\w-]+/)?(\\d+)/)"`, 'g');
+  // The season part, when present, is one path segment: `s2/` on kan.org.il, `עונה-3/` on kankids.
+  const re = new RegExp(`href="(?:https://[^"/]+)?(${esc}(?:[^"/]+/)?(\\d+)/)"`, 'g');
   const seen = new Map<string, KanEpisodeLink>();
   for (const m of html.matchAll(re)) {
     if (m[1] && m[2] && !seen.has(m[1])) seen.set(m[1], { path: m[1], id: Number(m[2]) });

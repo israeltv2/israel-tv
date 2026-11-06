@@ -189,7 +189,7 @@ async function main(argv: string[]): Promise<number> {
         const proxy = proxyEndpoints(config.geo)[0];
         const r = await crawlKan(store, {
           ...kanCrawlOptions(config, proxy, log),
-          ...(limit ? { pagesPerRun: limit } : {}),
+          ...(limit ? { pagesPerRun: Math.max(2, limit) } : {}),
         });
         return r.failed ? 1 : 0;
       }
