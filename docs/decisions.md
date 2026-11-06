@@ -868,3 +868,14 @@ the GraphQL API is no substitute (it only has request totals per Worker, not per
   `.local` names often fail on Android TV; Docker `chown` after copying `.env`; `<addon>` means the base URL
   everywhere and Hebrew searches use one word or `%20`; the admin cookie lasts 30 days; a first-time tunnel gets
   a complete `config.yml` in the right order; resolver-only update, restart and log commands.
+
+### Kan artwork: copy the lobby poster, not the share image
+
+Measured on the home machine in a real browser session (direct and through the proxy, same result): Kan answers
+403 (a Cloudflare page) for its share images (`og:image`, with or without resize parameters), the show page's
+hero and the video poster, whatever the request type (script fetch, page navigation, image element), while the
+pictures its pages actually show load (64 of 67 on a show page, served as WebP). So the copy is now made from the
+show's poster on its lobby card (portrait 300×450 on Kan 11; on the kids lobby the 239×360 poster, else the
+character picture), loaded from the show page's session — confirmed 200, 300×450. The share image is only a
+fallback for shows with no card. The catalog had been pointing at share images, so Kan posters were not showing
+for anyone; the copies fix that too.
