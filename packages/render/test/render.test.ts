@@ -63,7 +63,7 @@ test('catalog is newest first and paged by 100', () => {
   const shows = Array.from({ length: 150 }, (_, i) =>
     show(`iltv_mako_${i + 1}`, `2026-01-${String((i % 28) + 1).padStart(2, '0')}`),
   );
-  const files = renderSite({ ...base, shows });
+  const files = renderSite({ ...base, sources: ['mako'], shows });
   const page1 = read(files, 'catalog/series/iltv_keshet12.json').metas;
   const page2 = read(files, 'catalog/series/iltv_keshet12/skip-100.json').metas;
   expect(page1.length).toBe(100);
@@ -128,4 +128,16 @@ test('an external id held by two series is published for neither', () => {
     ],
   });
   expect(read(files, 'ext-ids.json')).toEqual({});
+});
+
+test('a running source whose row has no shows yet is listed, saying it is loading', () => {
+  const files = renderSite({ ...base, sources: ['mako', 'kan'], shows: [show('iltv_mako_1', '2026-11-05')] });
+  const manifest = JSON.parse(files.get('manifest.json') ?? '{}');
+  expect(manifest.catalogs.map((c: { id: string }) => c.id)).toEqual([
+    'iltv_keshet12',
+    'iltv_kan11',
+    'iltv_kankids',
+  ]);
+  const row = JSON.parse(files.get('catalog/series/iltv_kankids.json') ?? '{}');
+  expect(row.metas[0].name).toMatch(/^⏳/);
 });

@@ -141,13 +141,13 @@ export async function ingestShow(
   }
   const show = cleanShow(dedupeEpisodes(mergePartial(prev?.show, scraped, fetched)));
   if (!prev && episodeCount(show) === 0) {
-    if (scraped.notes?.length) {
-      store.addWarnings(
-        runId,
-        null,
-        scraped.notes.map((message) => ({ code: 'source-note', message: `${entry.title}: ${message}` })),
-      );
-    }
+    // Listed by the source but with nothing to watch: not in the catalog, and always said so.
+    const notes = scraped.notes?.length ? scraped.notes : ['listed, but its page has no episodes'];
+    store.addWarnings(
+      runId,
+      null,
+      notes.map((message) => ({ code: 'source-note', message: `${entry.title}: ${message}` })),
+    );
     return { kind: 'empty' };
   }
   const thin = thinReason(prev?.show, show);
@@ -191,7 +191,8 @@ async function runShows(
   let showsOk = 0;
   let showsFailed = 0;
   let newEpisodes = 0;
-  let empty = 0;
+  const empty: string[] = [];
+  let stoppedEarly = false;
   let consecutiveBlocks = 0;
   const errors: string[] = [];
   const list = opts.limit ? entries.slice(0, opts.limit) : entries;
@@ -201,7 +202,7 @@ async function runShows(
       showsOk++;
       consecutiveBlocks = 0;
       if (r.kind === 'empty') {
-        empty++;
+        empty.push(entry.title);
         continue;
       }
       newEpisodes += r.newEpisodes;
@@ -218,11 +219,14 @@ async function runShows(
           `stopped after ${consecutiveBlocks} blocked requests in a row; the rest waits for the next run`,
         );
         log(`stopping ${adapter.source}: blocked ${consecutiveBlocks} times in a row`);
+        stoppedEarly = true;
         break;
       }
     }
   }
   const status = runStatus(showsOk, showsFailed);
+  // A complete full read knows every listed show without episodes; /status lists them (see buildStatus).
+  if (kind === 'full' && !opts.limit && !stoppedEarly) store.setState(emptyShowsKey(adapter.source), empty);
   const summary: RunSummary = {
     runId,
     status,
@@ -244,7 +248,7 @@ async function runShows(
     ...(summary.error ? { error: summary.error } : {}),
   });
   log(
-    `${kind} ${adapter.source}: ${status}, ${showsOk} ok (${empty} without episodes), ${showsFailed} failed, +${newEpisodes} episodes, ${summary.requests} requests, ${Math.round(summary.ms / 1000)} s`,
+    `${kind} ${adapter.source}: ${status}, ${showsOk} ok (${empty.length} without episodes), ${showsFailed} failed, +${newEpisodes} episodes, ${summary.requests} requests, ${Math.round(summary.ms / 1000)} s`,
   );
   return summary;
 }
@@ -314,4 +318,9 @@ export async function runOne(
   const t0 = Date.now();
   const runId = store.startRun('show', `${adapter.source}:${entry.key}`);
   return runShows(store, adapter, 'show', [entry], opts, false, runId, t0);
+}
+
+/** Store key of the titles a source lists without any episodes (from the last complete full read). */
+export function emptyShowsKey(source: string): string {
+  return `empty-shows:${source}`;
 }

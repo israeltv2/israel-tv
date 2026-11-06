@@ -18,7 +18,7 @@ import {
 import { type LiveChannelRender, type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { liveRender } from './live.ts';
-import { episodeCount } from './runner.ts';
+import { emptyShowsKey, episodeCount } from './runner.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const VERSION = '1.0.0';
@@ -85,6 +85,13 @@ export function buildStatus(
     } else if (shows.length === 0 && last) {
       health = 'error';
       notes.push('no shows');
+    }
+    const empty = store.getState<string[]>(emptyShowsKey(source)) ?? [];
+    if (empty.length > 0) {
+      const names = empty.slice(0, 10).join(', ') + (empty.length > 10 ? `, +${empty.length - 10} more` : '');
+      notes.push(
+        `${empty.length} shows listed by the site have no episodes on their page, so they are not in the catalog: ${names}`,
+      );
     }
     out.push({
       source,
@@ -177,7 +184,7 @@ export function renderFromStore(store: Store, config: Config, live: LiveChannelR
   }));
   return renderSite({
     version: VERSION,
-    sources: enabledSources(config),
+    sources: activeSources(config),
     shows,
     live,
     status,

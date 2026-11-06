@@ -89,12 +89,31 @@ const STATE_KEY = 'kan:crawl';
 const CONNECTION_DOWN =
   /ERR_PROXY|ERR_TUNNEL|ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE|ERR_SOCKS|Target (page, context or browser )?closed|browser has been closed/i;
 /**
- * An episode page that fails for itself (404, no player on it) is tried this many times, at least RETRY_GAP_MS
- * apart (so over at least a day), before it is skipped.
+ * An episode page charged with a failure (its own: a 404, no player on it, or a server error while comparable
+ * pages load) is tried this many times, at least RETRY_GAP_MS apart (so over at least a day), before it is skipped.
  */
 const MAX_EPISODE_TRIES = 3;
-const RETRY_GAP_MS = 12 * 3_600_000;
-const HOUR = HOUR_MS;
+const RETRY_GAP_MS = 12 * HOUR_MS;
+
+/** Listing pages (lobbies, show pages) and episode pages are compared only with their own kind. */
+type Kind = 'listing' | 'episode';
+/**
+ * What a failed page load means: `outage` stops the slice and charges no page; `suspect` may be the page's own
+ * problem or the site's (decided by comparison); `page` is the page's own problem.
+ */
+type Failure = 'outage' | 'suspect' | 'page';
+class KanLoadError extends Error {
+  readonly failure: Failure;
+  constructor(message: string, failure: Failure) {
+    super(message);
+    this.failure = failure;
+  }
+}
+/** Anything thrown that is not a load error (a page that does not parse) is the page's own problem. */
+const failureOf = (err: unknown): Failure => (err instanceof KanLoadError ? err.failure : 'page');
+const firstLine = (err: unknown) => (err as Error).message.split('\n')[0];
+
+type BatchItem = { episode: ScrapedEpisode; season: number | undefined; url: string };
 
 export interface KanCrawlOptions {
   browser: BrowserConfig;
@@ -111,10 +130,10 @@ export interface KanCrawlOptions {
 }
 
 export function showDue(s: ShowState, now: number, windowDays: number): boolean {
-  if (!s.checkedAt) return !s.failedAt || now - Date.parse(s.failedAt) > 7 * 24 * HOUR;
+  if (!s.checkedAt) return !s.failedAt || now - Date.parse(s.failedAt) > 7 * DAY_MS;
   const age = now - Date.parse(s.checkedAt);
   const airing = s.lastNewAt !== undefined && now - Date.parse(s.lastNewAt) < windowDays * DAY_MS;
-  return age > (airing ? 6 : 7 * 24) * HOUR;
+  return age > (airing ? 6 * HOUR_MS : 7 * DAY_MS);
 }
 
 /** Episodes are keyed by their Kan page id (stable; the player config's id on an episode page). */
@@ -176,8 +195,8 @@ export async function crawlKan(
   let loader: PageLoader | undefined = opts.loader;
   let pages = 0;
   let newEpisodes = 0;
-  let blocked = 0;
   let problems = 0;
+  let stopped = false;
   /** Server errors in a row, per site (kan.org.il and kankids.org.il fail independently). */
   const serverErrors = new Map<string, number>();
   /**
@@ -186,22 +205,21 @@ export async function crawlKan(
    * pages can fail while the rest of the site works). At the end of a slice an open one is settled by loading a
    * comparable page; with nothing to compare against it stays uncharged and the run says so.
    */
-  type Kind = 'listing' | 'episode';
   let suspects: { site: string; kind: Kind; charge: () => void }[] = [];
-  let unsettled = 0;
-  const isServerError = (err: unknown) => (err as { serverError?: boolean }).serverError === true;
   const readShows: string[] = [];
   /** Shows whose page was read or failed without a block (a refresh of them is done either way). */
   const attemptedShows: string[] = [];
   let note = '';
 
   const origin = (url: string) => new URL(url).origin;
+  const warn = (seriesId: string | null | undefined, message: string) =>
+    store.addWarnings(runId, seriesId ?? null, [{ code: 'source-note', message }]);
+  /** A server error: the first on a site may be that page's problem; two in a row mean the site is down. */
   const serverError = (url: string, message: string): never => {
     const site = origin(url);
     const n = (serverErrors.get(site) ?? 0) + 1;
     serverErrors.set(site, n);
-    if (n >= 2) blocked++;
-    throw Object.assign(new Error(message), { serverError: true });
+    throw new KanLoadError(message, n >= 2 ? 'outage' : 'suspect');
   };
   const load = async (url: string, kind: Kind = 'listing') => {
     if (pages > 0) await sleep(opts.pageIntervalMs);
@@ -214,44 +232,58 @@ export async function crawlKan(
       );
     } catch (err) {
       // No browser: the slice fails, not any page.
-      blocked++;
-      throw new Error(`browser did not start: ${(err as Error).message.split('\n')[0]}`);
+      throw new KanLoadError(`browser did not start: ${firstLine(err)}`, 'outage');
     }
     try {
       r = await loader.load(url);
     } catch (err) {
-      const message = `${url}: ${(err as Error).message.split('\n')[0]}`;
+      const message = `${url}: ${firstLine(err)}`;
       // The proxy or this machine's network is down, or the browser died: back off, charge nobody.
-      if (CONNECTION_DOWN.test(message)) {
-        blocked++;
-        throw new Error(message);
-      }
+      if (CONNECTION_DOWN.test(message)) throw new KanLoadError(message, 'outage');
       // Anything else (a timeout, a redirect loop, an empty response) may be this page's own problem: treat it
       // like a server error, so it is compared with other pages of its site before anyone is charged.
       return serverError(url, message);
     }
     // Challenges and proxy refusals: the slice stops and backs off, and no page is charged for them.
     if (r.challenged || r.status === 403 || r.status === 407) {
-      blocked++;
-      throw new Error(`${url}: ${r.challenged ? 'Cloudflare challenge did not clear' : `HTTP ${r.status}`}`);
+      const why = r.challenged ? 'Cloudflare challenge did not clear' : `HTTP ${r.status}`;
+      throw new KanLoadError(`${url}: ${why}`, 'outage');
     }
-    // Server errors (5xx, rate limiting): one may be that page's problem; two in a row on the same site mean
-    // the site is down, so the slice backs off and no page is charged.
-    const site = origin(url);
     if (r.status === 429 || r.status >= 500) return serverError(url, `${url}: HTTP ${r.status}`);
+    // The site answered normally, so its pages of this kind that answered a server error are broken by themselves.
+    const site = origin(url);
     serverErrors.delete(site);
-    blocked = 0;
-    // The site answered normally, so its pages that answered a server error are broken by themselves.
-    const proven = suspects.filter((x) => x.site === site && x.kind === kind);
-    suspects = suspects.filter((x) => !proven.includes(x));
-    for (const x of proven) x.charge();
-    if (r.status >= 400) throw new Error(`${url}: HTTP ${r.status}`);
+    const proven: (() => void)[] = [];
+    suspects = suspects.filter((x) => {
+      if (x.site !== site || x.kind !== kind) return true;
+      proven.push(x.charge);
+      return false;
+    });
+    for (const charge of proven) charge();
+    if (r.status >= 400) throw new KanLoadError(`${url}: HTTP ${r.status}`, 'page');
     return r.html;
+  };
+  /**
+   * A failed show or episode page: an outage stops the slice (no one charged); a possible server-side problem
+   * becomes a suspect, charged once a comparable page loads; anything else is the page's own problem, charged now.
+   */
+  const triage = (err: unknown, url: string, kind: Kind, charge: () => void): 'suspect' | 'charged' => {
+    const failure = failureOf(err);
+    if (failure === 'outage') throw err;
+    if (failure === 'suspect') {
+      suspects.push({ site: origin(url), kind, charge });
+      return 'suspect';
+    }
+    charge();
+    return 'charged';
+  };
+  const rethrowOutage = (err: unknown) => {
+    if (failureOf(err) === 'outage') throw err;
   };
 
   try {
     // 1. Lobbies, once a day.
-    if (!state.lobbiesAt || now - Date.parse(state.lobbiesAt) > 24 * HOUR) {
+    if (!state.lobbiesAt || now - Date.parse(state.lobbiesAt) > DAY_MS) {
       const byUrl = new Map<string, string>();
       let lobbyEmpty = false;
       for (const l of KAN_LOBBIES) {
@@ -263,12 +295,10 @@ export async function crawlKan(
           } catch (err) {
             // One lobby failing (its site down, or the page moved) must not stop the other site or the known
             // shows: note it, keep going, and read the lobbies again next slice.
-            if (blocked > 0) throw err;
+            rethrowOutage(err);
             problems++;
             lobbyEmpty = true;
-            store.addWarnings(runId, null, [
-              { code: 'source-note', message: `Kan lobby ${l.url}: ${(err as Error).message}` },
-            ]);
+            warn(null, `Kan lobby ${l.url}: ${(err as Error).message}`);
             byUrl.set(l.url, '');
             continue;
           }
@@ -280,9 +310,7 @@ export async function crawlKan(
           // A lobby that loads but lists no shows is a layout change: say so and try again next slice.
           problems++;
           lobbyEmpty = true;
-          store.addWarnings(runId, null, [
-            { code: 'source-note', message: `Kan lobby ${l.url} (${l.channelPath}) lists no shows` },
-          ]);
+          warn(null, `Kan lobby ${l.url} (${l.channelPath}) lists no shows`);
         }
         for (const path of paths) {
           const key = `${l.origin}${path}`;
@@ -313,8 +341,8 @@ export async function crawlKan(
       const s = state.shows[key];
       if (!s) continue;
       if (pages >= showBudget && !prio.has(key)) break;
-      const id = store.findSeriesId('kan', key);
       if (!prio.has(key) && !showDue(s, now, opts.airingWindowDays)) continue;
+      const id = store.findSeriesId('kan', key);
       const firstRead = !s.checkedAt;
       const path = new URL(key).pathname;
       let page: ReturnType<typeof parseShowPage>;
@@ -324,7 +352,7 @@ export async function crawlKan(
       const chargeShow = (message: string) => {
         if (s.checkedAt) s.checkedAt = new Date().toISOString();
         else s.failedAt = new Date().toISOString();
-        store.addWarnings(runId, id ?? null, [{ code: 'source-note', message: `Kan ${key}: ${message}` }]);
+        warn(id, `Kan ${key}: ${message}`);
         if (id) {
           problems++;
           store.markShowFailed(id, `kept last good data: ${message}`);
@@ -333,12 +361,10 @@ export async function crawlKan(
       try {
         page = parseShowPage(await load(key), path);
       } catch (err) {
-        if (blocked > 0) throw err;
+        rethrowOutage(err);
         attemptedShows.push(key);
         const message = (err as Error).message;
-        if (isServerError(err))
-          suspects.push({ site: origin(key), kind: 'listing', charge: () => chargeShow(message) });
-        else chargeShow(message);
+        triage(err, key, 'listing', () => chargeShow(message));
         continue;
       }
       s.checkedAt = new Date().toISOString();
@@ -356,7 +382,7 @@ export async function crawlKan(
       const gaveUp = new Set(s.failed);
       s.pending = page.episodes
         .map((e) => `${s.origin}${e.path}`)
-        .filter((u) => !known.has(`kan:${/(\d+)\/$/.exec(u)?.[1]}`) && !gaveUp.has(u));
+        .filter((u) => !known.has(kanEpisodeKey({ id: String(/(\d+)\/$/.exec(u)?.[1]) })) && !gaveUp.has(u));
       // "Airing" means the show page revealed links we had never seen, not an old backlog or retries.
       const fresh = firstRead ? [] : s.pending.filter((u) => !seenBefore.has(u));
       if (fresh.length > 0) {
@@ -369,9 +395,7 @@ export async function crawlKan(
       if (page.episodes.length === 0 && known.size > 0 && id) {
         problems++;
         store.markShowFailed(id, 'kept last good data: the show page lists no episodes (layout change?)');
-        store.addWarnings(runId, id, [
-          { code: 'source-note', message: `Kan ${key}: show page lists no episodes` },
-        ]);
+        warn(id, `Kan ${key}: show page lists no episodes`);
       }
       // A good read of the show page clears an earlier failure (e.g. one empty page during a Kan deploy).
       else if (id && page.episodes.length > 0) store.markShowChecked(id);
@@ -387,65 +411,48 @@ export async function crawlKan(
       .filter(([, s]) => s.pending.length > 0 && retryAfter(s) <= Date.now())
       .sort(([, a], [, b]) => (b.checkedAt ?? '').localeCompare(a.checkedAt ?? ''));
     for (const [key, s] of queue) {
-      const batch: { episode: ScrapedEpisode; season: number | undefined; url?: string }[] = [];
+      const seriesId = store.findSeriesId('kan', key);
+      const batch: BatchItem[] = [];
       try {
         while (s.pending.length > 0 && pages < opts.pagesPerRun) {
           const url = s.pending[0] as string;
-          let problem: string | undefined;
           // Kan episodes are numbered in reading order (page-id order), so never read past a gap: a failing page
           // stays first, the show pauses, and the page is tried again later; only after several tries is it
           // given up. Returns whether reading this show may go on.
           const chargeEpisode = (message: string): boolean => {
             problems++;
             const tries = (s.retry?.[url]?.n ?? 0) + 1;
-            if (tries < MAX_EPISODE_TRIES) {
-              s.retry = { ...(s.retry ?? {}), [url]: { n: tries, at: new Date().toISOString() } };
-              store.addWarnings(runId, store.findSeriesId('kan', key) ?? null, [
-                {
-                  code: 'source-note',
-                  message: `Kan episode ${url}: ${message} (try ${tries} of ${MAX_EPISODE_TRIES}; the show waits for it)`,
-                },
-              ]);
-              return false;
-            }
-            if (s.retry) delete s.retry[url];
-            s.failed.push(url);
-            s.pending = s.pending.filter((u) => u !== url);
-            if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
-            store.addWarnings(runId, store.findSeriesId('kan', key) ?? null, [
-              {
-                code: 'source-note',
-                message: `Kan episode ${url}: ${message} (gave up after ${tries} tries)`,
-              },
-            ]);
-            return true;
+            const goOn = tries >= MAX_EPISODE_TRIES;
+            if (goOn) {
+              delete s.retry?.[url];
+              s.failed.push(url);
+              s.pending = s.pending.filter((u) => u !== url);
+              if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
+            } else s.retry = { ...(s.retry ?? {}), [url]: { n: tries, at: new Date().toISOString() } };
+            const outcome = goOn
+              ? `gave up after ${tries} tries`
+              : `try ${tries} of ${MAX_EPISODE_TRIES}; the show waits for it`;
+            warn(seriesId, `Kan episode ${url}: ${message} (${outcome})`);
+            return goOn;
           };
+          let e: ReturnType<typeof parseEpisodePage>;
           try {
-            const e = parseEpisodePage(await load(url, 'episode'), origin(url));
-            if (e) {
-              batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
-              state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
-            } else problem = 'no video player config on the page (layout changed?)';
+            e = parseEpisodePage(await load(url, 'episode'), origin(url));
           } catch (err) {
-            if (blocked > 0) throw err;
-            if (isServerError(err)) {
-              // Compare with the next page of this site (or its lobby at the end of the slice): if that loads,
-              // this one is charged; if it also fails, the site is down.
-              const message = (err as Error).message;
-              suspects.push({
-                site: origin(url),
-                kind: 'episode',
-                charge: () => void chargeEpisode(message),
-              });
+            const message = (err as Error).message;
+            const charged = { goOn: false };
+            if (triage(err, url, 'episode', () => (charged.goOn = chargeEpisode(message))) === 'suspect')
               break;
-            }
-            problem = (err as Error).message;
-          }
-          if (problem) {
-            if (!chargeEpisode(problem)) break;
+            if (!charged.goOn) break; // the show waits for this page
             continue;
           }
-          if (s.retry?.[url]) delete s.retry[url];
+          if (!e) {
+            if (!chargeEpisode('no video player config on the page (layout changed?)')) break;
+            continue;
+          }
+          batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
+          state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
+          delete s.retry?.[url];
           s.pending.shift();
         }
       } finally {
@@ -462,10 +469,10 @@ export async function crawlKan(
       try {
         await load(yardstick, kind);
       } catch (err) {
-        if (blocked > 0) throw err;
+        rethrowOutage(err);
       }
     }
-    unsettled = suspects.length;
+    const unsettled = suspects.length;
     const shows = Object.values(state.shows);
     const pendingTotal = shows.reduce((n, s) => n + s.pending.length, 0);
     // Shows paused on an episode page that failed: visible on /status for as long as they wait.
@@ -478,7 +485,8 @@ export async function crawlKan(
         ? [`${unsettled} Kan pages answered a server error (not yet known whose fault)`]
         : []),
     ];
-    // Pages that loaded but did not parse make the slice partial, so a layout change shows on /status.
+    // Pages that could not be read, shows waiting to retry one, and open suspects make the slice partial, so
+    // they show on /status.
     store.finishRun(runId, {
       status: issues.length > 0 ? 'partial' : 'ok',
       requests: pages,
@@ -488,7 +496,9 @@ export async function crawlKan(
         : {}),
     });
   } catch (err) {
-    // Blocked (challenge / proxy refusal): stop and wait well before trying again.
+    // An outage (challenge, proxy refusal, connection down, no browser, a site answering server errors): stop
+    // and wait well before trying again.
+    stopped = true;
     state.backoffUntil = new Date(Date.now() + 45 * 60_000).toISOString();
     note = `stopped: ${(err as Error).message}; next try after ${state.backoffUntil}`;
     store.finishRun(runId, {
@@ -502,23 +512,10 @@ export async function crawlKan(
     if (!opts.loader) await loader?.close();
   }
   log(`kan: ${note}`);
-  return {
-    pages,
-    newEpisodes,
-    note,
-    readShows,
-    attemptedShows,
-    ...(note.startsWith('stopped:') ? { failed: true } : {}),
-  };
+  return { pages, newEpisodes, note, readShows, attemptedShows, ...(stopped ? { failed: true } : {}) };
 }
 
-function saveEpisodes(
-  store: Store,
-  key: string,
-  s: ShowState,
-  batch: { episode: ScrapedEpisode; season: number | undefined; url?: string }[],
-  runId?: number,
-): number {
+function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[], runId: number): number {
   const seriesId = store.seriesIdFor('kan', key);
   const prev = store.getShow(seriesId)?.show;
   const base: ScrapedShow = prev ?? {
@@ -540,9 +537,9 @@ function saveEpisodes(
   );
   const clean = cleanShow(show);
   const numbering = assignNumbers(clean, store.assignments(seriesId));
-  if (numbering.warnings.length) store.addWarnings(runId ?? null, seriesId, numbering.warnings);
+  if (numbering.warnings.length) store.addWarnings(runId, seriesId, numbering.warnings);
   // Newly published episodes move the show up "newest first"; the first fill's backlog does not.
-  const fresh = batch.some((b) => b.url && s.fresh?.includes(b.url));
+  const fresh = batch.some((b) => s.fresh?.includes(b.url));
   if (s.fresh) s.fresh = s.fresh.filter((u) => !batch.some((b) => b.url === u));
   return store.saveShow(seriesId, clean, numbering.added, latestAirDate(clean), fresh);
 }
