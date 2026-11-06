@@ -128,3 +128,15 @@ test('a genre filter lists the shows of that genre in the row, in order, a page 
     },
   );
 });
+
+test('search matches whole words from their start', async () => {
+  const q = async (term: string) =>
+    (
+      (await get(`/catalog/series/iltv_keshet12/search=${encodeURIComponent(term)}.json`)).body as {
+        metas: unknown[];
+      }
+    ).metas.length;
+  expect(await q('מאסטר')).toBe(1);
+  expect(await q('שפ')).toBe(1); // "שף" is a word of its own
+  expect(await q('אסטר')).toBe(0); // the middle of a word
+});

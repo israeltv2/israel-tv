@@ -98,6 +98,8 @@ export function cleanKanTitle(raw: string): string {
       '',
     )
     .replace(/\s*[-–]?\s*לצפייה ישירה\s*$/, '')
+    .replace(/\s+[-–]\s+(?:סדרת|סדרה|סרט)\s[^|]*$/, '')
+    .replace(/\s*[|\-–]\s*$/, '')
     .trim();
   return t || raw.trim();
 }

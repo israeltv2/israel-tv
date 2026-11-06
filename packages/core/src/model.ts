@@ -90,9 +90,22 @@ export function cleanShow(show: ScrapedShow): ScrapedShow {
   return r.data;
 }
 
-/** Genres as a source gives them, cleaned: trimmed, no empties or repeats, at most 5. */
+/**
+ * Genres as a source gives them, cleaned for a filter: one spelling ("תוכניות" → "תכניות"), no "תכניות" prefix
+ * ("תכניות אקטואליה" → "אקטואליה"), no site sections (anything with a channel number, "חדשות 13"), no empties or
+ * repeats, at most 5.
+ */
 export function cleanGenres(list: readonly (string | null | undefined)[] | null | undefined): string[] {
+  const one = (g: string) =>
+    g
+      .replace(/[\s\u00a0]+/g, ' ')
+      .trim()
+      .replace(/תוכני/g, 'תכני')
+      .replace(/^תכני(?:ו)?ת\s+/, '')
+      .replace(/^מצויירים$/, 'מצוירים');
   return [
-    ...new Set((list ?? []).map((g) => (g ?? '').trim()).filter((g) => g.length > 0 && g.length <= 40)),
+    ...new Set(
+      (list ?? []).map((g) => one(g ?? '')).filter((g) => g.length > 0 && g.length <= 40 && !/\d/.test(g)),
+    ),
   ].slice(0, 5);
 }

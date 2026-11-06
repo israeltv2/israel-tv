@@ -3,12 +3,14 @@ import {
   CATALOG_PAGE_SIZE,
   CATALOGS,
   CONTRACT,
+  cleanGenres,
   type EpisodeAssignment,
   type EpisodePlay,
   type ExtIds,
   type Freshness,
   GEO_LIMITED,
   ISRAEL_ONLY,
+  LIVE_ALIASES,
   type Manifest,
   type Meta,
   type MetaPreview,
@@ -25,6 +27,8 @@ import {
   type Stream,
   sitePaths,
   streamName,
+  tidyEpisodeTitle,
+  tidyText,
   type Video,
   videoId,
 } from '@israel-tv/core';
@@ -104,20 +108,22 @@ export function releaseInfo(s: RenderShow): string | undefined {
 }
 
 function preview(s: RenderShow): MetaPreview {
-  const p: MetaPreview = { id: s.seriesId, type: 'series', name: s.title, posterShape: SHAPE };
+  const p: MetaPreview = { id: s.seriesId, type: 'series', name: tidyText(s.title), posterShape: SHAPE };
   if (s.show.poster) p.poster = s.show.poster;
-  if (s.show.description) p.description = s.show.description;
+  if (s.show.description) p.description = tidyText(s.show.description);
   const year = releaseInfo(s);
   if (year) p.releaseInfo = year;
-  if (s.show.genres?.length) p.genres = s.show.genres;
+  const genres = cleanGenres(s.show.genres);
+  if (genres.length) p.genres = genres;
   if (s.imdbId) p.imdb_id = s.imdbId;
   return p;
 }
 
 /** Named seasons ("VIP 5", numbered from 101) say which they are in episode titles; numbered and year ones not. */
 function seasonLabel(a: SeasonAssignment | undefined, title: string): string | undefined {
-  if (a?.kind !== 'named') return undefined;
-  return title || String(a.number);
+  // An untitled season has nothing to say ("101 ·" means nothing to a viewer).
+  if (a?.kind !== 'named' || !title.trim()) return undefined;
+  return tidyText(title);
 }
 
 function videosFor(s: RenderShow): Video[] {
@@ -130,7 +136,7 @@ function videosFor(s: RenderShow): Video[] {
     for (const ep of season.episodes) {
       const a = epByKey.get(ep.key);
       if (!a) continue;
-      const base = ep.title || `פרק ${a.episode}`;
+      const base = (ep.title && tidyEpisodeTitle(ep.title, s.title)) || `פרק ${a.episode}`;
       const v: Video = {
         id: videoId(s.seriesId, a.season, a.episode),
         title: label ? `${label} · ${base}` : base,
@@ -139,7 +145,7 @@ function videosFor(s: RenderShow): Video[] {
       };
       if (ep.airDate) v.released = `${ep.airDate}T00:00:00.000Z`;
       if (ep.thumbnail) v.thumbnail = ep.thumbnail;
-      if (ep.description) v.overview = ep.description;
+      if (ep.description) v.overview = tidyText(ep.description);
       videos.push(v);
     }
   }
@@ -197,7 +203,7 @@ function seasonStreamFiles(s: RenderShow): Map<number, SeasonStreams> {
         url: x.url,
         name: streamName(s.show.source, x.url),
         title: [
-          ep.title || `פרק ${a.episode}`,
+          (ep.title && tidyEpisodeTitle(ep.title, s.title)) || `פרק ${a.episode}`,
           x.label,
           ep.availableAbroad === false ? ISRAEL_ONLY : undefined,
         ]
@@ -234,8 +240,10 @@ function genreOptions(input: RenderInput, catalog: string): string[] {
   const n = new Map<string, number>();
   for (const s of input.shows)
     if (s.catalog === catalog && s.state === 'listed' && s.episodes.length > 0)
-      for (const g of s.show.genres ?? []) n.set(g, (n.get(g) ?? 0) + 1);
+      for (const g of cleanGenres(s.show.genres)) n.set(g, (n.get(g) ?? 0) + 1);
+  // A filter that finds one show is noise.
   return [...n]
+    .filter(([, count]) => count >= 2)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'he'))
     .slice(0, MAX_GENRE_OPTIONS)
     .map(([g]) => g);
@@ -288,14 +296,15 @@ export function renderSite(input: RenderInput): SiteFiles {
     const row = rows.get(s.catalog) ?? [];
     row.push(preview(s));
     rows.set(s.catalog, row);
+    const genres = cleanGenres(s.show.genres);
     search.push([
       s.seriesId,
       'series',
       s.catalog,
-      s.title,
+      tidyText(s.title),
       normalizeForSearch([s.title, ...(s.aliases ?? [])].join(' | ')),
       s.show.poster ?? '',
-      ...(s.show.genres?.length ? [s.show.genres] : []),
+      ...(genres.length ? [genres] : []),
     ] as SearchRow);
   }
 
@@ -345,7 +354,14 @@ export function renderSite(input: RenderInput): SiteFiles {
       };
       files.set(sitePaths.meta('tv', ch.id), json({ meta }));
       files.set(sitePaths.liveStreams(ch.id), json({ streams: ch.streams }));
-      search.push([ch.id, 'tv', 'iltv_live', ch.name, normalizeForSearch(ch.name), ch.logo ?? '']);
+      search.push([
+        ch.id,
+        'tv',
+        'iltv_live',
+        ch.name,
+        normalizeForSearch([ch.name, ...(LIVE_ALIASES[ch.id] ?? [])].join(' | ')),
+        ch.logo ?? '',
+      ]);
     }
     rows.set('iltv_live', row);
   }

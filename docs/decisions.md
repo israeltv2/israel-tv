@@ -1218,3 +1218,27 @@ Measured on the live addon, then fixed:
   ids. Removal requests: [takedown.md](takedown.md).
 - **Free-plan quota** on the dashboard (System): today's Worker requests per Worker and Analytics Engine writes
   against Cloudflare's free 100,000 a day each, read hourly; from 80% also on `/status`.
+
+## Viewer-persona review of the live data (2026-11-06)
+
+A fresh reviewer read the live addon as four viewers. Fixed:
+
+- **Reshet show descriptions** (none of 225 had one): the show page's description meta.
+- **Untitled seasons** no longer prefix episode titles with their number ("101 · …"). **Episode titles** lose the
+  show's name, "עונה N" and "התכנית המלאה" around them; titles and texts are entity-decoded (Kan had a literal
+  `&amp;nbsp;`) and spaces normalised (non-breaking ones in Mako names). Done when rendering, so stored data needs no
+  change.
+- **Kan names:** a trailing "|" or "-", and "- סדרת …" taglines, removed.
+- **Live channel texts** in plain words ("צריך את העוזר הביתי" instead of "רזולבר").
+- **Genre filters:** one spelling ("תוכניות" → "תכניות"), no "תכניות" prefix, no site sections ("חדשות 13"), and a
+  genre is offered as a filter only when at least two shows of the row have it.
+- **Search** matches whole words from their start ("kan" no longer finds the middle of another word); live channels
+  have English names to search by.
+
+Not changed, by design or waiting for the owner:
+
+- **Kan rows look thin:** 1,914 episode pages were still queued across 168 shows (polite pace, 5 pages per 10
+  minutes); they fill over the coming days.
+- **Kan episode order** follows Kan's page ids, so a show can list "פרק 4" before "פרק 1"; and **Reshet daily shows**
+  whose source gives untitled seasons sit in season 101. Both need stored numbers changed: the owner decides.
+- **Israel-only notes** appear only where Kaltura marks the episode geo-blocked; some Reshet episodes play abroad.

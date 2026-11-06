@@ -250,8 +250,15 @@ test('genres and the IMDb id are published; each row offers its genres as a filt
     genres: ['תעודה'],
     imdb_id: 'tt5',
   });
+  // One show of a genre makes no filter; two do.
   const row = read(files, 'manifest.json').catalogs.find((c: { id: string }) => c.id === 'iltv_keshet12');
-  expect(row.extra).toContainEqual({ name: 'genre', options: ['תעודה'] });
+  expect(row.extra.some((e: { name: string }) => e.name === 'genre')).toBe(false);
+  const two = renderSite({
+    ...base,
+    shows: [yearShow(['2024-03-01']), { ...yearShow(['2025-03-01']), seriesId: 'iltv_mako_55' }],
+  });
+  const row2 = read(two, 'manifest.json').catalogs.find((c: { id: string }) => c.id === 'iltv_keshet12');
+  expect(row2.extra).toContainEqual({ name: 'genre', options: ['תעודה'] });
   expect(read(files, 'search.json')[0][6]).toEqual(['תעודה']);
 });
 
@@ -293,4 +300,36 @@ test('search finds a show by its other names (English from TMDB) too, and still 
   const row = read(files, 'search.json')[0];
   expect(row[3]).toBe('show iltv_mako_2');
   expect(row[4]).toContain('masterchef');
+});
+
+test('an untitled named season adds nothing to episode titles; titles and texts are tidied', () => {
+  const base2 = show('iltv_reshet_183', '2026-11-05');
+  const files = renderSite({
+    ...base,
+    shows: [
+      {
+        ...base2,
+        title: 'עושים שישי',
+        show: {
+          ...base2.show,
+          title: 'עושים שישי',
+          description: 'סוף&amp;nbsp;',
+          seasons: [
+            {
+              key: 'u',
+              title: '',
+              episodes: [
+                { key: 'x', title: 'עושים שישי 06.11.26 - התכנית המלאה', airDate: '2026-11-06', streams: [] },
+              ],
+            },
+          ],
+        },
+        seasons: [{ key: 'u', number: 101, kind: 'named' }],
+        episodes: [{ key: 'x', season: 101, episode: 1 }],
+      },
+    ],
+  });
+  const meta = read(files, 'meta/series/iltv_reshet_183.json').meta;
+  expect(meta.videos[0].title).toBe('06.11.26');
+  expect(meta.description).toBe('סוף');
 });

@@ -120,7 +120,8 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
       const hits: SearchRow[] = [];
       if (q) {
         for (const row of index) {
-          if (row[2] === id && row[4].includes(q) && (!genre || row[6]?.includes(genre))) {
+          // Whole words from their start: "kan" finds "Kan 11", not the middle of another word.
+          if (row[2] === id && ` ${row[4]}`.includes(` ${q}`) && (!genre || row[6]?.includes(genre))) {
             hits.push(row);
             if (hits.length >= MAX_SEARCH) break;
           }

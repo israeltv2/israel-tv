@@ -38,7 +38,7 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
   {
     id: 'iltv_live_keshet12',
     name: 'קשת 12',
-    description: 'שידור חי של קשת 12 (דרך הרזולבר הביתי)',
+    description: 'שידור חי של קשת 12 · צריך את העוזר הביתי',
     direct: [],
     mako: [
       { title: 'קשת 12', path: '/stream/hls/live/2033791/k12/index.m3u8' },
@@ -78,7 +78,7 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
   {
     id: 'iltv_live_ch24',
     name: 'ערוץ 24',
-    description: 'שידור חי של ערוץ 24 (דרך הרזולבר הביתי)',
+    description: 'שידור חי של ערוץ 24 · צריך את העוזר הביתי',
     direct: [],
     mako: [
       { title: 'ערוץ 24', path: '/direct/hls/live/2035340/ch24live/index.m3u8' },
@@ -150,15 +150,35 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
   {
     id: 'iltv_live_erets',
     name: 'ערוץ ארץ נהדרת',
-    description: 'ערוץ ארץ נהדרת 24/7 (דרך הרזולבר הביתי)',
+    description: 'ערוץ ארץ נהדרת 24/7 · צריך את העוזר הביתי',
     direct: [],
     mako: [{ title: 'ארץ נהדרת', path: '/evrideo/hls/live/20001278/erets/index.m3u8' }],
   },
   {
     id: 'iltv_live_savri',
     name: 'ערוץ סברי מרנן',
-    description: 'ערוץ סברי מרנן 24/7 (דרך הרזולבר הביתי)',
+    description: 'ערוץ סברי מרנן 24/7 · צריך את העוזר הביתי',
     direct: [],
     mako: [{ title: 'סברי מרנן', path: '/evrideo/hls/live/20001278/savri/index.m3u8' }],
   },
 ];
+
+/** Other names of the live channels (English, as people type them): found by search, never shown. */
+export const LIVE_ALIASES: Record<string, string[]> = {
+  iltv_live_kan11: ['Kan 11', 'Kan'],
+  iltv_live_keshet12: ['Keshet 12', 'Channel 12', 'Mako'],
+  iltv_live_reshet13: ['Reshet 13', 'Channel 13'],
+  iltv_live_ch14: ['Channel 14', 'Now 14'],
+  iltv_live_ch24: ['Channel 24', 'Music 24'],
+  iltv_live_kanedu: ['Kan Educational', 'Kan Kids', 'Kan'],
+  iltv_live_makan33: ['Makan 33', 'Kan 33'],
+  iltv_live_knesset: ['Knesset Channel', 'Knesset'],
+  iltv_live_ch10: ['Channel 10'],
+  iltv_live_ynet: ['Ynet'],
+  iltv_live_i24he: ['i24 News Hebrew', 'i24'],
+  iltv_live_i24en: ['i24 News English', 'i24'],
+  iltv_live_i24fr: ['i24 News French', 'i24'],
+  iltv_live_i24ar: ['i24 News Arabic', 'i24'],
+  iltv_live_erets: ['Eretz Nehederet', 'A Wonderful Country'],
+  iltv_live_savri: ['Savri Maranan'],
+};
