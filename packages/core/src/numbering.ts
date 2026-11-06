@@ -30,7 +30,7 @@ export interface Assignments {
 }
 
 export interface NumberingWarning {
-  code: 'season-number-taken' | 'episode-number-taken' | 'source-renumbered';
+  code: 'season-number-taken' | 'episode-number-taken' | 'source-renumbered' | 'numbers-reversed';
   message: string;
 }
 
@@ -84,6 +84,23 @@ function chronological(season: ScrapedSeason): ScrapedSeason['episodes'] {
     if (first > last) return [...eps].reverse();
   }
   return eps;
+}
+
+/** True when, among dated episodes with printed numbers, higher numbers mostly have earlier dates. */
+export function hintsRunBackwards(eps: ScrapedSeason['episodes']): boolean {
+  const pts = eps
+    .filter((e) => e.numberHint !== undefined && e.airDate)
+    .sort((a, b) => (a.numberHint ?? 0) - (b.numberHint ?? 0));
+  if (pts.length < 3) return false;
+  let up = 0;
+  let down = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const prev = pts[i - 1]?.airDate ?? '';
+    const cur = pts[i]?.airDate ?? '';
+    if (cur > prev) up++;
+    else if (cur < prev) down++;
+  }
+  return down > up * 2;
 }
 
 export function assignNumbers(show: ScrapedShow, previous: Assignments): NumberingResult {
@@ -140,10 +157,19 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
       }
     }
     const fresh = chronological(season).filter((e) => !episodes.has(e.key));
+    // Printed numbers that run against the air dates (the source counts newest = 1) are positions, not
+    // episode numbers: number by date instead, and say so.
+    const trustHints = !hintsRunBackwards(season.episodes);
+    if (!trustHints) {
+      warnings.push({
+        code: 'numbers-reversed',
+        message: `season "${season.title}" (${season.key}): printed numbers run against the air dates; numbered by date`,
+      });
+    }
     // First pass: episodes whose printed number is free, so a later duplicate cannot steal it.
     const pending: typeof fresh = [];
     for (const ep of fresh) {
-      if (ep.numberHint !== undefined && !used.has(ep.numberHint)) {
+      if (trustHints && ep.numberHint !== undefined && !used.has(ep.numberHint)) {
         const a = { key: ep.key, season: seasonNumber, episode: ep.numberHint };
         episodes.set(ep.key, a);
         used.add(ep.numberHint);
@@ -156,7 +182,7 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
     for (const ep of pending) {
       const n = nextFree(used, max + 1);
       max = n;
-      if (ep.numberHint !== undefined) {
+      if (trustHints && ep.numberHint !== undefined) {
         warnings.push({
           code: 'episode-number-taken',
           message: `episode ${ep.key} "פרק ${ep.numberHint}" collides in season ${seasonNumber}; numbered ${n}`,

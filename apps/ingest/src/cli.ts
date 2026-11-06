@@ -55,8 +55,10 @@ async function main(argv: string[]): Promise<number> {
   try {
     parsed = parseCli(argv);
   } catch (err) {
+    // Node's message adds a hint about positional arguments that does not apply here; keep the first sentence.
+    const first = (err as Error).message.split('. ')[0];
     throw new UserError(
-      `${(err as Error).message}. Run \`pnpm israel-tv help\` for the commands and options.`,
+      `${first}. Options: --source, --limit, --no-initial-run, --port. Run \`pnpm israel-tv help\` for more.`,
     );
   }
   const { positionals, values } = parsed;

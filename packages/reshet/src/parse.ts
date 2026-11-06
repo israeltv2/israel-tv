@@ -89,6 +89,7 @@ const OldEpisode = z.looseObject({
   description: z.string().nullish(),
   entryId: z.string().nullish(),
   startDate: z.number().nullish(),
+  createDate: z.number().nullish(),
   mediaFiles: z.array(z.looseObject({ duration: z.number().nullish() })).nullish(),
   images: z.array(z.looseObject({ url: z.string() })).nullish(),
   metas: z.looseObject({ EpisodeNumber: z.number().nullish(), SeasonNumber: z.number().nullish() }).nullish(),
@@ -171,11 +172,29 @@ function fromNew(e: z.infer<typeof NewEpisode>): ScrapedEpisode | undefined {
   });
 }
 
+const epochDay = (sec: number | null | undefined) =>
+  sec ? new Date(sec * 1000).toISOString().slice(0, 10) : undefined;
+
+/**
+ * Older-template episodes, with one repair: some shows give every episode the show's own start date as
+ * `startDate`. When all episodes without a date in their title share one startDate, their upload date
+ * (`createDate`) is the better air date.
+ */
+function oldSeason(list: z.infer<typeof OldEpisode>[]): ScrapedEpisode[] {
+  const untitled = list.filter((e) => !parseDottedDate(e.name) && e.startDate);
+  const shared = untitled.length >= 2 && new Set(untitled.map((e) => e.startDate)).size === 1;
+  return list
+    .map((e) => (shared && !parseDottedDate(e.name) && e.createDate ? { ...e, startDate: e.createDate } : e))
+    .map(fromOld)
+    .filter((e): e is ScrapedEpisode => !!e);
+}
+
 export function fromOld(e: z.infer<typeof OldEpisode>): ScrapedEpisode | undefined {
   if (!e.entryId) return undefined;
   return episode(e.entryId, e.name, {
     numberHint: e.metas?.EpisodeNumber ?? parseEpisodeHint(e.name),
-    airDate: e.startDate ? new Date(e.startDate * 1000).toISOString().slice(0, 10) : undefined,
+    // A date in the title is the air date; otherwise startDate (see oldSeason for when that is the show's).
+    airDate: parseDottedDate(e.name) ?? epochDay(e.startDate),
     description: e.description,
     thumb: e.images?.[0]?.url,
     dur: e.mediaFiles?.[0]?.duration,
@@ -205,9 +224,7 @@ export function parseShowPage(html: string): ParsedShowPage {
       .map((s) => ({
         title: (s.name ?? `עונה ${s.position}`).trim(),
         position: s.position,
-        ...(s.position === current
-          ? { episodes: (p.episodes ?? []).map(fromOld).filter((e): e is ScrapedEpisode => !!e) }
-          : {}),
+        ...(s.position === current ? { episodes: oldSeason(p.episodes ?? []) } : {}),
       }));
     return { template: 'program', seriesId: p.seriesId, seasons };
   }
@@ -224,5 +241,5 @@ export function parseShowPage(html: string): ParsedShowPage {
 /** Episodes from an older-template season page. */
 export function parseSeasonPage(html: string): ScrapedEpisode[] {
   const d = ShowPageData.parse(nextData(html));
-  return (d.props.pageProps.program?.episodes ?? []).map(fromOld).filter((e): e is ScrapedEpisode => !!e);
+  return oldSeason(d.props.pageProps.program?.episodes ?? []);
 }

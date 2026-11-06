@@ -72,7 +72,7 @@ it (start from [`.env.example`](.env.example)).
 {
   "geo": {
     "type": "http-proxy",
-    "urls": ["https://proxy.example.net:3128"],
+    "urls": ["http://proxy.example.net:3128"],
     "usernameEnv": "GEO_PROXY_USERNAME",
     "passwordEnv": "GEO_PROXY_PASSWORD"
   }
@@ -118,7 +118,7 @@ fails, that stream answers 502, the log says why, and the admin `/status` shows 
 After each run the changed files are uploaded (`wrangler deploy`; static files are free and unlimited, the
 Worker only answers search, streams, paging and `/status`). `pnpm israel-tv publish` does it by hand and
 prints the URL to install: `https://israel-tv.<subdomain>.workers.dev/manifest.json` (a brand-new
-workers.dev name can take a minute to resolve). To preview what it serves: `pnpm israel-tv serve` (it renders the current data first; then open
+workers.dev name can take a minute to resolve). To preview what it serves: `pnpm israel-tv serve` (or `serve --port N`; it renders the current data first; then open
 `http://127.0.0.1:7700/manifest.json`).
 
 A failed upload is retried after the next run and shows on `/status` with Cloudflare's reason.

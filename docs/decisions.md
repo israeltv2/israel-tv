@@ -247,3 +247,19 @@ news numbered backwards ("פותחים את שנת 2026", 01.01.26, was episode 
 without dates the season was numbered in list order, which is newest first. Fixed (with the real page as a
 fixture). Because no viewer had used the addon yet, Mako's episode numbers were reset once and assigned
 again from correctly dated data; series ids were kept. From here on numbers are permanent as designed.
+
+### Intuitiveness review, round 3 (2026-11-06)
+
+Same three personas on a fresh export. Verdicts: **no real friction** for all three setup paths (in Israel
+at home; outside Israel with a proxy — including a mocked wrong login, unknown host and wrong scheme, all
+explained in words and shown on `/status`; public Cloudflare — failure reason shown, token never printed).
+What remained were nits, now done: a Docker note on which address to install, `serve --port` in the
+README, the proxy example uses `http://`, a cleaner unknown-option message, the next full-run time in the
+`--no-initial-run` message, "1 show".
+
+One real data problem surfaced in round 3 and is fixed: Reshet's older page template gives some shows'
+episodes the show's own start date (every episode of a daily show dated 2017-03-28) and counts its episode
+numbers newest = 1. Dates now come from the title first, and when all episodes share one start date, from
+their upload date. Generally, printed episode numbers that run against the air dates are ignored and the
+season is numbered by date (warning `numbers-reversed`). As with Mako earlier the same day, Reshet's episode
+numbers were reset once before anyone used the addon.

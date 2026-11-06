@@ -328,7 +328,10 @@ export async function startDaemon(
     log('no full run in the last 24 hours: starting one now (about half an hour; see /status)');
     d.fullRun();
   } else {
-    if (stale) log('no recent full run; skipped because of --no-initial-run (next one at schedule.fullRun)');
+    if (stale)
+      log(
+        `no recent full run (a --limit test run does not count); skipped because of --no-initial-run. Next full run: ${d.nextRuns()[config.schedule.fullRun] ?? 'per schedule.fullRun'} (UTC; schedule is ${config.schedule.timezone})`,
+      );
     d.enqueue('publish', () => d.publish());
   }
   d.kanCrawl();
