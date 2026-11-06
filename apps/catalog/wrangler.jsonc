@@ -1,8 +1,9 @@
-// Deployed by `israel-tv publish` with the Cloudflare publisher. The name and the assets directory are
-// passed on the command line from israel-tv.config.json; nothing here is account-specific.
+// The public data Worker: the catalog as static assets and a tiny router (src/router.ts) for the dynamic paths,
+// which it hands to the private API Worker through a service binding. Deployed by `israel-tv publish` with the
+// Cloudflare publisher; the name, the assets directory and the API Worker's name come from israel-tv.config.json.
 {
   "name": "israel-tv",
-  "main": "src/worker.ts",
+  "main": "src/router.ts",
   "compatibility_date": "2026-11-01",
   "workers_dev": true,
   "assets": { "directory": "../../data/site", "binding": "ASSETS", "not_found_handling": "none" },

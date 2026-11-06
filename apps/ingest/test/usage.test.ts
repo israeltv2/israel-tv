@@ -65,22 +65,40 @@ test('public usage: Analytics Engine when readable, else Workers Logs, into the 
   expect(await pullPublicUsage(events, cf(), '2026-11-05', {}, fakeFetch)).toBeUndefined();
 });
 
-test('the Worker runs only for rows and files with image URLs, counts streams in Analytics Engine, keeps no invocation logs', () => {
+test('two Workers: the public one runs only its router for dynamic paths; the API one has no public URL', async () => {
+  const { apiWorkerConfig } = await import('../src/publish.ts');
   const dir = new URL('../../catalog', import.meta.url).pathname;
   const c = workerConfig(cf().publisher as never, dir) as {
     assets: Record<string, unknown>;
     observability: unknown;
-    analytics_engine_datasets: unknown;
+    services: unknown;
     main: string;
+    analytics_engine_datasets?: unknown;
+    ratelimits?: unknown;
   };
-  expect(c.assets.run_worker_first).toEqual(['/manifest.json', '/catalog/*', '/meta/*']);
-  expect(c.observability).toEqual({
+  expect(c.assets.run_worker_first).toEqual([
+    '/catalog/*',
+    '/stream/*',
+    '/status*',
+    '/manifest.json',
+    '/meta/*',
+  ]);
+  expect(c.services).toEqual([{ binding: 'API', service: 'w-api' }]);
+  expect(c.main.endsWith('/catalog/src/router.ts')).toBe(true);
+  // Limits, counting and logs belong to the API Worker.
+  expect(c.analytics_engine_datasets).toBeUndefined();
+  expect(c.ratelimits).toBeUndefined();
+  const a = apiWorkerConfig(cf().publisher as never, dir) as Record<string, unknown>;
+  expect(a.name).toBe('w-api');
+  expect(a.workers_dev).toBe(false);
+  expect(a.preview_urls).toBe(false);
+  expect(String(a.main).endsWith('/catalog/src/api.ts')).toBe(true);
+  expect(a.analytics_engine_datasets).toEqual([{ binding: 'USAGE', dataset: 'israel_tv_usage' }]);
+  expect(a.observability).toEqual({
     enabled: true,
     head_sampling_rate: 1,
     logs: { enabled: true, invocation_logs: false },
   });
-  expect(c.analytics_engine_datasets).toEqual([{ binding: 'USAGE', dataset: 'israel_tv_usage' }]);
-  expect(c.main.endsWith('/catalog/src/worker.ts')).toBe(true);
   expect(workerFingerprint(cf().publisher as never)).toBe(workerFingerprint(cf().publisher as never));
 });
 
@@ -124,11 +142,18 @@ test('a secret never reaches a log line, wherever it appears', async () => {
   });
   logger.flush();
   let text = '';
-  for (let i = 0; i < 50 && !text.includes('manifest'); i++) {
+  for (let i = 0; i < 200 && !text.includes('"component":"mako-auth"'); i++) {
     await new Promise((r) => setTimeout(r, 50));
+    // The rotated files only (current.log is a symlink that can briefly point at a file not written yet).
     text = readdirSync(dir)
-      .filter((f) => f.endsWith('.log'))
-      .map((f) => readFileSync(join(dir, f), 'utf8'))
+      .filter((f) => f.endsWith('.log') && f !== 'current.log')
+      .map((f) => {
+        try {
+          return readFileSync(join(dir, f), 'utf8');
+        } catch {
+          return '';
+        }
+      })
       .join('');
   }
   expect(text).toContain('"component":"mako-auth"');
@@ -142,22 +167,18 @@ test('account ids count as secrets too', async () => {
   expect(secretValues({ CLOUDFLARE_ACCOUNT_ID: 'a2b3c4d5e6f7', HOME: '/Users/x' })).toEqual(['a2b3c4d5e6f7']);
 });
 
-test('the Worker deploys without Analytics Engine when the account has not enabled it', async () => {
+test('the API Worker deploys without Analytics Engine when the account has not enabled it', async () => {
+  const { apiWorkerConfig, analyticsOff, ANALYTICS_OFF } = await import('../src/publish.ts');
   const dir = new URL('../../catalog', import.meta.url).pathname;
-  const on = workerConfig(cf().publisher as never, dir, true) as Record<string, unknown>;
-  const off = workerConfig(cf().publisher as never, dir, false) as Record<string, unknown>;
+  const on = apiWorkerConfig(cf().publisher as never, dir, true) as Record<string, unknown>;
+  const off = apiWorkerConfig(cf().publisher as never, dir, false) as Record<string, unknown>;
   expect(on.analytics_engine_datasets).toBeDefined();
   expect(off.analytics_engine_datasets).toBeUndefined();
-  expect(workerFingerprint(cf().publisher as never, true)).not.toBe(
-    workerFingerprint(cf().publisher as never, false),
-  );
   const { Store } = await import('@israel-tv/store');
-  const { analyticsWanted, ANALYTICS_OFF } = await import('../src/publish.ts');
   const store = Store.open(':memory:');
-  expect(analyticsWanted(store)).toBe(true);
+  expect(analyticsOff(store)).toBe(false);
   store.setState(ANALYTICS_OFF, { at: new Date().toISOString() });
-  expect(analyticsWanted(store)).toBe(false);
-  expect(analyticsWanted(store, Date.now() + 8 * 86_400_000)).toBe(true);
+  expect(analyticsOff(store)).toBe(true);
 });
 
 test('a failed deploy never puts the account id (or any secret) into the published status', async () => {
@@ -190,12 +211,12 @@ test('a failed deploy never puts the account id (or any secret) into the publish
   }
 });
 
-test('with the public address known, image URLs are absolute and only catalog rows run the Worker', async () => {
+test('with the public address known, image URLs are absolute and only dynamic paths run the router', async () => {
   const { renderFromStore, workerConfig } = await import('../src/publish.ts');
   const { Store } = await import('@israel-tv/store');
   const dir = new URL('../../catalog', import.meta.url).pathname;
-  const known = workerConfig(cf().publisher as never, dir, true, true) as { assets: Record<string, unknown> };
-  expect(known.assets.run_worker_first).toEqual(['/catalog/*']);
+  const known = workerConfig(cf().publisher as never, dir, true) as { assets: Record<string, unknown> };
+  expect(known.assets.run_worker_first).toEqual(['/catalog/*', '/stream/*', '/status*']);
   const config = ConfigSchema.parse({
     publisher: {
       type: 'cloudflare',

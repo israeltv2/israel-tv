@@ -165,10 +165,12 @@ fails, that stream answers 502, the log says why, and the admin `/status` shows 
 3. In `israel-tv.config.json`: `"publisher": { "type": "cloudflare", "workerName": "israel-tv" }`. With it,
    the `:7700` addon on your machine stops: in your app, replace it with the `workers.dev` manifest URL (ids are
    the same, so watch progress stays).
+4. Once, and after each update: `pnpm israel-tv deploy` (it deploys the private API Worker, then publishes).
 
-After each run the changed files are uploaded (`wrangler deploy`). Metadata, images and the manifest are static
-files (free and unlimited); the Worker answers catalog rows (one request per row an app loads), search, streams
-and `/status` — those count toward the 100,000 a day, which is plenty for a household and friends. Past it,
+Two Workers go up: the public one holds the catalog files and a tiny router; a private one (no public address)
+holds the code. Changed files are uploaded after each run, gathered into one deploy at most every half hour.
+Metadata, images and the manifest are static files (free and unlimited); the router runs for catalog rows (one
+request per row an app loads), search, streams and `/status` — those count toward the 100,000 a day, which is plenty for a household and friends. Past it,
 Cloudflare answers errors until midnight UTC. Search and stream requests are also limited per client: 60
 searches and 120 stream requests a minute (devices behind one home address share it); over it, the addon
 answers HTTP 429 for a minute. `pnpm israel-tv publish` does it by hand and

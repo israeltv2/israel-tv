@@ -3,7 +3,7 @@
 // The Worker writes one Analytics Engine data point per stream request; reading them needs an API token with
 // "Account Analytics: Read". Without it, the same counts come from Workers Logs (the Worker also logs each
 // request it answers; the publishing token can query those).
-import type { Config } from '@israel-tv/core';
+import { apiWorkerName, type Config } from '@israel-tv/core';
 import type { DailyRow, EventStore } from '@israel-tv/events';
 
 const DATASET = 'israel_tv_usage';
@@ -164,7 +164,9 @@ export async function pullPublicUsage(
     events.putDaily(ae);
     result = { day, via: 'analytics-engine', rows: ae.length };
   } else {
-    const rows = await fromWorkersLogs(token, account, p.workerName, day, fetchImpl);
+    // The API Worker writes the request events; days before the two-Worker split were written by the public one.
+    let rows = await fromWorkersLogs(token, account, apiWorkerName(p), day, fetchImpl);
+    if (rows.length === 0) rows = await fromWorkersLogs(token, account, p.workerName, day, fetchImpl);
     events.putDaily(rows);
     result = {
       day,
