@@ -26,7 +26,7 @@ too.
 You will see new rows: **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער** and **שידור חי** (live).
 
 - **In Israel**, the link alone plays everything except Keshet 12.
-- **Abroad**, the link alone gives you all the shows and the live channels 13, 14 and i24; episodes need the home
+- **Abroad**, the link alone gives you all the shows and live channels such as 13, 14 and i24; episodes need the home
   helper with an Israeli connection.
 - **Keshet 12** shows have no play option until you add the [home helper](#want-keshet-12-mako).
 
@@ -73,9 +73,10 @@ Israel.
 - **Something does not play.** Check the [status page](https://israel-tv.israeltv2.workers.dev/status), then
   [report it](https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml) with the show and episode.
 - **Search finds nothing.** Search in Hebrew, as the channel writes the title.
-- **Does it work with my other addons?** Yes. It adds its own rows and shows (ids starting `iltv_`). When you open an
-  Israeli series from another catalog (Cinemeta, TMDB), it adds its streams only if that show was matched to it and the
-  seasons are numbered the same; otherwise it adds nothing. It never touches movies.
+- **Does it work with my other addons?** Yes. When you open an Israeli show from another addon's rows (such as
+  Stremio's own), Israel TV adds its episodes there too if it knows that show and its seasons are numbered the same.
+  It never touches movies. (Details for addon users: it answers its own `iltv_` ids, and `tt`/`tmdb:` series ids
+  matched to its shows.)
 - **Is it maintained?** It is in beta and runs every day. When a channel's site changes, its row shows ⚠ until the
   reading is fixed; reports help.
 
@@ -91,7 +92,7 @@ Israel.
   number.
 - **The catalog** is what your app talks to: the rows, show pages, search, and links to the broadcasters' own
   video.
-- **The home helper** does the little that has to happen on your own internet: Keshet 12's pass, and fetching
+- **The home helper** does the little that has to happen on your own internet: getting Keshet 12's permission to play, and fetching
   Israel-only video through an Israeli connection.
 
 The video always comes from the broadcasters themselves. More: [How Israel TV works](docs/architecture.md).

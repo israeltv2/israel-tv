@@ -11,12 +11,17 @@ stored. Opening a show page is not counted; loading a row is counted only as a n
 the project's Cloudflare account (Workers Analytics Engine keeps the counts; Workers Logs keeps debugging lines a few
 days, with the same daily code, never the address).
 
-## The home helper and your own copy
+## The home helper
 
-Your own copy keeps the same kind of record in your own database on your own computer: what the home helper was asked
-for and played, what failed and why, and how many devices used it per day, with the same daily code instead of
-addresses. 30 days in detail, a year as daily totals. Nobody else can see it; you can, on your admin page (`/usage`).
-If you share your copy with friends, tell them this.
+The home helper keeps a short record on your own computer of what it was asked for, what failed and why, with the
+same daily code instead of addresses (30 days in detail). Nobody else can see it; `docker logs israel-tv-helper` (or
+`pnpm resolver events`) shows it.
+
+## Your own copy
+
+A full copy of Israel TV keeps the same kind of record in its own database on your computer — plays, failures, and
+how many devices used it per day — 30 days in detail and a year as daily totals, which you see on its admin page
+(`pnpm israel-tv admin-url` prints the link). If you share your copy with friends, tell them this.
 
 ## Video
 

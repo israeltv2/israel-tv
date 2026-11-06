@@ -20,9 +20,14 @@ export async function checkProxy(config: Config, out: (line: string) => void = c
       const country = (await r.text()).trim();
       const good = r.ok && country === 'IL';
       if (good) ok++;
-      out(
-        `${p.server}: ${r.ok ? `exits in ${country}` : `HTTP ${r.status}`}${good ? ' ✓' : ' ✗ (needs an Israeli exit)'}`,
-      );
+      const why = good
+        ? ' ✓'
+        : r.status === 407
+          ? ' ✗ the proxy refused the login: check the proxy user name and password'
+          : r.ok
+            ? ' ✗ not an Israeli exit: pick a server in Israel'
+            : ' ✗ the proxy answered with an error';
+      out(`${p.server}: ${r.ok ? `exits in ${country}` : `HTTP ${r.status}`}${why}`);
     } catch (err) {
       // The geo fetch already explains the failure as "<proxy>: <why>".
       out(`${p.server}: ✗ ${(err as Error).message.replace(`${p.server}: `, '')}`);
