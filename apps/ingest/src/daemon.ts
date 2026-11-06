@@ -279,8 +279,9 @@ export class Daemon {
       } catch (err) {
         this.log(`catalog backup failed: ${(err as Error).message}`);
       }
-      // Relay sessions still open are written now, so they land in the day being rolled up.
-      this.sessions.flush(true);
+      // Relay sessions started before today and still open are written now, so they land in the day being rolled
+      // up; ones started today go on as one session.
+      this.sessions.flush(false, Date.parse(`${new Date(now).toISOString().slice(0, 10)}T00:00:00.000Z`));
       const m = this.events.maintain(now, this.config.events.maxMB * 1024 * 1024);
       this.log('usage events maintained', m);
       await this.canary();

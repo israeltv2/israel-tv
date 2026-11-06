@@ -408,3 +408,20 @@ test('a relayed play the broadcaster refuses is recorded as a failure (only forg
   expect((await app.request(forged)).status).toBe(403);
   expect(events).toHaveLength(2);
 });
+
+test('the daily flush ends only sessions started before today; a play going on stays one session', async () => {
+  const { PlaySessions } = await import('../src/sessions.ts');
+  const events: { kind: string }[] = [];
+  let t = Date.parse('2026-11-06T23:59:30Z');
+  const s = new PlaySessions(
+    (e) => events.push(e),
+    () => t,
+  );
+  s.relay('old', {}, { playlist: true, ms: 5, status: 200 });
+  t = Date.parse('2026-11-07T00:00:30Z');
+  s.relay('new', {}, { playlist: true, ms: 5, status: 200 });
+  s.relay('old', {}, { playlist: false, ms: 5, status: 200 });
+  s.flush(false, Date.parse('2026-11-07T00:00:00Z'));
+  expect(events).toHaveLength(1);
+  expect(s.active().map((a) => a.playId)).toEqual(['new']);
+});

@@ -106,14 +106,19 @@ export class PlaySessions {
   }
 
   /** End quiet sessions: relay sessions become one event each; old plays are dropped. */
-  flush(force = false): void {
+  /**
+   * End quiet sessions. `force`: end all (shutdown). `startedBefore`: also end those started before that time
+   * (the daily rollup needs yesterday's plays; ones started today keep running as one session).
+   */
+  flush(force = false, startedBefore?: number): void {
     const t = this.now();
     for (const [key, s] of this.sessions) {
+      const end = force || (startedBefore !== undefined && s.startedAt < startedBefore);
       if (s.kind === 'play') {
-        if (force || t - s.lastAt > PLAY_ACTIVE_MS) this.sessions.delete(key);
+        if (end || t - s.lastAt > PLAY_ACTIVE_MS) this.sessions.delete(key);
         continue;
       }
-      if (!force && t - s.lastAt <= IDLE_MS) continue;
+      if (!end && t - s.lastAt <= IDLE_MS) continue;
       this.sessions.delete(key);
       this.emit({
         ts: new Date(s.startedAt).toISOString(),

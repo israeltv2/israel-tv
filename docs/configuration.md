@@ -72,9 +72,11 @@ What goes through it: the resolver's "דרך ישראל" streams, offered only w
 | `dir`          | `./data/site`           | Build folder uploaded on each publish.                             |
 | `publicUrl`    | —                       | Optional, for your own reference.                                  |
 
-The Worker runs only for search, streams, paging past the end, `/status`, and the three kinds of files that carry
-image URLs (the manifest, the live row and live channel pages); catalogs and metadata are free static files
-(not counted). For each request it answers it writes one JSON line to Workers Logs (no addresses), and for each
+The Worker answers catalog rows (so it can add the warning to a row that has not been updated), search, streams,
+paging past the end and `/status`; those count toward the free plan's 100,000 a day. The manifest, metadata
+and images are free static files, with absolute image URLs written at publish time (the address is
+`publicUrl`, or else the one the first deploy reported; on that very first publish only, the manifest and
+metadata also go through the Worker to get the address filled in). For each request it answers it writes one JSON line to Workers Logs (no addresses), and for each
 stream request one Workers Analytics Engine data point; the home daemon reads the daily counts back with the
 same API token (Analytics Engine needs the token to also have "Account Analytics: Read"; without it the counts
 come from Workers Logs).

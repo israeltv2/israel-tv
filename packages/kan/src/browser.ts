@@ -34,9 +34,9 @@ async function fetchResized(arg: {
   src: string;
   width: number;
 }): Promise<{ status: number; b64?: string; error?: string }> {
-  // Browser APIs (this runs inside the page), typed here without pulling the DOM types into Node code. The image
-  // is loaded as an image (Kan refuses the same URL to a script's fetch) from the page's own site, so the canvas
-  // it is drawn on can be read back.
+  // Browser APIs (this runs inside the page), typed here without pulling the DOM types into Node code. It runs in
+  // a tab showing the image itself, so the image is same-site and the canvas it is drawn on can be read back
+  // (Kan refuses its images to a script's fetch).
   const g = globalThis as unknown as {
     Image: new () => { src: string; decode(): Promise<void>; naturalWidth: number; naturalHeight: number };
     OffscreenCanvas: new (
@@ -113,13 +113,19 @@ export async function createChromeLoader(
         const challenged = isChallenge(html);
         const src = !challenged && opts.image ? opts.image(html) : undefined;
         if (!src) return { status: res?.status() ?? 0, html, challenged };
+        // The image is opened in its own tab of this session: there it is the document itself (same site as the
+        // tab, whichever site the show page was on), so the canvas it is drawn on can be read back.
         allowImage = new URL(src, page.url()).toString();
-        const response = page
-          .waitForResponse((r) => r.url() === allowImage, { timeout: 30_000 })
-          .catch(() => undefined);
-        const got = await page.evaluate(fetchResized, { src: allowImage, width: opts.imageWidth ?? 960 });
-        const answered = (await response)?.status();
-        if (answered !== undefined) got.status = got.b64 ? answered : answered === 200 ? 0 : answered;
+        const imagePage = await context.newPage();
+        const answer = await imagePage
+          .goto(allowImage, { waitUntil: 'load', timeout: 30_000 })
+          .catch(() => null);
+        const answered = answer?.status() ?? 0;
+        const got =
+          answered === 200
+            ? await imagePage.evaluate(fetchResized, { src: allowImage, width: opts.imageWidth ?? 960 })
+            : { status: answered };
+        if (answered !== 200) got.status = answered;
         return {
           status: res?.status() ?? 0,
           html,

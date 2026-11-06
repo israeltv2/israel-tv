@@ -62,4 +62,6 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 - [ ] The evening after a new episode airs, it appears within the airing-check window (15 minutes in the
   evening, hourly otherwise) without any action.
 - [ ] For an immediate re-read of one show: `curl -X POST -H "Authorization: Bearer <admin token>" http://<host>:7702/refresh/<series-id>` from the
-  home network (find the series id in `https://<addon>/registry.json` (search the show's title), e.g. `iltv_mako_12`).
+  home network. The series id (e.g. `iltv_mako_12`) is in the row's search results:
+  `curl -s 'https://<addon>/catalog/series/iltv_keshet12/search=<title>.json'` → `metas[].id` (rows:
+  `iltv_keshet12`, `iltv_reshet13`, `iltv_kan11`, `iltv_kankids`).

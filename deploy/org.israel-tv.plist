@@ -5,6 +5,8 @@
   folder of `volta which node`), then:
     cp deploy/org.israel-tv.plist ~/Library/LaunchAgents/
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.israel-tv.plist
+  Restart (after an update, or a change to the config or .env):
+    launchctl kickstart -k gui/$(id -u)/org.israel-tv
   A LaunchAgent (not a daemon) runs in your login session, which Chrome needs for Kan.
 -->
 <plist version="1.0">

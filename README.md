@@ -124,7 +124,9 @@ fails, that stream answers 502, the log says why, and the admin `/status` shows 
    permission **Account → Account Analytics → Read** to the token, and switch on **Workers Analytics Engine**
    once (dashboard → _Workers & Pages_ → _Analytics Engine_ → enable; free). Without them the counts come from
    Workers Logs, which the template's permissions already read, and `/status` says so.
-3. In `israel-tv.config.json`: `"publisher": { "type": "cloudflare", "workerName": "israel-tv" }`.
+3. In `israel-tv.config.json`: `"publisher": { "type": "cloudflare", "workerName": "israel-tv" }`. With it,
+   the `:7700` addon on your machine stops: in your app, replace it with the `workers.dev` manifest URL (ids are
+   the same, so watch progress stays).
 
 After each run the changed files are uploaded (`wrangler deploy`). Metadata, images and the manifest are static
 files (free and unlimited); the Worker answers catalog rows (one request per row an app loads), search, streams
@@ -171,8 +173,9 @@ do not pass each viewer's address, so all viewers then share one rate limit.
 2. In `israel-tv.config.json`:
    `"resolver": { "remote": { "enabled": true, "publicUrl": "https://tv-remote.example.net" } }` — the tunnel's
    `https://` address, without the token.
-3. Route that hostname to `http://127.0.0.1:7703` in the tunnel (and nothing else: never the admin port). With
-   `cloudflared`: add `- hostname: tv-remote.example.net` / `service: http://127.0.0.1:7703` to the ingress
+3. Route that hostname to `http://127.0.0.1:7703` in the tunnel (and nothing else: never the admin port). No
+   tunnel yet? `cloudflared tunnel login`, `cloudflared tunnel create israel-tv`, and run it as a service
+   (`cloudflared service install`) so it survives reboots. With `cloudflared`: add `- hostname: tv-remote.example.net` / `service: http://127.0.0.1:7703` to the ingress
    list in `~/.cloudflared/config.yml` (before the catch-all), then `cloudflared tunnel route dns <tunnel>
    tv-remote.example.net` and restart cloudflared.
 4. Restart Israel TV, then install the link `pnpm israel-tv remote-url` prints (it contains the token; keep it
