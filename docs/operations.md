@@ -180,6 +180,28 @@ A failed upload to Cloudflare shows as `publish` on `/status` (overall health `e
 reason) and is retried after the next run. With a geo proxy, the admin `/status` also has `geo`: the
 proxies, and when relaying through them last worked or failed (and why).
 
+### Restoring from registry.json (when the database is lost)
+
+The public addon serves `/registry.json`: every series id, season number and episode number ever given out.
+It is enough to rebuild a lost database so every id and number comes back the same (watch progress in the
+apps keys on them):
+
+```bash
+# a new, empty data folder (the config's store.path must not exist yet)
+pnpm israel-tv restore https://<your addon>/registry.json      # or a saved copy of the file
+pnpm israel-tv full                                            # read everything again (about half an hour)
+```
+
+`restore` refuses a database that already has series. It loads the series, seasons and episode numbers as
+published and continues each source's id counter after its highest id, so a show that appears later never gets
+an old id. The fresh read then finds every show and episode under its old id and number; only episodes published
+since the copy get new numbers, after the existing ones. Kan's crawl fills in again over a few days (its numbers
+come back too). Keep a copy of `registry.json` somewhere else from time to time if the addon is not public.
+
+Drill (2026-11-06): the published registry (783 series, 1,665 seasons, 36,580 episode numbers) restored into an
+empty folder, then a fresh read of 9 real shows (6 Mako, 4 Reshet, one without episodes): all 3,527 of their
+episodes came back with exactly the published season and episode numbers, none differed.
+
 ## Updating
 
 Pull, `pnpm install --prod`, restart the service. Database migrations run on start. (`--prod` leaves out

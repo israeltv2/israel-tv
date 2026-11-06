@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   type Assignments,
   seriesId as makeSeriesId,
+  parseSeriesId,
   type ScrapedShow,
   ScrapedShow as ScrapedShowSchema,
   type Source,
@@ -74,6 +75,45 @@ export class Store {
 
   static openReadOnly(path: string): Store {
     return new Store(path, true);
+  }
+
+  /**
+   * Rebuild the id registry (series ids, season and episode numbers) from a published `registry.json`, into an
+   * empty database. The counters continue after the highest series number per source, so no id is ever given
+   * out twice. A fresh read then finds every show and episode under its old id and number.
+   */
+  restoreRegistry(reg: ReturnType<Store['registry']>): { series: number; seasons: number; episodes: number } {
+    const have = this.db.select({ n: sql<number>`count(*)` }).from(t.series).get()?.n ?? 0;
+    if (have > 0) throw new Error(`the database already has ${have} series; restore only into an empty one`);
+    this.tx(() => {
+      for (let i = 0; i < reg.series.length; i += 500)
+        this.db
+          .insert(t.series)
+          .values(reg.series.slice(i, i + 500))
+          .run();
+      for (let i = 0; i < reg.seasons.length; i += 500)
+        this.db
+          .insert(t.seasons)
+          .values(reg.seasons.slice(i, i + 500))
+          .run();
+      for (let i = 0; i < reg.episodes.length; i += 500)
+        this.db
+          .insert(t.episodes)
+          .values(reg.episodes.slice(i, i + 500))
+          .run();
+      const highest = new Map<string, number>();
+      for (const r of reg.series) {
+        const p = parseSeriesId(r.id);
+        if (p) highest.set(p.source, Math.max(highest.get(p.source) ?? 0, p.n));
+      }
+      for (const [source, n] of highest)
+        this.db
+          .insert(t.counters)
+          .values({ source, next: n + 1 })
+          .onConflictDoUpdate({ target: t.counters.source, set: { next: n + 1 } })
+          .run();
+    });
+    return { series: reg.series.length, seasons: reg.seasons.length, episodes: reg.episodes.length };
   }
 
   /** A consistent copy of the whole database at `file` (which must not exist). */
