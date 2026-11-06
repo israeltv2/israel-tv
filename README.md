@@ -88,11 +88,22 @@ refuses settings the role cannot use, and says what to change.
 | `resolver-only` | Only the home resolver, playing from someone's public catalog (`resolver.catalogUrl`) | nothing inside Israel; proxy login outside; remote token if used                             |
 
 A resolver-only instance takes what it needs per episode (Mako's play ids, the direct stream, whether it is
-Israel-only) from the catalog's published `play/` files, so it needs no database and reads no site. Start it the
-same way (`pnpm start`) and install its `:7701` manifest next to the public catalog. At start it checks the
-catalog and logs `catalog check: ok`, or what is wrong (a mistyped `catalogUrl`, or a catalog whose host runs a
-version from before play files). Outside Israel, also add the `geo` block from [Outside Israel](#outside-israel-add-a-proxy).
-It has no admin page or usage dashboard: its commands are `start`, `check-proxy`, `remote-url` and `pnpm logs …`.
+Israel-only) from the catalog's published files — the [catalog ↔ resolver contract](docs/contract.md) — so it
+needs no database and reads no site, and it installs only the resolver:
+
+```bash
+git clone https://github.com/israeltv2/israel-tv.git && cd israel-tv
+corepack enable && pnpm install --prod --filter "@israel-tv/resolver..."   # the resolver and what it uses (~85 MB)
+cp examples/resolver-only/israel-tv.config.example.json israel-tv.config.json   # set resolver.catalogUrl
+pnpm resolver check-catalog     # "catalog ok", or what is wrong
+pnpm resolver start             # then install http://<this machine>:7701/manifest.json next to the catalog
+```
+
+It refuses a catalog it cannot use and says why (a mistyped `catalogUrl`, or a catalog whose host runs a version
+of Israel TV that speaks another contract version). Outside Israel, also add the `geo` block from
+[Outside Israel](#outside-israel-add-a-proxy). It has no admin page or usage dashboard; its events and logs are
+local (`pnpm logs …` from a full install, or the log). Service files: `deploy/israel-tv-resolver.service`,
+`deploy/org.israel-tv.resolver.plist`, `deploy/docker-compose.resolver.yml`.
 
 ## Outside Israel: add a proxy
 
@@ -228,7 +239,27 @@ SQLite database and the rendered files) lives in `./data` by default.
 
 ## How it works
 
-Three parts, each with one job:
+### Why each part exists
+
+Israeli TV needs three different kinds of work, done in three different places. Each part does exactly one:
+
+- **The catalog** answers "what is there, and how do I play what needs nothing special?" — show rows, show
+  pages, search, and the direct links for everything that plays straight from the broadcaster (Reshet, Kan, most
+  live channels). It is public and stateless: the same files for everyone, served by Cloudflare or by your own
+  machine, and it knows nothing about any household.
+- **The resolver** does only the play-time work that has to happen on the viewer's own network: Mako hands out a
+  short-lived ticket per play that is bound to the player that uses it (so it must be fetched where the viewer
+  is), and some titles are refused outside Israel (so they must be relayed through a proxy with an Israeli exit —
+  only when they are actually refused there, so a title never gets a slower duplicate). It serves no catalogs,
+  reads no broadcaster site and needs no database: it takes what it needs per episode from the catalog
+  ([contract](docs/contract.md)).
+- **Ingest** builds the catalog: it reads the broadcasters' sites slowly, gives every show and episode a
+  permanent id and number, and publishes. It serves no viewers.
+
+The roles are just which of these you run: `host` = ingest + publisher + resolver; `local-only` = the same with
+the catalog on your network; `resolver-only` = the resolver alone, pointed at any public Israel TV catalog. An
+integration test (`apps/ingest/test/integration.test.ts`) installs both addons in a simulated client and checks,
+for every kind of title at home and abroad, which addon answers and that no title gets competing streams.
 
 ```
                     ┌────────────────────────── home ──────────────────────────┐
