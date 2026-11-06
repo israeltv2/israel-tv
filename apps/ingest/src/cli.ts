@@ -1,9 +1,11 @@
 // israel-tv command line. Run `node apps/ingest/src/cli.ts help`.
 import { parseArgs } from 'node:util';
 import { ConfigError, parseSeriesId, type Source } from '@israel-tv/core';
+import { proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
 import { loadConfig } from './config.ts';
 import { startDaemon } from './daemon.ts';
+import { crawlKan } from './kan.ts';
 import { checkLive, liveRender } from './live.ts';
 import { startLocalServer } from './local-server.ts';
 import { createLogger } from './log.ts';
@@ -21,6 +23,7 @@ const HELP = `israel-tv <command>
   resolver                           Run only the private resolver
   publish                            Render the addon files and deploy them with the configured publisher
   serve                              Serve the rendered files on the local network (local publisher)
+  kan                                Read one Kan crawl slice now (needs a browser; see docs)
   match                              Look up TMDB/IMDb ids for shows (needs tmdb in the config)
   status                             Recent runs and warnings
   help                               This text
@@ -124,6 +127,18 @@ async function main(argv: string[]): Promise<number> {
         log(`serving ${p.dir} on http://${host}:${port}/manifest.json`);
         await new Promise(() => {});
         return 0;
+      }
+      case 'kan': {
+        const proxy = proxyEndpoints(config.geo)[0];
+        const r = await crawlKan(store, {
+          browser: config.browser,
+          ...(proxy ? { proxy } : {}),
+          pagesPerRun: values.limit ? Number(values.limit) : config.scraping.browserPagesPerRun,
+          pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
+          airingWindowDays: config.schedule.airingWindowDays,
+          log,
+        });
+        return r.pages > 0 || r.note.includes('backing off') ? 0 : 1;
       }
       case 'match': {
         const key = config.tmdb ? process.env[config.tmdb.apiKeyEnv] : undefined;

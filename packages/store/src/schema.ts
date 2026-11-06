@@ -86,7 +86,7 @@ export const shows = sqliteTable(
 
 export const runs = sqliteTable('runs', {
   id: integer().primaryKey({ autoIncrement: true }),
-  kind: text({ enum: ['full', 'airing', 'show', 'publish', 'match'] }).notNull(),
+  kind: text({ enum: ['full', 'airing', 'show', 'publish', 'match', 'crawl'] }).notNull(),
   scope: text().notNull(),
   startedAt: text().notNull(),
   finishedAt: text(),
@@ -112,3 +112,10 @@ export const warnings = sqliteTable(
   },
   (t) => [index('warnings_series').on(t.seriesId)],
 );
+
+/** Small persistent state (e.g. a crawler's progress), as JSON. */
+export const kv = sqliteTable('kv', {
+  key: text().primaryKey(),
+  value: text().notNull(),
+  updatedAt: text().notNull(),
+});

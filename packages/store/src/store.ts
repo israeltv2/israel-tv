@@ -319,6 +319,16 @@ export class Store {
       .get()?.key;
   }
 
+  getState<T>(key: string): T | undefined {
+    const r = this.db.select().from(t.kv).where(eq(t.kv.key, key)).get();
+    return r ? (JSON.parse(r.value) as T) : undefined;
+  }
+
+  setState(key: string, value: unknown): void {
+    const row = { key, value: JSON.stringify(value), updatedAt: now() };
+    this.db.insert(t.kv).values(row).onConflictDoUpdate({ target: t.kv.key, set: row }).run();
+  }
+
   // ---- runs and warnings ----------------------------------------------------------------------------
 
   startRun(kind: RunKind, scope: string): number {

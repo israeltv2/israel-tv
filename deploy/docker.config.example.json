@@ -1,0 +1,5 @@
+{
+  "browser": { "type": "none" },
+  "store": { "path": "./israel-tv.sqlite" },
+  "publisher": { "type": "local", "dir": "./site" }
+}

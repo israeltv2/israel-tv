@@ -81,6 +81,8 @@ export const ConfigSchema = z.strictObject({
       fullRun: z.string().default('30 3 * * *'),
       /** Checks of shows with a recent episode. */
       airingChecks: z.array(z.string()).default(['5 * * * *', '*/15 19-23,0 * * *']),
+      /** Kan crawl slices (each reads a few pages; see scraping.browserPagesPerRun). */
+      kanCrawl: z.string().default('*/10 * * * *'),
       /** A show counts as airing when it had an episode in this many days. */
       airingWindowDays: z.number().int().positive().default(14),
     })
@@ -91,6 +93,9 @@ export const ConfigSchema = z.strictObject({
       delayMs: z.number().int().min(0).default(1000),
       /** A run that finds fewer than this share of a source's previous shows is treated as failed. */
       minShareOfPrevious: z.number().min(0).max(1).default(0.8),
+      /** Kan: browser pages per crawl slice, and the pause between pages (each page is a new browser session). */
+      browserPagesPerRun: z.number().int().positive().default(5),
+      browserPageIntervalSec: z.number().int().min(0).default(75),
     })
     .prefault({}),
   /** Optional log file for `start` (stdout is used otherwise). Trimmed to its newest half above maxMB. */

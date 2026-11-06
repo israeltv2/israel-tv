@@ -1,0 +1,12 @@
+# docker compose -f deploy/docker-compose.yml up -d
+# Put israel-tv.config.json (with "browser": { "type": "none" }) and .env in ./data first.
+services:
+  israel-tv:
+    build: ..
+    restart: unless-stopped
+    ports:
+      - "7000:7000" # addon (local publisher)
+      - "7001:7001" # resolver
+      - "7002:7002" # admin (/status)
+    volumes:
+      - ./data:/data

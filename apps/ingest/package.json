@@ -19,6 +19,7 @@
     "hono": "4.13.16",
     "@israel-tv/reshet": "workspace:*",
     "@israel-tv/resolver": "workspace:*",
-    "croner": "11.0.0"
+    "croner": "11.0.0",
+    "@israel-tv/kan": "workspace:*"
   }
 }
