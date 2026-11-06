@@ -32,6 +32,7 @@ export function loadConfig(
   const envFile = resolve(found ? resolve(found, '..') : process.cwd(), '.env');
   if (env === process.env && existsSync(envFile)) process.loadEnvFile(envFile);
   const config = parseConfig(raw, found ?? DEFAULT_CONFIG_FILE);
+  checkRole(config);
   if (opts.needSecrets !== false) checkSecrets(config, env, envFile);
   const base = found ? resolve(found, '..') : process.cwd();
   config.store.path = resolve(base, config.store.path);
@@ -53,4 +54,25 @@ export function loadConfig(
     }
   }
   return { config, file: found };
+}
+
+/** Each role only uses (and so only needs) its own settings; say so plainly when the config mixes them. */
+export function checkRole(config: Config): void {
+  const problems: string[] = [];
+  if (config.role === 'resolver-only') {
+    if (!config.resolver.catalogUrl)
+      problems.push('set resolver.catalogUrl to the public catalog you use (its manifest URL)');
+    if (config.publisher.type === 'cloudflare')
+      problems.push(
+        'remove publisher (a resolver-only instance publishes nothing; no Cloudflare token needed)',
+      );
+    if (config.tmdb) problems.push('remove tmdb (matching happens where the catalog is made)');
+    if (!config.resolver.enabled)
+      problems.push('resolver.enabled is false, so this instance would do nothing');
+  }
+  if (config.role === 'local-only' && config.publisher.type !== 'local')
+    problems.push(
+      'the local-only role serves the catalog on this network: set "publisher": { "type": "local" }',
+    );
+  if (problems.length) throw new ConfigError(`role "${config.role}" in the config: ${problems.join('; ')}.`);
 }

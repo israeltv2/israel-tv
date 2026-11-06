@@ -16,6 +16,10 @@ result as a Stremio addon — on your home network, or publicly through Cloudfla
 | **Wanting it reachable from anywhere, or shared** | The above, plus a free Cloudflare account                       | The catalog on `https://<name>.<you>.workers.dev`. See [what friends can play](#sharing-with-friends).    |
 | **Wanting Kan VOD**                               | Google Chrome (or Chromium) on the machine that runs it         | Kan 11 and Kan Educational episodes. The first fill takes days (see below).                               |
 
+Or you only want the playing part: someone already runs a public Israel TV catalog you use, and you want Mako
+and geo-blocked playback at home — that is the **resolver-only** role (see [Roles](#roles)): no reading of sites,
+no Cloudflare, no database.
+
 What each optional piece costs you if you leave it out:
 
 - **No proxy, outside Israel:** Reshet VOD, Kan VOD and (at times) Kan live do not play — they are
@@ -69,6 +73,21 @@ No config file is needed for this. To change anything, copy
 [`israel-tv.config.example.json`](israel-tv.config.example.json) to `israel-tv.config.json` and edit it;
 every option is described in [docs/configuration.md](docs/configuration.md). Secrets go in `.env` next to
 it (start from [`.env.example`](.env.example)).
+
+## Roles
+
+Pick one; each has a minimal config and `.env` in [`examples/`](examples) (copy both next to the repo root as
+`israel-tv.config.json` and `.env`). The config's `role` checks at start that nothing from another role is set.
+
+| Role            | Does                                                                                  | Needs in `.env`                                                                              |
+| --------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `local-only`    | Everything, catalog served on your network (inside Israel, at home)                   | nothing                                                                                      |
+| `host`          | Everything, catalog published to Cloudflare; friends can use it                       | Cloudflare token and account id; proxy login if used; optional TMDB, admin and remote tokens |
+| `resolver-only` | Only the home resolver, playing from someone's public catalog (`resolver.catalogUrl`) | nothing inside Israel; proxy login outside; remote token if used                             |
+
+A resolver-only instance takes what it needs per episode (Mako's play ids, the direct stream, whether it is
+Israel-only) from the catalog's published `play/` files, so it needs no database and reads no site. Start it the
+same way (`pnpm start`) and install its `:7701` manifest next to the public catalog.
 
 ## Outside Israel: add a proxy
 
