@@ -43,3 +43,24 @@ test('descriptions lose what sites add for search engines (the live cases)', asy
   const sentence = 'תכנית הבישול של קשת 12: כל המתכונים, הקטעים ופרקים מלאים מתכניות מבשלים עם קשת';
   expect(cleanDescription(sentence)).toBe(sentence);
 });
+
+test('RLM: Hebrew-first lines with Latin letters or digits start with it, once; others stay as they are', async () => {
+  const { RLM, rtl } = await import('../src/tidy.ts');
+  expect(rtl('פספורט TV')).toBe(`${RLM}פספורט TV`);
+  expect(rtl('רשת 13 · 720p')).toBe(`${RLM}רשת 13 · 720p`);
+  expect(rtl('100 שושנים - מחווה')).toBe(`${RLM}100 שושנים - מחווה`); // the first letter is Hebrew
+  expect(rtl(`${RLM}פספורט TV`)).toBe(`${RLM}פספורט TV`); // never twice
+  expect(rtl('בייבי בום')).toBe('בייבי בום'); // only Hebrew: not needed
+  expect(rtl('MasterChef Israel')).toBe('MasterChef Israel'); // Latin first
+  expect(rtl('i24 עברית')).toBe('i24 עברית'); // Latin letter first
+  expect(rtl('')).toBe('');
+  expect(rtl(undefined)).toBeUndefined();
+});
+
+test('filler endings go; "פרק N" stays', () => {
+  expect(tidyEpisodeTitle('פרק 1 המלא', 'x')).toBe('פרק 1');
+  expect(tidyEpisodeTitle('פרק 7 - הפרק המלא', 'x')).toBe('פרק 7');
+  expect(tidyEpisodeTitle('הגמר הגדול - התוכנית המלאה', 'x')).toBe('הגמר הגדול');
+  expect(tidyEpisodeTitle('המהדורה המלאה', 'x')).toBe('המהדורה');
+  expect(tidyEpisodeTitle('המלא', 'x')).toBe('המלא'); // never empty
+});

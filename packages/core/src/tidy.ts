@@ -34,7 +34,8 @@ export function tidyEpisodeTitle(title: string, showTitle: string): string {
   if (show) t = t.replace(new RegExp(`^${escapeRegExp(show)}(?:${SEP}|\\s+(?=\\d{1,2}[./]\\d{1,2})|$)`), '');
   t = t
     .replace(new RegExp(`^עונה\\s*\\d+(?:${SEP}|$)`), '')
-    .replace(/\s*[-–]?\s*(?:ה)?(?:תכנית|תוכנית) המלאה\s*$/, '')
+    // Filler endings: "the full episode/programme" ("פרק 1 המלא" → "פרק 1").
+    .replace(/\s*[-–]?\s*(?:הפרק המלא|(?:ה)?(?:תכנית|תוכנית) המלאה|המלאה|המלא)\s*$/, '')
     .replace(/\s*[-–,]?\s*לצפייה ישירה\s*$/, '')
     .replace(/\s*[|\-–·:,]+\s*$/, '')
     .replace(/^\s*[|\-–·:,]+\s*/, '')
@@ -60,4 +61,21 @@ export function cleanDescription(raw: string | undefined | null): string | undef
     .trim();
   if (t.length < 10 || BOILERPLATE.some((r) => r.test(t))) return undefined;
   return t;
+}
+
+/** RIGHT-TO-LEFT MARK: makes an app that lays text out left-to-right start a Hebrew line from the right. */
+export const RLM = '‏';
+
+/**
+ * Text for apps that lay every line out left to right (Nuvio on iPhone showed "פספורט TV" as "TV פספורט" and
+ * "רשת 13 · 720p" as "720 · 13 רשת"): a line whose first letter is Hebrew and that holds Latin letters or digits
+ * starts with RLM. Only where needed, never twice; Latin-first and pure-Hebrew lines stay as they are.
+ */
+export function rtl(s: string): string;
+export function rtl(s: string | undefined): string | undefined;
+export function rtl(s: string | undefined): string | undefined {
+  if (!s || s.startsWith(RLM)) return s;
+  const firstLetter = /\p{L}/u.exec(s)?.[0];
+  if (!firstLetter || !/[֐-׿]/.test(firstLetter)) return s;
+  return /[A-Za-z0-9]/.test(s) ? RLM + s : s;
 }

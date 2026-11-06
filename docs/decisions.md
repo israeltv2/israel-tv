@@ -1307,3 +1307,12 @@ junk names, duplicate ids or numbers, or unreachable posters. Fixed:
   release workflow now starts `ci` and `pr-title` on the release branch itself (`workflow_dispatch`, allowed from the
   workflow token), so the required checks run on the pull request's head commit under their usual names, and removes
   the held runs so the pull request shows only real results. No extra token or secret.
+
+## Right-to-left marks and filler endings (2026-11-07)
+
+- **RLM for apps that lay lines out left to right** (owner's iPhone: Nuvio showed "פספורט TV" as "TV פספורט" and
+  "רשת 13 · 720p" as "720 · 13 רשת"): a line whose first letter is Hebrew and that holds Latin letters or digits
+  starts with U+200F (`rtl()`), in names, descriptions, episode titles and overviews, stream names and titles
+  (catalog, live channels, the home helper), search results and the status rows. Never twice; Latin-first and
+  pure-Hebrew lines unchanged; ids and search keys untouched.
+- **Filler endings** in episode titles go: "המלא", "המלאה", "הפרק המלא", "התוכנית המלאה" ("פרק 1 המלא" → "פרק 1").

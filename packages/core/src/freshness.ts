@@ -1,3 +1,4 @@
+import { rtl } from './tidy.ts';
 // Staleness: the public catalog says so itself when it has not been updated for too long — computed where it is
 // served (the Worker), so it works even when the home machine is down and cannot publish anything.
 
@@ -45,7 +46,7 @@ export function staleItem(catalog: string, type: string, since: string) {
   return {
     id: `${STALE_ID_PREFIX}${catalog}`,
     type,
-    name,
+    name: rtl(name),
     description: `${name}. New episodes may be missing until it is updated again (catalog not updated since ${since.slice(0, 16).replace('T', ' ')} UTC).`,
     posterShape: type === 'tv' ? 'square' : 'poster',
   };
