@@ -1,3 +1,8 @@
 packages:
   - packages/*
   - apps/*
+  - spikes
+minimumReleaseAgeExclude:
+  - playwright-core@1.65.0
+  - miniflare@5.20261104.0-beta
+  - wrangler@4.158.0
