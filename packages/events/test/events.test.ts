@@ -110,3 +110,50 @@ test('a relay session that delivered nothing is a failure, not a play', () => {
   );
   expect(db.homeDay(day).find((r) => r.source === '' && r.showId === '')).toMatchObject({ plays: 1 });
 });
+
+test('every event time is stored as an ISO UTC string, whatever the writer handed in (seconds, ms, Date)', async () => {
+  const { eventTime } = await import('../src/index.ts');
+  const iso = '2026-11-07T01:02:03.000Z';
+  const ms = Date.parse(iso);
+  expect(eventTime(iso)).toBe(iso);
+  expect(eventTime(ms)).toBe(iso);
+  expect(eventTime(ms / 1000)).toBe(iso);
+  expect(eventTime(String(ms / 1000))).toBe(iso);
+  expect(eventTime(new Date(ms))).toBe(iso);
+  expect(eventTime('nonsense', ms)).toBe(iso);
+  const s = EventStore.open(':memory:');
+  s.record(ev({ ts: (ms / 1000) as never }));
+  expect(s.events()[0]?.ts).toBe(iso);
+});
+
+test('internal traffic (canary-, probe- play ids) stays out of rollups and failure groups, but is queryable', () => {
+  const s = EventStore.open(':memory:');
+  s.record(ev({ kind: 'failure', outcome: 'error', playId: 'probe-direct-1', detail: { reason: 'x' } }));
+  s.record(ev({ kind: 'play_start', playId: 'canary-abc' }));
+  s.record(ev({ kind: 'play_start', playId: 'viewer1', client: 'c1' }));
+  const total = s.homeDay(day).find((r) => r.source === '' && r.showId === '');
+  expect(total).toMatchObject({ plays: 1, failures: 0 });
+  expect(s.failuresByReason(`${day}T00:00:00Z`)).toEqual([]);
+  expect(s.events({ viewersOnly: true }).map((e) => e.playId)).toEqual(['viewer1']);
+  expect(s.events({ playId: 'probe-direct-1' })).toHaveLength(1);
+});
+
+test('once, old failures for ids that are not episode ids at all are retagged as probes', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const path = join(mkdtempSync(join(tmpdir(), 'iltv-events-')), 'events.sqlite');
+  const a = EventStore.open(path);
+  a.record(ev({ kind: 'failure', outcome: 'error', playId: 'direct-mw5axju9', episodeId: 'x' }));
+  a.record(ev({ kind: 'failure', outcome: 'error', playId: 'p2', episodeId: 'iltv_mako_15:9:46' }));
+  a.db.$client.exec("delete from meta where key = 'fix:probe-ids'");
+  a.close();
+  const b = EventStore.open(path);
+  expect(
+    b
+      .events({ kind: 'failure' })
+      .map((e) => e.playId)
+      .sort(),
+  ).toEqual(['p2', 'probe-direct-mw5axju9']);
+  b.close();
+});

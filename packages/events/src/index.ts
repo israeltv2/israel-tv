@@ -5,7 +5,12 @@ import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
-import { EVENT_RETENTION_DAYS, ROLLUP_RETENTION_DAYS, type UsageEvent } from '@israel-tv/core';
+import {
+  EVENT_RETENTION_DAYS,
+  NOT_INTERNAL_SQL,
+  ROLLUP_RETENTION_DAYS,
+  type UsageEvent,
+} from '@israel-tv/core';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
@@ -26,6 +31,8 @@ export interface EventFilter {
   since?: string;
   showId?: string;
   limit?: number;
+  /** Leave out the project's own traffic (canary, probes): viewers' events only. */
+  viewersOnly?: boolean;
 }
 
 /** Kinds that count as a play. */
@@ -53,7 +60,20 @@ export class EventStore {
   static open(path: string): EventStore {
     const s = new EventStore(path, false);
     migrate(s.db, { migrationsFolder: MIGRATIONS });
+    s.retagProbes();
     return s;
+  }
+
+  /**
+   * Once: failures recorded for "episode ids" that are not episode ids at all (security probes, typos, before
+   * the resolver refused those without recording) are internal traffic, not viewers' failures.
+   */
+  private retagProbes(): void {
+    if (this.getMeta('fix:probe-ids')) return;
+    this.db.run(sql`update ${t.events} set play_id = 'probe-' || coalesce(play_id, '')
+      where kind = 'failure' and episode_id is not null and episode_id not glob '*?:*[0-9]:*[0-9]'
+        and ${sql.raw(NOT_INTERNAL_SQL)}`);
+    this.setMeta('fix:probe-ids', new Date().toISOString());
   }
 
   static openReadOnly(path: string): EventStore {
@@ -80,7 +100,7 @@ export class EventStore {
     this.timer = undefined;
     if (this.buffer.length === 0) return;
     const rows = this.buffer.splice(0).map((e) => ({
-      ts: e.ts,
+      ts: eventTime(e.ts),
       kind: e.kind,
       component: e.component,
       outcome: e.outcome,
@@ -112,6 +132,7 @@ export class EventStore {
       f.outcome ? eq(t.events.outcome, f.outcome) : undefined,
       f.showId ? eq(t.events.showId, f.showId) : undefined,
       f.since ? sql`${t.events.ts} >= ${f.since}` : undefined,
+      f.viewersOnly ? sql.raw(NOT_INTERNAL_SQL) : undefined,
     ].filter((x) => x !== undefined);
     return this.db
       .select()
@@ -168,7 +189,7 @@ export class EventStore {
             coalesce(sum(case when kind = 'relay_session' then json_extract(detail, '$.durationMs') end), 0) / 60000.0 as minutes
           from ${t.events}
           where ts >= ${from} and ts < ${to} and kind not in ('run', 'canary')
-            and (play_id is null or play_id not like 'canary-%') ${l.only} ${l.group}`);
+            and ${sql.raw(NOT_INTERNAL_SQL)} ${l.only} ${l.group}`);
       for (const r of rows) {
         if ((r.plays ?? 0) + (r.clients ?? 0) + (r.failures ?? 0) === 0) continue;
         out.push({
@@ -197,7 +218,7 @@ export class EventStore {
     this.flush();
     return this.db.all(sql`select coalesce(json_extract(detail, '$.stage'), kind) as stage, status,
         substr(coalesce(json_extract(detail, '$.reason'), ''), 1, 120) as reason, count(*) as n, max(ts) as last
-      from ${t.events} where kind = 'failure' and ts >= ${since}
+      from ${t.events} where kind = 'failure' and ts >= ${since} and ${sql.raw(NOT_INTERNAL_SQL)}
       group by stage, status, reason order by n desc limit ${limit}`);
   }
 
@@ -310,6 +331,29 @@ export class EventStore {
       .onConflictDoUpdate({ target: t.meta.key, set: { value } })
       .run();
   }
+}
+
+/**
+ * Every event time is stored the same way: an ISO 8601 UTC string with milliseconds (`2026-11-07T01:02:03.456Z`),
+ * so text comparison is time order and `substr(ts, 1, 10)` is the UTC day. Numbers are taken as epoch seconds
+ * (below 1e12) or milliseconds; anything unreadable is the time of writing.
+ */
+export function eventTime(ts: string | number | Date | undefined, now = Date.now()): string {
+  const ms =
+    ts instanceof Date
+      ? ts.getTime()
+      : typeof ts === 'number'
+        ? ts < 1e12
+          ? ts * 1000
+          : ts
+        : typeof ts === 'string' && /^\d+(\.\d+)?$/.test(ts)
+          ? Number(ts) < 1e12
+            ? Number(ts) * 1000
+            : Number(ts)
+          : typeof ts === 'string'
+            ? Date.parse(ts)
+            : Number.NaN;
+  return new Date(Number.isFinite(ms) ? ms : now).toISOString();
 }
 
 function nextDay(day: string): string {

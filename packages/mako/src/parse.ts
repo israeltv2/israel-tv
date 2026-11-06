@@ -7,7 +7,7 @@ import {
   type ScrapedSeason,
 } from '@israel-tv/core';
 import { z } from 'zod';
-import { IndexResponse, ShowPage, VodSlot } from './schema.ts';
+import { IndexResponse, ShowPage, VodPage, VodSlot } from './schema.ts';
 
 export const MAKO_ORIGIN = 'https://www.mako.co.il';
 
@@ -61,6 +61,50 @@ export function episodesFromPage(page: ShowPage): ScrapedEpisode[] {
     });
   }
   return out;
+}
+
+/**
+ * The video a page features when it has no episode list at all (Mako's films and one-off specials, and the
+ * captioned news editions, which show only their latest broadcast). Undefined when the page lists episodes.
+ */
+export function featuredOnly(page: ShowPage): NonNullable<ShowPage['vod']> | undefined {
+  const listed = (page.menu ?? []).some((m) => (m.vods ?? []).some((v) => v.componentLayout === 'vod'));
+  return listed ? undefined : (page.vod ?? undefined);
+}
+
+/** A page's title without Mako's "watch now" boilerplate ("… לצפייה ישירה | 12+", "- הסרט המלא", "- המופע המלא"). */
+export function cleanVodTitle(seoTitle: string | undefined): string {
+  return (seoTitle ?? '')
+    .replace(/\s*\|\s*12\+.*$/, '')
+    .replace(/\s*לצפייה ישירה\s*$/, '')
+    .replace(/\s*-?\s*(הסרט המלא|המופע המלא|פרקים מלאים|עמוד הסרט)\s*$/, '')
+    .replace(/\s*-\s*$/, '')
+    .trim();
+}
+
+/** The one episode of a page that only features a video, from the video's own page when it could be read. */
+export function featuredEpisode(
+  page: ShowPage,
+  vod: NonNullable<ShowPage['vod']>,
+  showTitle: string,
+  rawVodPage?: unknown,
+): ScrapedEpisode {
+  const vp = rawVodPage === undefined ? undefined : VodPage.safeParse(rawVodPage).data;
+  const title = cleanVodTitle(vp?.seo?.title) || showTitle;
+  const airDate = parseDottedDate(title);
+  const v = vp?.vod ?? vod;
+  return {
+    key: vod.itemVcmId,
+    title,
+    ...(airDate ? { airDate } : {}),
+    ...(v.aINT !== undefined ? { availableAbroad: v.aINT } : {}),
+    streams: [],
+    play: {
+      vcmid: vod.itemVcmId,
+      channelId: v.channelId ?? vod.channelId ?? page.channelId,
+      galleryChannelId: v.galleryChannelId ?? vod.galleryChannelId ?? vod.itemVcmId,
+    },
+  };
 }
 
 export interface SeasonRef {

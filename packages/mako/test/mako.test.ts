@@ -190,3 +190,71 @@ test('genres come from the show page schema, cleaned of repeats', () => {
   expect(showArtwork(parseShowPage(fx('show-masterchef'))).genres).toEqual(['בישול', 'ריאליטי']);
   expect(showArtwork(parseShowPage(fx('show-main-newscast'))).genres).toEqual(['אקטואליה', 'חדשות']);
 });
+
+describe('pages with no episode list, only a featured video (recorded 2026-11-07)', () => {
+  test('a film: one episode, titled after the show when its own page is not read', async () => {
+    const { HttpError } = await import('@israel-tv/net');
+    const f = fixtureFetcher({ '/mako-vod-keshet/669_doco': 'show-669-film' });
+    const g = {
+      ...f,
+      async json<T>(url: string): Promise<T> {
+        if (new URL(url).pathname.includes('/VOD-')) throw new HttpError(url, 404);
+        return f.json<T>(url);
+      },
+    };
+    const show = await fetchShow(g, { key: '/mako-vod-keshet/669_doco', title: '669' });
+    expect(show.seasons).toHaveLength(1);
+    expect(show.seasons[0]?.episodes).toEqual([
+      expect.objectContaining({
+        key: '17b58d260c501a10VgnVCM100000700a10acRCRD',
+        title: '669',
+        availableAbroad: false,
+        play: expect.objectContaining({ vcmid: '17b58d260c501a10VgnVCM100000700a10acRCRD' }),
+      }),
+    ]);
+  });
+
+  test('a captioned news edition: the latest broadcast, titled and dated from its own page', async () => {
+    const f = fixtureFetcher({
+      '/mako-vod-channel2-news/main_newscast_captions': 'show-main-newscast-captions',
+      '/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm':
+        'vod-main-newscast-captions',
+    });
+    const show = await fetchShow(
+      f,
+      { key: '/mako-vod-channel2-news/main_newscast_captions', title: 'המהדורה המרכזית מונגש ללקויי שמיעה' },
+      { currentSeasonOnly: true },
+    );
+    const eps = show.seasons.flatMap((s) => s.episodes);
+    expect(eps).toEqual([
+      expect.objectContaining({
+        key: 'ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD',
+        title: 'המהדורה המרכזית כ.סמויות 05.11.26',
+        airDate: '2026-11-05',
+        play: {
+          vcmid: 'ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD',
+          channelId: '34a47f20b4271a10VgnVCM100000700a10acRCRD',
+          galleryChannelId: 'ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD',
+        },
+      }),
+    ]);
+  });
+
+  test('a page that lists episodes never falls back to its featured video', () => {
+    const eps = episodesFromPage(parseShowPage(fx('show-main-newscast')));
+    expect(eps.length).toBeGreaterThan(1);
+  });
+});
+
+test('featured-video titles lose the "watch now" boilerplate', async () => {
+  const { cleanVodTitle } = await import('../src/parse.ts');
+  expect(cleanVodTitle('669 - הסרט המלא לצפייה ישירה | 12+')).toBe('669');
+  expect(cleanVodTitle('הסטנדאפ של קובי מימון - המופע המלא לצפייה ישירה | 12+')).toBe(
+    'הסטנדאפ של קובי מימון',
+  );
+  expect(cleanVodTitle('השוטרים הנוקמים - עמוד הסרט | 12+')).toBe('השוטרים הנוקמים');
+  expect(cleanVodTitle('רק בישראל - ספיישל עצמאות לצפייה ישירה | 12+')).toBe('רק בישראל - ספיישל עצמאות');
+  expect(cleanVodTitle('המהדורה המרכזית כ.סמויות 05.11.26 לצפייה ישירה | 12+')).toBe(
+    'המהדורה המרכזית כ.סמויות 05.11.26',
+  );
+});

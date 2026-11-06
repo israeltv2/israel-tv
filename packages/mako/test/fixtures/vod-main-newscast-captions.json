@@ -1,0 +1,196 @@
+{
+ "lastUpdate": "Thu, 05 Nov 2026 23:16:50 +0200",
+ "timestamp": 1793913410253,
+ "pageType": "VOD",
+ "domoPageView": {
+  "content_type": "vod",
+  "channel_id": "34a47f20b4271a10VgnVCM100000700a10acRCRD",
+  "item_id": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD",
+  "channel_depth": 4,
+  "page_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+  "is_blocked_content": {
+   "israel": 0,
+   "international": 1
+  }
+ },
+ "makoCatDFP": {
+  "cust_params": {
+   "location_sub_campaign": "%LOCATION_SUB_CAMPAIGN%",
+   "payinguser": "%IS_PAYING_USER%",
+   "video_from_time": "%VIDEO_FROM_TIME%",
+   "bundleId": "%PRODUCT_BUNDLE_ID%",
+   "pushTags": "%PUSH_TAGS%",
+   "language": "%LANGUAGE%",
+   "locale": "%LOCALE%",
+   "deviceid": "%DEVICE_ID%",
+   "version": "%VERSION%",
+   "devicetype": "%DEVICE_TYPE%",
+   "MAKOPAGE": "%GUID%",
+   "advertiserId": "%ADVERTISER_ID%",
+   "carrier": "%CARRIER%",
+   "LEVEL4": "mainnewscastcaptions",
+   "osVersion": "%OS_VERSION%",
+   "LEVEL5": "2026",
+   "paidContent": "%IS_PAID_CONTENT%",
+   "appid": "%APP_ID%",
+   "makoHN": "%HOUSE_NUMBERS%",
+   "random_number": "%RANDOM_NUMBER%",
+   "osType": "%OS_TYPE%",
+   "deviceModel": "%DEVICE_MODEL%",
+   "pushTrigger": "%PUSH_TRIGGER%"
+  },
+  "iu": "/242748299/mako/vod/vod_news/"
+ },
+ "seo": {
+  "title": "המהדורה המרכזית כ.סמויות 05.11.26 לצפייה ישירה | 12+",
+  "description": "צפו במהדורה המלאה של המהדורה המרכזית כ.סמויות ששודרה בתאריך 05.11.26 - ליברמן מסיר את הווטו לממשלה עם החרדים. כל תכני החדשות לצפייה ישירה ב+12, אפליקציית הסטרימינג של ישראל",
+  "type": "tv_show",
+  "image": "https://img.mako.co.il/2026/11/05/Mahadura_Merkazit_051126_VOD_autoOrient_i.jpg",
+  "canonical": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+  "schema": {
+   "@context": "https://schema.org",
+   "@type": "TVEpisode",
+   "name": "05.11.26",
+   "description": "ליברמן מסיר את הווטו לממשלה עם החרדים",
+   "image": "https://img.mako.co.il/2026/11/05/Mahadura_Merkazit_051126_VOD_autoOrient_i.jpg",
+   "url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+   "partOfTVSeries": {
+    "@type": "TVSeries",
+    "name": "המהדורה המרכזית כ.סמויות",
+    "url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions"
+   },
+   "video": {
+    "@type": "VideoObject",
+    "name": "05.11.26",
+    "description": "ליברמן מסיר את הווטו לממשלה עם החרדים",
+    "thumbnailUrl": "https://img.mako.co.il/2026/11/05/Mahadura_Merkazit_051126_VOD_autoOrient_i.jpg",
+    "uploadDate": "2026-11-04T22:00:00Z",
+    "duration": "PT1H9M25S",
+    "contentUrl": "https://mako-vod.akamaized.net/i/VOD/KESHET/Hadashot_Keshet/Mahadura_Merkazit/2026/November/Mahadura_Merkazit_051126_VOD_fsd651/Mahadura_Merkazit_051126_VOD_fsd651_,550,850,1400,2200,.mp4.csmil/master.m3u8"
+   },
+   "provider": {
+    "@type": "Organization",
+    "name": "החדשות"
+   },
+   "publisher": {
+    "@type": "NewsMediaOrganization",
+    "name": "שידורי קשת"
+   }
+  }
+ },
+ "vod": {
+  "channelName": "נובמבר",
+  "channelId": "34a47f20b4271a10VgnVCM100000700a10acRCRD",
+  "sch": "34a47f20b4271a10",
+  "itemVcmId": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD",
+  "galleryChannelId": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD",
+  "programId": "fad47a8b6eb97910VgnVCM100000700a10acRCRD",
+  "programUrl": "/mako-vod-channel2-news/main_newscast_captions",
+  "programDomoClick": {
+   "content_type": "channel",
+   "channel_depth": -1,
+   "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions",
+   "clicked_channel_id": "fad47a8b6eb97910VgnVCM100000700a10acRCRD",
+   "referring_component": "080b8750-hero-41d9-refc-e6bfe67f099c",
+   "click_type": "link",
+   "clicked_item_id": "fad47a8b6eb97910VgnVCM100000700a10acRCRD"
+  },
+  "isLive": false,
+  "pageUrl": "/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+  "domoClick": {
+   "content_type": "vod",
+   "channel_depth": -1,
+   "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+   "clicked_channel_id": "34a47f20b4271a10VgnVCM100000700a10acRCRD",
+   "referring_component": "080b8750-hero-41d9-refc-e6bfe67f099c",
+   "click_type": "link",
+   "clicked_item_id": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD"
+  },
+  "domoPlay": {
+   "content_type": "vod",
+   "channel_id": "34a47f20b4271a10VgnVCM100000700a10acRCRD",
+   "item_id": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD",
+   "channel_depth": 4
+  },
+  "aIL": true,
+  "aINT": false,
+  "iPromoType": "Episode"
+ },
+ "hero": {
+  "title": "המהדורה המרכזית כ.סמויות",
+  "logo": "https://img.mako.co.il/2021/11/28/Merkazit_logo.png",
+  "logoAltText": "לוגו מהדורה מרכזית",
+  "subtitle": "05.11.26",
+  "description": "ליברמן מסיר את הווטו לממשלה עם החרדים",
+  "pics": [
+   {
+    "picUrl": "https://img.mako.co.il/2025/06/24/MainNews_HD_01.jpg",
+    "altText": "המהדורה המרכזית כ. סמויות"
+   }
+  ],
+  "mobilePics": [
+   {
+    "picUrl": "https://img.mako.co.il/2025/06/24/MainNews_CreditCard_01.jpg",
+    "altText": "המהדורה המרכזית כ. סמויות"
+   }
+  ]
+ },
+ "menu": [
+  {
+   "buttonText": "לצפייה",
+   "id": "specificEpisode",
+   "makoRefComp": "Specific_Episode",
+   "pageUrl": "/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+   "domoClick": {
+    "content_type": "vod",
+    "channel_depth": -1,
+    "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+    "clicked_channel_id": "34a47f20b4271a10VgnVCM100000700a10acRCRD",
+    "referring_component": "9ced3b0e-page-navi-refc-eb3fe7b8e0de",
+    "click_type": "link",
+    "clicked_item_id": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD"
+   }
+  },
+  {
+   "buttonText": "למהדורות הקודמות",
+   "id": "allEpisodes",
+   "makoRefComp": "All_Episodes",
+   "pageUrl": "/mako-vod-channel2-news?type=moreEpisodes",
+   "domoClick": {
+    "content_type": "fabricated",
+    "channel_depth": 1,
+    "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news?type=moreEpisodes",
+    "clicked_channel_id": "ee06c13070733210VgnVCM2000002a0c10acRCRD",
+    "referring_component": "9ced3b0e-page-navi-refc-eb3fe7b8e0de",
+    "click_type": "link",
+    "clicked_item_id": "ee06c13070733210VgnVCM2000002a0c10acRCRD"
+   }
+  }
+ ],
+ "historyObject": {
+  "pageUrl": "/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+  "title": "",
+  "programId": "fad47a8b6eb97910VgnVCM100000700a10acRCRD",
+  "domoClick": {
+   "content_type": "vod",
+   "channel_depth": 4,
+   "clicked_item_url": "https://www.mako.co.il/mako-vod-channel2-news/main_newscast_captions-2026/34a47f20b4271a10/VOD-ee23b3fcbeaa1a1027.htm",
+   "clicked_channel_id": "34a47f20b4271a10VgnVCM100000700a10acRCRD",
+   "referring_component": "ERROR_NO_REFERRER",
+   "click_type": "link",
+   "clicked_item_id": "ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD"
+  },
+  "picUrl": "https://img.mako.co.il/2026/11/05/Mahadura_Merkazit_051126_VOD_autoOrient_i.jpg",
+  "hero": {
+   "title": "המהדורה המרכזית כ.סמויות",
+   "extraInfo": "05.11.26",
+   "picUrl": "https://img.mako.co.il/2025/06/24/MainNews_HD_01.jpg",
+   "logo": "https://img.mako.co.il/2021/11/28/Merkazit_logo.png",
+   "subtitle": "ליברמן מסיר את הווטו לממשלה עם החרדים",
+   "description": ""
+  },
+  "buttonText": "להמשך צפייה",
+  "sch": "34a47f20b4271a10",
+  "seasonUrl": "/mako-vod-channel2-news/main_newscast_captions-2026"
+ }
+}

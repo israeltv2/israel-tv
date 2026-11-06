@@ -34,11 +34,22 @@ const MenuTab = z.looseObject({
   vods: z.array(z.looseObject({ componentLayout: z.string() })).nullish(),
 });
 
+/** The one video a page features (its hero's "watch" button): on most pages the newest episode. */
+const FeaturedVod = z.looseObject({
+  itemVcmId: z.string().min(1),
+  channelId: z.string().optional(),
+  galleryChannelId: z.string().optional(),
+  pageUrl: z.string().optional(),
+  aINT: z.boolean().optional(),
+});
+
 export const ShowPage = z.looseObject({
   channelId: z.string(),
   pageUrl: z.string(),
+  vod: FeaturedVod.nullish(),
   seo: z
     .looseObject({
+      title: z.string().optional(),
       description: z.string().optional(),
       image: z.string().optional(),
       schema: z.looseObject({ genre: z.union([z.array(z.string()), z.string()]).nullish() }).nullish(),
@@ -63,6 +74,13 @@ export const ShowPage = z.looseObject({
   menu: z.array(MenuTab).nullish(),
 });
 export type ShowPage = z.infer<typeof ShowPage>;
+
+/** A single video's own page (`…/VOD-….htm`): its title (with the air date on dated items) and ids. */
+export const VodPage = z.looseObject({
+  seo: z.looseObject({ title: z.string().optional() }).nullish(),
+  vod: FeaturedVod.extend({ channelName: z.string().optional() }),
+});
+export type VodPage = z.infer<typeof VodPage>;
 
 export const PlaylistResponse = z.looseObject({
   media: z.array(

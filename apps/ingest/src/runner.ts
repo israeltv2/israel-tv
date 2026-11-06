@@ -10,10 +10,16 @@ export interface RunOptions {
   /** A full run that lists fewer than this share of the previously listed shows is rejected. */
   minShareOfPrevious: number;
   log?: (line: string) => void;
+  /** The clock (tests). */
+  now?: number;
 }
 
 export interface RunSummary {
   runId: number;
+  /** Shows the site refused us (bot wall, rate limit) or that a stop after repeated blocks never reached. */
+  blocked?: BlockedShow[];
+  /** Shows that failed for any other reason. */
+  otherFailures?: number;
   status: 'ok' | 'partial' | 'failed';
   showsOk: number;
   showsFailed: number;
@@ -198,6 +204,8 @@ async function runShows(
   let stoppedEarly = false;
   let consecutiveBlocks = 0;
   const errors: string[] = [];
+  const blocked: BlockedShow[] = [];
+  let otherFailures = 0;
   const list = opts.limit ? entries.slice(0, opts.limit) : entries;
   for (const [i, entry] of list.entries()) {
     try {
@@ -217,12 +225,16 @@ async function runShows(
       log(`[${i + 1}/${list.length}] FAILED ${msg}`);
       // A blocking site keeps blocking: after three blocks in a row, stop instead of hammering it.
       consecutiveBlocks = isBlock(err) ? consecutiveBlocks + 1 : 0;
+      if (isBlock(err)) blocked.push({ ...entry, error: (err as Error).message.slice(0, 200) });
+      else otherFailures++;
       if (consecutiveBlocks >= 3) {
         errors.push(
-          `stopped after ${consecutiveBlocks} blocked requests in a row; the rest waits for the next run`,
+          `stopped after ${consecutiveBlocks} blocked requests in a row; the rest waits for a retry`,
         );
         log(`stopping ${adapter.source}: blocked ${consecutiveBlocks} times in a row`);
         stoppedEarly = true;
+        for (const rest of list.slice(i + 1))
+          blocked.push({ ...rest, error: 'not reached (stopped after blocks)' });
         break;
       }
     }
@@ -232,6 +244,8 @@ async function runShows(
   if (kind === 'full' && !opts.limit && !stoppedEarly) store.setState(emptyShowsKey(adapter.source), empty);
   const summary: RunSummary = {
     runId,
+    ...(blocked.length ? { blocked } : {}),
+    ...(otherFailures ? { otherFailures } : {}),
     status,
     showsOk,
     showsFailed,
@@ -289,6 +303,22 @@ export async function runFull(store: Store, adapter: SourceAdapter, opts: RunOpt
     const ids = entries.map((e) => store.findSeriesId(adapter.source, e.key)).filter((x): x is string => !!x);
     store.syncListed(adapter.source, ids);
   }
+  if (!opts.limit) {
+    const now = opts.now ?? Date.now();
+    store.setState(
+      retryKey(adapter.source),
+      summary.blocked?.length
+        ? ({
+            runId,
+            pending: summary.blocked,
+            recovered: [],
+            attempts: 0,
+            others: summary.otherFailures ?? 0,
+            nextAt: new Date(now + retryDelayMs(0)).toISOString(),
+          } satisfies BlockedRetry)
+        : null,
+    );
+  }
   return summary;
 }
 
@@ -321,6 +351,67 @@ export async function runOne(
   const t0 = Date.now();
   const runId = store.startRun('show', `${adapter.source}:${entry.key}`);
   return runShows(store, adapter, 'show', [entry], opts, false, runId, t0);
+}
+
+/** A show a full run could not read because the site refused us. */
+export interface BlockedShow extends ShowEntry {
+  error: string;
+}
+
+/** Shows blocked in a source's last full run, retried later the same night with growing pauses. */
+export interface BlockedRetry {
+  /** The full run they were blocked in. */
+  runId: number;
+  pending: BlockedShow[];
+  recovered: string[];
+  /** Retries done so far. */
+  attempts: number;
+  /** Shows of that run that failed for other reasons (those are not retried). */
+  others: number;
+  /** When the next retry is due; absent once retries are over. */
+  nextAt?: string;
+}
+
+/** Retries per full run, and the pause before each (30 min, 1 h, 2 h). */
+export const BLOCK_RETRIES = 3;
+export function retryDelayMs(attempt: number): number {
+  return 30 * 60_000 * 2 ** attempt;
+}
+
+export function retryKey(source: string): string {
+  return `blocked-retry:${source}`;
+}
+
+/** Retry the shows a full run was blocked on (once; the daemon calls it again at `nextAt`). */
+export async function runBlockedRetry(
+  store: Store,
+  adapter: SourceAdapter,
+  opts: RunOptions,
+): Promise<BlockedRetry | undefined> {
+  const state = store.getState<BlockedRetry | null>(retryKey(adapter.source));
+  if (!state?.pending.length || !state.nextAt) return state ?? undefined;
+  const t0 = Date.now();
+  const runId = store.startRun('show', `${adapter.source}:retry`);
+  const summary = await runShows(store, adapter, 'show', state.pending, opts, false, runId, t0);
+  // A show that now fails for another reason is no longer a block: it shows on /status as a failing show.
+  const pending = summary.blocked ?? [];
+  const still = new Set(pending.map((b) => b.key));
+  const failedOther = summary.showsFailed - pending.length;
+  const recovered = state.pending.filter((p) => !still.has(p.key)).map((p) => p.title);
+  const attempts = state.attempts + 1;
+  const { nextAt: _due, ...rest } = state;
+  const next: BlockedRetry = {
+    ...rest,
+    pending,
+    recovered: [...state.recovered, ...recovered],
+    attempts,
+    others: state.others + Math.max(0, failedOther),
+    ...(pending.length && attempts < BLOCK_RETRIES
+      ? { nextAt: new Date((opts.now ?? Date.now()) + retryDelayMs(attempts)).toISOString() }
+      : {}),
+  };
+  store.setState(retryKey(adapter.source), next);
+  return next;
 }
 
 /** Store key of the titles a source lists without any episodes (from the last complete full read). */

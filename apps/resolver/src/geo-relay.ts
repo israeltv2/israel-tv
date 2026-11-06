@@ -133,6 +133,7 @@ export function geoRelay(d: GeoRelayDeps) {
     // to the player as a plain redirect; nothing else is fetched through the proxy.
     let url = target;
     let r: Response | undefined;
+    let rotated = false;
     for (let hop = 0; hop < 5; hop++) {
       try {
         r = await d.geoFetch(url, {
@@ -145,6 +146,22 @@ export function geoRelay(d: GeoRelayDeps) {
         d.onRelay?.({ ok: false, error: why });
         d.log('relay through the geo proxy failed', { playId, host: new URL(url).host, error: why });
         return fail(`geo proxy failed: ${why}`, 502);
+      }
+      // A refusal can be the exit's fault (a CDN that does not see this exit as Israeli): once per request, try
+      // the next exit before giving up.
+      if ((r.status === 401 || r.status === 403) && !rotated && d.geoFetch.rotate) {
+        rotated = true;
+        await r.body?.cancel();
+        const exit = d.geoFetch.rotate();
+        d.log('relay refused through this exit; trying the next one', {
+          playId,
+          host: new URL(url).host,
+          status: r.status,
+          exit,
+        });
+        hop--;
+        r = undefined;
+        continue;
       }
       const location = r.status >= 300 && r.status < 400 ? r.headers.get('location') : null;
       if (!location) break;

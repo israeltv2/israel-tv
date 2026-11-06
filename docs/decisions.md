@@ -1352,3 +1352,43 @@ After the v0.2.2 deploy the owner's Nuvio still showed 0.2.1: the manifest was s
 Cloudflare's edge and apps could keep the old one for up to an hour, and when a full read was due at start the first
 publish waited behind it (about half an hour). Now the service publishes first thing at every start, before any
 read, and the manifest is cached for 300 s (catalogs and show pages keep 600 s, streams 300 s).
+
+## Round 6: what the dashboard showed (2026-11-07)
+
+Measured from `events.sqlite` on the home machine and live requests, then fixed:
+
+- **Mako's CloudFront fallback built an invalid URL.** Mako's entitlement service answers an Akamai ticket with an
+  absolute `url` but a CloudFront ("AWS") ticket with a _path_ (`/hls/VOD/…/index.m3u8`); `new URL(path)` threw
+  "Invalid URL" and the play failed with 502. The ticket URL is now resolved against the media URL. With that,
+  the recorded episode plays through CloudFront 200/200/206 (test from the recorded playlist and tickets,
+  `apps/resolver/test/fixtures`).
+- **The episode whose Akamai master answered 403** (גלית ואילנית, S9E46) was not gone: it refused for about six
+  minutes right after Mako published it (12:09–12:13 UTC on 2026-11-06) and played from 12:15 on, and plays now on
+  both CDNs. A freshly published episode can reach the CDN a few minutes after the page lists it. The CloudFront
+  fallback covers that window now; a failure where every CDN refuses a master despite valid tickets (or Mako lists
+  no media) is recorded with `blame: "episode"`, apart from failures of Mako itself (`blame: "source"`). Nothing
+  was unpublished: the episode is there and plays.
+- **Canary**: tries up to three recent titles per source and reports "episode unavailable" titles separately;
+  only a source where nothing plays (or a 5xx/network failure) is red; failed titles are skipped first for a day.
+  Relayed titles are checked a second time, and the relay moves to the next proxy exit when a CDN refuses one
+  (the one Kan segment 403 on 2026-11-06 passed on the next check four minutes later through the same relay).
+- **Probe traffic**: the 404 "unknown episode" for id `x` was a security-audit request. Internal requests now
+  carry `x-israel-tv-probe: <kind>` (the canary sends `canary`; the public Worker passes it on): their plays get
+  `probe-`/`canary-` ids and are left out of rollups, failure groups, "playing now" and the public addon's
+  Analytics Engine counts. A play URL whose id is not an episode id at all is refused without recording anything.
+  Old failures for such ids were retagged once.
+- **Bot-protection retries**: shows a full read was refused are read again 30 min, 1 h and 2 h later; amber only
+  if still refused after the last retry, with their names (operations.md).
+- **Mako "shows without episodes" (149)**: they were not empty. 146 of those pages have no episode list but feature
+  one video: films and documentaries ("669", "הסוד של מיקי ברקוביץ'"), stand-up and concert specials, and the
+  captioned news editions ("… מונגש ללקויי שמיעה"), which only ever show their latest broadcast. They are now read
+  as one-episode shows (title and date from the video's own page; one extra request each). Two pages were gone
+  (404), and one ("עד הקצה") lists eight episodes now: a new show whose page was still empty at the full read. Adding the captioned edition as a second stream on the matching
+  news episode was considered and rejected: Mako keeps no archive of captioned editions, so it would only ever
+  exist for the newest episode, and matching by date across two shows is fragile; as its own show it is plain.
+- **Empty-show notes** are a count now; the titles are in `emptyShows` per source (an expandable list on `/status`
+  and the dashboard). Reshet's 45 were checked by hand earlier and stay out.
+- **Event times**: measured, every `events.ts` is an ISO 8601 UTC string (the log files' pino `time` is epoch
+  milliseconds, a different thing). Readers compare text and take `substr(ts, 1, 10)` as the UTC day, which is right
+  for that form; the writer now normalises whatever it is handed (Date, epoch seconds or milliseconds) to that
+  form, so no reader can meet another.

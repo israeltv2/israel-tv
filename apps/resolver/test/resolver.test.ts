@@ -586,3 +586,106 @@ test('a full instance resolver reads the contract files from its publish folder,
   const lookup = catalogLookup('http://local-site', f);
   expect((await lookup.episode('iltv_mako_1', 2, 3))?.play).toEqual({ vcmid: 'v', channelId: 'c' });
 });
+
+describe('recorded Mako answers (2026-11-07): an episode listed on Akamai and CloudFront', async () => {
+  const { readFileSync } = await import('node:fs');
+  const fixture = (name: string) =>
+    JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+  const playlist = fixture('mako-playlist-two-cdns.json');
+  const tickets = fixture('mako-entitlement-by-cdn.json') as Record<string, unknown>;
+  const makeApp = (akamaiStatus: number, events: { kind: string; detail?: Record<string, unknown> }[]) =>
+    createResolverApp({
+      episode: () => ({ key: 'k', title: 't', streams: [], play: { vcmid: 'v', channelId: 'c' } }),
+      onEvent: (e) => events.push(e),
+      fetch: async (url) => {
+        if (url.includes('playlist.jsp')) return Response.json(playlist);
+        if (url.includes('entitlement'))
+          return Response.json(tickets[new URL(url).searchParams.get('rv') ?? '']);
+        if (url.includes('akamaized')) return new Response('#EXTM3U\na.m3u8\n', { status: akamaiStatus });
+        // CloudFront: only the ticketed URL on the media URL's own host plays.
+        if (url.startsWith('https://d3par5938i20jq.cloudfront.net/hls/') && url.includes('token=eyJ'))
+          return new Response('#EXTM3U\n../tok/index_1.m3u8\n');
+        return new Response('', { status: 400 });
+      },
+    });
+
+  test('CloudFront answers its ticket with a path: the fallback resolves it on the media host and plays', async () => {
+    const events: { kind: string; detail?: Record<string, unknown> }[] = [];
+    const r = await makeApp(403, events).request('/play/mako/iltv_mako_15%3A9%3A46.m3u8');
+    expect(r.status).toBe(200);
+    expect(await r.text()).toMatch(
+      /^https:\/\/d3par5938i20jq\.cloudfront\.net\/hls\/.*\/tok\/index_1\.m3u8$/m,
+    );
+    expect(String(events.find((e) => e.kind === 'play_start')?.detail?.upstream)).toBe(
+      'playlist 200, cdn AKAMAI, ticket 200, master 403, cdn AWS, ticket 200, master 200',
+    );
+  });
+
+  test("every CDN refusing the master with valid tickets is the episode's problem, not Mako's", async () => {
+    const events: { kind: string; detail?: Record<string, unknown> }[] = [];
+    const app = createResolverApp({
+      episode: () => ({ key: 'k', title: 't', streams: [], play: { vcmid: 'v', channelId: 'c' } }),
+      onEvent: (e) => events.push(e),
+      fetch: async (url) => {
+        if (url.includes('playlist.jsp')) return Response.json(playlist);
+        if (url.includes('entitlement'))
+          return Response.json(tickets[new URL(url).searchParams.get('rv') ?? '']);
+        return new Response('', { status: 403 });
+      },
+    });
+    const r = await app.request('/play/mako/iltv_mako_15%3A9%3A46.m3u8');
+    expect(r.status).toBe(403);
+    expect(events.find((e) => e.kind === 'failure')?.detail).toMatchObject({ blame: 'episode' });
+  });
+});
+
+test('internal traffic is marked: probe-/canary- play ids; a request for something that is not an episode id records nothing', async () => {
+  const events: { kind: string; playId?: string }[] = [];
+  const app = createResolverApp({
+    episode: () => undefined,
+    onEvent: (e) => events.push(e),
+    fetch: async () => new Response('', { status: 404 }),
+  });
+  expect((await app.request('/play/mako/x.m3u8')).status).toBe(404);
+  expect(events).toEqual([]);
+  await app.request('/play/mako/iltv_mako_1%3A1%3A1.m3u8', { headers: { 'x-israel-tv-probe': 'audit' } });
+  expect(events.at(-1)?.playId).toMatch(/^probe-direct-/);
+  await app.request('/stream/series/iltv_mako_1:1:1.json', { headers: { 'x-israel-tv-probe': 'canary' } });
+  expect(events.at(-1)?.playId).toMatch(/^canary-/);
+  await app.request('/stream/series/iltv_mako_1:1:1.json', { headers: { 'x-israel-tv-probe': 'test' } });
+  expect(events.at(-1)?.playId).toMatch(/^probe-/);
+});
+
+test('a relay refused through one exit is tried once through the next', async () => {
+  const exits: string[] = [];
+  let current = 'a';
+  const geoFetch = Object.assign(
+    async () => {
+      exits.push(current);
+      return current === 'a' ? new Response('', { status: 403 }) : new Response('seg', { status: 206 });
+    },
+    {
+      rotate: () => {
+        current = current === 'a' ? 'b' : 'a';
+        return current;
+      },
+    },
+  );
+  const app = createResolverApp({
+    episode: () => ({
+      key: 'k',
+      title: 't',
+      streams: [{ url: 'https://r.il.cdn-redge.media/x/playlist.m3u8', kind: 'direct' }],
+    }),
+    geoFetch: geoFetch as never,
+    fetch: async () => new Response('', { status: 403 }),
+  });
+  const s = await (await app.request('http://h/stream/series/iltv_kan_1:1:1.json')).json();
+  const relay = new URL(s.streams[0].url);
+  const r = await app.request(`${relay.pathname}${relay.search}`);
+  expect(r.status).toBe(200);
+  expect(exits).toEqual(['a', 'b']);
+});

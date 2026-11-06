@@ -5,6 +5,7 @@
 import {
   type LiveChannel,
   parseVideoId,
+  probePrefix,
   rtl,
   type ScrapedEpisode,
   SOURCE_LABELS,
@@ -39,6 +40,11 @@ export interface MakoAuthDeps extends ModuleContext {
 /** Upstream statuses of one play, filled in as it goes. */
 interface PlayRun extends Play {
   up: string[];
+  /**
+   * Whose fault a failed play is: `episode` when Mako answered properly but this one title cannot be played
+   * (every CDN refused its master with a valid ticket, no media listed), `source` otherwise.
+   */
+  blame?: 'episode' | 'source';
 }
 
 export function makoAuth(d: MakoAuthDeps) {
@@ -93,8 +99,9 @@ export function makoAuth(d: MakoAuthDeps) {
       throw new Error('Mako entitlement returned no ticket');
     }
     ticket('ok', r.status);
-    // An empty `url` means the media URL itself; one that already has a query gets the ticket appended to it.
-    const base = makoUrl(t.url || mediaUrl);
+    // An empty `url` means the media URL itself; Akamai answers an absolute URL, CloudFront ("AWS") a path on
+    // the media URL's host (measured 2026-11-07). One that already has a query gets the ticket appended to it.
+    const base = makoUrl(new URL(t.url || mediaUrl, mediaUrl).toString());
     return `${base}${base.includes('?') ? '&' : '?'}${decodeURIComponent(t.ticket)}`;
   }
 
@@ -133,7 +140,8 @@ export function makoAuth(d: MakoAuthDeps) {
   ): Promise<Response> {
     const t0 = Date.now();
     const given = c.req.query('p');
-    const playId = given || `direct-${t0.toString(36)}`;
+    // A play URL opened without a play id (a hand-made request); internal checks say so with a header.
+    const playId = given || `${probePrefix((h) => c.req.header(h))}direct-${t0.toString(36)}`;
     const client = await d.clientOf(c);
     const info: PlayInfo = { ...fallback, ...d.sessions.info(given), ...(client ? { client } : {}) };
     const run: PlayRun = { playId, info, up: [] };
@@ -167,7 +175,7 @@ export function makoAuth(d: MakoAuthDeps) {
         ...info,
         status: failed ? Number(failed) : res.status,
         latencyMs: ms,
-        detail: { stage: 'play', answered: res.status, upstream, reason },
+        detail: { stage: 'play', answered: res.status, upstream, reason, blame: run.blame ?? 'source' },
       });
       d.log('play failed', { playId, ...info, status: res.status, upstream, reason });
     }
@@ -178,39 +186,43 @@ export function makoAuth(d: MakoAuthDeps) {
     app.get('/play/mako/:file', async (c) => {
       const id = decodeURIComponent(c.req.param('file')).replace(/\.m3u8$/, '');
       const v = parseVideoId(id);
-      return recordPlay(
-        c,
-        { source: 'mako', episodeId: id, ...(v ? { showId: v.series } : {}) },
-        async (run) => {
-          const ep = v ? await d.episode(v.series, v.season, v.episode) : undefined;
-          const play = ep?.play;
-          if (!play?.vcmid || !play.channelId) return new Response('unknown episode', { status: 404 });
-          const pr = await d.fetch(
-            makoPlaylistUrl({
-              vcmid: play.vcmid,
-              channelId: play.channelId,
-              ...(play.galleryChannelId ? { galleryChannelId: play.galleryChannelId } : {}),
-            }),
-          );
-          run.up.push(`playlist ${pr.status}`);
-          if (!pr.ok) return new Response(`Mako playlist HTTP ${pr.status}`, { status: 502 });
-          const media = parsePlaylist(await pr.json());
-          if (media.length === 0) return new Response('Mako returned no media', { status: 502 });
-          // Akamai first; when it refuses the master (e.g. an episode still airing, served from the live
-          // window), the next CDN Mako lists usually plays.
-          const ordered = [
-            ...media.filter((m) => m.cdn === 'AKAMAI'),
-            ...media.filter((m) => m.cdn !== 'AKAMAI'),
-          ];
-          let last: Response | undefined;
-          for (const m of ordered) {
-            run.up.push(`cdn ${m.cdn ?? '?'}`);
-            last = await masterFor(makoUrl(m.url), m.cdn ?? 'AKAMAI', playerUA(c), run);
-            if (last.ok) return last;
-          }
-          return last as Response;
-        },
-      );
+      // Not an episode id at all (a probe, a typo): refused without recording a play or a failure.
+      if (!v) return c.text('unknown episode', 404);
+      return recordPlay(c, { source: 'mako', episodeId: id, showId: v.series }, async (run) => {
+        const ep = await d.episode(v.series, v.season, v.episode);
+        const play = ep?.play;
+        if (!play?.vcmid || !play.channelId) return new Response('unknown episode', { status: 404 });
+        const pr = await d.fetch(
+          makoPlaylistUrl({
+            vcmid: play.vcmid,
+            channelId: play.channelId,
+            ...(play.galleryChannelId ? { galleryChannelId: play.galleryChannelId } : {}),
+          }),
+        );
+        run.up.push(`playlist ${pr.status}`);
+        if (!pr.ok) return new Response(`Mako playlist HTTP ${pr.status}`, { status: 502 });
+        const media = parsePlaylist(await pr.json());
+        if (media.length === 0) {
+          run.blame = 'episode';
+          return new Response('Mako returned no media', { status: 502 });
+        }
+        // Akamai first; when it refuses the master (e.g. an episode still airing, served from the live
+        // window), the next CDN Mako lists usually plays.
+        const ordered = [
+          ...media.filter((m) => m.cdn === 'AKAMAI'),
+          ...media.filter((m) => m.cdn !== 'AKAMAI'),
+        ];
+        let last: Response | undefined;
+        for (const m of ordered) {
+          run.up.push(`cdn ${m.cdn ?? '?'}`);
+          last = await masterFor(makoUrl(m.url), m.cdn ?? 'AKAMAI', playerUA(c), run);
+          if (last.ok) return last;
+        }
+        // Tickets were issued, yet every CDN refused the master: this title, not Mako, is the problem
+        // (seen for a few minutes on a freshly published episode before its files reach Akamai).
+        if (last && last.status >= 400 && last.status < 500) run.blame = 'episode';
+        return last as Response;
+      });
     });
 
     app.get('/play/mako-live/:channel/:file', async (c) => {

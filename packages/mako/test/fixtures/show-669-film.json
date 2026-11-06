@@ -1,0 +1,151 @@
+{
+ "lastUpdate": "Sat, 31 Oct 2026 13:57:59 +0200",
+ "timestamp": 1793447879682,
+ "pageType": "Subvertical",
+ "channelId": "045c592a9e601a10VgnVCM200000650a10acRCRD",
+ "sch": "045c592a9e601a10",
+ "channelName": "עונה 1",
+ "pageUrl": "/mako-vod-keshet/669_doco-s1",
+ "domoPageView": {
+  "content_type": "channel",
+  "channel_id": "045c592a9e601a10VgnVCM200000650a10acRCRD",
+  "channel_depth": 3,
+  "item_id": "045c592a9e601a10VgnVCM200000650a10acRCRD",
+  "page_url": "https://www.mako.co.il/mako-vod-keshet/669_doco-s1",
+  "is_blocked_content": {
+   "israel": 0,
+   "international": 0
+  }
+ },
+ "preload": true,
+ "makoCatDFP": {
+  "cust_params": {
+   "location_sub_campaign": "%LOCATION_SUB_CAMPAIGN%",
+   "payinguser": "%IS_PAYING_USER%",
+   "video_from_time": "%VIDEO_FROM_TIME%",
+   "bundleId": "%PRODUCT_BUNDLE_ID%",
+   "pushTags": "%PUSH_TAGS%",
+   "language": "%LANGUAGE%",
+   "locale": "%LOCALE%",
+   "deviceid": "%DEVICE_ID%",
+   "version": "%VERSION%",
+   "devicetype": "%DEVICE_TYPE%",
+   "MAKOPAGE": "%GUID%",
+   "advertiserId": "%ADVERTISER_ID%",
+   "carrier": "%CARRIER%",
+   "LEVEL4": "669doco",
+   "osVersion": "%OS_VERSION%",
+   "LEVEL5": "s1",
+   "paidContent": "%IS_PAID_CONTENT%",
+   "appid": "%APP_ID%",
+   "makoHN": "%HOUSE_NUMBERS%",
+   "random_number": "%RANDOM_NUMBER%",
+   "osType": "%OS_TYPE%",
+   "deviceModel": "%DEVICE_MODEL%",
+   "pushTrigger": "%PUSH_TRIGGER%"
+  },
+  "iu": "/242748299/mako/vod/vod_keshet/"
+ },
+ "seo": {
+  "title": "669 - הסרט המלא לצפייה ישירה | 12+",
+  "description": "669 - הסרט המלא לצפייה ישירה. ליחידת החילוץ 669 יש משימה אחת: להציל חיים. סרטו של יואב לימור מציג את המבצעים שרק עכשיו מותר לספר עליהם, והמפגש המרגש עם שורדי השבי",
+  "type": "tv_show",
+  "image": "https://img.mako.co.il/2026/10/05/669_x5_autoOrient_i.jpg",
+  "canonical": "https://www.mako.co.il/mako-vod-keshet/669_doco",
+  "schema": {
+   "@context": "https://schema.org",
+   "@type": "TvSeries",
+   "name": "669",
+   "description": "669 - הסרט המלא לצפייה ישירה. ליחידת החילוץ 669 יש משימה אחת: להציל חיים. סרטו של יואב לימור מציג את המבצעים שרק עכשיו מותר לספר עליהם, והמפגש עם שורדי השבי",
+   "image": "https://img.mako.co.il/2026/10/05/669_x5_autoOrient_i.jpg",
+   "url": "https://www.mako.co.il/mako-vod-keshet/669_doco",
+   "genre": [
+    "תעודה",
+    "דוקומנטרי",
+    "תחקיר"
+   ],
+   "provider": {
+    "@type": "Organization",
+    "name": "תכניות קשת"
+   },
+   "publisher": {
+    "@type": "NewsMediaOrganization",
+    "name": "שידורי קשת"
+   }
+  }
+ },
+ "vod": {
+  "channelId": "045c592a9e601a10VgnVCM200000650a10acRCRD",
+  "itemVcmId": "17b58d260c501a10VgnVCM100000700a10acRCRD",
+  "galleryChannelId": "17b58d260c501a10VgnVCM100000700a10acRCRD",
+  "programId": "5f3a592a9e601a10VgnVCM200000650a10acRCRD",
+  "mostCurrent": true,
+  "domoPlay": {
+   "content_type": "vod",
+   "channel_id": "045c592a9e601a10VgnVCM200000650a10acRCRD",
+   "channel_depth": 3,
+   "item_id": "17b58d260c501a10VgnVCM100000700a10acRCRD"
+  },
+  "pageUrl": "/mako-vod-keshet/669_doco-s1/VOD-17b58d260c501a1027.htm",
+  "domoClick": {
+   "content_type": "vod",
+   "channel_depth": -1,
+   "clicked_item_id": "17b58d260c501a10VgnVCM100000700a10acRCRD",
+   "click_type": "link",
+   "clicked_item_url": "https://www.mako.co.il/mako-vod-keshet/669_doco-s1/VOD-17b58d260c501a1027.htm",
+   "clicked_channel_id": "045c592a9e601a10VgnVCM200000650a10acRCRD",
+   "referring_component": "080b8750-hero-41d9-refc-e6bfe67f099c"
+  },
+  "iPromoType": "Program",
+  "aIL": true,
+  "aINT": false
+ },
+ "hero": {
+  "itemVcmId": "51e48d260c501a10VgnVCM100000700a10acRCRD",
+  "channelId": "045c592a9e601a10VgnVCM200000650a10acRCRD",
+  "logo": "https://img.mako.co.il/2026/10/05/669_logo_e.png",
+  "logoAltText": "לוגו 669",
+  "description": "ליחידת החילוץ 669 יש משימה אחת: להציל חיים. סרטו של יואב לימור מציג את המבצעים שרק עכשיו מותר לספר עליהם, והמפגש המרגש עם שורדי השבי שחילצו",
+  "pics": [
+   {
+    "picUrl": "https://img.mako.co.il/2026/10/05/669_x5.jpg",
+    "altText": "סט 669"
+   }
+  ],
+  "mobilePics": [
+   {
+    "picUrl": "https://img.mako.co.il/2026/10/05/669_E_nologo.jpg",
+    "altText": "סט 669"
+   }
+  ],
+  "buttonText": "לצפייה",
+  "makoRefComp": "Specific_Episode"
+ },
+ "menu": [],
+ "historyObject": {
+  "pageUrl": "/mako-vod-keshet/669_doco-s1/VOD-17b58d260c501a1027.htm",
+  "title": "669",
+  "programId": "5f3a592a9e601a10VgnVCM200000650a10acRCRD",
+  "domoClick": {
+   "content_type": "vod",
+   "channel_depth": 3,
+   "clicked_item_id": "17b58d260c501a10VgnVCM100000700a10acRCRD",
+   "click_type": "link",
+   "clicked_item_url": "https://www.mako.co.il/mako-vod-keshet/669_doco-s1/VOD-17b58d260c501a1027.htm",
+   "clicked_channel_id": "045c592a9e601a10VgnVCM200000650a10acRCRD",
+   "referring_component": "ERROR_NO_REFERRER"
+  },
+  "picUrl": "https://img.mako.co.il/2026/10/06/Doco_669_Catava_autoOrient_i.jpg",
+  "hero": {
+   "title": "669",
+   "extraInfo": "05.10.26",
+   "picUrl": "https://img.mako.co.il/2026/10/05/669_x5.jpg",
+   "logo": "https://img.mako.co.il/2026/10/05/669_logo_e.png",
+   "subtitle": "669",
+   "description": "ליחידת החילוץ 669 יש משימה אחת: להציל חיים"
+  },
+  "buttonText": "להמשך צפייה",
+  "sch": "045c592a9e601a10",
+  "seasonUrl": "/mako-vod-keshet/669_doco-s1"
+ }
+}
