@@ -225,6 +225,23 @@ A failed upload to Cloudflare shows as `publish` on `/status` (overall health `e
 reason) and is retried after the next run. With a geo proxy, the admin `/status` also has `geo`: the
 proxies, and when relaying through them last worked or failed (and why).
 
+### Rolling back on Cloudflare
+
+The public data Worker (the catalog and its router) and the private API Worker (the code) have their own versions
+and roll back on their own:
+
+```bash
+pnpm israel-tv versions data          # every publish is a version of the data Worker
+pnpm israel-tv rollback data          # the catalog as it was one publish ago (or: rollback data <version-id>)
+pnpm israel-tv versions api
+pnpm israel-tv rollback api           # the previous code (or: rollback api <version-id>)
+```
+
+Cloudflare keeps the last 100 versions of each. A data rollback holds only until the next publish (at most
+`minIntervalMinutes` away while routine changes come in), so to keep an old catalog, stop the service first. The
+router and the API check each other's contract version: if a rollback leaves them speaking different versions,
+the public addon answers a clear error (and `/status` says so) until the matching one is deployed.
+
 ### Restoring from registry.json (when the database is lost)
 
 The public addon serves `/registry.json`: every series id, season number and episode number ever given out.
@@ -254,6 +271,7 @@ Pull, `pnpm install --prod`, restart the service: `launchctl kickstart -k gui/$(
 Resolver-only: `pnpm install --prod --frozen-lockfile --filter "@israel-tv/resolver..."`, then
 `launchctl kickstart -k gui/$(id -u)/org.israel-tv.resolver`, `systemctl restart israel-tv-resolver`, or
 `docker compose -f deploy/docker-compose.resolver.yml up -d --build`.
-The same restart applies after changing the config or `.env`. Database migrations run on start. (`--prod` leaves out
+With the Cloudflare publisher, also deploy the API Worker after each update: `pnpm israel-tv deploy-api` (or
+`pnpm israel-tv deploy`, which also publishes). The same restart applies after changing the config or `.env`. Database migrations run on start. (`--prod` leaves out
 the development tools, so `pnpm check` needs a full `pnpm install`.) Deploy tooling may write the deployed
 git revision to a `.revision` file in the repo root; `/status` shows it (`dev` otherwise).

@@ -901,3 +901,46 @@ Owner decision: the project is AGPL-3.0-only (© Israel TV contributors), so any
 service must publish their changes. The license text is the unmodified official one. No funding, sponsor or
 donation links of any kind will be added (they would identify the people behind the project), and Mako playback
 stays self-hosted per household: there is no public resolver.
+
+## Round 3: two Workers on workers.dev
+
+Problem: the catalog's files and the Worker's code shipped as one Worker version, so every catalog refresh was a
+code version, a code rollback also rolled back the catalog, and the version history was noise.
+
+**Platform facts checked against Cloudflare's docs (2026-11-06) before building:**
+
+- `assets.run_worker_first` takes an array of path patterns (`*` matches deeply, `!` excludes; wrangler ≥ 4.20,
+  we use 4.158); everything else is served as a static asset — "Requests to static assets are free and
+  unlimited." Once the daily free limit is reached, requests that run the Worker get a 429; assets keep working.
+- Service bindings: "Service bindings don't increase costs"; on Standard pricing the call adds no request fee
+  (CPU of both counts). The free plan's subrequest limit (50 per request) applies to the callee calls.
+- A Worker with `workers_dev = false` and no routes is reachable only through a binding; `preview_urls = false` is
+  set explicitly because an omitted setting leaves an existing preview URL as it is.
+- A version includes code, static assets and bindings; `wrangler rollback` per Worker, last 100 versions; "Resources
+  connected to your Worker will not be changed during a rollback", so the two Workers drift on purpose — hence the
+  versioned contract.
+- A Worker binding to a Worker that does not exist yet fails to deploy: the API Worker goes first.
+- Rate limiting (`ratelimits`), Analytics Engine and Workers Logs need no public route.
+- Whether `request.cf` / `CF-Connecting-IP` reach a callee is not documented: the router passes the client's address
+  explicitly in the envelope (safe: the API has no other way in).
+- Circular service bindings are not documented: avoided. The API reads catalog files by asking the router for them
+  (a "need" answer; the router reads them from its assets and sends the envelope again), so the binding goes one
+  way only. The API keeps files for a minute, so most requests take one round.
+- Each Worker has its own wrangler config (`apps/catalog/wrangler.jsonc`, `wrangler.api.jsonc`).
+- Token: "Workers Scripts: Edit" covers deploying both; under Cloudflare's newer roles, _creating_ a Worker may need
+  the product-level Admin role — tried on the first deploy-api (see below).
+
+**Built:** `apps/catalog/src/router.ts` (data Worker, a few dozen lines, imports only the contract),
+`apps/catalog/src/api.ts` (everything else), `packages/core/src/router-contract.ts` (version 1, envelope, need
+exchange, safe paths). The API refuses another contract version with a 500 that says which versions and what to
+deploy (an HTML page on `/status`). Contract tests: rows and search through the router, a refused version, the
+API answering nothing but envelopes, the router's 503 when the API is missing and its refusal to read unsafe
+paths, and rate limits counted once per request whatever the rounds. `israel-tv deploy-api` (code releases;
+Analytics Engine tried every time, fallback without it), `deploy` (both, in order: one command for a new
+self-hoster), `versions` and `rollback` per Worker. The publisher deploys only the data Worker; a first publish
+before deploy-api fails with what to run. The usage reader takes Workers Logs from the API Worker (falling back
+to the old single Worker for days before the split).
+
+**Publish batching:** airing checks and Kan slices request a publish; one is made at once if the last was at least
+`publisher.minIntervalMinutes` (30) ago, else one timer publishes everything gathered when the interval is up.
+The end of a full run, an owner's show refresh (Kan too) and start-up publish at once. Test with fake timers.

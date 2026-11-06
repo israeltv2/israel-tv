@@ -72,22 +72,36 @@ What goes through it: the resolver's "דרך ישראל" streams, offered only w
 
 `cloudflare`:
 
-| Option         | Default                 |                                                                    |
-| -------------- | ----------------------- | ------------------------------------------------------------------ |
-| `workerName`   | `israel-tv`             | Served at `https://<workerName>.<your-subdomain>.workers.dev`.     |
-| `accountIdEnv` | `CLOUDFLARE_ACCOUNT_ID` | `.env` variable with the account id.                               |
-| `apiTokenEnv`  | `CLOUDFLARE_API_TOKEN`  | `.env` variable with an API token allowed to edit Workers scripts. |
-| `dir`          | `./data/site`           | Build folder uploaded on each publish.                             |
-| `publicUrl`    | —                       | Optional, for your own reference.                                  |
+| Option               | Default                 |                                                                    |
+| -------------------- | ----------------------- | ------------------------------------------------------------------ |
+| `workerName`         | `israel-tv`             | Served at `https://<workerName>.<your-subdomain>.workers.dev`.     |
+| `accountIdEnv`       | `CLOUDFLARE_ACCOUNT_ID` | `.env` variable with the account id.                               |
+| `apiTokenEnv`        | `CLOUDFLARE_API_TOKEN`  | `.env` variable with an API token allowed to edit Workers scripts. |
+| `dir`                | `./data/site`           | Build folder uploaded on each publish.                             |
+| `publicUrl`          | —                       | Optional, for your own reference.                                  |
+| `apiWorkerName`      | `<workerName>-api`      | The private API Worker (no public address).                        |
+| `minIntervalMinutes` | `30`                    | Routine changes are published at most this often, in one deploy.   |
 
-The Worker answers catalog rows (so it can add the warning to a row that has not been updated), search, streams,
-paging past the end and `/status`; those count toward the free plan's 100,000 a day. The manifest, metadata
-and images are free static files, with absolute image URLs written at publish time (the address is
-`publicUrl`, or else the one the first deploy reported; on that very first publish only, the manifest and
-metadata also go through the Worker to get the address filled in). For each request it answers it writes one JSON line to Workers Logs (no addresses), and for each
-stream request one Workers Analytics Engine data point; the home daemon reads the daily counts back with the
-same API token (Analytics Engine needs the token to also have "Account Analytics: Read"; without it the counts
-come from Workers Logs).
+Two Workers on your account:
+
+- **`<workerName>` (public, the data Worker):** the catalog as static assets — manifest, rows' files, show pages,
+  images — served by Cloudflare without running any code (free and not counted). A tiny router runs only for the
+  dynamic paths (`/catalog/*` rows and search, `/stream/*`, `/status*`) and hands them to the API Worker through a
+  service binding. Every publish is a new version of this Worker: its versions are the catalog's history.
+- **`<workerName>-api` (private, the code):** rows (with the warning on a row not updated for too long), search,
+  streams, `/status`, the per-client limits, one Workers Logs line per request (no addresses) and one Analytics
+  Engine data point per stream request. It has no public address. It is deployed by `pnpm israel-tv deploy-api`
+  (after each update), never by a publish, so code and catalog roll back separately (see operations.md).
+
+Router requests count toward the free plan's 100,000 a day (one per row, search, stream or status request; the
+call into the API Worker adds no request fee). Image URLs are written absolute at publish time (the address is
+`publicUrl`, or else the one the first deploy reported; on that very first publish only, the manifest and show
+pages also go through the API to get the address filled in). The home daemon reads the daily counts back with
+the same API token (Analytics Engine needs the token to also have "Account Analytics: Read"; without it the
+counts come from Workers Logs).
+
+Publishing is batched: airing checks and Kan slices gather their changes into one deploy at most every
+`minIntervalMinutes`; the end of a full run and a show refresh you ask for publish at once.
 
 ## `resolver`
 

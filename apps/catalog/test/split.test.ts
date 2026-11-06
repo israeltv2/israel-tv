@@ -127,7 +127,14 @@ test('the router answers 503 when the API is missing, and gives no file it shoul
 
 test('a request is rate-limited once, not once per round', async () => {
   let counted = 0;
-  const w = wire({ RATE_STREAM: { limit: async () => (counted++, { success: true }) } });
+  const w = wire({
+    RATE_STREAM: {
+      limit: async () => {
+        counted++;
+        return { success: true };
+      },
+    },
+  });
   const before = w.apiCalls.length;
   expect((await w.get('/stream/series/iltv_mako_1:1:1.json')).status).toBe(200);
   expect(w.apiCalls.length - before).toBeGreaterThanOrEqual(2); // asked for the season's stream file first
