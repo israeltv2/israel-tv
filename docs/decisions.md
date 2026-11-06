@@ -361,3 +361,11 @@ and lists no episode pages) would have been marked failed on every re-read; the 
 skips a show whose one stored episode is the page's own video. Everything else the reviewer checked —
 numbering, store, runner, all three readers, the daemon, publishing, rendering, the addon, the Worker, the
 resolver and the network layer — was reported sound.
+
+### Code review, round 11 (2026-11-06)
+
+2 findings in the Kan crawler, both fixed before any affected data existed: a premiere or upcoming show whose
+page embeds a player before listing its episode pages would have had that video stored as S1E1 and every real
+episode shifted by one (a page video is now taken as a single-video show only after two reads at least a day
+apart, and an episode page carrying a video already stored from the show page is not stored again); a known
+Kan show whose page disappeared stayed healthy on `/status` (it is now marked failing, its data kept).

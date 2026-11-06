@@ -72,6 +72,8 @@ interface ShowState {
   fresh?: string[];
   /** When a show page that was never read successfully last failed (retried after a week). */
   failedAt?: string;
+  /** First read on which the page embedded a video but listed no episode pages. */
+  featuredSeenAt?: string;
 }
 
 interface CrawlState {
@@ -257,6 +259,11 @@ export async function crawlKan(
         store.addWarnings(runId, id ?? null, [
           { code: 'source-note', message: `Kan ${key}: ${(err as Error).message}` },
         ]);
+        // A show we already have: keep its data, and show it as failing on /status.
+        if (id) {
+          problems++;
+          store.markShowFailed(id, `kept last good data: ${(err as Error).message}`);
+        }
         continue;
       }
       s.checkedAt = new Date().toISOString();
@@ -296,11 +303,20 @@ export async function crawlKan(
       else if (id && (page.episodes.length > 0 || page.featured)) store.markShowChecked(id);
       // Single-video show: the video is on the show page itself. Only for a show with nothing stored yet,
       // so a page's embedded player can never become a duplicate episode.
+      // A premiere or an upcoming show can embed a player before its episode pages are listed, so the page
+      // must look like this on two reads at least a day apart before its video is taken as the one episode.
       if (page.episodes.length === 0 && page.featured && known.size === 0) {
-        newEpisodes += saveEpisodes(store, key, s, [
-          { episode: toEpisode(page.featured), season: undefined },
-        ]);
-      }
+        if (!s.featuredSeenAt) s.featuredSeenAt = new Date().toISOString();
+        else if (Date.now() - Date.parse(s.featuredSeenAt) >= DAY_MS) {
+          newEpisodes += saveEpisodes(
+            store,
+            key,
+            s,
+            [{ episode: toEpisode(page.featured), season: undefined }],
+            runId,
+          );
+        }
+      } else if (page.episodes.length > 0) delete s.featuredSeenAt;
     }
 
     // 3. Episode pages, airing shows first, oldest episode first within a show.
@@ -382,6 +398,17 @@ function saveEpisodes(
 ): number {
   const seriesId = store.seriesIdFor('kan', key);
   const prev = store.getShow(seriesId)?.show;
+  // The same video already stored from the show page (kan:vod-<id>) is not added again from its episode page.
+  const storedVods = new Set(
+    (prev?.seasons ?? [])
+      .flatMap((x) => x.episodes.map((e) => e.key))
+      .filter((k) => k.startsWith('kan:vod-')),
+  );
+  batch = batch.filter((b) => {
+    const vod = /\/kancdn\/vod\/([^/]+)\//.exec(b.episode.streams[0]?.url ?? '')?.[1];
+    return !(vod && b.episode.key !== `kan:vod-${vod}` && storedVods.has(`kan:vod-${vod}`));
+  });
+  if (batch.length === 0) return 0;
   const base: ScrapedShow = prev ?? {
     source: 'kan',
     key,
