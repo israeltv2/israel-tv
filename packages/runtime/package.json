@@ -14,5 +14,6 @@
     "@israel-tv/core": "workspace:*",
     "pino": "10.4.0",
     "pino-roll": "4.0.0"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

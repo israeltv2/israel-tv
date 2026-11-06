@@ -24,5 +24,6 @@
   },
   "bin": {
     "israel-tv-resolver": "src/cli.ts"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

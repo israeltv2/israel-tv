@@ -339,5 +339,7 @@ needed to run Israel TV.
 
 ## License
 
-MIT. This project only reads public web pages and points your player at the broadcasters' own streams; it
-does not host or re-broadcast any video. Respect the broadcasters' terms where you live.
+[AGPL-3.0-only](LICENSE), © 2026 Israel TV contributors. If you run a modified copy as a service for others,
+you must publish your changes too. This project only reads public web pages and points your player at the
+broadcasters' own streams; it does not host or re-broadcast any video. Respect the broadcasters' terms where you
+live.
