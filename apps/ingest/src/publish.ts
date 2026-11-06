@@ -11,13 +11,14 @@ import {
   enabledSources,
   type Health,
   HOUR_MS,
+  LIVE_CHANNELS,
   type PublisherConfig,
   type Source,
   type StatusFile,
   sitePaths,
 } from '@israel-tv/core';
-import { type LiveChannelRender, type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
-import { brandImage } from '@israel-tv/resolver';
+import { type RenderShow, renderSite, type SiteFiles } from '@israel-tv/render';
+import { brandImage, channelLogo } from '@israel-tv/resolver';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { liveRender } from './live.ts';
 import { emptyShowsKey, episodeCount } from './runner.ts';
@@ -161,7 +162,7 @@ export function catalogWarnings(status: StatusFile): Record<string, string> {
   return out;
 }
 
-export function renderFromStore(store: Store, config: Config, live: LiveChannelRender[]): SiteFiles {
+export function renderFromStore(store: Store, config: Config): SiteFiles {
   const rows = store.listShows();
   const status = buildStatus(store, activeSources(config), Date.now(), rows);
   const registry = store.registry();
@@ -192,6 +193,18 @@ export function renderFromStore(store: Store, config: Config, live: LiveChannelR
     const img = brandImage(config.branding.dir, name);
     if (img) assets.set(path, img.body);
   }
+  // Live channel logos are served from here (their sources are not ours to hotlink).
+  const logos = new Set<string>();
+  if (config.sources.live) {
+    for (const c of LIVE_CHANNELS) {
+      const png = channelLogo(c.id);
+      if (png) {
+        assets.set(sitePaths.channelLogo(c.id), png);
+        logos.add(c.id);
+      }
+    }
+  }
+  const live = config.sources.live ? liveRender(logos) : [];
   return renderSite({
     version: VERSION,
     assets,
@@ -483,10 +496,7 @@ export async function publishSite(
   const kind = config.publisher.type;
   let w: ReturnType<typeof writeSite>;
   try {
-    w = writeSite(
-      config.publisher.dir,
-      renderFromStore(store, config, config.sources.live ? liveRender() : []),
-    );
+    w = writeSite(config.publisher.dir, renderFromStore(store, config));
   } catch (err) {
     // Render/write problems (disk full, permissions) are publish failures too, visible on /status.
     const runId = store.startRun('publish', kind);

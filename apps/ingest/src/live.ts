@@ -1,13 +1,15 @@
 // Live channels: render entries and a health check of their direct streams.
-import { LIVE_CHANNELS, type LiveChannel } from '@israel-tv/core';
+import { LIVE_CHANNELS, type LiveChannel, ORIGIN_TOKEN, sitePaths } from '@israel-tv/core';
 import type { LiveChannelRender } from '@israel-tv/render';
 import type { Store } from '@israel-tv/store';
 import { runStatus } from './runner.ts';
 
-export function liveRender(): LiveChannelRender[] {
+/** Live channels for rendering; `logos` are the channel ids that have a logo tile among the site's images. */
+export function liveRender(logos: ReadonlySet<string> = new Set()): LiveChannelRender[] {
   return LIVE_CHANNELS.map((c) => ({
     id: c.id,
     name: c.name,
+    ...(logos.has(c.id) ? { logo: `${ORIGIN_TOKEN}/${sitePaths.channelLogo(c.id)}` } : {}),
     description: c.description,
     streams: c.direct.map((l) => ({
       url: l.url,
