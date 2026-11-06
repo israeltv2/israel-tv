@@ -2,14 +2,31 @@
 import { readFile } from 'node:fs/promises';
 import { join, normalize, sep } from 'node:path';
 import { createAddonApp } from '@israel-tv/addon';
+import { Hono } from 'hono';
+
+const IMAGE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg' };
 
 export function localAddonApp(dir: string) {
   const root = normalize(dir);
-  const app = createAddonApp(
+  const inside = (p: string) => p.startsWith(root.endsWith(sep) ? root : root + sep);
+  const images = new Hono();
+  // Images (the addon's logo and background, channel logos) are served as they are.
+  images.get('/:path{(logos/[a-z0-9_]+\\.png|logo\\.png|background\\.jpg)}', async (c) => {
+    const p = normalize(join(root, c.req.param('path')));
+    if (!inside(p)) return c.notFound();
+    try {
+      const body = await readFile(p);
+      const type = IMAGE_TYPES[p.split('.').pop() ?? ''] ?? 'application/octet-stream';
+      return c.body(body, 200, { 'content-type': type, 'cache-control': 'public, max-age=86400' });
+    } catch {
+      return c.notFound();
+    }
+  });
+  const addon = createAddonApp(
     {
       async read(path) {
         const p = normalize(join(root, path));
-        if (!p.startsWith(root.endsWith(sep) ? root : root + sep)) return undefined;
+        if (!inside(p)) return undefined;
         try {
           return await readFile(p, 'utf8');
         } catch {
@@ -19,5 +36,6 @@ export function localAddonApp(dir: string) {
     },
     { cacheMs: 5_000 },
   );
-  return app;
+  images.route('/', addon);
+  return images;
 }

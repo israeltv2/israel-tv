@@ -57,7 +57,8 @@ function show(id: string, latestAirDate: string, extra: Partial<RenderShow> = {}
 }
 
 const base = { version: '1.0.0', live: [], status, registry: {}, catalogWarnings: {} };
-const read = (files: Map<string, string>, p: string) => JSON.parse(files.get(p) ?? 'null');
+const text = (files: Map<string, string | Uint8Array>, p: string) => String(files.get(p) ?? 'null');
+const read = (files: Map<string, string | Uint8Array>, p: string) => JSON.parse(text(files, p));
 
 test('catalog is newest first and paged by 100', () => {
   const shows = Array.from({ length: 150 }, (_, i) =>
@@ -132,12 +133,30 @@ test('an external id held by two series is published for neither', () => {
 
 test('a running source whose row has no shows yet is listed, saying it is loading', () => {
   const files = renderSite({ ...base, sources: ['mako', 'kan'], shows: [show('iltv_mako_1', '2026-11-05')] });
-  const manifest = JSON.parse(files.get('manifest.json') ?? '{}');
+  const manifest = read(files, 'manifest.json');
   expect(manifest.catalogs.map((c: { id: string }) => c.id)).toEqual([
     'iltv_keshet12',
     'iltv_kan11',
     'iltv_kankids',
   ]);
-  const row = JSON.parse(files.get('catalog/series/iltv_kankids.json') ?? '{}');
+  const row = read(files, 'catalog/series/iltv_kankids.json');
   expect(row.metas[0].name).toMatch(/^⏳/);
+});
+
+test('logo and background are in the manifest only when their images are there, as origin-relative URLs', () => {
+  const none = read(renderSite({ ...base, shows: [] }), 'manifest.json');
+  expect(none.logo).toBeUndefined();
+  const png = new Uint8Array([137, 80, 78, 71]);
+  const files = renderSite({
+    ...base,
+    shows: [],
+    assets: new Map([
+      ['logo.png', png],
+      ['background.jpg', png],
+    ]),
+  });
+  const m = read(files, 'manifest.json');
+  expect(m.logo).toBe('{{israel-tv-origin}}/logo.png');
+  expect(m.background).toBe('{{israel-tv-origin}}/background.jpg');
+  expect(files.get('logo.png')).toBe(png);
 });

@@ -9,6 +9,7 @@ import {
   type Meta,
   type MetaPreview,
   normalizeForSearch,
+  ORIGIN_TOKEN,
   type ScrapedShow,
   type SearchRow,
   type SeasonAssignment,
@@ -57,9 +58,12 @@ export interface RenderInput {
   name?: string;
   /** Enabled sources, for the description (default: all). */
   sources?: string[];
+  /** Images served as they are: `logo.png`, `background.png`, `logos/<channel id>.png`. */
+  assets?: Map<string, Uint8Array>;
 }
 
-export type SiteFiles = Map<string, string>;
+/** Rendered files: text (JSON, HTML) or binary (images). */
+export type SiteFiles = Map<string, string | Uint8Array>;
 
 const SHAPE = 'landscape' as const;
 const json = (v: unknown) => JSON.stringify(v);
@@ -176,6 +180,10 @@ export function buildManifest(input: RenderInput, catalogIds: Set<string>, exter
     ],
     types: ['series', 'tv'],
     idPrefixes: streamPrefixes,
+    ...(input.assets?.has(sitePaths.logo) ? { logo: `${ORIGIN_TOKEN}/${sitePaths.logo}` } : {}),
+    ...(input.assets?.has(sitePaths.background)
+      ? { background: `${ORIGIN_TOKEN}/${sitePaths.background}` }
+      : {}),
     catalogs: CATALOGS.filter((c) => catalogIds.has(c.id)).map((c) => ({
       type: c.type,
       id: c.id,
@@ -186,7 +194,7 @@ export function buildManifest(input: RenderInput, catalogIds: Set<string>, exter
 }
 
 export function renderSite(input: RenderInput): SiteFiles {
-  const files: SiteFiles = new Map();
+  const files: SiteFiles = new Map(input.assets ?? []);
   const search: SearchRow[] = [];
   const extIds: ExtIds = {};
   const rows = new Map<string, MetaPreview[]>();

@@ -15,6 +15,12 @@ Relative paths are relative to the config file's folder.
 | ------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `path` | `./data/israel-tv.sqlite` | The database: permanent ids, numbering, last good data, run log. Back it up; `/registry.json` on the addon is a public copy of the id registry. |
 
+## `branding`
+
+`dir` (default `./branding`): your own addon images, used instead of the bundled ones when present —
+`logo.png` (the addon's logo, square, about 256 px), `resolver-logo.png` (the resolver's) and `background.jpg`
+or `background.png` (1920×1080). Missing ones fall back to the bundled images in `assets/branding/`.
+
 ## `sources`
 
 `mako`, `reshet`, `kan`, `live`: each `true` (default) or `false`.

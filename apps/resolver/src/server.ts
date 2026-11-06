@@ -3,6 +3,7 @@ import type { Config, ScrapedEpisode } from '@israel-tv/core';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
 import { createResolverApp, type ResolverDeps } from './app.ts';
+import { brandImage } from './branding.ts';
 
 export function episodeLookup(storePath: string) {
   let store: Store | undefined;
@@ -35,8 +36,11 @@ export function resolverApp(
   extra: Pick<ResolverDeps, 'onEvent' | 'sessions' | 'salt' | 'clientAddress'> = {},
 ) {
   const proxies = proxyEndpoints(config.geo, env);
+  const logo = brandImage(config.branding.dir, 'resolver-logo');
+  const background = brandImage(config.branding.dir, 'background');
   return createResolverApp({
     ...extra,
+    branding: { ...(logo ? { logo } : {}), ...(background ? { background } : {}) },
     log,
     ...(onRelay ? { onRelay } : {}),
     episode: episodeLookup(config.store.path),

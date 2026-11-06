@@ -531,3 +531,18 @@ resolver (which runs on the viewer's network) tries the direct stream first and 
 refused (401/403/451, or no answer within 4 s), cached per show (or live channel stream) for 6 hours. At home
 in Israel, Reshet and Kan play straight from the CDN and the "via Israel" stream no longer appears. Kan is
 treated the same way (its blocks are per title, so the probe is per show).
+
+### Addon branding
+
+The owner's logo, resolver logo and background are the project's branding (`assets/branding/`). The logos had
+truly transparent corners (alpha 0); their artwork was not centred on the 1024 canvas (near-invisible alpha
+pixels reached the left edge), so they were trimmed to their visible pixels (alpha > 24), centred on a square
+with a 4% margin, and saved as a 1024 px master and a 256 px manifest logo (41 KB). The background (1920×1080,
+1.6 MB PNG) is served as an 87 KB JPEG. It shows Jerusalem's skyline including the Dome of the Rock: the owner's
+choice, kept as is. Anyone running their own instance can drop their own `logo.png`, `resolver-logo.png` and
+`background.jpg`/`.png` into `branding.dir` (default `./branding` next to the config).
+
+Image URLs in a Stremio manifest must be absolute, and the address an addon is served from is only known when a
+request comes in. Rendered files carry a placeholder origin that the Worker and the local server replace with the
+request's origin when serving JSON; without request logs the Worker still runs first for the three kinds of
+files that carry images (manifest, the live row, live channel pages).
