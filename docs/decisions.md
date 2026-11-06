@@ -730,3 +730,13 @@ Five findings, fixed:
    the WAL is checkpointed after VACUUM and the size is measured from the database's pages.
 5. Requests refused by the rate limit were logged as stream requests, so the Workers Logs fallback counted
    them as plays: they are logged as `route: limited`.
+
+### Image URLs are made absolute at publish time
+
+Revisiting fix 1 above: sending `/meta/*` through the Worker put every show-page open on the free plan's 100,000
+Worker requests a day. Instead, the publish writes absolute image URLs into every file whenever it knows the
+public address — `publisher.publicUrl`, or else the address the last successful deploy reported (remembered in
+the database). Then only catalog rows run the Worker (for the stale-row warning); the manifest and all metadata
+are plain static files again. Only the very first publish of a brand-new install, before any address is known,
+still sends the manifest and metadata through the Worker to fill the address in; its next publish switches over
+by itself. The local server keeps filling in its address per request (it is reached under different LAN names).
