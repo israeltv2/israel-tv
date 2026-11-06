@@ -88,8 +88,11 @@ interface ShowState {
   retry?: Record<string, { n: number; at: string }>;
 }
 
-/** Bumped when the way show images are copied changes (2: from the lobby, with the page's own images loaded). */
-const ART_METHOD = 2;
+/**
+ * Bumped when the way show images are copied changes (2: from the lobby, with the page's own images loaded;
+ * 3: a show page's own still when the show has no lobby card).
+ */
+const ART_METHOD = 3;
 
 interface CrawlState {
   lobbiesAt?: string;
@@ -441,7 +444,7 @@ export async function crawlKan(
             key,
             'listing',
             opts.artworkDir
-              ? { image: (html) => s.lobbyPoster ?? parseShowPage(html, path).image }
+              ? { image: (html) => s.lobbyPoster ?? absolute(parseShowPage(html, path).image, s.origin) }
               : undefined,
           ),
           path,
@@ -459,7 +462,7 @@ export async function crawlKan(
       attemptedShows.push(key);
       if (page.title) s.title = page.title;
       if (page.description) s.description = page.description;
-      const image = s.lobbyPoster ?? page.image;
+      const image = s.lobbyPoster ?? absolute(page.image, s.origin);
       if (image) s.image = image;
       const known = new Set(
         id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
@@ -670,6 +673,11 @@ export function kanCrawlOptions(
 /** Where Kan show images are kept (next to the catalog database). */
 export function kanArtworkDir(config: Config): string {
   return join(dirname(config.store.path), 'artwork');
+}
+
+/** An image path from a Kan page, made absolute against its site. */
+function absolute(src: string | undefined, origin: string): string | undefined {
+  return src ? new URL(src, origin).toString() : undefined;
 }
 
 /** The file name of a Kan show's saved image (from its page URL, which never changes). */

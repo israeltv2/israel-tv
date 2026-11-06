@@ -97,7 +97,10 @@ export function parseShowPage(html: string, showPath: string): KanShowPage {
     stripTags(/<title>([\s\S]*?)<\/title>/.exec(html)?.[1] ?? '');
   const desc = /class="info-description[^"]*"[^>]*>([\s\S]*?)<\/div>/.exec(html)?.[1];
   const description = desc ? stripTags(desc) : meta(html, 'og:description');
-  const image = meta(html, 'og:image');
+  // Kan refuses its share image (og:image) off its pages; a picture the page itself shows loads: its first
+  // still or promo (the `?width=…&v=…` images), the share image only as a last resort.
+  const shown = /<img[^>]*\ssrc="(\/media\/[^"]+\.(?:jpe?g|png|webp)\?[^"]*width=\d+[^"]*)"/i.exec(html)?.[1];
+  const image = shown ? shown.replace(/&amp;/g, '&') : meta(html, 'og:image');
   return {
     title: title.replace(/\s*\|\s*כאן.*$/, '').trim(),
     ...(description ? { description } : {}),
