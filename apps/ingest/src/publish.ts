@@ -25,6 +25,7 @@ import { brandImage, channelLogo } from '@israel-tv/resolver';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { kanArtwork, kanArtworkDir } from './kan.ts';
 import { liveRender } from './live.ts';
+import { scrub, secretValues } from './log.ts';
 import { emptyShowsKey, episodeCount } from './runner.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -146,7 +147,8 @@ export function buildStatus(
       : out.some((s) => s.health === 'warn') || failingShows.length > 0 || matchNote
         ? 'warn'
         : 'ok';
-  return {
+  // The status is published: no secret may be in it, whatever an error message carried.
+  return cleanSecrets({
     generatedAt: new Date(now).toISOString(),
     health: worst,
     ...(publishNote ? { publish: publishNote } : {}),
@@ -154,7 +156,21 @@ export function buildStatus(
     sources: out,
     failingShows,
     warnings,
-  };
+  });
+}
+
+/** Remove every secret from text (or strings inside a value): `.env` values, and Cloudflare account paths. */
+export function cleanSecrets<T>(value: T, env: NodeJS.ProcessEnv = process.env): T {
+  const scrubbed = scrub(value, secretValues(env));
+  const accounts = (v: unknown): unknown =>
+    typeof v === 'string'
+      ? v.replace(/\/accounts\/[0-9a-f]{32}/gi, '/accounts/[redacted]')
+      : Array.isArray(v)
+        ? v.map(accounts)
+        : v && typeof v === 'object'
+          ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, accounts(x)]))
+          : v;
+  return accounts(scrubbed) as T;
 }
 
 export function catalogWarnings(status: StatusFile): Record<string, string> {
@@ -358,7 +374,7 @@ export function publishError(
   code: number | null,
   p: { apiTokenEnv: string; accountIdEnv: string },
 ): PublishError {
-  const lines = out
+  const lines = cleanSecrets(out)
     .replace(ANSI, '')
     .split('\n')
     .map((l) => l.trim())
