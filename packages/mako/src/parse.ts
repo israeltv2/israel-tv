@@ -35,7 +35,8 @@ export function episodesFromPage(page: ShowPage): ScrapedEpisode[] {
   for (const v of vods) {
     if (v.componentLayout !== 'vod') continue;
     const [hintPart, datePart] = (v.extraInfo ?? '').split('@');
-    const airDate = parseDottedDate(datePart) ?? parseDottedDate(v.title);
+    // extraInfo is "פרק 5@05.11.26" on most seasons, but just "05.11.26" on daily shows.
+    const airDate = parseDottedDate(datePart ?? hintPart) ?? parseDottedDate(v.title);
     const numberHint = parseEpisodeHint(hintPart) ?? parseEpisodeHint(v.title);
     const thumb = v.pics?.[0]?.picUrl;
     out.push({

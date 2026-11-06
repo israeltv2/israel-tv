@@ -145,3 +145,24 @@ test('a dead season link is skipped with a note instead of failing the show', as
     '/mako-vod-keshet/masterchef-dream_team_2',
   );
 });
+
+test('daily-show seasons with a bare date in extraInfo are dated and numbered oldest first', () => {
+  const eps = episodesFromPage(parseShowPage(fx('season-morning-news-2026')));
+  expect(eps.length).toBe(212);
+  expect(eps.every((e) => e.airDate)).toBe(true);
+  expect(eps[0]).toMatchObject({ airDate: '2026-11-05' });
+  const r = assignNumbers(
+    {
+      source: 'mako',
+      key: '/m',
+      title: 'm',
+      catalog: 'iltv_keshet12',
+      seasons: [{ key: 's', title: 'עונה 2026', episodes: eps }],
+    },
+    { seasons: [], episodes: [] },
+  );
+  const first = r.episodes.find((e) => e.key === eps.at(-1)?.key);
+  const latest = r.episodes.find((e) => e.key === eps[0]?.key);
+  expect(first?.episode).toBe(1); // "פותחים את שנת 2026", 01.01.26
+  expect(latest?.episode).toBe(212);
+});
