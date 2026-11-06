@@ -1,4 +1,5 @@
 // israel-tv command line. Run `node apps/ingest/src/cli.ts help`.
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ConfigError, parseSeriesId, type Source, tmdbApiKey } from '@israel-tv/core';
@@ -41,6 +42,7 @@ const HELP = `israel-tv <command>
                                      Usage and diagnostics events as JSON lines, oldest first (pnpm logs …)
   usage                              The usage dashboard's figures as JSON (pnpm usage)
   admin-url                          The admin page's address with its token (open it once in a browser)
+  restore <registry.json file or URL> Rebuild ids and numbering into an empty database (see docs/operations.md)
   help                               This text
 
 Config: israel-tv.config.json in the current folder (or ISRAEL_TV_CONFIG). Secrets: .env.`;
@@ -87,7 +89,9 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
   // Commands that only read local state do not need the secrets of every configured service.
-  const { config } = loadConfig(process.env, { needSecrets: !['status', 'serve', 'events'].includes(cmd) });
+  const { config } = loadConfig(process.env, {
+    needSecrets: !['status', 'serve', 'events', 'usage', 'admin-url', 'restore'].includes(cmd),
+  });
   const store = Store.open(config.store.path);
   store.closeStaleRuns();
   const adapters = createAdapters(config);
@@ -298,6 +302,21 @@ async function main(argv: string[]): Promise<number> {
         } finally {
           events.close();
         }
+        return 0;
+      }
+      case 'restore': {
+        if (!arg)
+          throw new UserError('restore needs a registry.json file or URL (e.g. https://…/registry.json)');
+        const text = /^https?:\/\//.test(arg)
+          ? await (await fetch(arg, { signal: AbortSignal.timeout(60_000) })).text()
+          : readFileSync(arg, 'utf8');
+        const reg = JSON.parse(text) as Parameters<Store['restoreRegistry']>[0];
+        if (!Array.isArray(reg.series) || !Array.isArray(reg.seasons) || !Array.isArray(reg.episodes))
+          throw new UserError(`${arg} is not a registry.json (series, seasons, episodes)`);
+        const n = store.restoreRegistry(reg);
+        console.log(
+          `restored ${n.series} series, ${n.seasons} seasons, ${n.episodes} episode numbers into ${config.store.path}. Next: \`pnpm israel-tv full\` (or start the service) reads every show again under its old ids.`,
+        );
         return 0;
       }
       case 'admin-url': {

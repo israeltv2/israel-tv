@@ -679,3 +679,11 @@ on demand.
   `.m3u8` whenever the original URL contained "playlist" or "manifest" anywhere (Kan's segment URLs do), and the
   canary believed the name. The relay now names a URL a playlist only when its path ends in `.m3u8` or is
   Kaltura's `playManifest`, and the canary decides from the answer itself (a playlist starts with `#EXTM3U`).
+
+### Restore drill
+
+`israel-tv restore <registry.json>` rebuilds the id registry into an empty database (it refuses a non-empty
+one) and continues each source's id counter after its highest id. Tested both ways: a unit test (ingest, publish
+the registry, restore into an empty store, ingest again in a different order: identical registry; a new show
+gets the next id) and a live drill on 2026-11-06 (783 series, 1,665 seasons, 36,580 episode numbers restored;
+a fresh read of 9 real shows put all 3,527 of their episodes under the published numbers, none differed).

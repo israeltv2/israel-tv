@@ -282,3 +282,37 @@ test('a Kan refresh during a back-off does not spin the event loop', async () =>
   expect(ticked).toBe(true);
   expect((d as unknown as { kanRefresh: Set<string> }).kanRefresh.size).toBe(1); // kept for the next slice
 });
+
+test('restore drill: ids and numbers come back identical from registry.json and a fresh read', async () => {
+  const a = Store.open(':memory:');
+  const shows = {
+    '/a': show('/a', [
+      { key: 's1', title: 'עונה 1', n: 3 },
+      { key: 's2', title: 'VIP 5', n: 2 },
+    ]),
+    '/b': show('/b', [{ key: 's1', title: 'עונה 2', n: 4 }]),
+  };
+  await runFull(a, adapter(entries('/a', '/b'), shows), opts);
+  const published = JSON.parse(JSON.stringify(a.registry()));
+  const b = Store.open(':memory:');
+  expect(b.restoreRegistry(published)).toMatchObject({ series: 2 });
+  // The fresh read lists the shows in another order: ids and numbers still come back the same.
+  await runFull(b, adapter(entries('/b', '/a'), shows), opts);
+  const sort = (r: ReturnType<Store['registry']>) => ({
+    series: r.series.map((x) => [x.id, x.key]).sort(),
+    seasons: r.seasons.map((x) => [x.seriesId, x.key, x.number, x.kind]).sort(),
+    episodes: r.episodes.map((x) => [x.seriesId, x.key, x.season, x.episode]).sort(),
+  });
+  expect(sort(b.registry())).toEqual(sort(a.registry()));
+  // A show that appears after the restore gets the next id, never an old one.
+  await runFull(
+    b,
+    adapter(entries('/a', '/b', '/c'), {
+      ...shows,
+      '/c': show('/c', [{ key: 's1', title: 'עונה 1', n: 1 }]),
+    }),
+    opts,
+  );
+  expect(b.findSeriesId('mako', '/c')).toBe('iltv_mako_3');
+  expect(() => b.restoreRegistry(published)).toThrow(/empty/);
+});
