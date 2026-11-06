@@ -69,6 +69,8 @@ interface ShowState {
   lastNewAt?: string;
   /** Episode pages found as new on a re-read (newly published), as opposed to the first fill's backlog. */
   fresh?: string[];
+  /** When a show page that was never read successfully last failed (retried after a week). */
+  failedAt?: string;
 }
 
 interface CrawlState {
@@ -87,6 +89,8 @@ export interface KanCrawlOptions {
   pageIntervalMs: number;
   /** Shows with an episode in this many days are re-read every 6 hours; others weekly. */
   airingWindowDays: number;
+  /** Shows to read first in this slice, whatever their schedule (single-show refresh). */
+  priority?: string[];
   /** Test seam. */
   loader?: PageLoader;
   /** Test seam: whether a Redge URL plays from here without the proxy. */
@@ -105,7 +109,7 @@ async function defaultPlaysDirectly(url: string): Promise<boolean> {
 }
 
 export function showDue(s: ShowState, now: number, windowDays: number): boolean {
-  if (!s.checkedAt) return true;
+  if (!s.checkedAt) return !s.failedAt || now - Date.parse(s.failedAt) > 7 * 24 * HOUR;
   const age = now - Date.parse(s.checkedAt);
   const airing = s.lastNewAt !== undefined && now - Date.parse(s.lastNewAt) < windowDays * DAY_MS;
   return age > (airing ? 6 : 7 * 24) * HOUR;
@@ -204,8 +208,20 @@ export async function crawlKan(
     //    at most half the slice goes to show pages, so both make progress.
     const waiting = Object.values(state.shows).some((s) => s.pending.length > 0);
     const showBudget = waiting ? Math.ceil(opts.pagesPerRun / 2) : opts.pagesPerRun;
-    for (const [key, s] of Object.entries(state.shows)) {
-      if (pages >= showBudget) break;
+    // Refresh requests first, made due now; then everything else in order.
+    const prio = new Set((opts.priority ?? []).filter((k) => state.shows[k]));
+    for (const k of prio) {
+      const s = state.shows[k];
+      if (s) {
+        delete s.checkedAt;
+        delete s.failedAt;
+      }
+    }
+    const order = [...prio, ...Object.keys(state.shows).filter((k) => !prio.has(k))];
+    for (const key of order) {
+      const s = state.shows[key];
+      if (!s) continue;
+      if (pages >= showBudget && !prio.has(key)) break;
       const id = store.findSeriesId('kan', key);
       if (!showDue(s, now, opts.airingWindowDays)) continue;
       const firstRead = !s.checkedAt;
@@ -215,8 +231,10 @@ export async function crawlKan(
         page = parseShowPage(await load(key), path, s.origin);
       } catch (err) {
         if (blocked > 0) throw err;
-        // A broken show page is that show's problem only: note it and try again next week.
-        s.checkedAt = new Date().toISOString();
+        // A broken show page is that show's problem only: note it and try again next week. A show never read
+        // successfully keeps "first read" status, so its backlog is not mistaken for new episodes later.
+        if (s.checkedAt) s.checkedAt = new Date().toISOString();
+        else s.failedAt = new Date().toISOString();
         store.addWarnings(runId, id ?? null, [
           { code: 'source-note', message: `Kan ${key}: ${(err as Error).message}` },
         ]);
@@ -269,6 +287,7 @@ export async function crawlKan(
           }
           if (problem) {
             s.failed.push(url);
+            if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
             store.addWarnings(runId, store.findSeriesId('kan', key) ?? null, [
               { code: 'source-note', message: `Kan episode ${url}: ${problem}` },
             ]);
@@ -336,15 +355,9 @@ function saveEpisodes(
   return store.saveShow(seriesId, show, numbering.added, latestAirDate(show), fresh);
 }
 
-/** Make one Kan show due now (single-show refresh); the next crawl slice reads it first. */
-export function markKanShowDue(store: Store, key: string): boolean {
-  const state = store.getState<CrawlState>(STATE_KEY);
-  const s = state?.shows[key];
-  if (!state || !s) return false;
-  delete s.checkedAt;
-  delete state.backoffUntil;
-  store.setState(STATE_KEY, state);
-  return true;
+/** Whether a Kan show is known to the crawler (by its page URL). */
+export function kanShowKnown(store: Store, key: string): boolean {
+  return !!store.getState<CrawlState>(STATE_KEY)?.shows[key];
 }
 
 /** Kan VOD runs only when the source is on and a browser is configured. */

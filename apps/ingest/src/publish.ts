@@ -70,7 +70,8 @@ export function buildStatus(
       );
     }
     // Time since the last good run; for a source that never had one, since its first attempt.
-    const ref = lastGood ?? (last ? store.firstRun(read.kind, source) : undefined);
+    const everGood = store.lastGoodRun(read.kind, source);
+    const ref = everGood ?? (last ? store.firstRun(read.kind, source) : undefined);
     if (last && ref && now - Date.parse(ref.startedAt) > 36 * HOUR_MS) {
       health = 'error';
       notes.push(
@@ -145,7 +146,7 @@ export function catalogWarnings(status: StatusFile): Record<string, string> {
 
 export function renderFromStore(store: Store, config: Config, live: LiveChannelRender[]): SiteFiles {
   const rows = store.listShows();
-  const status = buildStatus(store, enabledSources(config), Date.now(), rows);
+  const status = buildStatus(store, activeSources(config), Date.now(), rows);
   const registry = store.registry();
   const seasonsBy = groupBy(registry.seasons, (x) => x.seriesId);
   const episodesBy = groupBy(registry.episodes, (x) => x.seriesId);
@@ -380,4 +381,9 @@ export async function publishSite(
     log(`publish failed: ${(err as Error).message}`);
     return false;
   }
+}
+
+/** Sources that actually run: Kan needs a browser as well as `sources.kan`. */
+export function activeSources(config: Config): Source[] {
+  return enabledSources(config).filter((s) => s !== 'kan' || config.browser.type !== 'none');
 }

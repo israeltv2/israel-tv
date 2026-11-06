@@ -277,7 +277,11 @@ export function createResolverApp(deps: ResolverDeps) {
       r = undefined;
     }
     if (!r) return c.text('too many redirects', 502);
-    deps.onRelay?.({ ok: true });
+    deps.onRelay?.(
+      r.ok || r.status === 206
+        ? { ok: true }
+        : { ok: false, error: `upstream answered HTTP ${r.status} (is the proxy's exit in Israel?)` },
+    );
     const type = r.headers.get('content-type') ?? '';
     const isPlaylist = /mpegurl/i.test(type) || /\.m3u8(\?|$)/.test(url);
     if (isPlaylist && r.ok) {

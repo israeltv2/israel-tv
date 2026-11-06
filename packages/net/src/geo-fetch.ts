@@ -41,12 +41,15 @@ export function createGeoFetch(proxies: ProxyEndpoint[]): GeoFetch {
           dispatcher,
         })) as unknown as Response;
         if (r.status === 407) {
+          await r.body?.cancel();
           lastErr = new Error(`${proxies[idx]?.server}: ${explainNetError({ message: '407' })}`);
           continue;
         }
         current = idx;
         return r;
       } catch (err) {
+        // The caller gave up (timeout): do not blame or try the other proxies.
+        if (init?.signal?.aborted) throw err;
         const proxy = proxies[idx];
         // undici hides a refused CONNECT behind "Request was cancelled"; ask the proxy directly what it says.
         const said = proxy ? await connectStatus(proxy, url).catch(() => undefined) : undefined;
@@ -66,7 +69,9 @@ function connectStatus(p: ProxyEndpoint, target: string): Promise<number | undef
   const proxy = new URL(p.server);
   if (proxy.protocol !== 'http:' && proxy.protocol !== 'https:') return Promise.resolve(undefined);
   const t = new URL(target);
-  const headers: Record<string, string> = { host: `${t.hostname}:${t.port || 443}` };
+  const headers: Record<string, string> = {
+    host: `${t.hostname}:${t.port || (t.protocol === 'http:' ? 80 : 443)}`,
+  };
   if (p.username)
     headers['proxy-authorization'] =
       `Basic ${Buffer.from(`${p.username}:${p.password ?? ''}`).toString('base64')}`;

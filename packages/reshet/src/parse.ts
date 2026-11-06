@@ -117,6 +117,8 @@ const ShowPageData = z.looseObject({
 });
 
 export interface ParsedSeason {
+  /** Reshet's own season id (map key or position); stable when the title changes. */
+  id: string;
   title: string;
   /** Older template: the season's position, to fetch its page. */
   position?: number;
@@ -210,6 +212,7 @@ export function parseShowPage(html: string): ParsedShowPage {
     const seasons = Object.entries(g.episodesSeasonsMap)
       .sort(([a], [b]) => Number(a) - Number(b))
       .map(([k, v]) => ({
+        id: k,
         title: (v.name ?? `עונה ${k}`).trim(),
         episodes: (v.episodes ?? []).map(fromNew).filter((e): e is ScrapedEpisode => !!e),
       }));
@@ -222,6 +225,7 @@ export function parseShowPage(html: string): ParsedShowPage {
     const seasons = [...list]
       .sort((a, b) => a.position - b.position)
       .map((s) => ({
+        id: String(s.position),
         title: (s.name ?? `עונה ${s.position}`).trim(),
         position: s.position,
         ...(s.position === current ? { episodes: oldSeason(p.episodes ?? []) } : {}),

@@ -428,6 +428,7 @@ export class Store {
     return closed;
   }
 
+  /** Record warnings; one already recorded for the same show with the same text is not repeated. */
   addWarnings(
     runId: number | null,
     seriesId: string | null,
@@ -435,9 +436,29 @@ export class Store {
   ): void {
     if (list.length === 0) return;
     const createdAt = now();
+    const known = new Set(
+      this.db
+        .select({ code: t.warnings.code, message: t.warnings.message })
+        .from(t.warnings)
+        .where(seriesId === null ? sql`${t.warnings.seriesId} is null` : eq(t.warnings.seriesId, seriesId))
+        .all()
+        .map((w) => `${w.code}\n${w.message}`),
+    );
+    const fresh = list.filter((w) => !known.has(`${w.code}\n${w.message}`));
+    if (fresh.length === 0) return;
     this.db
       .insert(t.warnings)
-      .values(list.map((w) => ({ runId, seriesId, code: w.code, message: w.message, createdAt })))
+      .values(fresh.map((w) => ({ runId, seriesId, code: w.code, message: w.message, createdAt })))
+      .run();
+  }
+
+  /** Drop warnings and finished runs older than `days` days (the log would otherwise grow forever). */
+  prune(days = 60): void {
+    const before = new Date(Date.now() - days * 86_400_000).toISOString();
+    this.db.delete(t.warnings).where(sql`${t.warnings.createdAt} < ${before}`).run();
+    this.db
+      .delete(t.runs)
+      .where(sql`${t.runs.startedAt} < ${before} and ${t.runs.status} != 'running'`)
       .run();
   }
 

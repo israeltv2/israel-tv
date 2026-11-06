@@ -101,7 +101,7 @@ test('fetchShow reads other seasons, marks blocked entries, numbers by season ti
   if (ok instanceof Error) throw ok;
   expect(g.urls.length).toBe(4);
   expect(ok.seasons[0]?.episodes.every((e) => e.availableAbroad === false)).toBe(true);
-  expect(ok.seasons[0]?.key).toBe('/all-shows/kitchen-nightmares-902985891/|עונה 1');
+  expect(ok.seasons[0]?.key).toBe('/all-shows/kitchen-nightmares-902985891/|s1');
   const r = assignNumbers({ ...ok, seasons: ok.seasons.slice(0, 2) }, { seasons: [], episodes: [] });
   expect(r.seasons.map((s) => s.number)).toEqual([1, 2]);
 });

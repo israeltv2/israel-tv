@@ -175,8 +175,26 @@ test('admin refuses cross-site requests from web pages', async () => {
     env,
   );
   expect(viaPage.status).toBe(403);
-  const status = await app.request('/status', {}, env);
+  const status = await app.request('/status', { headers: { host: '192.168.1.10:7702' } }, env);
+  const rebound = await app.request('/status', { headers: { host: 'evil.example:7702' } }, env);
+  expect(rebound.status).toBe(403);
   expect(status.status).toBe(200);
-  const outside = await app.request('/status', {}, { incoming: { socket: { remoteAddress: '8.8.8.8' } } });
+  const outside = await app.request(
+    '/status',
+    { headers: { host: '192.168.1.10:7702' } },
+    { incoming: { socket: { remoteAddress: '8.8.8.8' } } },
+  );
   expect(outside.status).toBe(403);
+});
+
+test('a known show that suddenly has no seasons is a failed read, not an empty show', async () => {
+  const store = Store.open(':memory:');
+  await runFull(
+    store,
+    adapter(entries('/a'), { '/a': show('/a', [{ key: 's1', title: 'עונה 1', n: 3 }]) }),
+    opts,
+  );
+  const r = await runFull(store, adapter(entries('/a'), { '/a': show('/a', []) }), opts);
+  expect(r.status).toBe('failed');
+  expect(store.getShow('iltv_mako_1')?.lastError).toMatch(/no seasons/);
 });

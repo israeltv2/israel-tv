@@ -70,3 +70,18 @@ test('runs and stale-run cleanup', () => {
   expect(s.closeStaleRuns(() => false)).toBe(1);
   expect(s.lastRun('full', 'mako')).toMatchObject({ id: r, status: 'failed' });
 });
+
+test('a warning already recorded for the same show is not repeated', () => {
+  const s = Store.open(tmp());
+  s.addWarnings(null, 'iltv_mako_1', [{ code: 'x', message: 'same' }]);
+  s.addWarnings(null, 'iltv_mako_1', [
+    { code: 'x', message: 'same' },
+    { code: 'x', message: 'other' },
+  ]);
+  expect(
+    s
+      .recentWarnings()
+      .map((w) => w.message)
+      .sort(),
+  ).toEqual(['other', 'same']);
+});

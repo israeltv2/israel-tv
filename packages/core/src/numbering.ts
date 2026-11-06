@@ -147,9 +147,12 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
     usedBySeason.set(seasonNumber, used);
     let max = 0;
     for (const n of used) if (n > max) max = n;
+    // Printed numbers that run against the air dates (the source counts newest = 1) are positions, not
+    // episode numbers: number by date instead (and do not report them as renumberings).
+    const trustHints = !hintsRunBackwards(season.episodes);
     for (const ep of season.episodes) {
       const stored = episodes.get(ep.key);
-      if (stored && ep.numberHint !== undefined && stored.episode !== ep.numberHint) {
+      if (trustHints && stored && ep.numberHint !== undefined && stored.episode !== ep.numberHint) {
         warnings.push({
           code: 'source-renumbered',
           message: `episode ${ep.key} is now "פרק ${ep.numberHint}" at the source; kept S${stored.season}E${stored.episode}`,
@@ -157,10 +160,7 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
       }
     }
     const fresh = chronological(season).filter((e) => !episodes.has(e.key));
-    // Printed numbers that run against the air dates (the source counts newest = 1) are positions, not
-    // episode numbers: number by date instead, and say so.
-    const trustHints = !hintsRunBackwards(season.episodes);
-    if (!trustHints) {
+    if (!trustHints && fresh.length > 0) {
       warnings.push({
         code: 'numbers-reversed',
         message: `season "${season.title}" (${season.key}): printed numbers run against the air dates; numbered by date`,
