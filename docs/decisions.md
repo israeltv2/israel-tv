@@ -1337,3 +1337,11 @@ junk names, duplicate ids or numbers, or unreachable posters. Fixed:
   `lastAirDate` (the latest episode) and `status`: "Ended" after a year without episodes, else "Returning Series".
   Ended shows then read "2021 - 2024" (or one year); running ones "2024 -", Nuvio's own way of writing a running
   series. `status` is also shown as a "Status" row, so it says what is true.
+
+## Year line: the usual form (2026-11-07)
+
+`releaseInfo` follows the common convention (Cinemeta, IMDb and Wikipedia write ranges with an en dash and no
+spaces): "2024–present" while a show runs (an episode within the last year), "2021–2024" or "2024" once it has ended
+— the open "2024–" of IMDb and Cinemeta is left out, as it read as unfinished on the owner's phone. Nuvio shows any
+`releaseInfo` that is not a bare year as it is; for a bare year on a running series it would write "2026 -" itself.
+`status` and `lastAirDate` stay (Nuvio's "Status" row).

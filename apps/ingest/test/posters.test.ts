@@ -245,7 +245,7 @@ test('the catalog audit flags what a viewer should never see', async () => {
     'site text in an episode title',
     'empty name or site text in a name',
     'site text in a description',
-    'year line not a year or a closed range',
+    'year line not "2024", "2021–2024" or "2024–present"',
     'row item differs from its show page',
   ])
     expect(checks, c).toContain(c);

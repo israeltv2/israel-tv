@@ -96,27 +96,42 @@ function sortKey(s: RenderShow): string {
   return `${s.latestAirDate ?? '0000-00-00'}|${s.latestEpisodeSeenAt ?? ''}`;
 }
 
-/**
- * First to last episode year ("2024–2026"), or one year when they are the same. Never open-ended: a lone "2024–"
- * reads as broken in apps, especially right-to-left.
- */
-export function releaseInfo(s: RenderShow): string | undefined {
-  const dates = s.show.seasons
+/** No episode for this long: the show has ended (a seasonal show off the air for months has not). */
+const ENDED_AFTER_DAYS = 365;
+
+function airDates(s: RenderShow): string[] {
+  return s.show.seasons
     .flatMap((x) => x.episodes.map((e) => e.airDate))
     .filter((d): d is string => !!d)
     .sort();
+}
+
+export function hasEnded(s: RenderShow, now: number): boolean | undefined {
+  const last = airDates(s).at(-1);
+  if (!last) return undefined;
+  return now - Date.parse(`${last}T00:00:00Z`) > ENDED_AFTER_DAYS * 86_400_000;
+}
+
+/**
+ * The year line, in the usual form (Cinemeta, IMDb, Wikipedia: en dash, no spaces): "2024–present" while a show
+ * runs, "2021–2024" or "2024" once it has ended. Apps show it as it is (a bare year for a running show makes Nuvio
+ * add its own open dash, "2026 -", which reads as if something were missing).
+ */
+export function releaseInfo(s: RenderShow, now: number): string | undefined {
+  const dates = airDates(s);
   const first = dates[0]?.slice(0, 4);
   const last = dates.at(-1)?.slice(0, 4);
   if (!first || !last) return undefined;
+  if (!hasEnded(s, now)) return `${first}–present`;
   return first === last ? first : `${first}–${last}`;
 }
 
-function preview(s: RenderShow): MetaPreview {
+function preview(s: RenderShow, now: number): MetaPreview {
   const p: MetaPreview = { id: s.seriesId, type: 'series', name: rtl(tidyText(s.title)), posterShape: SHAPE };
   if (s.show.poster) p.poster = s.show.poster;
   const description = cleanDescription(s.show.description);
   if (description) p.description = rtl(description);
-  const year = releaseInfo(s);
+  const year = releaseInfo(s, now);
   if (year) p.releaseInfo = year;
   const genres = cleanGenres(s.show.genres);
   if (genres.length) p.genres = genres;
@@ -157,21 +172,13 @@ function videosFor(s: RenderShow): Video[] {
   return videos.sort((x, y) => (x.season ?? 0) - (y.season ?? 0) || (x.episode ?? 0) - (y.episode ?? 0));
 }
 
-/** No episode for this long: the show has ended (a seasonal show off the air for months has not). */
-const ENDED_AFTER_DAYS = 365;
-
 function metaFor(s: RenderShow, now: number): Meta {
-  const m: Meta = { ...preview(s), videos: videosFor(s) };
-  // Apps build the year line from these (Nuvio: "2021 - 2024" when ended, "2024 -" while running).
-  const last = s.show.seasons
-    .flatMap((x) => x.episodes.map((e) => e.airDate))
-    .filter((d): d is string => !!d)
-    .sort()
-    .at(-1);
+  const m: Meta = { ...preview(s, now), videos: videosFor(s) };
+  // Shown by apps (Nuvio: a "Status" row), and used by them for the year line when it is a bare year.
+  const last = airDates(s).at(-1);
   if (last) {
     m.lastAirDate = last;
-    m.status =
-      now - Date.parse(`${last}T00:00:00Z`) > ENDED_AFTER_DAYS * 86_400_000 ? 'Ended' : 'Returning Series';
+    m.status = hasEnded(s, now) ? 'Ended' : 'Returning Series';
   }
   if (s.show.background) m.background = s.show.background;
   if (s.show.pageUrl) m.links = [{ name: 'Source', category: 'Website', url: s.show.pageUrl }];
@@ -316,7 +323,7 @@ export function renderSite(input: RenderInput): SiteFiles {
   listed.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
   for (const s of listed) {
     const row = rows.get(s.catalog) ?? [];
-    row.push(preview(s));
+    row.push(preview(s, now));
     rows.set(s.catalog, row);
     const genres = cleanGenres(s.show.genres);
     search.push([

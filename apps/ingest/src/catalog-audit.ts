@@ -84,8 +84,8 @@ export function auditSite(
     // Text and year line.
     if (!meta.name?.trim() || JUNK.test(meta.name)) flag('empty name or site text in a name', id);
     if (meta.description && JUNK.test(meta.description)) flag('site text in a description', id);
-    if (meta.releaseInfo && !/^\d{4}(?:–\d{4})?$/.test(meta.releaseInfo))
-      flag('year line not a year or a closed range', id);
+    if (meta.releaseInfo && !/^\d{4}(?:–(?:\d{4}|present))?$/.test(meta.releaseInfo))
+      flag('year line not "2024", "2021–2024" or "2024–present"', id);
     // The row's item says the same as the show page.
     const item = items.get(id);
     if (
