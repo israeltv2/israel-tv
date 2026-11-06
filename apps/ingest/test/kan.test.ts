@@ -378,3 +378,43 @@ test('a lone server error at the end of a slice is settled with the lobby, and s
   expect(charged).toBe(true);
   expect(store.lastRun('crawl', 'kan')?.status).toBe('partial');
 });
+
+test('an outage of episode pages alone, with the lobby up, never charges the waiting page', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  for (let i = 0; i < 30; i++) await crawlKan(store, opts(base as never, 10)); // first fill
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-1006421/';
+  const st = store.getState<Crawl & { shows: Record<string, { pending: string[] }> }>('kan:crawl');
+  const show = st?.shows[key];
+  if (!st || !show) throw new Error('no state');
+  show.pending = [`${key}s1/1009999/`]; // a new episode is waiting
+  store.setState('kan:crawl', st);
+  const down = {
+    ...base,
+    async load(url: string) {
+      return /\/s1\/\d+\/$/.test(url) ? { status: 503, html: '', challenged: false } : base.load(url);
+    },
+  };
+  for (let i = 0; i < 20; i++) {
+    await crawlKan(store, opts(down as never, 10));
+    age(store);
+  }
+  const after = store.getState<Crawl>('kan:crawl')?.shows[key];
+  expect(after?.failed).toEqual([]);
+  expect(after?.retry ?? {}).toEqual({});
+});
+
+test('a lobby that fails does not stop the crawl of known shows', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const l = {
+    ...base,
+    async load(url: string) {
+      return url.includes('lobby-kids') ? { status: 503, html: '', challenged: false } : base.load(url);
+    },
+  };
+  const eps = () =>
+    store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes)).length;
+  for (let i = 0; i < 30 && eps() < 9; i++) await crawlKan(store, opts(l as never, 10));
+  expect(eps()).toBe(9);
+});
