@@ -31,3 +31,22 @@ test('where the config is: explicit file, then ISRAEL_TV_HOME, then the current 
     why: 'the current folder',
   });
 });
+
+test('a container can be set up from the environment; a config file wins', async () => {
+  const { withEnvSettings } = await import('../src/config.ts');
+  const env = {
+    ISRAEL_TV_CATALOG_URL: 'https://catalog.example/manifest.json',
+    ISRAEL_TV_PROXY: 'http://u:p@proxy.example:3128',
+  };
+  expect(withEnvSettings({}, env, false)).toEqual({
+    role: 'resolver-only',
+    resolver: { catalogUrl: 'https://catalog.example/manifest.json' },
+    geo: { type: 'http-proxy', urls: ['http://u:p@proxy.example:3128'] },
+  });
+  expect(withEnvSettings({ role: 'local-only' }, env, true)).toMatchObject({ role: 'local-only' });
+  expect(withEnvSettings({ geo: { type: 'none' } }, env, true)).toEqual({ geo: { type: 'none' } });
+  expect(withEnvSettings({}, { ISRAEL_TV_PROXY: 'socks5://h:1080' }, false)).toEqual({
+    geo: { type: 'socks5', urls: ['socks5://h:1080'] },
+  });
+  expect(() => withEnvSettings({}, { ISRAEL_TV_PROXY: 'nonsense' }, false)).toThrow(/not a URL/);
+});

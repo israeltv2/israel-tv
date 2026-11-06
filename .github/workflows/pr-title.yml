@@ -1,0 +1,20 @@
+name: pr-title
+# Pull requests are squash-merged with their title as the commit message: titles follow Conventional Commits
+# (feat:, fix:, docs:, chore:, …) so releases and the changelog can be made from them.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if ! printf '%s' "$TITLE" | grep -Eq '^(feat|fix|docs|chore|refactor|test|ci|perf|build|style|revert)(\([a-z0-9-]+\))?!?: .+'; then
+            echo "Pull request title must follow Conventional Commits, e.g. 'fix(kan): …' or 'docs: …'. Got: $TITLE"
+            exit 1
+          fi

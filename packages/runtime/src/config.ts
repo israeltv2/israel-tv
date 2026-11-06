@@ -63,7 +63,7 @@ export function loadConfig(
     process.loadEnvFile(envFile);
     warnIfShared(envFile);
   }
-  const config = parseConfig(raw, found ?? DEFAULT_CONFIG_FILE);
+  const config = parseConfig(withEnvSettings(raw, env, found !== undefined), found ?? DEFAULT_CONFIG_FILE);
   checkRole(config);
   if (opts.needSecrets !== false) checkSecrets(config, env, envFile);
   config.store.path = resolve(base, config.store.path);
@@ -98,6 +98,36 @@ function warnIfShared(file: string): void {
     console.error(
       `warning: ${file} can be read by other users of this computer; make it private: chmod 600 "${file}"`,
     );
+}
+
+/**
+ * Two settings that can come from the environment, for a ready-made container where writing a config file is a
+ * hurdle: ISRAEL_TV_CATALOG_URL (with no config file, this instance is a resolver-only one playing from that
+ * catalog) and ISRAEL_TV_PROXY (a proxy URL with an Israeli exit, credentials included, used when the config sets
+ * no `geo`). A config file always wins.
+ */
+export function withEnvSettings(
+  raw: unknown,
+  env: Record<string, string | undefined>,
+  hasFile: boolean,
+): unknown {
+  const out = { ...(raw as Record<string, unknown>) };
+  if (env.ISRAEL_TV_CATALOG_URL && !hasFile) {
+    out.role = 'resolver-only';
+    out.resolver = { ...(out.resolver as object), catalogUrl: env.ISRAEL_TV_CATALOG_URL };
+  }
+  if (env.ISRAEL_TV_PROXY && out.geo === undefined) {
+    let scheme: string;
+    try {
+      scheme = new URL(env.ISRAEL_TV_PROXY).protocol;
+    } catch {
+      throw new ConfigError(
+        'ISRAEL_TV_PROXY is not a URL (e.g. http://user:password@proxy.example.net:3128)',
+      );
+    }
+    out.geo = { type: scheme.startsWith('socks') ? 'socks5' : 'http-proxy', urls: [env.ISRAEL_TV_PROXY] };
+  }
+  return out;
 }
 
 /** Each role only uses (and so only needs) its own settings; say so plainly when the config mixes them. */
