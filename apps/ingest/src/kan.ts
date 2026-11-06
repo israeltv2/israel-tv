@@ -282,7 +282,10 @@ export async function crawlKan(
       // A show we have episodes for whose page now lists none (and has no video of its own) is a failed
       // read — most likely a layout change — not an empty show.
       // (A player on the page does not change that: multi-episode show pages embed one too.)
-      if (page.episodes.length === 0 && known.size > 0 && id) {
+      // …except a single-video show whose one stored episode is this page's own video.
+      const featuredKey = page.featured ? kanEpisodeKey(page.featured) : undefined;
+      const onlyFeatured = featuredKey !== undefined && known.size === 1 && known.has(featuredKey);
+      if (page.episodes.length === 0 && known.size > 0 && id && !onlyFeatured) {
         problems++;
         store.markShowFailed(id, 'kept last good data: the show page lists no episodes (layout change?)');
         store.addWarnings(runId, id, [

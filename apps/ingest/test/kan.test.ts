@@ -190,3 +190,21 @@ test('a known show whose page lists no episodes is a failed read, even with a pl
   expect(store.assignments(id).episodes.length).toBe(before);
   expect(store.getShow(id)?.lastError).toMatch(/lists no episodes/);
 });
+
+test('a single-video show stays healthy when its page is read again', async () => {
+  const store = Store.open(':memory:');
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-1003359/';
+  const single = fx('show-p-1003359-single').replace(/href="[^"]*p-1003359\/\d+\/"/g, 'href="#"');
+  const l = {
+    ...loader(routes),
+    async load(url: string) {
+      return url === key ? { status: 200, html: single, challenged: false } : loader(routes).load(url);
+    },
+  };
+  await crawlKan(store, { ...opts(l as never, 3), priority: [key] });
+  const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
+  expect(store.assignments(id).episodes.length).toBe(1);
+  await crawlKan(store, { ...opts(l as never, 3), priority: [key] });
+  expect(store.getShow(id)?.lastError).toBeNull();
+  expect(store.assignments(id).episodes.length).toBe(1);
+});
