@@ -131,10 +131,9 @@ export function createResolverApp(deps: ResolverDeps) {
     // Shows opened from other catalogs (tt123:2:5 or tmdb:123:2:5) map onto ours, numbered seasons only.
     const ext = /^(tt\d+|tmdb:\d+):(\d+):(\d+)$/.exec(id);
     const mapped = ext?.[1] ? deps.external?.(ext[1]) : undefined;
-    const v =
-      mapped && mapped.seasons.includes(Number(ext?.[2]))
-        ? { series: mapped.series, season: Number(ext?.[2]), episode: Number(ext?.[3]) }
-        : parseVideoId(id);
+    const v = mapped?.seasons.includes(Number(ext?.[2]))
+      ? { series: mapped.series, season: Number(ext?.[2]), episode: Number(ext?.[3]) }
+      : parseVideoId(id);
     if (v) {
       const ep = deps.episode(v.series, v.season, v.episode);
       if (ep && v.series.startsWith('iltv_mako_') && ep.play?.vcmid) {
