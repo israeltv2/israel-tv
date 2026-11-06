@@ -199,6 +199,11 @@ test('the Israel-only access profile is labelled even when the check passes (ing
 });
 
 test('genres come from the episodes’ Kaltura tags (older template)', () => {
-  expect(parseShowPage(html('show-kitchen-nightmares')).genres).toEqual(['תוכניות אוכל']);
+  expect(parseShowPage(html('show-kitchen-nightmares')).genres).toEqual(['אוכל']);
   expect(parseShowPage(html('show-the-voice')).genres).toBeUndefined();
+});
+
+test('a show has its own blurb from the page', () => {
+  expect(parseShowPage(html('show-kitchen-nightmares')).description).toMatch(/^השף אסף גרניט/);
+  expect(parseShowPage(html('show-kitchen-nightmares')).description).not.toMatch(/&quot;|&amp;/);
 });

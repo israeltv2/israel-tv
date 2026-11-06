@@ -4,7 +4,13 @@
 //   live on /allshows/series/<id>/season/<position>/.
 // Video is on Kaltura (partner 2748741); episodes are keyed by the Kaltura entry id, which is the same in
 // both templates.
-import { cleanGenres, parseDottedDate, parseEpisodeHint, type ScrapedEpisode } from '@israel-tv/core';
+import {
+  cleanGenres,
+  parseDottedDate,
+  parseEpisodeHint,
+  type ScrapedEpisode,
+  tidyText,
+} from '@israel-tv/core';
 import { z } from 'zod';
 
 export const RESHET_ORIGIN = 'https://13tv.co.il';
@@ -141,6 +147,8 @@ export interface ParsedShowPage {
   seasons: ParsedSeason[];
   /** The show's genres, from its episodes' Kaltura tags (older template only). */
   genres?: string[];
+  /** The show's own blurb (the page's description meta). */
+  description?: string;
 }
 
 const img = (o: z.infer<typeof ImageObj>) => o?.d ?? o?.m ?? undefined;
@@ -212,7 +220,18 @@ export function fromOld(e: z.infer<typeof OldEpisode>): ScrapedEpisode | undefin
   });
 }
 
+/** The page's description meta, decoded: the show's own blurb. */
+function pageDescription(html: string): string | undefined {
+  const m =
+    /<meta[^>]+(?:property|name)="(?:og:)?description"[^>]+content="([^"]*)"/i.exec(html) ??
+    /<meta[^>]+content="([^"]*)"[^>]+(?:property|name)="(?:og:)?description"/i.exec(html);
+  const t = m?.[1] ? tidyText(m[1]) : '';
+  return t.length >= 10 ? t : undefined;
+}
+
 export function parseShowPage(html: string): ParsedShowPage {
+  const description = pageDescription(html);
+  const blurb = description ? { description } : {};
   const d = ShowPageData.parse(nextData(html));
   const pp = d.props.pageProps;
   const grid = pp.page?.Content.PageGrid.find((g) => g.grid_type === 'VodPlaylist');
@@ -225,7 +244,7 @@ export function parseShowPage(html: string): ParsedShowPage {
         title: (v.name ?? `עונה ${k}`).trim(),
         episodes: (v.episodes ?? []).map(fromNew).filter((e): e is ScrapedEpisode => !!e),
       }));
-    return { template: 'vod-playlist', seasons };
+    return { template: 'vod-playlist', seasons, ...blurb };
   }
   if (pp.program) {
     const p = pp.program;
@@ -242,14 +261,25 @@ export function parseShowPage(html: string): ParsedShowPage {
     const genres = cleanGenres(
       (p.episodes ?? []).flatMap((e) => e.tags?.Genre?.objects?.map((o) => o.value) ?? []),
     );
-    return { template: 'program', seriesId: p.seriesId, seasons, ...(genres.length ? { genres } : {}) };
+    return {
+      template: 'program',
+      seriesId: p.seriesId,
+      seasons,
+      ...(genres.length ? { genres } : {}),
+      ...blurb,
+    };
   }
   // Pages with only article/clip grids (no episode list) are shows without VOD. They are noted, not failed;
   // a page with no grids at all is still treated as a layout change.
   const grids = pp.page?.Content.PageGrid ?? [];
   if (grids.length > 0) {
     const kinds = [...new Set(grids.map((g) => g.grid_type ?? '?'))].join(', ');
-    return { template: 'no-vod', seasons: [], note: `no episode list on the show page (only ${kinds})` };
+    return {
+      template: 'no-vod',
+      seasons: [],
+      note: `no episode list on the show page (only ${kinds})`,
+      ...blurb,
+    };
   }
   throw new Error('show page has neither a VodPlaylist grid nor a program (layout changed?)');
 }

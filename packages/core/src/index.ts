@@ -12,3 +12,4 @@ export * from './numbering.ts';
 export * from './site.ts';
 export * from './stream-label.ts';
 export type * from './stremio.ts';
+export * from './tidy.ts';
