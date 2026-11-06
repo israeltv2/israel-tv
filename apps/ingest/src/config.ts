@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
-import { type Config, ConfigError, checkSecrets, parseConfig } from '@israel-tv/core';
+import { type Config, ConfigError, checkSecrets, parseConfig, roleOf } from '@israel-tv/core';
 
 export const DEFAULT_CONFIG_FILE = 'israel-tv.config.json';
 
@@ -58,8 +58,9 @@ export function loadConfig(
 
 /** Each role only uses (and so only needs) its own settings; say so plainly when the config mixes them. */
 export function checkRole(config: Config): void {
+  const role = roleOf(config);
   const problems: string[] = [];
-  if (config.role === 'resolver-only') {
+  if (role === 'resolver-only') {
     if (!config.resolver.catalogUrl)
       problems.push('set resolver.catalogUrl to the public catalog you use (its manifest URL)');
     if (config.publisher.type === 'cloudflare')
@@ -70,9 +71,15 @@ export function checkRole(config: Config): void {
     if (!config.resolver.enabled)
       problems.push('resolver.enabled is false, so this instance would do nothing');
   }
-  if (config.role === 'local-only' && config.publisher.type !== 'local')
+  if (role === 'local-only' && config.publisher.type !== 'local')
     problems.push(
       'the local-only role serves the catalog on this network: set "publisher": { "type": "local" }',
     );
-  if (problems.length) throw new ConfigError(`role "${config.role}" in the config: ${problems.join('; ')}.`);
+  if (role === 'host' && config.publisher.type !== 'cloudflare')
+    problems.push(
+      'the host role publishes to Cloudflare: set "publisher": { "type": "cloudflare" } (or use role "local-only" for a catalog on this network)',
+    );
+  if (role !== 'resolver-only' && config.resolver.catalogUrl)
+    problems.push('resolver.catalogUrl is only for role "resolver-only" (this instance has its own catalog)');
+  if (problems.length) throw new ConfigError(`role "${role}": ${problems.join('; ')}.`);
 }

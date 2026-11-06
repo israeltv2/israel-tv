@@ -46,7 +46,7 @@ What to check on the TV/phone after installing. `<addon>` is your addon's manife
 
 - [ ] **Kan covers:** Kan 11 and Kids/Teens tiles show their pictures (served from the addon itself).
 
-## Usage dashboard
+## Usage dashboard (host or local-only)
 
 - [ ] On a laptop at home, open the link `pnpm israel-tv admin-url` prints: the page shows "This home (resolver)" with
   the plays just made, "Playing now" while something plays, and the playback canary as pass for each source.

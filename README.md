@@ -76,8 +76,10 @@ it (start from [`.env.example`](.env.example)).
 
 ## Roles
 
-Pick one; each has a minimal config and `.env` in [`examples/`](examples) (copy both next to the repo root as
-`israel-tv.config.json` and `.env`). The config's `role` checks at start that nothing from another role is set.
+Pick one; each has a minimal `israel-tv.config.example.json` and `.env.example` in [`examples/`](examples) (copy
+them next to the repo root as `israel-tv.config.json` and `.env`). The role is the config's `role`, or, when it is
+not set, follows the publisher (Cloudflare: `host`; local: `local-only` — the no-config Quick start). The start
+refuses settings the role cannot use, and says what to change.
 
 | Role            | Does                                                                                  | Needs in `.env`                                                                              |
 | --------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
@@ -87,7 +89,10 @@ Pick one; each has a minimal config and `.env` in [`examples/`](examples) (copy 
 
 A resolver-only instance takes what it needs per episode (Mako's play ids, the direct stream, whether it is
 Israel-only) from the catalog's published `play/` files, so it needs no database and reads no site. Start it the
-same way (`pnpm start`) and install its `:7701` manifest next to the public catalog.
+same way (`pnpm start`) and install its `:7701` manifest next to the public catalog. At start it checks the
+catalog and logs `catalog check: ok`, or what is wrong (a mistyped `catalogUrl`, or a catalog whose host runs a
+version from before play files). Outside Israel, also add the `geo` block from [Outside Israel](#outside-israel-add-a-proxy).
+It has no admin page or usage dashboard: its commands are `start`, `check-proxy`, `remote-url` and `pnpm logs …`.
 
 ## Outside Israel: add a proxy
 
@@ -172,13 +177,10 @@ What friends who install your public addon get:
   Knesset, ynet, Calcala 10. Kan's channels can be geo-blocked outside Israel.
 - Reshet and Kan episodes: only for friends inside Israel.
 - The per-client limits above (a friend's whole household shares them).
-- **Not** Mako episodes, or the Keshet 12, 24, Eretz Nehederet and Savri Maranan live channels: those need
-  a resolver, and the resolver needs the database of the instance that collected the data. Don't expose your
-  resolver to the internet (it has no login and would relay through your proxy). Friends who want Mako run
-  their own instance.
-
-So a public instance with only Mako enabled gives friends the live channels and a Keshet 12 row they cannot
-play; enable Reshet (and Kan) if you want them to have episodes to watch.
+- **Not** Mako episodes, or the Keshet 12, 24, Eretz Nehederet and Savri Maranan live channels: those need a
+  resolver on the viewer's own network. Friends who want them run the small **resolver-only** role (see
+  [Roles](#roles)) with `resolver.catalogUrl` set to your manifest URL — no database, no Cloudflare. Don't expose
+  your own resolver to the internet (it has no login and would relay through your proxy).
 
 ### Mako away from home
 
@@ -203,7 +205,8 @@ do not pass each viewer's address, so all viewers then share one rate limit.
 Only Mako's routes are there — its manifest, stream requests and the small playlist per play; video comes from
 Mako's CDN to the player, never through your home or the tunnel. Every other path, and any request without the
 token, gets an empty 404, and each client is rate-limited. Change the token to revoke all installs. Plays through
-this link are counted on your usage page under "This home", like plays at home.
+this link are counted on your usage page under "This home", like plays at home (a resolver-only instance keeps
+them in its event log: `pnpm logs`).
 
 ## Kan VOD
 

@@ -1,0 +1,4 @@
+{
+  "role": "host",
+  "publisher": { "type": "cloudflare", "workerName": "israel-tv" }
+}
