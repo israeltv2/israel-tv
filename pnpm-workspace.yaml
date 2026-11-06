@@ -6,3 +6,8 @@ minimumReleaseAgeExclude:
   - playwright-core@1.65.0
   - miniflare@5.20261104.0-beta
   - wrangler@4.158.0
+
+# Dependencies allowed to run install scripts (esbuild and workerd fetch their platform binaries).
+allowBuilds:
+  esbuild: true
+  workerd: true
