@@ -21,6 +21,15 @@ const HLS = 'application/vnd.apple.mpegurl';
 const MAKO_ENTITLEMENT = 'https://mass.mako.co.il/ClicksStatistics/entitlementsServicesV2.jsp';
 const MAKO_LIVE_HOST = 'https://mako-streaming.akamaized.net';
 const MAKO_PLAYLIST = 'https://www.mako.co.il/AjaxPage';
+/** Where Mako's own responses may send the resolver (its CDNs); anything else is refused. */
+const MAKO_MEDIA_HOST = /(^|\.)(akamaized\.net|mako\.co\.il|cloudfront\.net)$/;
+
+function makoUrl(u: string): string {
+  const url = new URL(u);
+  if (url.protocol !== 'https:' || !MAKO_MEDIA_HOST.test(url.hostname))
+    throw new Error(`unexpected Mako media host ${url.host}`);
+  return url.toString();
+}
 
 /** Hosts the relay may fetch through the geo proxy. */
 export const RELAY_HOSTS = [/(^|\.)cdn-redge\.media$/, /(^|\.)kan\.org\.il$/, /^cdnapisec\.kaltura\.com$/];
@@ -160,7 +169,7 @@ export function createResolverApp(deps: ResolverDeps) {
     const j = (await r.json()) as { tickets?: { ticket?: string; url?: string }[] };
     const t = j.tickets?.[0];
     if (!t?.ticket) throw new Error('Mako entitlement returned no ticket');
-    return `${t.url ?? mediaUrl}?${decodeURIComponent(t.ticket)}`;
+    return `${makoUrl(t.url ?? mediaUrl)}?${decodeURIComponent(t.ticket)}`;
   }
 
   async function makoMasterFor(mediaUrl: string, cdn: string, userAgent: string): Promise<Response> {
@@ -197,7 +206,7 @@ export function createResolverApp(deps: ResolverDeps) {
       const media = ((await pr.json()) as { media?: { url: string; cdn?: string }[] }).media ?? [];
       const pick = media.find((m) => m.cdn === 'AKAMAI') ?? media[0];
       if (!pick) return c.text('Mako returned no media', 502);
-      return await makoMasterFor(pick.url, pick.cdn ?? 'AKAMAI', playerUA(c));
+      return await makoMasterFor(makoUrl(pick.url), pick.cdn ?? 'AKAMAI', playerUA(c));
     } catch (err) {
       return c.text((err as Error).message, 502);
     }
@@ -231,18 +240,34 @@ export function createResolverApp(deps: ResolverDeps) {
     }
     if (!RELAY_HOSTS.some((re) => re.test(host))) return c.text('host not allowed', 403);
     const range = c.req.header('range');
-    const r = await geo(target, {
-      headers: { 'user-agent': playerUA(c), ...(range ? { range } : {}) },
-      signal: AbortSignal.timeout(30_000),
-    });
+    // Follow redirects by hand so every hop is checked: a hop to a host that is not geo-gated goes back
+    // to the player as a plain redirect; nothing else is fetched through the proxy.
+    let url = target;
+    let r: Response | undefined;
+    for (let hop = 0; hop < 5; hop++) {
+      r = await geo(url, {
+        headers: { 'user-agent': playerUA(c), ...(range ? { range } : {}) },
+        signal: AbortSignal.timeout(30_000),
+        redirect: 'manual',
+      });
+      const location = r.status >= 300 && r.status < 400 ? r.headers.get('location') : null;
+      if (!location) break;
+      await r.body?.cancel();
+      const next = new URL(location, url);
+      if (next.protocol !== 'https:' && next.protocol !== 'http:') return c.text('bad redirect', 502);
+      if (!RELAY_HOSTS.some((re) => re.test(next.hostname))) return c.redirect(next.toString(), 302);
+      url = next.toString();
+      r = undefined;
+    }
+    if (!r) return c.text('too many redirects', 502);
     const type = r.headers.get('content-type') ?? '';
-    const isPlaylist = /mpegurl/i.test(type) || /\.m3u8(\?|$)/.test(r.url || target);
+    const isPlaylist = /mpegurl/i.test(type) || /\.m3u8(\?|$)/.test(url);
     if (isPlaylist && r.ok) {
       const text = await r.text();
       // Relay nested playlists and segments too only for hosts on the list; others (signed CDN links that
       // are not geo-gated) go to the player directly.
       const origin = base(c);
-      const body = absolutize(text, r.url || target, (abs) =>
+      const body = absolutize(text, url, (abs) =>
         RELAY_HOSTS.some((re) => re.test(new URL(abs).hostname)) ? relayUrl(origin, abs) : abs,
       );
       return c.body(body, 200, { 'content-type': HLS, 'cache-control': 'no-store' });

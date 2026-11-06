@@ -137,7 +137,7 @@ export interface ParsedSeason {
 }
 
 export interface ParsedShowPage {
-  template: 'vod-playlist' | 'program';
+  template: 'vod-playlist' | 'program' | 'no-vod';
   seriesId?: string;
   seasons: ParsedSeason[];
 }
@@ -211,6 +211,12 @@ export function parseShowPage(html: string): ParsedShowPage {
           : {}),
       }));
     return { template: 'program', seriesId: p.seriesId, seasons };
+  }
+  // Shows without VOD get a plain article grid with no posts: nothing to read, not a layout change.
+  const grids = pp.page?.Content.PageGrid ?? [];
+  if (grids.length > 0 && grids.every((g) => g.grid_type === 'Base' || g.grid_type === 'PaginationArray')) {
+    const posts = grids.flatMap((g) => ((g as { posts?: unknown[] }).posts ?? []) as unknown[]);
+    if (posts.length === 0) return { template: 'no-vod', seasons: [] };
   }
   throw new Error('show page has neither a VodPlaylist grid nor a program (layout changed?)');
 }

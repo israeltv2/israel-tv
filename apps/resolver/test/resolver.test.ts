@@ -158,3 +158,37 @@ test('absolutize keeps tags, resolves URIs, rewrites key URIs', () => {
     '#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="https://cdn/a/b/k.key"\nhttps://cdn/a/b/seg1.ts\n',
   );
 });
+
+describe('hardening', () => {
+  test('relay hops to a non-gated host go back to the player as a redirect', async () => {
+    const geoCalls: string[] = [];
+    const geoFetch = async (url: string) => {
+      geoCalls.push(url);
+      return new Response(null, { status: 302, headers: { location: 'https://cfvod.kaltura.com/x/a.m3u8' } });
+    };
+    const app = createResolverApp({ episode, fetch: makoNet([]), geoFetch });
+    const s = await (await app.request('http://h/stream/series/iltv_reshet_1:1:1.json')).json();
+    const r = await app.request(new URL(s.streams[0].url).pathname);
+    expect(r.status).toBe(302);
+    expect(r.headers.get('location')).toBe('https://cfvod.kaltura.com/x/a.m3u8');
+    expect(geoCalls).toHaveLength(1);
+  });
+
+  test('a Mako ticket pointing at another host is refused', async () => {
+    const net = async (url: string) => {
+      if (url.startsWith('https://www.mako.co.il/AjaxPage')) {
+        return Response.json({
+          media: [{ url: 'https://mako-vod.akamaized.net/i/x/master.m3u8', cdn: 'AKAMAI' }],
+        });
+      }
+      if (url.startsWith('https://mass.mako.co.il/')) {
+        return Response.json({ tickets: [{ ticket: 'a', url: 'http://192.168.1.1/admin' }] });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    };
+    const app = createResolverApp({ episode, fetch: net });
+    const r = await app.request('/play/mako/iltv_mako_1%3A2%3A3.m3u8');
+    expect(r.status).toBe(502);
+    expect(await r.text()).toMatch(/unexpected Mako media host/);
+  });
+});

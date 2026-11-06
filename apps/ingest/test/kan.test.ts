@@ -90,3 +90,15 @@ test('browser off means Kan off', async () => {
   const r = await crawlKan(store, { ...opts(loader(routes), 5), browser: { type: 'none' } });
   expect(r.note).toMatch(/Kan is off/);
 });
+
+test('episodes read before a block are kept and not re-read', async () => {
+  const store = Store.open(':memory:');
+  const challenged = new Set(['https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1006640/']);
+  const l = loader(routes, challenged);
+  let r = await crawlKan(store, opts(l, 10));
+  for (let i = 0; i < 40 && !r.failed; i++) r = await crawlKan(store, opts(l, 10));
+  expect(r.failed).toBe(true);
+  expect(l.urls.filter((u) => u.endsWith('/1006639/'))).toHaveLength(1);
+  const show = store.listShows({ source: 'kan' })[0];
+  expect(show?.show.seasons.flatMap((s) => s.episodes).map((e) => e.key)).toEqual(['kan:1006639']);
+});

@@ -148,3 +148,7 @@ test('each Kaltura access profile is checked once', async () => {
   await blockedEntries(['e'], profiles, post);
   expect(contexts).toBe(2);
 });
+
+test('a show page without VOD (empty article grid) reads as no seasons, not an error', () => {
+  expect(parseShowPage(html('show-empty-show-time'))).toEqual({ template: 'no-vod', seasons: [] });
+});

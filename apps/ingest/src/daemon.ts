@@ -150,23 +150,32 @@ export class Daemon {
   }
 
   private kanSlices = 0;
+  private kanRunning = false;
 
-  /** One Kan crawl slice (a few browser pages), then publish if anything was added. */
+  /**
+   * One Kan crawl slice, in its own lane: its pauses between browser pages must not hold the shared
+   * queue (airing checks and refreshes). It only writes Kan shows; publishing goes through the queue.
+   */
   kanCrawl(): void {
-    if (!this.config.sources.kan || this.config.browser.type === 'none') return;
-    this.enqueue('kan', async () => {
-      const proxies = proxyEndpoints(this.config.geo);
-      const proxy = proxies[this.kanSlices++ % Math.max(proxies.length, 1)];
-      const r = await crawlKan(this.store, {
-        browser: this.config.browser,
-        ...(proxy ? { proxy } : {}),
-        pagesPerRun: this.config.scraping.browserPagesPerRun,
-        pageIntervalMs: this.config.scraping.browserPageIntervalSec * 1000,
-        airingWindowDays: this.config.schedule.airingWindowDays,
-        log: this.log,
+    if (!this.config.sources.kan || this.config.browser.type === 'none' || this.kanRunning) return;
+    this.kanRunning = true;
+    const proxies = proxyEndpoints(this.config.geo);
+    const proxy = proxies[this.kanSlices++ % Math.max(proxies.length, 1)];
+    crawlKan(this.store, {
+      browser: this.config.browser,
+      ...(proxy ? { proxy } : {}),
+      pagesPerRun: this.config.scraping.browserPagesPerRun,
+      pageIntervalMs: this.config.scraping.browserPageIntervalSec * 1000,
+      airingWindowDays: this.config.schedule.airingWindowDays,
+      log: this.log,
+    })
+      .then((r) => {
+        if (r.newEpisodes > 0) this.enqueue('publish', () => this.publish());
+      })
+      .catch((err) => this.log(`kan crawl failed: ${(err as Error).stack ?? err}`))
+      .finally(() => {
+        this.kanRunning = false;
       });
-      if (r.newEpisodes > 0) await this.publish();
-    });
   }
 
   schedule(): void {

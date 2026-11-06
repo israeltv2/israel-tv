@@ -50,10 +50,13 @@ async function main(argv: string[]): Promise<number> {
       .filter(([s]) => !only || s === only)
       .map(([, make]) => make());
   const log = (l: string) => console.log(`${new Date().toISOString().slice(11, 19)} ${l}`);
+  const limit = values.limit === undefined ? undefined : Number(values.limit);
+  if (limit !== undefined && !(Number.isInteger(limit) && limit > 0))
+    throw new Error('--limit must be a positive whole number');
   const opts = {
     minShareOfPrevious: config.scraping.minShareOfPrevious,
     log,
-    ...(values.limit ? { limit: Number(values.limit) } : {}),
+    ...(limit ? { limit } : {}),
   };
   try {
     switch (cmd) {
@@ -133,12 +136,12 @@ async function main(argv: string[]): Promise<number> {
         const r = await crawlKan(store, {
           browser: config.browser,
           ...(proxy ? { proxy } : {}),
-          pagesPerRun: values.limit ? Number(values.limit) : config.scraping.browserPagesPerRun,
+          pagesPerRun: limit ?? config.scraping.browserPagesPerRun,
           pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
           airingWindowDays: config.schedule.airingWindowDays,
           log,
         });
-        return r.pages > 0 || r.note.includes('backing off') ? 0 : 1;
+        return r.failed ? 1 : 0;
       }
       case 'match': {
         const key = config.tmdb ? process.env[config.tmdb.apiKeyEnv] : undefined;

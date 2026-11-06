@@ -372,6 +372,28 @@ export class Store {
       .get();
   }
 
+  /** Oldest run of a kind/scope. */
+  firstRun(kind: RunKind, scope: string): RunRow | undefined {
+    return this.db
+      .select()
+      .from(t.runs)
+      .where(and(eq(t.runs.kind, kind), eq(t.runs.scope, scope)))
+      .orderBy(t.runs.id)
+      .limit(1)
+      .get();
+  }
+
+  /** Newest run of a kind/scope that did not fail. */
+  lastGoodRun(kind: RunKind, scope: string): RunRow | undefined {
+    return this.db
+      .select()
+      .from(t.runs)
+      .where(and(eq(t.runs.kind, kind), eq(t.runs.scope, scope), inArray(t.runs.status, ['ok', 'partial'])))
+      .orderBy(desc(t.runs.id))
+      .limit(1)
+      .get();
+  }
+
   /** Mark runs left `running` by a process that no longer exists as failed. */
   closeStaleRuns(isAlive: (pid: number) => boolean = processAlive): number {
     const running = this.db

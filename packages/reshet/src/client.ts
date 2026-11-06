@@ -18,7 +18,9 @@ export async function fetchIndex(f: Fetcher): Promise<ReshetIndexEntry[]> {
   return parseAllShows(r.body);
 }
 
-class PageMissing extends Error {}
+class PageMissing extends Error {
+  readonly status = 404;
+}
 
 async function page(f: Fetcher, path: string): Promise<string> {
   const r = await f.text(`${RESHET_ORIGIN}${path}`);

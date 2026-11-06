@@ -149,3 +149,17 @@ test('a never-seen show whose page is gone is noted, not failed', async () => {
   expect(r).toMatchObject({ status: 'ok', showsFailed: 0 });
   expect(store.recentWarnings()[0]?.message).toMatch(/page is gone/);
 });
+
+test('an episode listed twice by the source is stored once', async () => {
+  const store = Store.open(':memory:');
+  const s = show('/a', [
+    { key: 's1', title: 'עונה 1', n: 2 },
+    { key: 's2', title: 'עונה 2', n: 0 },
+  ]);
+  const dup = s.seasons[0]?.episodes[0];
+  if (!dup) throw new Error('fixture');
+  s.seasons[0]?.episodes.push({ ...dup, numberHint: 9 });
+  s.seasons[1]?.episodes.push(dup);
+  const r = await runFull(store, adapter(entries('/a'), { '/a': s }), opts);
+  expect(r).toMatchObject({ status: 'ok', newEpisodes: 2 });
+});

@@ -4,7 +4,7 @@ import type { ProxyEndpoint } from './geo.ts';
 
 export type GeoFetch = (
   url: string,
-  init?: { headers?: Record<string, string>; signal?: AbortSignal },
+  init?: { headers?: Record<string, string>; signal?: AbortSignal; redirect?: 'follow' | 'manual' },
 ) => Promise<Response>;
 
 function agentFor(p: ProxyEndpoint): Dispatcher {
@@ -28,7 +28,7 @@ function agentFor(p: ProxyEndpoint): Dispatcher {
  */
 export function createGeoFetch(proxies: ProxyEndpoint[]): GeoFetch {
   if (proxies.length === 0) {
-    return (url, init) => fetch(url, { ...init, redirect: 'follow' });
+    return (url, init) => fetch(url, { ...init, redirect: init?.redirect ?? 'follow' });
   }
   const agents = proxies.map(agentFor);
   let current = 0;
@@ -41,7 +41,7 @@ export function createGeoFetch(proxies: ProxyEndpoint[]): GeoFetch {
       try {
         const r = (await undiciFetch(url, {
           ...init,
-          redirect: 'follow',
+          redirect: init?.redirect ?? 'follow',
           dispatcher,
         })) as unknown as Response;
         if (r.status === 407) {
