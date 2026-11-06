@@ -380,3 +380,12 @@ page). Decision: **Kan episodes come only from episode pages**, keyed by their s
 embedded in a show page is never stored. A known show whose page lists no episode pages is a failed read.
 Possible gap: a Kan special published with no episode page of its own would not appear. No such episode had
 been stored (checked on the deployment database).
+
+### Code review, round 13 (2026-11-06)
+
+One finding, fixed: Kan episodes have no air dates or printed numbers and are numbered in reading order, so
+an episode page that failed once (a transient 5xx) and was read a week later would have been numbered after
+all newer episodes. The crawler now never reads past a gap: a failed episode page stays first in its show's
+queue, the show pauses, and the page is retried at least two hours apart; only after three tries is it given
+up (with a warning) and reading continues. (On the deployment no Kan episode page had failed yet, so nothing
+stored was out of order.)

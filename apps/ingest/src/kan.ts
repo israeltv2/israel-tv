@@ -72,6 +72,8 @@ interface ShowState {
   fresh?: string[];
   /** When a show page that was never read successfully last failed (retried after a week). */
   failedAt?: string;
+  /** Episode pages that failed and will be tried again before reading past them. */
+  retry?: Record<string, { n: number; at: string }>;
 }
 
 interface CrawlState {
@@ -81,6 +83,9 @@ interface CrawlState {
 }
 
 const STATE_KEY = 'kan:crawl';
+/** A failed episode page is tried this many times, at least RETRY_GAP_MS apart, before it is skipped. */
+const MAX_EPISODE_TRIES = 3;
+const RETRY_GAP_MS = 2 * 3_600_000;
 const HOUR = HOUR_MS;
 
 export interface KanCrawlOptions {
@@ -294,8 +299,13 @@ export async function crawlKan(
     }
 
     // 3. Episode pages, airing shows first, oldest episode first within a show.
+    // A show whose next episode page just failed waits (see below) instead of reading past the gap.
+    const retryAfter = (s: ShowState) => {
+      const r = s.pending[0] ? s.retry?.[s.pending[0]] : undefined;
+      return r ? Date.parse(r.at) + RETRY_GAP_MS : 0;
+    };
     const queue = Object.entries(state.shows)
-      .filter(([, s]) => s.pending.length > 0)
+      .filter(([, s]) => s.pending.length > 0 && retryAfter(s) <= Date.now())
       .sort(([, a], [, b]) => (b.checkedAt ?? '').localeCompare(a.checkedAt ?? ''));
     for (const [key, s] of queue) {
       const batch: { episode: ScrapedEpisode; season: number | undefined; url?: string }[] = [];
@@ -313,12 +323,23 @@ export async function crawlKan(
           }
           if (problem) {
             problems++;
+            // Kan episodes are numbered in reading order (page-id order), so never read past a gap: keep this
+            // page first, pause the show, and try again later. Only after several tries is it given up.
+            const tries = (s.retry?.[url]?.n ?? 0) + 1;
+            if (tries < MAX_EPISODE_TRIES) {
+              s.retry = { ...(s.retry ?? {}), [url]: { n: tries, at: new Date().toISOString() } };
+              break;
+            }
+            if (s.retry) delete s.retry[url];
             s.failed.push(url);
             if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
             store.addWarnings(runId, store.findSeriesId('kan', key) ?? null, [
-              { code: 'source-note', message: `Kan episode ${url}: ${problem}` },
+              {
+                code: 'source-note',
+                message: `Kan episode ${url}: ${problem} (gave up after ${tries} tries)`,
+              },
             ]);
-          }
+          } else if (s.retry?.[url]) delete s.retry[url];
           s.pending.shift();
         }
       } finally {
