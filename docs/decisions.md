@@ -804,3 +804,12 @@ still said Mako needs the host's database (friends now run the resolver-only rol
 what a resolver-only instance has (no admin page or dashboard) is stated; the role check now also covers `host`
 (it must publish to Cloudflare) and refuses `catalogUrl` outside resolver-only; and the role, when not set,
 follows the publisher (Cloudflare: host; local: local-only), so the no-config Quick start is local-only.
+
+### Code review, round 2 (fourth pass)
+
+Two findings in the resolver-only path, fixed: a failed catalog fetch was cached like real data (10 minutes per
+season file, an hour for `ext-ids.json`), and an episode published after a season file was cached stayed unseen
+for up to 10 minutes — failures are no longer kept (they are logged, and the last good copy is used while the
+catalog is unreachable), and a file older than a minute that lacks the episode asked for is fetched again; and a
+resolver-only instance never pruned, rolled up or capped its usage events — it now runs the same daily
+housekeeping (and once at start).

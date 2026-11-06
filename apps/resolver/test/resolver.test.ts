@@ -486,3 +486,36 @@ test('a resolver-only instance can tell a catalog it cannot use (a typo, or one 
   expect(await checkCatalog('https://c.example/manifest.json', site(false))).toMatch(/no play files/);
   expect(await checkCatalog('https://wrong.example/', site(true))).toMatch(/no Israel TV manifest/);
 });
+
+test('resolver-only: a failed catalog fetch is not kept, and a just-published episode is found', async () => {
+  const { catalogLookup } = await import('../src/server.ts');
+  let t = 0;
+  let mode: 'down' | 'old' | 'new' = 'down';
+  const fakeFetch = (async () => {
+    if (mode === 'down') throw new Error('network down');
+    return Response.json(
+      mode === 'old'
+        ? { '4': { mako: { vcmid: 'a', channelId: 'c' } } }
+        : { '4': { mako: { vcmid: 'a', channelId: 'c' } }, '5': { mako: { vcmid: 'b', channelId: 'c' } } },
+    );
+  }) as unknown as typeof fetch;
+  const logged: string[] = [];
+  const c = catalogLookup(
+    'https://c.example',
+    fakeFetch,
+    (m) => logged.push(m),
+    () => t,
+  );
+  expect(await c.episode('iltv_mako_1', 1, 4)).toBeUndefined();
+  expect(logged).toContain('catalog fetch failed');
+  mode = 'old';
+  expect(await c.episode('iltv_mako_1', 1, 4)).toBeDefined(); // the failure was not cached
+  mode = 'new';
+  t = 30_000;
+  expect(await c.episode('iltv_mako_1', 1, 5)).toBeUndefined(); // fetched just now: not again yet
+  t = 90_000;
+  expect(await c.episode('iltv_mako_1', 1, 5)).toBeDefined(); // older than a minute and lacking it: fetched again
+  mode = 'down';
+  t = 20 * 60_000;
+  expect(await c.episode('iltv_mako_1', 1, 4)).toBeDefined(); // unreachable: the last good copy is used
+});

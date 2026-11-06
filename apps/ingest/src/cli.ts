@@ -16,6 +16,7 @@ import { EventStore } from '@israel-tv/events';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { checkCatalog, PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
 import { Store } from '@israel-tv/store';
+import { Cron } from 'croner';
 import { loadConfig } from './config.ts';
 import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
 import { crawlKan, kanCrawlOptions } from './kan.ts';
@@ -438,6 +439,15 @@ async function runResolverOnly(config: Config): Promise<number> {
     }
   }
   setInterval(() => sessions.flush(), 30_000).unref();
+  // Daily: the same usage housekeeping as a full instance (rollups, 30-day pruning, VACUUM, size cap).
+  const maintain = () => {
+    sessions.flush(false, Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`));
+    logger.log('usage events maintained', {
+      ...events.maintain(Date.now(), config.events.maxMB * 1024 * 1024),
+    });
+  };
+  maintain();
+  new Cron(config.schedule.daily, { timezone: config.schedule.timezone, protect: true }, maintain);
   // Say at once if the catalog cannot serve a resolver (a typo, or a host on an older version).
   void checkCatalog(config.resolver.catalogUrl ?? '').then((problem) =>
     logger.log(problem ? `catalog check: ${problem}` : 'catalog check: ok'),
