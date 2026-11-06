@@ -232,15 +232,14 @@ test('year seasons: numbers 1, 2 in ids, no year in episode titles, mapped for o
   expect(read(files, 'ext-ids.json').tt5).toEqual({ id: 'iltv_mako_54', seasons: [1, 2] });
 });
 
-test('releaseInfo is the first-aired year, a range when ended, open when still running', () => {
-  const now = Date.parse('2026-11-06T00:00:00Z');
+test('releaseInfo is first to last episode year, or one year; never open-ended', () => {
   const info = (dates: string[]) =>
-    read(renderSite({ ...base, now, shows: [yearShow(dates)] }), 'catalog/series/iltv_keshet12.json').metas[0]
+    read(renderSite({ ...base, shows: [yearShow(dates)] }), 'catalog/series/iltv_keshet12.json').metas[0]
       .releaseInfo;
-  expect(info(['2024-03-01', '2026-10-20'])).toBe('2024–');
-  expect(info(['2024-03-01', '2025-02-01'])).toBe('2024–2025');
+  expect(info(['2024-03-01', '2026-10-20'])).toBe('2024–2026');
   expect(info(['2023-03-01', '2023-05-01'])).toBe('2023');
-  expect(info(['2026-09-01'])).toBe('2026–');
+  expect(info(['2026-09-01'])).toBe('2026');
+  expect(info(['2024-03-01', '2026-10-20'])).not.toMatch(/–$/);
 });
 
 test('genres and the IMDb id are published; each row offers its genres as a filter', () => {
