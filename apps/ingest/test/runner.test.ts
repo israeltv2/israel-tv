@@ -198,3 +198,40 @@ test('a known show that suddenly has no seasons is a failed read, not an empty s
   expect(r.status).toBe('failed');
   expect(store.getShow('iltv_mako_1')?.lastError).toMatch(/no seasons/);
 });
+
+test('a full read in which every season comes back empty is a failed read', async () => {
+  const store = Store.open(':memory:');
+  await runFull(
+    store,
+    adapter(entries('/a'), { '/a': show('/a', [{ key: 's1', title: 'עונה 1', n: 3 }]) }),
+    opts,
+  );
+  const r = await runFull(
+    store,
+    adapter(entries('/a'), { '/a': show('/a', [{ key: 's1', title: 'עונה 1', n: 0 }]) }),
+    opts,
+  );
+  expect(r.status).toBe('failed');
+  expect(store.getShow('iltv_mako_1')?.lastError).toMatch(/every season read empty/);
+});
+
+test('a Kan refresh during a back-off does not spin the event loop', async () => {
+  const { Daemon } = await import('../src/daemon.ts');
+  const { parseConfig } = await import('@israel-tv/core');
+  const store = Store.open(':memory:');
+  store.setState('kan:crawl', { shows: {}, backoffUntil: new Date(Date.now() + 3_600_000).toISOString() });
+  const d = new Daemon(parseConfig({ browser: { type: 'chrome' } }), store, () => {});
+  (d as unknown as { kanRefresh: Set<string> }).kanRefresh.add(
+    'https://www.kan.org.il/content/kan/kan-11/p-1/',
+  );
+  d.kanCrawl();
+  let ticked = false;
+  await new Promise<void>((resolve) =>
+    setTimeout(() => {
+      ticked = true;
+      resolve();
+    }, 20),
+  );
+  expect(ticked).toBe(true);
+  expect((d as unknown as { kanRefresh: Set<string> }).kanRefresh.size).toBe(1); // kept for the next slice
+});

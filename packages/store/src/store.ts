@@ -206,6 +206,15 @@ export class Store {
     });
   }
 
+  /** A good read that changed nothing: clear an earlier failure. */
+  markShowChecked(seriesId: string): void {
+    this.db
+      .update(t.shows)
+      .set({ lastCheckedAt: now(), lastError: null })
+      .where(eq(t.shows.seriesId, seriesId))
+      .run();
+  }
+
   /** Record a failed check; the last good data stays as it is. */
   markShowFailed(seriesId: string, error: string): void {
     this.db

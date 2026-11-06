@@ -301,3 +301,11 @@ make the catalog unreadable; a Kan refresh no longer hides new episodes or pause
 across a back-off, and a Kan show page that suddenly lists no episodes is a failed read (slices with
 unreadable pages are "partial"); after a container restart, runs of the previous process (same pid 1) are
 closed; a publish requested while one is running is no longer dropped.
+
+### Code review, round 5 (2026-11-06)
+
+4 findings, all fixed: a Kan refresh during a back-off re-started the crawl in a tight promise loop and froze
+the daemon (reproduced; now the next scheduled slice takes it); a known show whose every season read empty
+in a full read was saved as a success (now a failed read, as for "no seasons"); a Kan show's "page lists no
+episodes" error never cleared (a later good read clears it); a single-show refresh dropped the show's
+poster (now kept).

@@ -157,7 +157,13 @@ export class Daemon {
     const make = createAdapters(this.config)[parsed.source];
     if (!make) return { error: `source ${parsed.source} is not enabled` };
     return this.enqueue(`show:${seriesId}`, async () => {
-      await runOne(this.store, make(), { key: row.show.key, title: row.title }, this.runOpts);
+      const poster = row.show.poster;
+      await runOne(
+        this.store,
+        make(),
+        { key: row.show.key, title: row.title, ...(poster ? { poster } : {}) },
+        this.runOpts,
+      );
       await this.publish();
     });
   }
@@ -179,15 +185,20 @@ export class Daemon {
     this.kanRefresh.clear();
     crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
       .then((r) => {
-        // During a back-off nothing was read: keep the refresh requests for the next slice.
+        // Nothing was read (back-off): keep the refresh requests for the next scheduled slice.
         if (r.pages === 0) for (const k of priority) this.kanRefresh.add(k);
         if (r.newEpisodes > 0) this.enqueue('publish', () => this.publish());
+        return r.pages > 0;
       })
-      .catch((err) => this.log(`kan crawl failed: ${(err as Error).stack ?? err}`))
-      .finally(() => {
+      .catch((err) => {
+        this.log(`kan crawl failed: ${(err as Error).stack ?? err}`);
+        return false;
+      })
+      .then((read) => {
         this.kanRunning = false;
-        // A refresh asked for during this slice gets its own slice right away.
-        if (this.kanRefresh.size > 0) this.kanCrawl();
+        // A refresh asked for during a slice that did read pages gets its own slice right away; after a
+        // slice that read nothing (back-off) the next scheduled slice takes it, so this never spins.
+        if (read && this.kanRefresh.size > 0) setTimeout(() => this.kanCrawl(), 0);
       });
   }
 
