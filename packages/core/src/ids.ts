@@ -4,6 +4,9 @@
 export const SOURCES = ['mako', 'reshet', 'kan', 'live'] as const;
 export type Source = (typeof SOURCES)[number];
 
+/** Sources whose video is mostly geo-blocked outside Israel (the resolver can relay them). */
+export const GEO_LIMITED: ReadonlySet<Source> = new Set(['reshet', 'kan']);
+
 const SERIES_RE = /^iltv_(mako|reshet|kan|live)_(\d+)$/;
 const VIDEO_RE = /^(iltv_(?:mako|reshet|kan|live)_\d+):(\d+):(\d+)$/;
 
@@ -26,8 +29,4 @@ export function parseVideoId(id: string): { series: string; season: number; epis
   const m = VIDEO_RE.exec(id);
   if (!m?.[1]) return undefined;
   return { series: m[1], season: Number(m[2]), episode: Number(m[3]) };
-}
-
-export function isOurId(id: string): boolean {
-  return id.startsWith('iltv_');
 }

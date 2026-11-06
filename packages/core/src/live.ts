@@ -162,7 +162,3 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     mako: [{ title: 'סברי מרנן', path: '/evrideo/hls/live/20001278/savri/index.m3u8' }],
   },
 ];
-
-export function liveChannel(id: string): LiveChannel | undefined {
-  return LIVE_CHANNELS.find((c) => c.id === id);
-}

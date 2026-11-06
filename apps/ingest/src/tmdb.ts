@@ -2,11 +2,12 @@
 // also gets our streams. Only exact matches are accepted: an Israeli show whose Hebrew or original title
 // normalizes to ours. Numbered seasons only are answered (see render), because named or year seasons
 // do not line up with TMDB's season numbers.
-import { normalizeForSearch } from '@israel-tv/core';
+
+import { setTimeout as sleep } from 'node:timers/promises';
+import { DAY_MS, normalizeForSearch } from '@israel-tv/core';
 import type { Store } from '@israel-tv/store';
 
 const API = 'https://api.themoviedb.org/3';
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface TmdbResult {
   id: number;
@@ -45,7 +46,7 @@ export async function matchShows(
   opts: { log?: (l: string) => void; recheckDays?: number; get?: Get; delayMs?: number } = {},
 ): Promise<{ checked: number; matched: number }> {
   const get = opts.get ?? defaultGet;
-  const before = new Date(Date.now() - (opts.recheckDays ?? 30) * 86_400_000).toISOString();
+  const before = new Date(Date.now() - (opts.recheckDays ?? 30) * DAY_MS).toISOString();
   const rows = store.showsToMatch(before);
   const runId = store.startRun('match', 'tmdb');
   let matched = 0;

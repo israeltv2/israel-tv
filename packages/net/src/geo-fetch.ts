@@ -1,6 +1,6 @@
 // fetch() that leaves through the geo adapter's proxies (or directly when there are none).
 import { type Dispatcher, ProxyAgent, Socks5ProxyAgent, fetch as undiciFetch } from 'undici';
-import type { ProxyEndpoint } from './geo.ts';
+import { type ProxyEndpoint, proxyUrlWithAuth } from './geo.ts';
 
 export type GeoFetch = (
   url: string,
@@ -9,13 +9,7 @@ export type GeoFetch = (
 
 function agentFor(p: ProxyEndpoint): Dispatcher {
   const url = new URL(p.server);
-  if (url.protocol === 'socks5:') {
-    if (p.username) {
-      url.username = encodeURIComponent(p.username);
-      url.password = encodeURIComponent(p.password ?? '');
-    }
-    return new Socks5ProxyAgent(url.toString());
-  }
+  if (url.protocol === 'socks5:') return new Socks5ProxyAgent(proxyUrlWithAuth(p));
   const token = p.username
     ? `Basic ${Buffer.from(`${p.username}:${p.password ?? ''}`).toString('base64')}`
     : undefined;

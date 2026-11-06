@@ -32,7 +32,6 @@ const AllShowsPage = z.looseObject({
       page: z.looseObject({
         Content: z.looseObject({ PageGrid: z.array(z.looseObject({ shows: z.array(ShowRef).optional() })) }),
       }),
-      liveSources: z.unknown().optional(),
     }),
   }),
 });
@@ -60,18 +59,6 @@ export function parseAllShows(html: string): ReshetIndexEntry[] {
     out.push({ key, title: s.title.trim(), ...(s.poster ? { poster: s.poster } : {}) });
   }
   return out;
-}
-
-/** Live HLS URLs embedded in every page (Reshet 13 live). */
-export function parseLiveSources(html: string): string[] {
-  const d = AllShowsPage.parse(nextData(html));
-  const urls: string[] = [];
-  const walk = (o: unknown) => {
-    if (typeof o === 'string' && /^https:\/\/.+\.m3u8/.test(o)) urls.push(o);
-    else if (o && typeof o === 'object') for (const v of Object.values(o)) walk(v);
-  };
-  walk(d.props.pageProps.liveSources);
-  return urls;
 }
 
 // ---- show pages ---------------------------------------------------------------------------------------
@@ -144,43 +131,53 @@ export interface ParsedShowPage {
 
 const img = (o: z.infer<typeof ImageObj>) => o?.d ?? o?.m ?? undefined;
 
-function fromNew(e: z.infer<typeof NewEpisode>): ScrapedEpisode | undefined {
-  const entryId = e.video?.kalturaId;
-  if (e.isBlank || !entryId) return undefined;
-  const numberHint = parseEpisodeHint(e.title);
-  const airDate = parseDottedDate(e.air_date);
-  const thumb = img(e.imageObj);
-  const dur = e.video?.duration;
+/** The common episode shape for both page templates. */
+function episode(
+  entryId: string,
+  rawTitle: string,
+  f: {
+    numberHint?: number | undefined;
+    airDate?: string | undefined;
+    description?: string | null | undefined;
+    thumb?: string | null | undefined;
+    dur?: number | null | undefined;
+  },
+): ScrapedEpisode {
   return {
     key: entryId,
-    title: e.title.replace(/^.*?פרק\s*\d+\s*[:\-–]\s*/, '').trim() || e.title.trim(),
-    ...(numberHint ? { numberHint } : {}),
-    ...(airDate ? { airDate } : {}),
-    ...(e.secondaryTitle ? { description: e.secondaryTitle.trim() } : {}),
-    ...(thumb ? { thumbnail: thumb } : {}),
-    ...(dur && dur > 0 ? { durationSec: Math.round(dur) } : {}),
+    // "דה וויס, עונה 6, פרק 26: הגמר הגדול!" → "הגמר הגדול!"
+    title: rawTitle.replace(/^.*?פרק\s*\d+\s*[:\-–]\s*/, '').trim() || rawTitle.trim(),
+    ...(f.numberHint && f.numberHint > 0 ? { numberHint: f.numberHint } : {}),
+    ...(f.airDate ? { airDate: f.airDate } : {}),
+    ...(f.description ? { description: f.description.trim() } : {}),
+    ...(f.thumb ? { thumbnail: f.thumb } : {}),
+    ...(f.dur && f.dur > 0 ? { durationSec: Math.round(f.dur) } : {}),
     streams: [{ url: playManifestUrl(entryId), kind: 'direct' }],
     play: { entryId },
   };
 }
 
+function fromNew(e: z.infer<typeof NewEpisode>): ScrapedEpisode | undefined {
+  const entryId = e.video?.kalturaId;
+  if (e.isBlank || !entryId) return undefined;
+  return episode(entryId, e.title, {
+    numberHint: parseEpisodeHint(e.title),
+    airDate: parseDottedDate(e.air_date),
+    description: e.secondaryTitle,
+    thumb: img(e.imageObj),
+    dur: e.video?.duration,
+  });
+}
+
 export function fromOld(e: z.infer<typeof OldEpisode>): ScrapedEpisode | undefined {
   if (!e.entryId) return undefined;
-  const numberHint = e.metas?.EpisodeNumber ?? parseEpisodeHint(e.name);
-  const airDate = e.startDate ? new Date(e.startDate * 1000).toISOString().slice(0, 10) : undefined;
-  const thumb = e.images?.[0]?.url;
-  const dur = e.mediaFiles?.[0]?.duration;
-  return {
-    key: e.entryId,
-    title: e.name.replace(/^.*?פרק\s*\d+\s*[:\-–]\s*/, '').trim() || e.name.trim(),
-    ...(numberHint && numberHint > 0 ? { numberHint } : {}),
-    ...(airDate ? { airDate } : {}),
-    ...(e.description ? { description: e.description.trim() } : {}),
-    ...(thumb ? { thumbnail: thumb } : {}),
-    ...(dur && dur > 0 ? { durationSec: Math.round(dur) } : {}),
-    streams: [{ url: playManifestUrl(e.entryId), kind: 'direct' }],
-    play: { entryId: e.entryId },
-  };
+  return episode(e.entryId, e.name, {
+    numberHint: e.metas?.EpisodeNumber ?? parseEpisodeHint(e.name),
+    airDate: e.startDate ? new Date(e.startDate * 1000).toISOString().slice(0, 10) : undefined,
+    description: e.description,
+    thumb: e.images?.[0]?.url,
+    dur: e.mediaFiles?.[0]?.duration,
+  });
 }
 
 export function parseShowPage(html: string): ParsedShowPage {

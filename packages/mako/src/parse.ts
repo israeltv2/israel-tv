@@ -74,14 +74,12 @@ export function seasonRefs(page: ShowPage): SeasonRef[] {
   return [{ key: tabUrl ?? page.pageUrl.replace(/\/+$/, ''), title: '', current: true }];
 }
 
-export function showArtwork(page: ShowPage): { description?: string; background?: string; logo?: string } {
+export function showArtwork(page: ShowPage): { description?: string; background?: string } {
   const description = page.hero?.description?.trim() || page.seo?.description?.trim();
   const background = page.hero?.pics?.[0]?.picUrl ?? page.seo?.image;
-  const logo = page.hero?.logo ?? undefined;
   return {
     ...(description ? { description } : {}),
     ...(background ? { background } : {}),
-    ...(logo ? { logo } : {}),
   };
 }
 

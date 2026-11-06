@@ -67,8 +67,8 @@ export interface MakoPlay {
   galleryChannelId?: string;
 }
 
-/** HLS URLs for one episode (unsigned; playback needs a ticket, see resolver). */
-export async function fetchPlaylist(f: Fetcher, p: MakoPlay): Promise<{ url: string; cdn?: string }[]> {
+/** The playlist.jsp URL that lists one episode's HLS media (unsigned; playback needs a ticket). */
+export function makoPlaylistUrl(p: MakoPlay): string {
   const u = new URL(`${MAKO_ORIGIN}/AjaxPage`);
   u.search = new URLSearchParams({
     jspName: 'playlist.jsp',
@@ -79,6 +79,15 @@ export async function fetchPlaylist(f: Fetcher, p: MakoPlay): Promise<{ url: str
     consumer: 'web_html5',
     encryption: 'no',
   }).toString();
-  const r = PlaylistResponse.parse(await f.json(u.toString()));
-  return r.media.map((m) => ({ url: m.url, ...(m.cdn ? { cdn: m.cdn } : {}) }));
+  return u.toString();
+}
+
+/** Media of one episode's playlist response. */
+export function parsePlaylist(raw: unknown): { url: string; cdn?: string }[] {
+  return PlaylistResponse.parse(raw).media.map((m) => ({ url: m.url, ...(m.cdn ? { cdn: m.cdn } : {}) }));
+}
+
+/** HLS URLs for one episode (unsigned; playback needs a ticket, see resolver). */
+export async function fetchPlaylist(f: Fetcher, p: MakoPlay): Promise<{ url: string; cdn?: string }[]> {
+  return parsePlaylist(await f.json(makoPlaylistUrl(p)));
 }

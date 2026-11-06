@@ -4,6 +4,7 @@ import {
   CATALOGS,
   type EpisodeAssignment,
   type ExtIds,
+  GEO_LIMITED,
   type Manifest,
   type Meta,
   type MetaPreview,
@@ -12,6 +13,8 @@ import {
   type SearchRow,
   type SeasonAssignment,
   type SeasonStreams,
+  SOURCES,
+  type Source,
   type StatusFile,
   type Stream,
   sitePaths,
@@ -153,7 +156,7 @@ function describe(sources: string[]): string {
     notes.push(
       'Mako episodes play through the Israel TV resolver on the home network of whoever runs this instance',
     );
-  if (sources.includes('reshet') || sources.includes('kan'))
+  if (sources.some((s) => GEO_LIMITED.has(s as Source)))
     notes.push('Reshet and Kan video is mostly limited to Israel');
   return `Israeli TV: ${list}.${notes.length ? ` ${notes.join('; ')}.` : ''}`;
 }
@@ -163,7 +166,7 @@ export function buildManifest(input: RenderInput, catalogIds: Set<string>): Mani
     id: 'community.israel-tv',
     version: input.version,
     name: input.name ?? 'Israel TV',
-    description: describe(input.sources ?? ['mako', 'reshet', 'kan', 'live']),
+    description: describe(input.sources ?? [...SOURCES]),
     resources: [
       'catalog',
       { name: 'meta', types: ['series', 'tv'], idPrefixes: ['iltv_'] },

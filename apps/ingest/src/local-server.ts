@@ -1,7 +1,6 @@
 // Local publisher: serve the rendered site on the local network with the same addon app the Worker uses.
 import { readFile } from 'node:fs/promises';
 import { join, normalize, sep } from 'node:path';
-import { serve } from '@hono/node-server';
 import { createAddonApp } from '@israel-tv/addon';
 
 export function localAddonApp(dir: string) {
@@ -21,8 +20,4 @@ export function localAddonApp(dir: string) {
     { cacheMs: 5_000 },
   );
   return app;
-}
-
-export function startLocalServer(dir: string, host: string, port: number) {
-  return serve({ fetch: localAddonApp(dir).fetch, hostname: host, port });
 }

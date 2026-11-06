@@ -2,6 +2,7 @@
 import { LIVE_CHANNELS, type LiveChannel } from '@israel-tv/core';
 import type { LiveChannelRender } from '@israel-tv/render';
 import type { Store } from '@israel-tv/store';
+import { runStatus } from './runner.ts';
 
 export function liveRender(): LiveChannelRender[] {
   return LIVE_CHANNELS.map((c) => ({
@@ -38,19 +39,18 @@ export async function checkLive(
   const failed: string[] = [];
   let ok = 0;
   for (const c of channels) {
-    const first = c.direct[0];
-    if (!first) continue;
-    let status = await probe(first.url);
-    // Fall back to the next link before calling the channel down.
-    for (const alt of c.direct.slice(1)) {
+    if (c.direct.length === 0) continue;
+    // The first link that answers counts; a channel is down only when none do.
+    let status = 0;
+    for (const l of c.direct) {
+      status = await probe(l.url);
       if (status === 200) break;
-      status = await probe(alt.url);
     }
     if (status === 200) ok++;
     else failed.push(`${c.name} (HTTP ${status || 'no answer'})`);
   }
   store.finishRun(runId, {
-    status: failed.length === 0 ? 'ok' : ok === 0 ? 'failed' : 'partial',
+    status: runStatus(ok, failed.length),
     showsOk: ok,
     showsFailed: failed.length,
     ...(failed.length ? { error: `not answering: ${failed.join(', ')}` } : {}),

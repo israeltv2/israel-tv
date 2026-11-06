@@ -37,7 +37,6 @@ export interface ShowRow {
   latestAirDate: string | null;
   latestEpisodeSeenAt: string | null;
   lastOkAt: string;
-  lastCheckedAt: string;
   lastError: string | null;
   state: 'listed' | 'delisted';
   tmdbId: number | null;
@@ -136,7 +135,11 @@ export class Store {
   }
 
   /** Whole registry, for the public backup file. */
-  registry(): { series: (typeof t.series.$inferSelect)[]; seasons: unknown[]; episodes: unknown[] } {
+  registry(): {
+    series: (typeof t.series.$inferSelect)[];
+    seasons: (typeof t.seasons.$inferSelect)[];
+    episodes: (typeof t.episodes.$inferSelect)[];
+  } {
     return {
       series: this.db.select().from(t.series).all(),
       seasons: this.db.select().from(t.seasons).all(),
@@ -264,7 +267,6 @@ export class Store {
       latestAirDate: r.latestAirDate,
       latestEpisodeSeenAt: r.latestEpisodeSeenAt,
       lastOkAt: r.lastOkAt,
-      lastCheckedAt: r.lastCheckedAt,
       lastError: r.lastError,
       state: r.state,
       tmdbId: r.tmdbId,
@@ -288,6 +290,16 @@ export class Store {
       .where(conds.length ? and(...conds) : undefined)
       .all()
       .map((r) => this.toShowRow(r));
+  }
+
+  countShows(source: Source, state: 'listed' | 'delisted'): number {
+    return (
+      this.db
+        .select({ n: sql<number>`count(*)` })
+        .from(t.shows)
+        .where(and(eq(t.shows.source, source), eq(t.shows.state, state)))
+        .get()?.n ?? 0
+    );
   }
 
   /** Shows of a source with an episode aired since `sinceDate` (yyyy-mm-dd). */
@@ -421,13 +433,18 @@ export class Store {
     seriesId: string | null,
     list: readonly { code: string; message: string }[],
   ): void {
-    const ts = now();
-    for (const w of list) {
-      this.db
-        .insert(t.warnings)
-        .values({ runId, seriesId, code: w.code, message: w.message, createdAt: ts })
-        .run();
-    }
+    if (list.length === 0) return;
+    const createdAt = now();
+    this.db
+      .insert(t.warnings)
+      .values(list.map((w) => ({ runId, seriesId, code: w.code, message: w.message, createdAt })))
+      .run();
+  }
+
+  /** When a show's stored data last changed (cheap; for caches). */
+  showStamp(seriesId: string): string | undefined {
+    return this.db.select({ at: t.shows.lastOkAt }).from(t.shows).where(eq(t.shows.seriesId, seriesId)).get()
+      ?.at;
   }
 
   recentWarnings(limit = 50): WarningRow[] {
