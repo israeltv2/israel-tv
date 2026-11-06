@@ -1,8 +1,20 @@
 // Resolver wiring: episode details (the home database on a full host, or a published catalog for a resolver that
 // runs on its own) + geo adapter from the config.
-import { type Config, roleOf, type ScrapedEpisode, type SeasonPlay, sitePaths } from '@israel-tv/core';
+import {
+  type Config,
+  type Contract,
+  ContractSchema,
+  ExtIdsSchema,
+  RESOLVER_CONTRACT_VERSION,
+  roleOf,
+  type ScrapedEpisode,
+  type SeasonPlay,
+  SeasonPlaySchema,
+  sitePaths,
+} from '@israel-tv/core';
 import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import { Store } from '@israel-tv/store';
+import type { z } from 'zod';
 import { createResolverApp, type ExternalHit, type ResolverDeps } from './app.ts';
 import { brandImage } from './branding.ts';
 import { createRemoteResolverApp } from './remote.ts';
@@ -106,8 +118,11 @@ export function catalogLookup(
   type Got<T> = { at: number; data: T };
   const seasons = new Map<string, Got<SeasonPlay>>();
   let ext: Got<Record<string, { id: string; seasons: number[] }>> | undefined;
-  /** The file's content; `{}` when it does not exist; undefined when the catalog could not be reached. */
-  const getJson = async <T>(path: string, empty: T): Promise<T | undefined> => {
+  /**
+   * The file's content, checked against the contract's schema; `empty` when it does not exist (or does not fit
+   * the contract: that is logged); undefined when the catalog could not be reached.
+   */
+  const getJson = async <T>(path: string, empty: T, schema: z.ZodType<T>): Promise<T | undefined> => {
     try {
       const r = await fetchImpl(`${base}/${path}`, { signal: AbortSignal.timeout(15_000) });
       if (r.status === 404) return empty;
@@ -115,12 +130,31 @@ export function catalogLookup(
         log('catalog fetch failed', { path, status: r.status });
         return undefined;
       }
-      return (await r.json()) as T;
+      const parsed = schema.safeParse(await r.json());
+      if (!parsed.success) {
+        log('catalog file does not match the resolver contract', {
+          path,
+          problem: parsed.error.issues[0]?.message,
+        });
+        return empty;
+      }
+      return parsed.data;
     } catch (err) {
       log('catalog fetch failed', { path, error: (err as Error).message });
       return undefined;
     }
   };
+  /** The catalog's contract version, checked once an hour; nothing is offered from a version not understood. */
+  let contract: { at: number; ok: boolean } | undefined;
+  async function contractOk(): Promise<boolean> {
+    if (contract && now() - contract.at < 60 * 60_000) return contract.ok;
+    const c = await getJson<Contract | null>(sitePaths.contract, null, ContractSchema.nullable());
+    if (c === undefined) return contract?.ok ?? true; // unreachable now: keep the last answer
+    const problem = contractProblem(c ?? undefined);
+    if (problem && contract?.ok !== false) log(`catalog refused: ${problem}`);
+    contract = { at: now(), ok: !problem };
+    return contract.ok;
+  }
   const SEASON_TTL = 10 * 60_000;
   /** A file kept longer than this is fetched again when it lacks what was asked (e.g. a just-published episode). */
   const RECHECK_MS = 60_000;
@@ -129,7 +163,7 @@ export function catalogLookup(
     const hit = seasons.get(key);
     const fresh = hit && now() - hit.at <= SEASON_TTL;
     if (fresh && (hit.data[wanted] || now() - hit.at <= RECHECK_MS)) return hit.data;
-    const data = await getJson<SeasonPlay>(sitePaths.seasonPlay(series, n), {});
+    const data = await getJson<SeasonPlay>(sitePaths.seasonPlay(series, n), {}, SeasonPlaySchema);
     if (data === undefined) return hit?.data; // unreachable now: keep using what we had, if anything
     seasons.set(key, { at: now(), data });
     if (seasons.size > 500) seasons.delete(seasons.keys().next().value as string);
@@ -137,20 +171,30 @@ export function catalogLookup(
   }
   return {
     async episode(series: string, n: number, episode: number): Promise<ScrapedEpisode | undefined> {
+      if (!(await contractOk())) return undefined;
       const p = (await season(series, n, String(episode)))?.[String(episode)];
       if (!p) return undefined;
       return {
         key: `${series}:${n}:${episode}`,
         title: '',
         streams: p.direct ? [{ url: p.direct, kind: 'direct' }] : [],
-        ...(p.mako ? { play: p.mako } : {}),
+        ...(p.mako
+          ? {
+              play: {
+                vcmid: p.mako.vcmid,
+                channelId: p.mako.channelId,
+                ...(p.mako.galleryChannelId ? { galleryChannelId: p.mako.galleryChannelId } : {}),
+              },
+            }
+          : {}),
         ...(p.israelOnly ? { availableAbroad: false } : {}),
       };
     },
     async external(id: string): Promise<ExternalHit | undefined> {
+      if (!(await contractOk())) return undefined;
       const stale = !ext || now() - ext.at > 60 * 60_000 || (!ext.data[id] && now() - ext.at > RECHECK_MS);
       if (stale) {
-        const data = await getJson<Record<string, { id: string; seasons: number[] }>>(sitePaths.extIds, {});
+        const data = await getJson(sitePaths.extIds, {}, ExtIdsSchema);
         if (data !== undefined) ext = { at: now(), data };
       }
       const hit = ext?.data[id];
@@ -193,6 +237,9 @@ export async function checkCatalog(
   const manifest = (await get('manifest.json')) as { catalogs?: { id: string; type: string }[] } | undefined;
   if (!manifest?.catalogs)
     return `no Israel TV manifest at ${base}/manifest.json (check resolver.catalogUrl)`;
+  const parsed = ContractSchema.safeParse(await get(sitePaths.contract));
+  const problem = contractProblem(parsed.success ? parsed.data : undefined);
+  if (problem) return problem;
   for (const c of manifest.catalogs.filter((x) => x.type === 'series')) {
     const row = (await get(`catalog/series/${c.id}.json`)) as { metas?: { id: string }[] } | undefined;
     const id = row?.metas?.find((m) => /^iltv_(mako|reshet|kan)_\d+$/.test(m.id))?.id;
@@ -207,4 +254,13 @@ export async function checkCatalog(
       : `the catalog at ${base} has no play files (its host runs an older Israel TV): Mako and relayed plays will not be offered until it updates`;
   }
   return `the catalog at ${base} lists no shows to check`;
+}
+
+/** Why a catalog's contract cannot be used by this resolver, or undefined when it can. */
+export function contractProblem(c: Contract | undefined): string | undefined {
+  if (!c)
+    return 'the catalog publishes no resolver contract (resolver-contract.json): its host runs an Israel TV older than this resolver; Mako and relayed plays are off until it updates';
+  if (c.version !== RESOLVER_CONTRACT_VERSION)
+    return `the catalog speaks resolver contract version ${c.version}, this resolver understands version ${RESOLVER_CONTRACT_VERSION}: update ${c.version > RESOLVER_CONTRACT_VERSION ? 'this resolver' : 'the catalog'} (Mako and relayed plays are off until then)`;
+  return undefined;
 }

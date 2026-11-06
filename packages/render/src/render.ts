@@ -2,6 +2,7 @@
 import {
   CATALOG_PAGE_SIZE,
   CATALOGS,
+  CONTRACT,
   type EpisodeAssignment,
   type EpisodePlay,
   type ExtIds,
@@ -340,6 +341,7 @@ export function renderSite(input: RenderInput): SiteFiles {
   files.set(sitePaths.status, json(input.status));
   files.set(sitePaths.statusPage, renderStatusHtml(input.status));
   files.set(sitePaths.registry, json(input.registry));
+  files.set(sitePaths.contract, json(CONTRACT));
   if (input.freshness) files.set(sitePaths.freshness, json(input.freshness));
   return files;
 }

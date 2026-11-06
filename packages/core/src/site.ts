@@ -14,6 +14,8 @@ export const sitePaths = {
   seasonStreams: (seriesId: string, season: number) => `streams/${seriesId}/${season}.json`,
   /** What a resolver needs to play a season's episodes, so it can run from the public catalog alone. */
   seasonPlay: (seriesId: string, season: number) => `play/${seriesId}/${season}.json`,
+  /** The catalog ↔ resolver contract version (see contract.ts). */
+  contract: 'resolver-contract.json',
   liveStreams: (id: string) => `streams/${id}.json`,
   search: 'search.json',
   extIds: 'ext-ids.json',
@@ -51,19 +53,6 @@ export type SearchRow = [
 
 /** streams/<series>/<season>.json: episode number → streams. */
 export type SeasonStreams = Record<string, Stream[]>;
-
-/** One episode's play details for a resolver (published per season as `play/<series>/<season>.json`). */
-export interface EpisodePlay {
-  /** Mako's ids for its playlist service. */
-  mako?: { vcmid: string; channelId: string; galleryChannelId?: string };
-  /** The direct stream (Reshet, Kan). */
-  direct?: string;
-  /** Refused outside Israel (as far as ingest knows). */
-  israelOnly?: boolean;
-}
-
-/** Episode number → its play details. */
-export type SeasonPlay = Record<string, EpisodePlay>;
 
 /** ext-ids.json: "tt123" or "tmdb:123" → our series and the seasons that share numbering with TMDB. */
 export type ExtIds = Record<string, { id: string; seasons: number[] }>;
