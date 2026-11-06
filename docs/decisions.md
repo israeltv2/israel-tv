@@ -825,3 +825,23 @@ is a one-time switch in the Cloudflare dashboard (free on the Workers free plan)
 needed: the next publish (it retries weekly) adds the binding, the Worker starts writing data points, and the daily
 job reads them. Until then the public counts keep coming from Workers Logs (same numbers, counted by Cloudflare);
 the GraphQL API is no substitute (it only has request totals per Worker, not per show).
+
+### Architecture clean-up: one job per part, a versioned contract, per-role packaging
+
+- **Contract.** What a catalog gives a resolver is now a versioned contract (`packages/core/src/contract.ts`,
+  docs/contract.md): `resolver-contract.json` (version 1), per-season play files and `ext-ids.json`, each with a
+  schema. The resolver checks the version (hourly) and the files, and refuses a version it does not understand
+  with a clear message instead of guessing. Contract tests on both sides: what the renderer publishes fits the
+  schemas; the resolver refuses a newer or missing version and files that do not fit.
+- **Packaging per role.** What every process shares (config loading and role checks, logging, serving) moved to
+  `packages/runtime`. The resolver has its own entry point (`apps/resolver/src/cli.ts`, `pnpm resolver …`), so a
+  resolver-only install is `pnpm install --prod --filter "@israel-tv/resolver..."`: about 85 MB, with no
+  browser, scrapers or Cloudflare tooling (checked from a clean clone, then played Mako from the live catalog).
+  Per-role service files: `deploy/israel-tv-resolver.service`, `deploy/org.israel-tv.resolver.plist`,
+  `deploy/docker-compose.resolver.yml` with `Dockerfile.resolver`. The full entry point still runs a
+  resolver-only config (it hands over to the same code).
+- **Which addon answers what** is an integration test: both addons in a simulated client, every kind of title,
+  at home and abroad. At most one stream per addon per title; the only pair is deliberate (abroad: the catalog's
+  direct stream labelled Israel-only, and the resolver's relay of it) — the catalog is public and stateless and
+  cannot know where the viewer is.
+- The README explains why each part exists.
