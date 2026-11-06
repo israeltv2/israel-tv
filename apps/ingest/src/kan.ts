@@ -85,6 +85,9 @@ interface CrawlState {
 }
 
 const STATE_KEY = 'kan:crawl';
+/** Browser errors that mean the connection is down (proxy, network, browser), not that one page is broken. */
+const CONNECTION_DOWN =
+  /ERR_PROXY|ERR_TUNNEL|ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE|ERR_SOCKS|Target (page, context or browser )?closed|browser has been closed/i;
 /**
  * An episode page that fails for itself (404, no player on it) is tried this many times, at least RETRY_GAP_MS
  * apart (so over at least a day), before it is skipped.
@@ -193,6 +196,13 @@ export async function crawlKan(
   let note = '';
 
   const origin = (url: string) => new URL(url).origin;
+  const serverError = (url: string, message: string): never => {
+    const site = origin(url);
+    const n = (serverErrors.get(site) ?? 0) + 1;
+    serverErrors.set(site, n);
+    if (n >= 2) blocked++;
+    throw Object.assign(new Error(message), { serverError: true });
+  };
   const load = async (url: string, kind: Kind = 'listing') => {
     if (pages > 0) await sleep(opts.pageIntervalMs);
     pages++;
@@ -202,12 +212,23 @@ export async function crawlKan(
         opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
         opts.proxy,
       );
+    } catch (err) {
+      // No browser: the slice fails, not any page.
+      blocked++;
+      throw new Error(`browser did not start: ${(err as Error).message.split('\n')[0]}`);
+    }
+    try {
       r = await loader.load(url);
     } catch (err) {
-      // The browser could not load the page at all (proxy refused or down, browser missing): that is the
-      // slice failing, not this page — back off instead of marking pages as broken.
-      blocked++;
-      throw new Error(`${url}: ${(err as Error).message.split('\n')[0]}`);
+      const message = `${url}: ${(err as Error).message.split('\n')[0]}`;
+      // The proxy or this machine's network is down, or the browser died: back off, charge nobody.
+      if (CONNECTION_DOWN.test(message)) {
+        blocked++;
+        throw new Error(message);
+      }
+      // Anything else (a timeout, a redirect loop, an empty response) may be this page's own problem: treat it
+      // like a server error, so it is compared with other pages of its site before anyone is charged.
+      return serverError(url, message);
     }
     // Challenges and proxy refusals: the slice stops and backs off, and no page is charged for them.
     if (r.challenged || r.status === 403 || r.status === 407) {
@@ -217,12 +238,7 @@ export async function crawlKan(
     // Server errors (5xx, rate limiting): one may be that page's problem; two in a row on the same site mean
     // the site is down, so the slice backs off and no page is charged.
     const site = origin(url);
-    if (r.status === 429 || r.status >= 500) {
-      const n = (serverErrors.get(site) ?? 0) + 1;
-      serverErrors.set(site, n);
-      if (n >= 2) blocked++;
-      throw Object.assign(new Error(`${url}: HTTP ${r.status}`), { serverError: true });
-    }
+    if (r.status === 429 || r.status >= 500) return serverError(url, `${url}: HTTP ${r.status}`);
     serverErrors.delete(site);
     blocked = 0;
     // The site answered normally, so its pages that answered a server error are broken by themselves.
@@ -270,7 +286,15 @@ export async function crawlKan(
         }
         for (const path of paths) {
           const key = `${l.origin}${path}`;
-          state.shows[key] ??= { origin: l.origin, catalog: l.catalog, pending: [], failed: [] };
+          // A show that appears after the first lobby read is a premiere: airing from the start, so its next
+          // episodes are picked up within hours, not on the weekly re-read.
+          state.shows[key] ??= {
+            origin: l.origin,
+            catalog: l.catalog,
+            pending: [],
+            failed: [],
+            ...(state.lobbiesAt ? { lastNewAt: new Date(now).toISOString() } : {}),
+          };
         }
       }
       if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size)
