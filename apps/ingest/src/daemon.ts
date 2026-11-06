@@ -3,8 +3,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
-import { networkInterfaces } from 'node:os';
-import { serve } from '@hono/node-server';
 import {
   type Config,
   DAY_MS,
@@ -16,6 +14,7 @@ import {
 import type { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
 import { PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
+import { type Logger, lanAddresses, listen } from '@israel-tv/runtime';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
@@ -24,7 +23,6 @@ import { type CanaryResult, canaryEvent, runCanary } from './canary.ts';
 import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive } from './live.ts';
 import { localAddonApp } from './local-server.ts';
-import type { Logger } from './log.ts';
 import { pullPublicUsage } from './public-usage.ts';
 import { activeSources, analyticsWanted, buildStatus, publishSite } from './publish.ts';
 import { type RunOptions, runAiring, runFull, runOne } from './runner.ts';
@@ -453,37 +451,6 @@ export function adminApp(d: Daemon, token: string) {
   return app;
 }
 
-/** Listen, or fail with a message that names the port and the option that sets it. */
-export function listen(
-  fetch: (req: Request, ...rest: never[]) => Response | Promise<Response>,
-  host: string,
-  port: number,
-  option: string,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const server = serve({ fetch: fetch as never, hostname: host, port }, () => resolve());
-    server.on('error', (err: NodeJS.ErrnoException) => {
-      reject(
-        new Error(
-          err.code === 'EADDRINUSE'
-            ? `port ${port} is already in use (${option}). Is israel-tv already running?`
-            : `cannot listen on ${host}:${port} (${option}): ${err.message}`,
-        ),
-      );
-    });
-  });
-}
-
-/** Addresses other devices on the network can use to reach this machine. */
-export function lanAddresses(host: string): string[] {
-  if (host !== '0.0.0.0' && host !== '::') return [host];
-  const out: string[] = [];
-  for (const list of Object.values(networkInterfaces())) {
-    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal) out.push(a.address);
-  }
-  return out.length ? out : ['127.0.0.1'];
-}
-
 /** Start everything the config enables. Ports are opened first, so a clash stops before any work. */
 export async function startDaemon(
   config: Config,
@@ -611,3 +578,5 @@ export async function startDaemon(
   d.kanCrawl();
   return d;
 }
+
+export { lanAddresses, listen };

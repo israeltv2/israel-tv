@@ -1,0 +1,11 @@
+# Israel TV's resolver on its own (role "resolver-only"): only the resolver and the packages it uses are installed
+# (no browser, no scrapers, no Cloudflare tooling). Config, .env and data live in /data.
+FROM node:24-bookworm-slim
+WORKDIR /app
+RUN corepack enable
+COPY --chown=node:node . .
+RUN CI=true pnpm install --prod --frozen-lockfile --filter "@israel-tv/resolver..." && mkdir -p /data && chown -R node:node /data /app
+USER node
+ENV ISRAEL_TV_CONFIG=/data/israel-tv.config.json
+EXPOSE 7701 7703
+CMD ["node", "apps/resolver/src/cli.ts", "start"]

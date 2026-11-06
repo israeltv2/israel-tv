@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd agent (macOS) for the resolver on its own (role resolver-only; install with
+  pnpm install --prod --filter "@israel-tv/resolver..."). Replace /path/to/israel-tv and /path/to/node-dir (the folder holding bin/node; with Volta, use the
+  folder of `volta which node`), then:
+    cp deploy/org.israel-tv.resolver.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.israel-tv.resolver.plist
+  Restart (after an update, or a change to the config or .env):
+    launchctl kickstart -k gui/$(id -u)/org.israel-tv.resolver
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>org.israel-tv.resolver</string>
+    <key>ProgramArguments</key><array>
+        <string>/path/to/node-dir/bin/node</string>
+        <string>apps/resolver/src/cli.ts</string>
+        <string>start</string>
+    </array>
+    <key>WorkingDirectory</key><string>/path/to/israel-tv</string>
+    <key>EnvironmentVariables</key><dict>
+        <key>PATH</key><string>/path/to/node-dir/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><true/>
+    <key>ThrottleInterval</key><integer>10</integer>
+    <key>StandardOutPath</key><string>/path/to/israel-tv/data/israel-tv-resolver.log</string>
+    <key>StandardErrorPath</key><string>/path/to/israel-tv/data/israel-tv-resolver.log</string>
+</dict>
+</plist>
