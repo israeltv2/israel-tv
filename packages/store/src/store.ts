@@ -1,5 +1,5 @@
-// SQLite store (node:sqlite + Drizzle). The single writer is the ingest daemon; the resolver opens the same
-// file read-only.
+// SQLite store (node:sqlite + Drizzle): the catalog database. Only ingest (and its commands) open it; the
+// resolver never does (it reads the published contract files).
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -71,10 +71,6 @@ export class Store {
     const s = new Store(path, false);
     migrate(s.db, { migrationsFolder: MIGRATIONS });
     return s;
-  }
-
-  static openReadOnly(path: string): Store {
-    return new Store(path, true);
   }
 
   /**
