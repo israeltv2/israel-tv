@@ -63,19 +63,25 @@ export function cleanDescription(raw: string | undefined | null): string | undef
   return t;
 }
 
-/** RIGHT-TO-LEFT MARK: makes an app that lays text out left-to-right start a Hebrew line from the right. */
-export const RLM = '‏';
+/** RIGHT-TO-LEFT MARK (an earlier way of marking lines; removed when a line is wrapped). */
+export const RLM = '\u200F';
+/** RIGHT-TO-LEFT EMBEDDING … POP DIRECTIONAL FORMATTING: the text between is laid out right to left. */
+export const RLE = '\u202B';
+export const PDF = '\u202C';
 
 /**
- * Text for apps that lay every line out left to right (Nuvio on iPhone showed "פספורט TV" as "TV פספורט" and
- * "רשת 13 · 720p" as "720 · 13 רשת"): a line whose first letter is Hebrew and that holds Latin letters or digits
- * starts with RLM. Only where needed, never twice; Latin-first and pure-Hebrew lines stay as they are.
+ * Text for apps that lay every line out left to right. Nuvio on iPhone showed "פספורט TV" as "TV פספורט" and
+ * "רשת 13 · 720p" as "720 · 13 pרשת" — also with a right-to-left mark in front, which a forced left-to-right
+ * paragraph ignores. A right-to-left embedding works whatever the paragraph's direction: a line whose first
+ * letter is Hebrew and that holds Latin letters or digits is wrapped in RLE … PDF. Only where needed, never twice;
+ * Latin-first and pure-Hebrew lines stay as they are.
  */
 export function rtl(s: string): string;
 export function rtl(s: string | undefined): string | undefined;
 export function rtl(s: string | undefined): string | undefined {
-  if (!s || s.startsWith(RLM)) return s;
-  const firstLetter = /\p{L}/u.exec(s)?.[0];
-  if (!firstLetter || !/[֐-׿]/.test(firstLetter)) return s;
-  return /[A-Za-z0-9]/.test(s) ? RLM + s : s;
+  if (!s || s.startsWith(RLE)) return s;
+  const t = s.startsWith(RLM) ? s.slice(RLM.length) : s;
+  const firstLetter = /\p{L}/u.exec(t)?.[0];
+  if (!firstLetter || !/[\u0590-\u05FF]/.test(firstLetter)) return t;
+  return /[A-Za-z0-9]/.test(t) ? `${RLE}${t}${PDF}` : t;
 }

@@ -1325,3 +1325,15 @@ junk names, duplicate ids or numbers, or unreachable posters. Fixed:
   results as commit statuses under the same names (`check (…)`, `windows-task`, `audit`, `title`): the branch
   ruleset counts statuses on a pull request's head commit, but not check runs from dispatched workflows (measured on
   release PR #105: six passing check runs, merge state "blocked").
+
+## Nuvio: right-to-left embedding, status and lastAirDate (2026-11-07)
+
+- The right-to-left mark did not help in Nuvio, which lays lines out left to right whatever they hold (the owner's
+  iPhone still showed "TV פספורט" and "720 · 13 pרשת"): a mark only steers neutral characters in such a paragraph.
+  Lines that need it are now wrapped in a right-to-left embedding (U+202B … U+202C), which is laid out right to left
+  inside any paragraph; the earlier mark is replaced.
+- Nuvio builds a series' year line from `releaseInfo`, `status` and `lastAirDate` (read in its source,
+  `MetaDetailsReleaseLine.kt`): without an "ended" status it always writes "<first year> -". Metas now carry
+  `lastAirDate` (the latest episode) and `status`: "Ended" after a year without episodes, else "Returning Series".
+  Ended shows then read "2021 - 2024" (or one year); running ones "2024 -", Nuvio's own way of writing a running
+  series. `status` is also shown as a "Status" row, so it says what is true.

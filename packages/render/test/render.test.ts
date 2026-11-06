@@ -333,3 +333,19 @@ test('an untitled named season adds nothing to episode titles; titles and texts 
   expect(meta.videos[0].title).toBe('06.11.26');
   expect(meta.description).toBe('תכנית אקטואליה שבועית');
 });
+
+test('status and lastAirDate let apps write the year line: ended after a year without episodes', () => {
+  const now = Date.parse('2026-11-07T00:00:00Z');
+  const meta = (dates: string[]) =>
+    read(renderSite({ ...base, now, shows: [yearShow(dates)] }), 'meta/series/iltv_mako_54.json').meta;
+  expect(meta(['2021-03-01', '2024-06-01'])).toMatchObject({
+    status: 'Ended',
+    lastAirDate: '2024-06-01',
+    releaseInfo: '2021–2024',
+  });
+  expect(meta(['2026-01-01', '2026-07-26'])).toMatchObject({
+    status: 'Returning Series',
+    lastAirDate: '2026-07-26',
+    releaseInfo: '2026',
+  });
+});

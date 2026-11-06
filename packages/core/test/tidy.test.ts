@@ -44,15 +44,16 @@ test('descriptions lose what sites add for search engines (the live cases)', asy
   expect(cleanDescription(sentence)).toBe(sentence);
 });
 
-test('RLM: Hebrew-first lines with Latin letters or digits start with it, once; others stay as they are', async () => {
-  const { RLM, rtl } = await import('../src/tidy.ts');
-  expect(rtl('פספורט TV')).toBe(`${RLM}פספורט TV`);
-  expect(rtl('רשת 13 · 720p')).toBe(`${RLM}רשת 13 · 720p`);
-  expect(rtl('100 שושנים - מחווה')).toBe(`${RLM}100 שושנים - מחווה`); // the first letter is Hebrew
-  expect(rtl(`${RLM}פספורט TV`)).toBe(`${RLM}פספורט TV`); // never twice
+test('right-to-left: Hebrew-first lines with Latin letters or digits are wrapped in an RTL embedding, once', async () => {
+  const { RLM, RLE, PDF, rtl } = await import('../src/tidy.ts');
+  expect(rtl('פספורט TV')).toBe(`${RLE}פספורט TV${PDF}`);
+  expect(rtl('רשת 13 · 720p')).toBe(`${RLE}רשת 13 · 720p${PDF}`);
+  expect(rtl('100 שושנים - מחווה')).toBe(`${RLE}100 שושנים - מחווה${PDF}`); // the first letter is Hebrew
+  expect(rtl(rtl('פספורט TV'))).toBe(`${RLE}פספורט TV${PDF}`); // never twice
+  expect(rtl(`${RLM}פספורט TV`)).toBe(`${RLE}פספורט TV${PDF}`); // the older mark is replaced
   expect(rtl('בייבי בום')).toBe('בייבי בום'); // only Hebrew: not needed
   expect(rtl('MasterChef Israel')).toBe('MasterChef Israel'); // Latin first
-  expect(rtl('i24 עברית')).toBe('i24 עברית'); // Latin letter first
+  expect(rtl('i24 עברית')).toBe('i24 עברית');
   expect(rtl('')).toBe('');
   expect(rtl(undefined)).toBeUndefined();
 });
