@@ -1,0 +1,5 @@
+[install]
+run = ["corepack pnpm install --frozen-lockfile || pnpm install --frozen-lockfile"]
+
+[setup]
+run = ["./.paradev/setup.sh"]
