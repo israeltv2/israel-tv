@@ -260,27 +260,43 @@ test('an episode page given up on is not queued again when the show page is re-r
   expect(st?.shows[key]?.pending).toEqual([]);
 });
 
-test('a Kan server error backs off without charging the page a try', async () => {
+type Crawl = {
+  backoffUntil?: string;
+  shows: Record<
+    string,
+    { retry?: Record<string, { at: string }>; failed: string[]; suspectSince?: Record<string, string> }
+  >;
+};
+const age = (store: Store) => {
+  const st = store.getState<Crawl>('kan:crawl');
+  if (!st) return;
+  delete st.backoffUntil;
+  for (const s of Object.values(st.shows)) {
+    for (const r of Object.values(s.retry ?? {})) r.at = '2000-01-01T00:00:00.000Z';
+    for (const k of Object.keys(s.suspectSince ?? {}))
+      if (s.suspectSince) s.suspectSince[k] = '2000-01-01T00:00:00.000Z';
+  }
+  store.setState('kan:crawl', st);
+};
+
+test('server errors on two pages in a row back off without charging anything', async () => {
   const store = Store.open(':memory:');
   const base = loader(routes);
   const down = {
     ...base,
     async load(url: string) {
-      return /\/s1\/\d+\/$/.test(url) ? { status: 503, html: '', challenged: false } : base.load(url);
+      return /\/(s1\/\d+|p-\d+)\/$/.test(url) ? { status: 503, html: '', challenged: false } : base.load(url);
     },
   };
   let r = await crawlKan(store, opts(down as never, 10));
-  for (let i = 0; i < 10 && !r.failed; i++) r = await crawlKan(store, opts(down as never, 10));
+  for (let i = 0; i < 5 && !r.failed; i++) r = await crawlKan(store, opts(down as never, 10));
   expect(r.failed).toBe(true);
-  const st = store.getState<{
-    backoffUntil?: string;
-    shows: Record<string, { retry?: Record<string, unknown>; failed: string[] }>;
-  }>('kan:crawl');
+  const st = store.getState<Crawl>('kan:crawl');
   expect(st?.backoffUntil).toBeDefined();
   expect(Object.values(st?.shows ?? {}).every((s) => !s.retry && s.failed.length === 0)).toBe(true);
 });
 
-test('one episode page that always answers 500 does not stop Kan for good', async () => {
+test('one episode page that always answers 500 is given up in time; the rest are read in order', async () => {
   const store = Store.open(':memory:');
   const base = loader(routes);
   const broken = {
@@ -289,24 +305,34 @@ test('one episode page that always answers 500 does not stop Kan for good', asyn
       return url.endsWith('/s1/1006640/') ? { status: 500, html: '', challenged: false } : base.load(url);
     },
   };
-  const clear = () => {
-    const st = store.getState<{
-      backoffUntil?: string;
-      shows: Record<string, { retry?: Record<string, { at: string }> }>;
-    }>('kan:crawl');
-    if (!st) return;
-    delete st.backoffUntil;
-    for (const s of Object.values(st.shows))
-      for (const r of Object.values(s.retry ?? {})) r.at = '2000-01-01T00:00:00.000Z';
-    store.setState('kan:crawl', st);
-  };
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 80; i++) {
     await crawlKan(store, opts(broken as never, 10));
-    clear();
+    age(store);
   }
-  const keys = store
-    .listShows({ source: 'kan' })
-    .flatMap((x) => x.show.seasons.flatMap((y) => y.episodes.map((e) => e.key)));
-  expect(keys).not.toContain('kan:1006640');
-  expect(keys.length).toBe(8); // the rest were read after the broken page was given up
+  const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
+  const byKey = new Map(store.assignments(id).episodes.map((e) => [e.key, e.episode]));
+  expect(byKey.has('kan:1006640')).toBe(false);
+  expect(byKey.size).toBe(8);
+  expect(byKey.get('kan:1006639')).toBe(1);
+  expect(byKey.get('kan:1006641') ?? byKey.get('kan:1007199')).toBe(2); // next page continues the order
+});
+
+test('a show page that always answers 500 is charged and skipped, not a reason to stop Kan', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const brokenShow = 'https://www.kan.org.il/content/kan/kan-11/p-1003359/';
+  const l = {
+    ...base,
+    async load(url: string) {
+      return url === brokenShow ? { status: 500, html: '', challenged: false } : base.load(url);
+    },
+  };
+  const eps = () =>
+    store.listShows({ source: 'kan' }).flatMap((x) => x.show.seasons.flatMap((y) => y.episodes)).length;
+  for (let i = 0; i < 60 && eps() < 9; i++) await crawlKan(store, opts(l as never, 10));
+  expect(eps()).toBe(9); // the Eurovision show was still read in full
+  const st = store.getState<{ shows: Record<string, { failedAt?: string; checkedAt?: string }> }>(
+    'kan:crawl',
+  );
+  expect(st?.shows[brokenShow]?.failedAt ?? st?.shows[brokenShow]?.checkedAt).toBeDefined();
 });
