@@ -36,9 +36,9 @@ test('episode page: player config with an untokened Redge HLS URL', () => {
   expect(e?.title).toContain('קופה ראשית');
 });
 
-test('single-video show: the video is on the show page itself', () => {
+test('a show with one episode lists its episode page', () => {
   const p = parseShowPage(html('show-p-1003359-single'), '/content/kan/kan-11/p-1003359/');
-  expect(p.featured?.hls).toMatch(/kancdn\/vod\/2171294\//);
+  expect(p.episodes.map((e) => e.id)).toEqual([1003373]);
 });
 
 test('challenge pages are recognized', () => {
@@ -48,6 +48,6 @@ test('challenge pages are recognized', () => {
 
 test('kids episode links with a Hebrew season segment are found', () => {
   const html = `<a href="/content/kids/hinuchit-main/malon_hotel/עונה-3/1037174/">x</a><a href="https://www.kankids.org.il/content/kids/hinuchit-main/malon_hotel/s2/1000001/">y</a>`;
-  const p = parseShowPage(html, '/content/kids/hinuchit-main/malon_hotel/', 'https://www.kankids.org.il');
+  const p = parseShowPage(html, '/content/kids/hinuchit-main/malon_hotel/');
   expect(p.episodes.map((e) => e.id)).toEqual([1000001, 1037174]);
 });

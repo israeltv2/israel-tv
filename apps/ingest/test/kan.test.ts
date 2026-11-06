@@ -149,19 +149,6 @@ test('a refreshed show whose page fails without a block counts as attempted (no 
   expect(r.failed).toBeUndefined();
 });
 
-test('a video embedded in a show page is keyed by its stable Kan video id', async () => {
-  const { kanEpisodeKey } = await import('../src/kan.ts');
-  expect(
-    kanEpisodeKey({ id: '1006639', hls: 'https://r.il.cdn-redge.media/x/kancdn/vod/2173543/L/a.m3u8' }),
-  ).toBe('kan:1006639');
-  expect(
-    kanEpisodeKey({
-      id: 'h5b9ddce0bdef4bc8929337f2519979ba',
-      hls: 'https://r.il.cdn-redge.media/x/kancdn/vod/2171294/L/a.m3u8',
-    }),
-  ).toBe('kan:vod-2171294');
-});
-
 test('a known show whose page lists no episodes is a failed read, even with a player on the page', async () => {
   const store = Store.open(':memory:');
   const l = loader(routes);
@@ -189,34 +176,6 @@ test('a known show whose page lists no episodes is a failed read, even with a pl
   });
   expect(store.assignments(id).episodes.length).toBe(before);
   expect(store.getShow(id)?.lastError).toMatch(/lists no episodes/);
-});
-
-test('a single-video show stays healthy when its page is read again', async () => {
-  const store = Store.open(':memory:');
-  const key = 'https://www.kan.org.il/content/kan/kan-11/p-1003359/';
-  const single = fx('show-p-1003359-single').replace(/href="[^"]*p-1003359\/\d+\/"/g, 'href="#"');
-  const l = {
-    ...loader(routes),
-    async load(url: string) {
-      return url === key ? { status: 200, html: single, challenged: false } : loader(routes).load(url);
-    },
-  };
-  // First read: the page embeds a video and lists no episodes — not saved yet (could be a premiere).
-  await crawlKan(store, { ...opts(l as never, 3), priority: [key] });
-  expect(store.listShows({ source: 'kan' })).toHaveLength(0);
-  // A day later it still looks the same: now it is a single-video show.
-  const state = store.getState<{ shows: Record<string, { featuredSeenAt?: string }> }>('kan:crawl');
-  const st = state?.shows[key];
-  if (!state || !st) throw new Error('no crawl state');
-  st.featuredSeenAt = new Date(Date.now() - 2 * 86_400_000).toISOString();
-  store.setState('kan:crawl', state);
-  await crawlKan(store, { ...opts(l as never, 3), priority: [key] });
-  const id = store.listShows({ source: 'kan' })[0]?.seriesId ?? '';
-  expect(store.assignments(id).episodes.length).toBe(1);
-  // Read again: still healthy, still one episode.
-  await crawlKan(store, { ...opts(l as never, 3), priority: [key] });
-  expect(store.getShow(id)?.lastError).toBeNull();
-  expect(store.assignments(id).episodes.length).toBe(1);
 });
 
 test('a known Kan show whose page disappears shows as failing', async () => {
