@@ -281,7 +281,8 @@ export async function crawlKan(
       }
       // A show we have episodes for whose page now lists none (and has no video of its own) is a failed
       // read — most likely a layout change — not an empty show.
-      if (page.episodes.length === 0 && !page.featured && known.size > 0 && id) {
+      // (A player on the page does not change that: multi-episode show pages embed one too.)
+      if (page.episodes.length === 0 && known.size > 0 && id) {
         problems++;
         store.markShowFailed(id, 'kept last good data: the show page lists no episodes (layout change?)');
         store.addWarnings(runId, id, [
@@ -290,8 +291,9 @@ export async function crawlKan(
       }
       // A good read of the show page clears an earlier failure (e.g. one empty page during a Kan deploy).
       else if (id && (page.episodes.length > 0 || page.featured)) store.markShowChecked(id);
-      // Single-video show: the video is on the show page itself.
-      if (page.episodes.length === 0 && page.featured) {
+      // Single-video show: the video is on the show page itself. Only for a show with nothing stored yet,
+      // so a page's embedded player can never become a duplicate episode.
+      if (page.episodes.length === 0 && page.featured && known.size === 0) {
         newEpisodes += saveEpisodes(store, key, s, [
           { episode: toEpisode(page.featured), season: undefined },
         ]);

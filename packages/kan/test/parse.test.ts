@@ -45,3 +45,9 @@ test('challenge pages are recognized', () => {
   expect(isChallenge('<html><head><title>רק רגע...</title>')).toBe(true);
   expect(isChallenge(html('episode-1006639'))).toBe(false);
 });
+
+test('kids episode links with a Hebrew season segment are found', () => {
+  const html = `<a href="/content/kids/hinuchit-main/malon_hotel/עונה-3/1037174/">x</a><a href="https://www.kankids.org.il/content/kids/hinuchit-main/malon_hotel/s2/1000001/">y</a>`;
+  const p = parseShowPage(html, '/content/kids/hinuchit-main/malon_hotel/', 'https://www.kankids.org.il');
+  expect(p.episodes.map((e) => e.id)).toEqual([1000001, 1037174]);
+});

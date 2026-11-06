@@ -344,3 +344,12 @@ duplicate episode on every re-read (now keyed by Kan's video id from the stream 
 been stored yet); a restart during the first full run left later sources empty until the night (startup now
 runs the full read when any source has had no good run in a day); a failed TMDB matching run (e.g. a revoked
 key) did not show on `/status` (now a `tmdb` note and health warn).
+
+### Code review, round 9 (2026-11-06)
+
+3 findings in the Kan crawler, all fixed: kankids episode links whose season segment is Hebrew (`עונה-3/`)
+were dropped (any single segment is now accepted); a show page's embedded player could be saved as a
+duplicate episode (a page video is saved only for a show with nothing stored yet, and a known show whose
+page lists no episodes is a failed read whether or not it embeds a player); a page budget of 1 never got past
+the first lobby (the budget is at least 2). Kan's stored data (20 episodes, collected in the first hours)
+was cleared once and crawled again, so the missing kids seasons are numbered in Kan's page order.
