@@ -206,6 +206,9 @@ importers:
       '@israel-tv/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@israel-tv/kan':
+        specifier: workspace:*
+        version: link:../../packages/kan
       '@israel-tv/mako':
         specifier: workspace:*
         version: link:../../packages/mako
@@ -263,6 +266,21 @@ importers:
 
   packages/core:
     dependencies:
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  packages/kan:
+    dependencies:
+      '@israel-tv/core':
+        specifier: workspace:*
+        version: link:../core
+      '@israel-tv/net':
+        specifier: workspace:*
+        version: link:../net
+      playwright-core:
+        specifier: 1.65.0
+        version: 1.65.0
       zod:
         specifier: 4.6.7
         version: 4.6.7

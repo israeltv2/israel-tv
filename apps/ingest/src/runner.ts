@@ -79,7 +79,17 @@ export async function ingestShow(
   try {
     scraped = await adapter.fetchShow(entry, { currentSeasonOnly: currentSeasonOnly && prev !== undefined });
   } catch (err) {
-    if (knownId && prev) store.markShowFailed(knownId, (err as Error).message);
+    if (knownId && prev) {
+      store.markShowFailed(knownId, (err as Error).message);
+      throw err;
+    }
+    // Listed by the source but its page is gone, and we never had it: nothing to publish or keep.
+    if ((err as { status?: number }).status === 404) {
+      store.addWarnings(runId, null, [
+        { code: 'source-note', message: `${entry.title}: listed, but its page is gone (404)` },
+      ]);
+      return { kind: 'empty' };
+    }
     throw err;
   }
   // A season that comes back empty (not fetched in an airing check, or a dead page) keeps its last good

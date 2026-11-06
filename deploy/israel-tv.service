@@ -1,0 +1,17 @@
+# systemd unit (Linux). Adjust User and the two paths, then:
+#   sudo cp deploy/israel-tv.service /etc/systemd/system/ && sudo systemctl enable --now israel-tv
+[Unit]
+Description=Israel TV (ingest, addon, resolver)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=israeltv
+WorkingDirectory=/opt/israel-tv
+Environment=ISRAEL_TV_CONFIG=/opt/israel-tv/israel-tv.config.json
+ExecStart=/usr/bin/node apps/ingest/src/cli.ts start
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

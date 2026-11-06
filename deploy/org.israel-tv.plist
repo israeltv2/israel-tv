@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd agent (macOS). Replace /path/to/israel-tv and /path/to/node, then:
+    cp deploy/org.israel-tv.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.israel-tv.plist
+  A LaunchAgent (not a daemon) runs in your login session, which Chrome needs for Kan.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>org.israel-tv</string>
+    <key>ProgramArguments</key><array>
+        <string>/path/to/node</string>
+        <string>apps/ingest/src/cli.ts</string>
+        <string>start</string>
+    </array>
+    <key>WorkingDirectory</key><string>/path/to/israel-tv</string>
+    <key>EnvironmentVariables</key><dict>
+        <!-- Cloudflare publishing runs wrangler, a node script: node must be on PATH. -->
+        <key>PATH</key><string>/path/to/node/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><true/>
+    <key>ThrottleInterval</key><integer>10</integer>
+    <key>StandardOutPath</key><string>/path/to/israel-tv/data/israel-tv.log</string>
+    <key>StandardErrorPath</key><string>/path/to/israel-tv/data/israel-tv.log</string>
+</dict>
+</plist>

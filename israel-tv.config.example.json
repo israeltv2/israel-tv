@@ -1,0 +1,17 @@
+{
+  "store": { "path": "./data/israel-tv.sqlite" },
+  "sources": { "mako": true, "reshet": true, "kan": true, "live": true },
+  "geo": { "type": "none" },
+  "browser": { "type": "chrome" },
+  "publisher": { "type": "local", "host": "0.0.0.0", "port": 7000 },
+  "resolver": { "enabled": true, "host": "0.0.0.0", "port": 7001 },
+  "admin": { "host": "0.0.0.0", "port": 7002 },
+  "schedule": {
+    "timezone": "Asia/Jerusalem",
+    "fullRun": "30 3 * * *",
+    "airingChecks": ["5 * * * *", "*/15 19-23,0 * * *"],
+    "kanCrawl": "*/10 * * * *",
+    "airingWindowDays": 14
+  },
+  "scraping": { "delayMs": 1000, "browserPagesPerRun": 5, "browserPageIntervalSec": 75 }
+}

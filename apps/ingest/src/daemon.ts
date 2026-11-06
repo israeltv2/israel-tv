@@ -4,10 +4,12 @@ import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { serve } from '@hono/node-server';
 import { type Config, parseSeriesId, type Source } from '@israel-tv/core';
+import { proxyEndpoints } from '@israel-tv/net';
 import { startResolver } from '@israel-tv/resolver';
 import type { Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
+import { crawlKan } from './kan.ts';
 import { checkLive, liveRender } from './live.ts';
 import { startLocalServer } from './local-server.ts';
 import { buildStatus, deploy, renderFromStore, writeSite } from './publish.ts';
@@ -147,12 +149,34 @@ export class Daemon {
     });
   }
 
+  private kanSlices = 0;
+
+  /** One Kan crawl slice (a few browser pages), then publish if anything was added. */
+  kanCrawl(): void {
+    if (!this.config.sources.kan || this.config.browser.type === 'none') return;
+    this.enqueue('kan', async () => {
+      const proxies = proxyEndpoints(this.config.geo);
+      const proxy = proxies[this.kanSlices++ % Math.max(proxies.length, 1)];
+      const r = await crawlKan(this.store, {
+        browser: this.config.browser,
+        ...(proxy ? { proxy } : {}),
+        pagesPerRun: this.config.scraping.browserPagesPerRun,
+        pageIntervalMs: this.config.scraping.browserPageIntervalSec * 1000,
+        airingWindowDays: this.config.schedule.airingWindowDays,
+        log: this.log,
+      });
+      if (r.newEpisodes > 0) await this.publish();
+    });
+  }
+
   schedule(): void {
     const tz = this.config.schedule.timezone;
     const at = (pattern: string, fn: () => void) =>
       this.crons.push(new Cron(pattern, { timezone: tz, protect: true }, fn));
     at(this.config.schedule.fullRun, () => this.fullRun());
     for (const p of this.config.schedule.airingChecks) at(p, () => this.airingRun());
+    if (this.config.sources.kan && this.config.browser.type !== 'none')
+      at(this.config.schedule.kanCrawl, () => this.kanCrawl());
   }
 
   nextRuns(): Record<string, string | null> {

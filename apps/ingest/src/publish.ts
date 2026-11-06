@@ -28,7 +28,8 @@ export function buildStatus(store: Store, sources: Source[], now = Date.now()): 
   for (const source of sources) {
     const shows = all.filter((s) => s.source === source && s.state === 'listed');
     const episodes = shows.reduce((n, s) => n + s.show.seasons.reduce((m, x) => m + x.episodes.length, 0), 0);
-    const full = store.lastRun('full', source);
+    // Kan is read in small crawl slices rather than full runs.
+    const full = source === 'kan' ? store.lastRun('crawl', 'kan') : store.lastRun('full', source);
     const airing = store.lastRun('airing', source);
     const notes: string[] = [];
     let health: Health = 'ok';
@@ -37,7 +38,8 @@ export function buildStatus(store: Store, sources: Source[], now = Date.now()): 
       health = 'warn';
       notes.push('no full run yet');
     } else if (full.status === 'failed') {
-      health = 'error';
+      // A Kan slice that hit a challenge backs off and retries; only a long run of them is an error.
+      health = source === 'kan' ? 'warn' : 'error';
       notes.push(`last full run failed: ${full.error ?? 'unknown error'}`);
     } else if (full.status === 'partial') {
       health = 'warn';
