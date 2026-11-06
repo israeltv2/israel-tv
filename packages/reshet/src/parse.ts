@@ -125,6 +125,8 @@ export interface ParsedSeason {
 
 export interface ParsedShowPage {
   template: 'vod-playlist' | 'program' | 'no-vod';
+  /** Why there are no episodes, for a warning. */
+  note?: string;
   seriesId?: string;
   seasons: ParsedSeason[];
 }
@@ -209,11 +211,12 @@ export function parseShowPage(html: string): ParsedShowPage {
       }));
     return { template: 'program', seriesId: p.seriesId, seasons };
   }
-  // Shows without VOD get a plain article grid with no posts: nothing to read, not a layout change.
+  // Pages with only article/clip grids (no episode list) are shows without VOD. They are noted, not failed;
+  // a page with no grids at all is still treated as a layout change.
   const grids = pp.page?.Content.PageGrid ?? [];
-  if (grids.length > 0 && grids.every((g) => g.grid_type === 'Base' || g.grid_type === 'PaginationArray')) {
-    const posts = grids.flatMap((g) => ((g as { posts?: unknown[] }).posts ?? []) as unknown[]);
-    if (posts.length === 0) return { template: 'no-vod', seasons: [] };
+  if (grids.length > 0) {
+    const kinds = [...new Set(grids.map((g) => g.grid_type ?? '?'))].join(', ');
+    return { template: 'no-vod', seasons: [], note: `no episode list on the show page (only ${kinds})` };
   }
   throw new Error('show page has neither a VodPlaylist grid nor a program (layout changed?)');
 }

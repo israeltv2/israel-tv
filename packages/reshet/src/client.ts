@@ -43,7 +43,7 @@ export async function fetchShow(
 ): Promise<ScrapedShow> {
   const parsed = parseShowPage(await page(f, entry.key));
   const seasons: { s: ParsedSeason; episodes: ScrapedEpisode[] }[] = [];
-  const notes: string[] = [];
+  const notes: string[] = parsed.note ? [parsed.note] : [];
   for (const s of parsed.seasons) {
     let episodes = s.episodes;
     if (!episodes && !opts.currentSeasonOnly && parsed.seriesId && s.position !== undefined) {

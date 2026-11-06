@@ -126,7 +126,16 @@ export async function ingestShow(
   // episodes: a published episode never disappears because of one bad read.
   const fetched = new Set(scraped.seasons.filter((s) => s.episodes.length > 0).map((s) => s.key));
   const show = dedupeEpisodes(mergePartial(prev?.show, scraped, fetched));
-  if (!prev && episodeCount(show) === 0) return { kind: 'empty' };
+  if (!prev && episodeCount(show) === 0) {
+    if (scraped.notes?.length) {
+      store.addWarnings(
+        runId,
+        null,
+        scraped.notes.map((message) => ({ code: 'source-note', message: `${entry.title}: ${message}` })),
+      );
+    }
+    return { kind: 'empty' };
+  }
   const thin = thinReason(prev?.show, show);
   if (thin) {
     if (knownId && prev) store.markShowFailed(knownId, `kept last good data: ${thin}`);
