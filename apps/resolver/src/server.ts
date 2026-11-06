@@ -41,7 +41,7 @@ export function resolverApp(
     ...(onRelay ? { onRelay } : {}),
     episode: episodeLookup(config.store.path),
     external: externalLookup(config.store.path),
-    fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) }),
+    fetch: (url, init) => fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }),
     ...(proxies.length > 0 ? { geoFetch: createGeoFetch(proxies) } : {}),
   });
 }
