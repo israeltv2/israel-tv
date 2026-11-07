@@ -118,3 +118,43 @@ test('an episode page with subtitles in its player config says so (kept as given
   const withSubs = page.replace('"subtitles":null', '"subtitles":[{"src":"/x.vtt","lang":"he"}]');
   expect(parseEpisodePage(withSubs)?.subtitles).toEqual([{ src: '/x.vtt', lang: 'he' }]);
 });
+
+test('episode pages are told apart: a video, the bot check, rights expired, or not a video (measured pages)', async () => {
+  const { classifyEpisodePage } = await import('../src/parse.ts');
+  expect(classifyEpisodePage(html('episode-1006639')).kind).toBe('episode');
+  // Cloudflare's Turnstile interstitial, as the crawler got it instead of an episode page.
+  expect(classifyEpisodePage(html('challenge-turnstile')).kind).toBe('challenge');
+  // "בשל הסכמי זכויות שידור, פרק זה כבר לא זמין לצפייה": still has a contentUrl, but the video is gone.
+  expect(
+    classifyEpisodePage(
+      html('episode-447786-rights-expired'),
+      KAN_ORIGIN,
+      `${KAN_ORIGIN}/content/kan/kan-11/p-445792/447786/`,
+    ).kind,
+  ).toBe('removed');
+  // An interview article linked among the episodes: a VideoObject with an empty contentUrl.
+  expect(classifyEpisodePage(html('episode-128487-no-video')).kind).toBe('not-video');
+  expect(classifyEpisodePage('<html><title>x</title></html>').kind).toBe('unknown');
+});
+
+test('a page without a player config but with a Redge VideoObject still gives its episode', async () => {
+  const { classifyEpisodePage } = await import('../src/parse.ts');
+  const page = html('episode-447786-rights-expired').replace(/class="rights-expired"/g, 'class="x"');
+  const r = classifyEpisodePage(page, KAN_ORIGIN, `${KAN_ORIGIN}/content/kan/kan-11/p-445792/s2/447786/`);
+  expect(r.kind).toBe('episode');
+  if (r.kind !== 'episode') return;
+  expect(r.episode).toMatchObject({
+    id: '447786',
+    title: 'פרק 1 - ארה"ב',
+    seriesName: 'טייקונים',
+    seasonNumber: 2,
+    published: '2023-07-18',
+  });
+  expect(r.episode.hls).toMatch(/^https:\/\/r\.il\.cdn-redge\.media\/.+playlist\.m3u8\?fmp4$/);
+});
+
+test('normal Kan pages carry a bot-scoring script but are not challenges', () => {
+  for (const n of ['episode-447786-rights-expired', 'episode-128487-no-video', 'lobby-series'])
+    expect(isChallenge(html(n)), n).toBe(false);
+  expect(isChallenge(html('challenge-turnstile'))).toBe(true);
+});

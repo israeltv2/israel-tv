@@ -280,7 +280,11 @@ export class Daemon {
     });
   }
 
-  private kanSlices = 0;
+  /**
+   * The proxy exit Kan uses: sticky, because Cloudflare's clearance (kept in the exit's browser profile) is tied to the
+   * exit's address. It moves to the next exit only after a slice that failed (a block or an outage).
+   */
+  private kanExit = 0;
   private kanRunning = false;
   private kanRefresh = new Set<string>();
 
@@ -292,12 +296,13 @@ export class Daemon {
     if (!kanEnabled(this.config) || this.kanRunning) return;
     this.kanRunning = true;
     const proxies = proxyEndpoints(this.config.geo);
-    const proxy = proxies[this.kanSlices++ % Math.max(proxies.length, 1)];
+    const proxy = proxies[this.kanExit % Math.max(proxies.length, 1)];
     const priority = [...this.kanRefresh];
     this.kanRefresh.clear();
     // Handled below: failures are caught and logged; the last step cannot throw.
     void crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
       .then((r) => {
+        if (r.failed) this.kanExit++;
         // Refreshes asked for while this slice ran get a slice of their own right away.
         const arrived = this.kanRefresh.size > 0;
         // Refreshes this slice never got to (back-off, block) wait for the next scheduled slice; one whose

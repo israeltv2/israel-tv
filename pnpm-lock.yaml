@@ -179,6 +179,9 @@ catalogs:
     jpeg-js:
       specifier: 0.4.4
       version: 0.4.4
+    patchright-core:
+      specifier: 1.64.3
+      version: 1.64.3
     playwright-core:
       specifier: 1.65.0
       version: 1.65.0
@@ -417,9 +420,9 @@ importers:
       '@israel-tv/net':
         specifier: workspace:*
         version: link:../net
-      playwright-core:
+      patchright-core:
         specifier: 'catalog:'
-        version: 1.65.0
+        version: 1.64.3
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2556,6 +2559,11 @@ packages:
   package-manager-detector@1.9.0:
     resolution: {integrity: sha512-zAMfbta9nPA8AKkA4WdmNAT8R8s6Dk0/xwPsqNnRidMFcLo1YkLuPDTgs2f64XdzS8vbLNnoJ+uUIkgbz7oRHA==}
 
+  patchright-core@1.64.3:
+    resolution: {integrity: sha512-AikBjQ6CcsEtk7pJGlZ7ITxIInVd0a8HWPtuGjx2Y0Ogb88sj1wqICiYFz4du6fbaLQStLNEnWCmYm5uODsEzQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   path-parse@1.0.7:
     resolution: {integrity: sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw==}
 
@@ -4400,6 +4408,8 @@ snapshots:
   p-cancelable@4.0.1: {}
 
   package-manager-detector@1.9.0: {}
+
+  patchright-core@1.64.3: {}
 
   path-parse@1.0.7: {}
 
