@@ -16,6 +16,9 @@ import {
 } from '@israel-tv/core';
 import { z } from 'zod';
 
+/** At most this many list pages are read per show (the longest show had 26 on 2026-11-07). */
+export const SITE_LIST_PAGES = 40;
+
 export const RESHET_ORIGIN = 'https://13tv.co.il';
 export const KALTURA_PARTNER = 2748741;
 
@@ -456,8 +459,15 @@ export function parseShowSitePage(
     }
     const link = g.grid_title?.link?.trim();
     if (link?.startsWith(showPath) && /\/episodes\/?$/.test(link) && !lists.includes(link)) lists.push(link);
-    if (g.grid_type === 'PaginationArray' && g.base?.includes('%#%') && g.max_page) {
-      for (let n = (g.current_page ?? 1) + 1; n <= g.max_page; n++)
+    // A site path only ("/…", never "//host" or "@host"), and never more pages than a show may read.
+    if (
+      g.grid_type === 'PaginationArray' &&
+      /^\/[^/@]/.test(g.base ?? '') &&
+      g.base?.includes('%#%') &&
+      g.max_page
+    ) {
+      const current = g.current_page ?? 1;
+      for (let n = current + 1; n <= Math.min(g.max_page, current + SITE_LIST_PAGES); n++)
         morePages.push(`${g.base.replace('%#%', String(n)).replace(/\/?$/, '/')}`);
     }
   }

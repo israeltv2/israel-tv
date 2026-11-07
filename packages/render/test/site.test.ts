@@ -190,6 +190,16 @@ describe('nothing private is published', () => {
     expect(out).toContain('[path]');
   });
 
+  test('credentials written without a web address are hidden too', () => {
+    const out = publicText(
+      'proxy user:secret@proxy.example.net:1080 refused; Authorization: Bearer sk_live_abcdefgh12345; ' +
+        'GET /x?token=abc123&ok=1 password=hunter22 socks5://u:p@h.example.org:1080 ' +
+        'https://user:pw@www.mako.co.il/x?ticket=SECRET',
+    );
+    expect(out).not.toMatch(/secret|sk_live|abc123|hunter22|u:p|user:pw|SECRET|proxy\.example|h\.example/);
+    expect(out).toContain('https://www.mako.co.il/x');
+  });
+
   test('times, ids and episode keys are left alone', () => {
     const s = 'at 2026-11-07T06:48:28.210Z iltv_mako_535:1:1 kan:830066 21:30:00 S1E4';
     expect(publicText(s)).toBe(s);

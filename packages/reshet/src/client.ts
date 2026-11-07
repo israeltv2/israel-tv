@@ -10,6 +10,7 @@ import {
   RESHET_ORIGIN,
   type ReshetIndexEntry,
   type ShowSitePage,
+  SITE_LIST_PAGES,
   type SiteEpisode,
   siteSeasons,
   untitledSeasonsByYear,
@@ -28,7 +29,10 @@ class PageMissing extends Error {
 }
 
 async function page(f: Fetcher, path: string): Promise<string> {
-  const r = await f.text(`${RESHET_ORIGIN}${path}`);
+  // Paths come from Reshet's own pages: only ever this site (a path like "@other.host/…" must not leave it).
+  const url = new URL(path, RESHET_ORIGIN);
+  if (url.origin !== RESHET_ORIGIN || !path.startsWith('/')) throw new Error(`${path}: not a Reshet page`);
+  const r = await f.text(url.toString());
   if (r.status === 404) throw new PageMissing(`${path}: HTTP 404`);
   if (r.status !== 200) throw new Error(`${path}: HTTP ${r.status}`);
   return r.body;
@@ -42,7 +46,7 @@ export interface ReshetOptions {
 }
 
 /** Most pages read from one show's site lists (a daily show's list runs to 26, 2026-11-07). */
-export const SITE_PAGE_LIMIT = 40;
+export const SITE_PAGE_LIMIT = SITE_LIST_PAGES;
 
 /**
  * A show's episodes from its own site page and the full-episode lists it links to, with their further pages. Always
@@ -91,6 +95,7 @@ async function readSitePages(
   const more = [...first.morePages];
   for (const list of first.lists) {
     if (list === show) continue;
+    if (reads >= SITE_PAGE_LIMIT) break;
     const p = await tryVisit(list);
     if (p) more.push(...p.morePages);
   }
