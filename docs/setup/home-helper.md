@@ -8,7 +8,7 @@ second link, next to the [Israel TV link](../../README.md#install).
 (NAS) or a small always-on computer like a Raspberry Pi (a Pi 3, 4 or 5 with the 64-bit system). A laptop works only while it is open, awake and at home —
 Keshet 12 stops when it sleeps or leaves the house.
 
-It takes about 15 minutes. Pick one way:
+It takes 15 minutes to an hour the first time. Pick one way:
 
 - **[The easy way: Docker](#the-easy-way-docker)** — copy one command.
 - **Ask an AI assistant to do it** — one that can use your computer's terminal (not a chat on your phone): give it
