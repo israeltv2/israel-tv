@@ -606,6 +606,11 @@ export function adminToken(config: Config, store: Store, env: NodeJS.ProcessEnv 
 
 export function adminApp(d: Daemon, token: string) {
   const app = new Hono<{ Bindings: { incoming: { socket: { remoteAddress?: string } } } }>();
+  // The owner's pages and answers are never indexed (refusals included), whatever finds them.
+  app.use('*', async (c, next) => {
+    await next();
+    c.header('x-robots-tag', 'noindex, nofollow');
+  });
   app.use('*', async (c, next) => {
     const addr = c.env?.incoming?.socket?.remoteAddress;
     if (!isLocalAddress(addr)) return c.text('admin endpoints are for the local network only', 403);

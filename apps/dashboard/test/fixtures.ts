@@ -1,6 +1,8 @@
 // A believable week for the dashboard's screenshots and design checks: every admin API answer, typed by the
-// contract (and checked against its schemas in fixtures.test.ts). Times are fixed around NOW; posters are
-// generated tiles served by the screenshot script (no broadcaster artwork in the repo).
+// contract (and checked against its schemas in fixtures.test.ts). Times are fixed around NOW; posters and logos are
+// generated tiles served by the screenshot script (no broadcaster artwork in the repo). The image cases are all here:
+// a poster, a channel logo (square), a show with no image of its own (a Kan show whose copy is not made yet), and an
+// image that is refused (`refused-*`: answered 403, as Kan's own images are outside Israel).
 import type { Responses } from '@israel-tv/admin-contract';
 
 export const NOW = Date.parse('2026-11-07T09:30:00Z');
@@ -19,22 +21,41 @@ const wave = (n: number, base: number, amp: number, phase = 0) =>
   );
 
 const month = days(30);
-const homePlays = wave(30, 9, 5);
+/** Counting began on these days: earlier days have no data (the chart hatches them). */
+const HOME_SINCE = 9;
+const PUBLIC_SINCE = 22;
+const homePlays = wave(30, 9, 5).map((n, i) => (i < HOME_SINCE ? 0 : n));
 const homeUnique = wave(30, 3, 1.5, 1);
 const homeFail = wave(30, 0.6, 1.2, 2);
-const publicPlays = wave(30, 46, 18, 0.5);
+const publicPlays = wave(30, 46, 18, 0.5).map((n, i) => (i < PUBLIC_SINCE ? 0 : n));
 const poster = (n: number) => `https://img.example/poster-${n}.svg`;
+const logo = (n: number) => ({ poster: `https://img.example/logo-${n}.svg`, posterShape: 'square' as const });
 
-const shows = [
+const shows: Responses['plays']['topShows'] = [
   { showId: 'iltv_mako_15', title: 'גלית ואילנית', source: 'mako', plays: 14, poster: poster(1) },
   { showId: 'iltv_reshet_150', title: 'חדשות היום', source: 'reshet', plays: 11, poster: poster(2) },
   { showId: 'iltv_mako_3', title: 'מאסטר שף', source: 'mako', plays: 9, poster: poster(3) },
-  { showId: 'iltv_kan_17', title: 'שעת נעילה', source: 'kan', plays: 7, poster: poster(4) },
-  { showId: 'iltv_live_kan11', title: 'כאן 11', source: 'live', plays: 6 },
+  // No image of its own yet: a tile with its first letter.
+  { showId: 'iltv_kan_17', title: 'שעת נעילה', source: 'kan', plays: 7 },
+  { showId: 'iltv_live_keshet12', title: 'קשת 12', source: 'live', plays: 6, ...logo(1) },
   { showId: 'iltv_reshet_41', title: 'הכוכב הבא', source: 'reshet', plays: 4, poster: poster(5) },
   { showId: 'iltv_mako_220', title: 'עובדה', source: 'mako', plays: 3, poster: poster(6) },
-  { showId: 'iltv_kan_52', title: 'הבורר', source: 'kan', plays: 2, poster: poster(7) },
+  // Its image does not load: the same tile.
+  {
+    showId: 'iltv_kan_52',
+    title: 'הבורר',
+    source: 'kan',
+    plays: 2,
+    poster: 'https://img.example/refused-1.jpg',
+  },
 ];
+const artOf = (showId: string) => {
+  const s = shows.find((x) => x.showId === showId);
+  return {
+    ...(s?.poster ? { poster: s.poster } : {}),
+    ...(s?.posterShape ? { posterShape: s.posterShape } : {}),
+  };
+};
 
 const canaryHistory = (fails: number[], unavailable: number[] = []) =>
   Array.from({ length: 14 }, (_, i) => ({
@@ -67,6 +88,7 @@ const playLines = [
     title: 'גלית ואילנית',
     latencyMs: 840,
     status: 200,
+    ...artOf('iltv_mako_15'),
   },
   {
     playId: 'pHS0MSBHvFJw',
@@ -78,6 +100,7 @@ const playLines = [
     title: 'חדשות היום',
     latencyMs: 1320,
     status: 200,
+    ...artOf('iltv_reshet_150'),
   },
   {
     playId: '1vBVjuqTAxOs',
@@ -89,6 +112,7 @@ const playLines = [
     title: 'גלית ואילנית',
     status: 403,
     reason: 'Mako master HTTP 403',
+    ...artOf('iltv_mako_15'),
   },
   {
     playId: 'ZvPkOnWRacs8',
@@ -106,10 +130,11 @@ const playLines = [
     at: ago(320),
     outcome: 'ok',
     source: 'live',
-    showId: 'iltv_live_kan11',
-    title: 'כאן 11',
+    showId: 'iltv_live_keshet12',
+    title: 'קשת 12',
     latencyMs: 610,
     status: 200,
+    ...artOf('iltv_live_keshet12'),
   },
   {
     playId: 'WFrFQ4V6ucTQ',
@@ -121,6 +146,7 @@ const playLines = [
     title: 'מאסטר שף',
     latencyMs: 990,
     status: 200,
+    ...artOf('iltv_mako_3'),
   },
 ];
 
@@ -158,11 +184,13 @@ export const FIXTURES: Responses = {
         failures: homeFail[i] ?? 0,
         minutes: (homePlays[i] ?? 0) * 7,
       })),
+      countedSince: month[HOME_SINCE] as string,
       topShows: shows.slice(0, 6),
     },
     public: {
       counted: true,
       lastDay: month[28] as string,
+      countedSince: month[PUBLIC_SINCE] as string,
       d7: { plays: 318, uniqueClients: 14, failures: 2, minutesWatched: 0 },
       d30: { plays: 1390, uniqueClients: 12, failures: 9, minutesWatched: 0 },
       perDay: month.map((day, i) => ({
@@ -301,6 +329,7 @@ export const FIXTURES: Responses = {
         {
           id: 'iltv_live_kan11',
           name: 'כאן 11',
+          ...logo(2),
           streams: [
             { title: 'כאן 11', via: 'direct', outcome: 'ok', statuses: '200/200/206' },
             { title: 'כאן 11 · כתוביות', via: 'direct', outcome: 'ok', statuses: '200/200/206' },
@@ -310,12 +339,14 @@ export const FIXTURES: Responses = {
         {
           id: 'iltv_live_keshet12',
           name: 'קשת 12',
+          ...logo(1),
           streams: [
             { title: 'קשת 12', via: 'helper', outcome: 'ok', statuses: '200/200/206' },
             { title: 'קשת 12 · גיבוי', via: 'helper', outcome: 'failed', detail: 'master HTTP 404' },
           ],
           guide: { at: ago(7 * 60), programmes: 0, error: 'HTTP 503' },
         },
+        // A channel without a logo of ours.
         { id: 'iltv_live_ynet', name: 'ynet', streams: [{ title: 'ynet', via: 'direct', outcome: 'ok' }] },
       ],
     },
@@ -338,7 +369,7 @@ export const FIXTURES: Responses = {
         poster: poster(2),
       },
       { episodeId: 'iltv_mako_3:12:4', title: 'מאסטר שף', plays: 4, source: 'mako', poster: poster(3) },
-      { episodeId: 'iltv_kan_17:1:3', title: 'שעת נעילה', plays: 3, source: 'kan', poster: poster(4) },
+      { episodeId: 'iltv_kan_17:1:3', title: 'שעת נעילה', plays: 3, source: 'kan' },
     ],
     firstPlaylistMs: { p50: 910, p95: 2340, n: 57 },
     latencyPerDay: days(14).map((day, i) => ({
@@ -446,6 +477,7 @@ export const FIXTURES: Responses = {
         showId: 'iltv_mako_15',
         episodeId: 'iltv_mako_15:9:47',
         title: 'גלית ואילנית',
+        ...artOf('iltv_mako_15'),
         segments: 0,
         bytes: 0,
       },
@@ -459,6 +491,17 @@ export const FIXTURES: Responses = {
         title: 'שעת נעילה',
         segments: 312,
         bytes: 418_000_000,
+      },
+      {
+        kind: 'relay',
+        playId: 'Qz7MNh4ByPEN',
+        since: ago(4),
+        source: 'live',
+        showId: 'iltv_live_keshet12',
+        title: 'קשת 12',
+        ...artOf('iltv_live_keshet12'),
+        segments: 42,
+        bytes: 61_000_000,
       },
     ],
   },
@@ -485,6 +528,13 @@ export const FIXTURES: Responses = {
         title: 'קופה ראשית',
         error: 'kept last good data: the show page lists no episodes (layout change?)',
         lastOkAt: ago(3000),
+      },
+      {
+        id: 'iltv_mako_220',
+        title: 'עובדה',
+        error: 'kept last good data: HTTP 503',
+        lastOkAt: ago(1500),
+        ...artOf('iltv_mako_220'),
       },
     ],
     cloudflare: {

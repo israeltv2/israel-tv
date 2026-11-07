@@ -38,6 +38,9 @@ export interface EventFilter {
   viewersOnly?: boolean;
 }
 
+/** The canary reports a title within this many seconds of asking for its stream (see retagCanaryPlays). */
+const CANARY_REPORT_S = 60;
+
 /** Kinds that count as a play. */
 const PLAY_KINDS = ['play_start', 'relay_session'] as const;
 
@@ -74,6 +77,7 @@ export class EventStore {
     const s = new EventStore(path, false, opts);
     migrate(s.db, { migrationsFolder: MIGRATIONS });
     s.retagProbes();
+    s.retagCanaryPlays();
     return s;
   }
 
@@ -87,6 +91,44 @@ export class EventStore {
       where kind = 'failure' and episode_id is not null and episode_id not glob '*?:*[0-9]:*[0-9]'
         and ${sql.raw(NOT_INTERNAL_SQL)}`);
     this.setMeta('fix:probe-ids', new Date().toISOString());
+  }
+
+  /**
+   * Once: before the canary's plays carried its `canary-` id, they were counted as a viewer's (a canary failing on
+   * a source fault then read as viewers' failures on the dashboard). Such a play is the one the canary reported a
+   * moment later for the same title; it gets the prefix now, and the days it fell on are rolled up again.
+   */
+  private retagCanaryPlays(): void {
+    if (this.getMeta('fix:canary-plays')) return;
+    const bound =
+      this.db.get<{ ts: string | null }>(
+        sql`select min(ts) as ts from ${t.events} where play_id like 'canary-%'`,
+      )?.ts ?? new Date().toISOString();
+    const ids = this.db
+      .all<{ id: string }>(sql`select distinct e.play_id as id from ${t.events} e join ${t.events} c
+        on c.kind = 'canary' and c.show_id = e.show_id and coalesce(c.episode_id, '') = coalesce(e.episode_id, '')
+          and c.ts >= e.ts and (julianday(c.ts) - julianday(e.ts)) * 86400 <= ${CANARY_REPORT_S}
+        where e.kind = 'stream_request' and e.ts < ${bound} and e.play_id is not null
+          and e.play_id not like 'canary-%' and e.play_id not like 'probe-%'`)
+      .map((r) => r.id);
+    const days = new Set<string>();
+    this.db.transaction((tx) => {
+      for (const id of ids) {
+        for (const r of tx.all<{ ts: string }>(sql`select ts from ${t.events} where play_id = ${id}`))
+          days.add(this.dayOf(r.ts));
+        tx.run(sql`update ${t.events} set play_id = 'canary-' || play_id where play_id = ${id}`);
+      }
+    });
+    const rolled = this.getMeta('rollup:last');
+    for (const day of [...days].sort()) {
+      if (!rolled || day > rolled) continue;
+      this.db
+        .delete(t.dailyUsage)
+        .where(and(eq(t.dailyUsage.day, day), eq(t.dailyUsage.origin, 'home')))
+        .run();
+      this.putDaily(this.homeDay(day));
+    }
+    this.setMeta('fix:canary-plays', JSON.stringify({ at: new Date().toISOString(), plays: ids.length }));
   }
 
   static openReadOnly(path: string, opts: EventStoreOptions = {}): EventStore {
@@ -251,6 +293,23 @@ export class EventStore {
         substr(coalesce(json_extract(detail, '$.reason'), ''), 1, 120) as reason, count(*) as n, max(ts) as last
       from ${t.events} where kind = 'failure' and ts >= ${since} and ${sql.raw(NOT_INTERNAL_SQL)}
       group by stage, status, reason order by n desc limit ${limit}`);
+  }
+
+  /**
+   * The first day `origin` was counted: the public addon's first daily total with any traffic (a total of zero is
+   * what a day read before counting was switched on looks like), or this home's first event or total, the older. Days before it have no data (not zero plays). Undefined when nothing yet.
+   */
+  countedSince(origin: 'home' | 'public'): string | undefined {
+    this.flush();
+    const daily =
+      this.db.get<{ day: string | null }>(
+        sql`select min(day) as day from ${t.dailyUsage}
+          where origin = ${origin} and (plays > 0 or unique_clients > 0 or failures > 0)`,
+      )?.day ?? undefined;
+    if (origin === 'public') return daily;
+    const first = this.db.get<{ ts: string | null }>(sql`select min(ts) as ts from ${t.events}`)?.ts;
+    const since = first ? this.dayOf(first) : undefined;
+    return [daily, since].filter((d): d is string => !!d).sort()[0];
   }
 
   /** Raw events per day (for the "events per day" figure). */

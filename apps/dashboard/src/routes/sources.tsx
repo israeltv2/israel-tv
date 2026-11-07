@@ -4,6 +4,7 @@ import { ActionButton } from '#components/actions.tsx';
 import { Ago, Empty, LoadError, PageHeader, SourceTag, When } from '#components/bits.tsx';
 import { CanaryStrip } from '#components/canary-strip.tsx';
 import { asHealth, HealthPill } from '#components/health.tsx';
+import { Poster } from '#components/poster.tsx';
 import { Badge } from '#components/ui/badge.tsx';
 import { Card, CardBody, CardHeader } from '#components/ui/card.tsx';
 import { Meter } from '#components/ui/progress.tsx';
@@ -361,43 +362,46 @@ function LiveChannels({ live }: { live: NonNullable<SourcesData['live']> }) {
       <CardBody>
         <ul className="divide-y divide-border">
           {live.channels.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
-              <div className="min-w-0">
-                <div className="font-medium">
-                  <bdi>{c.name}</bdi>
-                </div>
-                <div className="text-muted text-xs">
-                  {c.guide ? (
-                    c.guide.error ? (
-                      <span className="text-[var(--error)]">Guide: last read failed ({c.guide.error})</span>
+            <li key={c.id} className="flex items-start gap-3 py-2">
+              <Poster art={c} source="live" title={c.name} className="w-8" />
+              <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium">
+                    <bdi>{c.name}</bdi>
+                  </div>
+                  <div className="text-muted text-xs">
+                    {c.guide ? (
+                      c.guide.error ? (
+                        <span className="text-[var(--error)]">Guide: last read failed ({c.guide.error})</span>
+                      ) : (
+                        <>
+                          Guide: {num(c.guide.programmes)} programmes ahead
+                          {c.guide.until ? (
+                            <>
+                              , until <When iso={c.guide.until} />
+                            </>
+                          ) : null}
+                        </>
+                      )
                     ) : (
-                      <>
-                        Guide: {num(c.guide.programmes)} programmes ahead
-                        {c.guide.until ? (
-                          <>
-                            , until <When iso={c.guide.until} />
-                          </>
-                        ) : null}
-                      </>
-                    )
+                      'No guide (the broadcaster publishes none we read)'
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap justify-end gap-1">
+                  {c.streams.length ? (
+                    c.streams.map((x) => (
+                      <span key={`${x.via}:${x.title}`} title={x.detail ?? x.statuses ?? ''}>
+                        <HealthPill
+                          state={STREAM_STATE[x.outcome] ?? 'unknown'}
+                          label={x.via === 'helper' ? `helper: ${x.title}` : x.title}
+                        />
+                      </span>
+                    ))
                   ) : (
-                    'No guide (the broadcaster publishes none we read)'
+                    <Badge>not checked</Badge>
                   )}
                 </div>
-              </div>
-              <div className="flex flex-wrap justify-end gap-1">
-                {c.streams.length ? (
-                  c.streams.map((x) => (
-                    <span key={`${x.via}:${x.title}`} title={x.detail ?? x.statuses ?? ''}>
-                      <HealthPill
-                        state={STREAM_STATE[x.outcome] ?? 'unknown'}
-                        label={x.via === 'helper' ? `helper: ${x.title}` : x.title}
-                      />
-                    </span>
-                  ))
-                ) : (
-                  <Badge>not checked</Badge>
-                )}
               </div>
             </li>
           ))}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActionButton } from '#components/actions.tsx';
 import { Ago, CopyCommand, Empty, LoadError, PageHeader, SourceTag, Title, When } from '#components/bits.tsx';
 import { HealthPill } from '#components/health.tsx';
+import { Poster } from '#components/poster.tsx';
 import { Card, CardBody, CardHeader } from '#components/ui/card.tsx';
 import { Skeleton } from '#components/ui/skeleton.tsx';
 import { useApi } from '#lib/api.ts';
@@ -207,17 +208,20 @@ export function Deploys() {
           {d.failingShows.length ? (
             <ul className="divide-y divide-border">
               {d.failingShows.map((s) => (
-                <li key={s.id} className="py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <Title className="font-medium">{s.title}</Title>
-                    <span className="shrink-0 font-mono text-muted text-xs">{s.id}</span>
+                <li key={s.id} className="flex items-start gap-3 py-2">
+                  <Poster art={s} source={s.id.split('_')[1]} title={s.title} className="w-8" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Title className="font-medium">{s.title}</Title>
+                      <span className="shrink-0 font-mono text-muted text-xs">{s.id}</span>
+                    </div>
+                    <p className="break-words text-xs" style={{ color: 'var(--error)' }}>
+                      {s.error}
+                    </p>
+                    <p className="text-muted text-xs">
+                      last good read <Ago iso={s.lastOkAt} />
+                    </p>
                   </div>
-                  <p className="break-words text-xs" style={{ color: 'var(--error)' }}>
-                    {s.error}
-                  </p>
-                  <p className="text-muted text-xs">
-                    last good read <Ago iso={s.lastOkAt} />
-                  </p>
                 </li>
               ))}
             </ul>

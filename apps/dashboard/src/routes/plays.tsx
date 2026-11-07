@@ -90,7 +90,7 @@ export function Plays() {
             <ol className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
               {p.topShows.map((s) => (
                 <li key={s.showId} className="min-w-0">
-                  <Poster url={s.poster} source={s.source} className="w-full" />
+                  <Poster art={s} source={s.source} title={s.title} className="w-full" />
                   <Title className="mt-1.5 block font-medium text-sm">{s.title ?? s.showId}</Title>
                   <div className="flex items-center justify-between gap-2">
                     <SourceTag source={s.source} />
@@ -114,7 +114,7 @@ export function Plays() {
                   const [, season, episode] = e.episodeId.split(':');
                   return (
                     <li key={e.episodeId} className="flex items-center gap-3 py-2">
-                      <Poster url={e.poster} source={e.source} className="w-7" />
+                      <Poster art={e} source={e.source} title={e.title} className="w-7" />
                       <div className="min-w-0 flex-1">
                         <Title className="block font-medium">{e.title ?? e.episodeId}</Title>
                         <span className="num text-muted text-xs">

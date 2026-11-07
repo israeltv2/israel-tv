@@ -4,6 +4,7 @@ import { Radio } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Ago, Empty, PageHeader, SourceTag, Title } from '#components/bits.tsx';
 import { HealthPill } from '#components/health.tsx';
+import { Poster } from '#components/poster.tsx';
 import { Badge } from '#components/ui/badge.tsx';
 import { Card } from '#components/ui/card.tsx';
 import { get, subscribeLive } from '#lib/api.ts';
@@ -51,8 +52,9 @@ export function LiveNow() {
           {sessions.map((s) => (
             <li key={s.playId}>
               <Card className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex items-start gap-3">
+                  <Poster art={s} source={s.source} title={s.title} className="w-12" />
+                  <div className="min-w-0 flex-1">
                     <Title className="block font-semibold">{s.title ?? s.showId ?? s.playId}</Title>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-muted text-xs">
                       <SourceTag source={s.source} />
