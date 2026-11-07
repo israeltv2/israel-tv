@@ -24,19 +24,26 @@ import {
   zonedDay,
 } from '@israel-tv/core';
 import {
+  type AppItem,
+  appCategoryUrl,
+  appEpisode,
+  appProgramUrl,
   classifyEpisodePage,
   cleanKanTitle,
   createChromeLoader,
   isChallenge,
+  KAN_APP_CATEGORIES,
   type KanEpisode,
   type LoadedPage,
   type LoadOptions,
   type PageLoader,
+  parseAppCategory,
+  parseAppProgram,
   parseLobby,
   parseLobbyPosters,
   parseShowPage,
 } from '@israel-tv/kan';
-import type { ProxyEndpoint } from '@israel-tv/net';
+import { createGeoFetch, type ProxyEndpoint } from '@israel-tv/net';
 import type { Store } from '@israel-tv/store';
 import { KAN_GUIDE_CHANNELS, parseKanGuide, storeGuide } from './epg.ts';
 import { latestAirDate } from './runner.ts';
@@ -99,6 +106,8 @@ interface ShowState {
   failed: string[];
   /** Episode pages that are trailers, not episodes; kept so they never re-enter the queue. */
   skipped?: string[];
+  /** The show's id in Kan's app API when its page address has none (kankids slugs), from the app's category lists. */
+  appId?: string;
   /** Episode pages whose video Kan took down (broadcast rights ended); counted on /status, never queued again. */
   removed?: string[];
   /** Pages linked among the episodes that hold no video (articles, promos); likewise. */
@@ -168,6 +177,8 @@ const CONNECTION_DOWN =
  */
 const MAX_EPISODE_TRIES = 3;
 const RETRY_GAP_MS = 12 * HOUR_MS;
+/** At most this many app-named episodes per slice (each costs one master-playlist check on Kan's CDN). */
+const MAX_STREAM_CHECKS = 400;
 
 /** Listing pages (lobbies, show pages) and episode pages are compared only with their own kind. */
 type Kind = 'listing' | 'episode';
@@ -205,6 +216,12 @@ export interface KanCrawlOptions {
   artworkDir?: string;
   /** The browser profile kept between slices (Cloudflare's clearance lives in its cookies). */
   profileDir?: string;
+  /** Read episode lists from Kan's app API (default true): one request per show instead of a page per episode. */
+  appApi?: boolean;
+  /** Whether a stream's master playlist answers (test seam; default: a GET through the geo proxy). */
+  streamPlays?: (url: string) => Promise<boolean>;
+  /** App-named episodes per slice (default MAX_STREAM_CHECKS). */
+  maxStreamChecks?: number;
   /** Read Kan's live programme guide pages too (default true). */
   guide?: boolean;
 }
@@ -439,6 +456,92 @@ export async function crawlKan(
     if (failureOf(err) === 'outage') throw err;
   };
 
+  // Kan's app API (docs/decisions.md "Kan's app API"): a show's whole episode list in one request. Used only to
+  // name episodes the crawl would read anyway, in the same order; ids, seasons and numbers come out as the pages give.
+  const useApp = opts.appApi !== false;
+  /** JSON from the app API through the same session and pacing as a page; undefined when it is not usable. */
+  const loadJson = async (url: string): Promise<unknown> => {
+    if (!useApp) return undefined;
+    if (pages > 0) await sleep(opts.pageIntervalMs);
+    try {
+      loader ??= await createChromeLoader(
+        opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
+        opts.proxy,
+        opts.profileDir ? { profileDir: opts.profileDir } : {},
+      );
+    } catch (err) {
+      throw new KanLoadError(`browser did not start: ${firstLine(err)}`, 'outage');
+    }
+    if (!loader.text) return undefined;
+    pages++;
+    let r: Awaited<ReturnType<NonNullable<PageLoader['text']>>>;
+    try {
+      r = await loader.text(url);
+    } catch (err) {
+      const message = `${url}: ${firstLine(err)}`;
+      if (CONNECTION_DOWN.test(message)) throw new KanLoadError(message, 'outage');
+      appProblems.push(message);
+      return undefined;
+    }
+    tally({ status: r.status, html: '', challenged: r.challenged });
+    if (r.challenged || r.status === 403 || r.status === 407)
+      throw new KanLoadError(`${url}: ${r.challenged ? BOT_CHECK : `HTTP ${r.status}`}`, 'outage');
+    if (r.status !== 200) {
+      appProblems.push(`${url}: HTTP ${r.status}`);
+      return undefined;
+    }
+    try {
+      return JSON.parse(r.body);
+    } catch {
+      appProblems.push(`${url}: not JSON`);
+      return undefined;
+    }
+  };
+  /** Problems with the app API in this slice (the crawl falls back to pages; one warning at the end). */
+  const appProblems: string[] = [];
+  /** Episodes named from the app API in this slice (no page read). */
+  let fromApp = 0;
+  /** Stream checks made in this slice (each one small GET of a master playlist on Kan's CDN). */
+  let streamChecks = 0;
+  const geo = opts.streamPlays ? undefined : createGeoFetch(opts.proxy ? [opts.proxy] : []);
+  /** A Redge master playlist that answers: the proof that the app's entry is the stream the page would play. */
+  const streamPlays =
+    opts.streamPlays ??
+    (async (url: string) => {
+      try {
+        const r = await (geo as NonNullable<typeof geo>)(url, { signal: AbortSignal.timeout(20_000) });
+        if (r.status !== 200) {
+          await r.body?.cancel();
+          return false;
+        }
+        const body = await r.text();
+        return body.startsWith('#EXTM3U');
+      } catch {
+        return false;
+      }
+    });
+  /** A show's episodes in the app API by Kan's page id (all pages of the list), or undefined. */
+  const appFeed = async (key: string, s: ShowState): Promise<Map<string, AppItem> | undefined> => {
+    const programId = /\/p-(\d+)\/$/.exec(key)?.[1] ?? s.appId;
+    if (!programId || !useApp) return undefined;
+    const items = new Map<string, AppItem>();
+    for (let from = 1, n = 0; n < 10; n++) {
+      const json = await loadJson(appProgramUrl(programId, from));
+      if (json === undefined) return items.size > 0 ? items : undefined;
+      let page: ReturnType<typeof parseAppProgram>;
+      try {
+        page = parseAppProgram(json);
+      } catch (err) {
+        appProblems.push(`${appProgramUrl(programId, from)}: ${firstLine(err)}`);
+        return undefined;
+      }
+      for (const item of page.items) items.set(item.id, item);
+      if (!page.full) break;
+      from += page.items.length;
+    }
+    return items;
+  };
+
   try {
     // 1. Lobbies, once a day — and whenever a show's poster has no saved copy yet (copies are made from the
     // lobby, which shows them all: Kan refuses its share images).
@@ -524,6 +627,23 @@ export async function crawlKan(
             show.artTriedAt = new Date(now).toISOString();
       }
       log(`kan: ${Object.keys(state.shows).length} shows known`);
+      // Shows whose address has no numeric id (kankids slugs) get their app id from the app's category lists.
+      const slugs = Object.entries(state.shows).filter(([k, s]) => !/\/p-\d+\/$/.test(k) && !s.appId);
+      if (slugs.length > 0)
+        for (const category of KAN_APP_CATEGORIES) {
+          if (pages >= opts.pagesPerRun) break;
+          const json = await loadJson(appCategoryUrl(category));
+          if (json === undefined) continue;
+          try {
+            const { shows } = parseAppCategory(json);
+            for (const [k, s] of slugs) {
+              const id = shows.get(k);
+              if (id) s.appId = id;
+            }
+          } catch (err) {
+            appProblems.push(`${appCategoryUrl(category)}: ${firstLine(err)}`);
+          }
+        }
     }
 
     // 1b. One live-guide page per slice when one is due: today's and tomorrow's schedule of each Kan channel.
@@ -674,8 +794,20 @@ export async function crawlKan(
     for (const [key, s] of queue) {
       const seriesId = store.findSeriesId('kan', key);
       const batch: BatchItem[] = [];
+      // The show's app list, read once (only when it has episodes waiting and the slice has room for it).
+      const listed = s.pending.length > 0 && pages < opts.pagesPerRun ? await appFeed(key, s) : undefined;
+      // Trusted only where it agrees with what the pages gave this show (measured: the app's season differs from
+      // the page player's for some shows, e.g. "s8" in the app where the page has no season, stored as 1).
+      const trusted = () =>
+        !!listed &&
+        appAgrees(
+          store,
+          seriesId,
+          listed,
+          batch.map((b) => ({ ...b.episode, season: b.season ?? 1 })),
+        );
       try {
-        while (s.pending.length > 0 && pages < opts.pagesPerRun) {
+        while (s.pending.length > 0) {
           const url = s.pending[0] as string;
           // Kan episodes are numbered in reading order (page-id order), so never read past a gap: a failing page
           // stays first, the show pauses, and the page is tried again later; only after several tries is it
@@ -696,6 +828,30 @@ export async function crawlKan(
             warn(seriesId, `Kan episode ${url}: ${message} (${outcome})`);
             return goOn;
           };
+          // Named by the app: its Kaltura entry gives the page's Redge stream when that stream answers (where the
+          // page plays another asset, the derived address answers 404: measured), else the page is read as before.
+          const item = listed?.get(/(\d+)\/$/.exec(url)?.[1] ?? '');
+          const named =
+            item?.stream.kind === 'redge' &&
+            !!item.title &&
+            streamChecks < (opts.maxStreamChecks ?? MAX_STREAM_CHECKS) &&
+            trusted();
+          if (named) streamChecks++;
+          if (named && item?.stream.kind === 'redge' && (await streamPlays(item.stream.url))) {
+            const e = appEpisode({ ...item, stream: item.stream });
+            delete s.retry?.[url];
+            s.pending.shift();
+            if (isTrailer(e.title)) {
+              s.skipped = [...new Set([...(s.skipped ?? []), url])];
+              if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
+              continue;
+            }
+            batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
+            fromApp++;
+            continue;
+          }
+          // Only a page read costs the slice's page budget.
+          if (pages >= opts.pagesPerRun) break;
           let page: ReturnType<typeof classifyEpisodePage>;
           try {
             page = classifyEpisodePage(await load(url, 'episode'), origin(url), url);
@@ -780,7 +936,12 @@ export async function crawlKan(
     const pendingTotal = shows.reduce((n, s) => n + s.pending.length, 0);
     // Shows paused on an episode page that failed: visible on /status for as long as they wait.
     const waitingShows = shows.filter((s) => s.pending[0] && s.retry?.[s.pending[0]]).length;
-    note = `${pages} pages, +${newEpisodes} episodes, ${pendingTotal} episode pages still to read`;
+    note = `${pages} pages, +${newEpisodes} episodes (${fromApp} named by the app API), ${pendingTotal} episode pages still to read`;
+    if (appProblems.length > 0)
+      warn(
+        null,
+        `Kan app API: ${appProblems.length} ${appProblems.length === 1 ? 'request' : 'requests'} not usable, read from the pages instead (e.g. ${appProblems[0]})`,
+      );
     const issues = [
       ...(problems > 0 ? [`${problems} Kan pages could not be read`] : []),
       ...(waitingShows > 0 ? [`${waitingShows} Kan shows wait to retry an episode page`] : []),
@@ -1034,6 +1195,47 @@ export function kanArtwork(store: Store, dir: string): Map<string, string> {
 /** Pages and images loaded per day and how many met Kan's bot check (newest last). */
 export function kanBotCheck(store: Pick<Store, 'getState'>): Record<string, BotCheckDay> {
   return store.getState<CrawlState>(STATE_KEY)?.botCheck ?? {};
+}
+
+/** Stored episodes of a show that must agree with its app list before the app names any of its new episodes. */
+export const APP_AGREEMENT = 2;
+
+/**
+ * Whether a show's app list says what its pages said: at least APP_AGREEMENT of its stored episodes are listed, and
+ * every listed one has the same title, season and stream (and day, when both have one). A show without that evidence (new,
+ * or the app disagrees) reads its pages, as before.
+ */
+export function appAgrees(
+  store: Pick<Store, 'getShow'>,
+  seriesId: string | undefined,
+  feed: Map<string, AppItem>,
+  /** Episodes read from pages in this slice, not stored yet. */
+  read: {
+    key: string;
+    title: string;
+    season: number;
+    airDate?: string | undefined;
+    streams: { url: string }[];
+  }[] = [],
+): boolean {
+  const show = seriesId ? store.getShow(seriesId)?.show : undefined;
+  const stored = (show?.seasons ?? []).flatMap((x) =>
+    x.episodes.map((e) => ({ ...e, season: Number(/\|s(\d+)$/.exec(x.key)?.[1] ?? Number.NaN) })),
+  );
+  let agree = 0;
+  for (const e of [...stored, ...read]) {
+    const item = feed.get(e.key.replace(/^kan:/, ''));
+    if (!item) continue;
+    // Where the app names a stream, it must be the one the page played (some shows' pages play other assets).
+    const same =
+      item.title === e.title &&
+      (item.seasonNumber ?? 1) === e.season &&
+      (!item.published || !e.airDate || item.published === e.airDate) &&
+      (item.stream.kind !== 'redge' || item.stream.url === e.streams[0]?.url);
+    if (!same) return false;
+    agree++;
+  }
+  return agree >= APP_AGREEMENT;
 }
 
 /** Episode pages skipped because Kan took the video down (rights ended) or the page holds no video. */

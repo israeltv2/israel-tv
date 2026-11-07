@@ -1,0 +1,633 @@
+{
+  "title": "אינתיפאדה",
+  "type": {
+    "value": "feed"
+  },
+  "entry": [
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/tlyntlqn/640x360-169-with-logo_אינתיפאדה.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-729641/s1/729643/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=729641&subid=729658",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 729641,
+          "show_name": "אינתיפאדה",
+          "cq_id": "S0377369",
+          "kantar_content_id": "S0377369",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": "דוקו",
+          "season": 1,
+          "episode_number": 1,
+          "episode_title": "בלו הול",
+          "duration": "00:52:58",
+          "program_type": "טלויזיה",
+          "program_genre": "דוקו",
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "אינתיפאדה | פרק 1 - בלו הול",
+          "item_author": "",
+          "content_id": "729641",
+          "content_program": "אינתיפאדה",
+          "content_tvShow": "אינתיפאדה",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": "דוקו",
+          "content_season": "1",
+          "content_episodeTitle": "בלו הול",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "1",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "27-09-2025",
+          "content_customDimension_8": "S0377369"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "פרק 1 - בלו הול",
+          "description": "תקרית אש במחנה הפליטים ג'בליה ב-1987, מובילה לפרוץ האינתיפאדה הראשונה",
+          "show_name": "אינתיפאדה"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 52,
+        "duration_length": "52:58",
+        "duration_date": "27.03.24 | 52",
+        "mainid": "S0377369"
+      },
+      "programId": "729641",
+      "id": "729643",
+      "title": "פרק 1 - בלו הול",
+      "description": "תקרית אש במחנה הפליטים ג'בליה ב-1987, מובילה לפרוץ האינתיפאדה הראשונה",
+      "summary": "תקרית אש במחנה הפליטים ג'בליה ב-1987, מובילה לפרוץ האינתיפאדה הראשונה",
+      "published": "2024-03-27T13:18:58+02:00",
+      "updated": "29.9.2025 17:11:36",
+      "published_date": "13:18",
+      "credit": "‏29 בספטמבר 2025",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-729641/s1/729643/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/a1vjowg0/לאתר.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/a1vjowg0/לאתר.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/a1vjowg0/לאתר.jpg?rxy=0.40465936106882494,0.35954604489137854&width=480&height=480&v=1dc2aebd423cf30",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/a1vjowg0/לאתר.jpg?rxy=0.40465936106882494,0.35954604489137854&width=468&v=1dc2aebd423cf30",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/a1vjowg0/לאתר.jpg?rxy=0.40465936106882494,0.35954604489137854&width=480&height=480&v=1dc2aebd423cf30&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/a1vjowg0/לאתר.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "video"
+      },
+      "content": {
+        "type": "video/hls",
+        "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_mfyi68r9/format/applehttp/protocol/https/desiredFileName.m3u8",
+        "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_mfyi68r9/format/applehttp/protocol/https/desiredFileName.m3u8"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/tlyntlqn/640x360-169-with-logo_אינתיפאדה.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-729641/s1/729658/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=729641&subid=729659",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 729641,
+          "show_name": "אינתיפאדה",
+          "cq_id": "S0377370",
+          "kantar_content_id": "S0377370",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": "דוקו",
+          "season": 1,
+          "episode_number": 2,
+          "episode_title": "ליל האלות השבורות",
+          "duration": "00:55:26",
+          "program_type": "טלויזיה",
+          "program_genre": "דוקו",
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "אינתיפאדה | פרק 2 - ליל האלות השבורות",
+          "item_author": "",
+          "content_id": "729641",
+          "content_program": "אינתיפאדה",
+          "content_tvShow": "אינתיפאדה",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": "דוקו",
+          "content_season": "1",
+          "content_episodeTitle": "ליל האלות השבורות",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "2",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "28-09-2025",
+          "content_customDimension_8": "S0377370"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "פרק 2 - ליל האלות השבורות",
+          "description": "אירועי האלימות מתרחבים וישראל מתמודדת לראשונה עם התקוממות עממית רחבה",
+          "show_name": "אינתיפאדה"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 55,
+        "duration_length": "55:26",
+        "duration_date": "27.03.24 | 55",
+        "mainid": "S0377370"
+      },
+      "programId": "729641",
+      "id": "729658",
+      "title": "פרק 2 - ליל האלות השבורות",
+      "description": "אירועי האלימות מתרחבים וישראל מתמודדת לראשונה עם התקוממות עממית רחבה",
+      "summary": "אירועי האלימות מתרחבים וישראל מתמודדת לראשונה עם התקוממות עממית רחבה",
+      "published": "2024-03-27T14:01:48+02:00",
+      "updated": "29.9.2025 17:11:42",
+      "published_date": "14:01",
+      "credit": "‏29 בספטמבר 2025",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-729641/s1/729658/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/kghf5m3m/לאתר.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/kghf5m3m/לאתר.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/kghf5m3m/לאתר.jpg?rxy=0.34474764914612194,0.4031205063836586&width=480&height=480&v=1dc2aebfd729ba0",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/kghf5m3m/לאתר.jpg?rxy=0.34474764914612194,0.4031205063836586&width=468&v=1dc2aebfd729ba0",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/kghf5m3m/לאתר.jpg?rxy=0.34474764914612194,0.4031205063836586&width=480&height=480&v=1dc2aebfd729ba0&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/kghf5m3m/לאתר.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "video"
+      },
+      "content": {
+        "type": "video/hls",
+        "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_uirvwdd8/format/applehttp/protocol/https/desiredFileName.m3u8",
+        "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_uirvwdd8/format/applehttp/protocol/https/desiredFileName.m3u8"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/tlyntlqn/640x360-169-with-logo_אינתיפאדה.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-729641/s1/729659/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=729641&subid=945437",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 729641,
+          "show_name": "אינתיפאדה",
+          "cq_id": "S0377371",
+          "kantar_content_id": "S0377371",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": "דוקו",
+          "season": 1,
+          "episode_number": 3,
+          "episode_title": "לרוצץ את ראש הנחש",
+          "duration": "00:49:32",
+          "program_type": "טלויזיה",
+          "program_genre": "דוקו",
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "אינתיפאדה | פרק 3 - לרוצץ את ראש הנחש",
+          "item_author": "",
+          "content_id": "729641",
+          "content_program": "אינתיפאדה",
+          "content_tvShow": "אינתיפאדה",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": "דוקו",
+          "content_season": "1",
+          "content_episodeTitle": "לרוצץ את ראש הנחש",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "3",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "30-09-2025",
+          "content_customDimension_8": "S0377371"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "פרק 3 - לרוצץ את ראש הנחש",
+          "description": "ישראל מקימה את יחידות המסתערבים והפלסטינים פונים לטרור \"מקצועי\"",
+          "show_name": "אינתיפאדה"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 49,
+        "duration_length": "49:32",
+        "duration_date": "27.03.24 | 49",
+        "mainid": "S0377371"
+      },
+      "programId": "729641",
+      "id": "729659",
+      "title": "פרק 3 - לרוצץ את ראש הנחש",
+      "description": "ישראל מקימה את יחידות המסתערבים והפלסטינים פונים לטרור \"מקצועי\"",
+      "summary": "ישראל מקימה את יחידות המסתערבים והפלסטינים פונים לטרור \"מקצועי\"",
+      "published": "2024-03-27T14:02:52+02:00",
+      "updated": "30.9.2025 21:19:35",
+      "published_date": "14:02",
+      "credit": "‏30 בספטמבר 2025",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-729641/s1/729659/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/pctlihjb/אינתיפדה-פרק-3.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/pctlihjb/אינתיפדה-פרק-3.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/pctlihjb/אינתיפדה-פרק-3.jpg?width=480&height=480&v=1dc315edc78e6b0",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/pctlihjb/אינתיפדה-פרק-3.jpg?width=468&v=1dc315edc78e6b0",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/pctlihjb/אינתיפדה-פרק-3.jpg?width=480&height=480&v=1dc315edc78e6b0&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/pctlihjb/אינתיפדה-פרק-3.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "video"
+      },
+      "content": {
+        "type": "video/hls",
+        "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_jaw2d263/format/applehttp/protocol/https/desiredFileName.m3u8",
+        "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_jaw2d263/format/applehttp/protocol/https/desiredFileName.m3u8"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/tlyntlqn/640x360-169-with-logo_אינתיפאדה.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-729641/s1/945437/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=729641&subid=934022",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 729641,
+          "show_name": "אינתיפאדה",
+          "cq_id": "S0377372",
+          "kantar_content_id": "S0377372",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": "דוקו",
+          "season": 1,
+          "episode_number": 4,
+          "episode_title": "להוציא את עזה מתל אביב",
+          "duration": "00:54:42",
+          "program_type": "טלויזיה",
+          "program_genre": "דוקו",
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "אינתיפאדה | פרק 4 - להוציא את עזה מתל אביב",
+          "item_author": "",
+          "content_id": "729641",
+          "content_program": "אינתיפאדה",
+          "content_tvShow": "אינתיפאדה",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": "דוקו",
+          "content_season": "1",
+          "content_episodeTitle": "להוציא את עזה מתל אביב",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "4",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "30-09-2025",
+          "content_customDimension_8": "S0377372"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "פרק 4 - להוציא את עזה מתל אביב",
+          "description": "האינתיפאדה חודרת את תחומי הקו הירוק דרך שורה של פיגועי טרור קשים",
+          "show_name": "אינתיפאדה"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 54,
+        "duration_length": "54:42",
+        "duration_date": "26.08.25 | 54",
+        "mainid": "S0377372"
+      },
+      "programId": "729641",
+      "id": "945437",
+      "title": "פרק 4 - להוציא את עזה מתל אביב",
+      "description": "האינתיפאדה חודרת את תחומי הקו הירוק דרך שורה של פיגועי טרור קשים",
+      "summary": "האינתיפאדה חודרת את תחומי הקו הירוק דרך שורה של פיגועי טרור קשים",
+      "published": "2025-08-26T14:14:27+03:00",
+      "updated": "30.10.2025 11:50:38",
+      "published_date": "14:14",
+      "credit": "‏30 באוקטובר 2025",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-729641/s1/945437/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/ny0notsf/פרק-4-חדש.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ny0notsf/פרק-4-חדש.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ny0notsf/פרק-4-חדש.jpg?width=480&height=480&v=1dc323171625bd0",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ny0notsf/פרק-4-חדש.jpg?width=468&v=1dc323171625bd0",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ny0notsf/פרק-4-חדש.jpg?width=480&height=480&v=1dc323171625bd0&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ny0notsf/פרק-4-חדש.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "video"
+      },
+      "content": {
+        "type": "video/hls",
+        "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_hvso15l5/format/applehttp/protocol/https/desiredFileName.m3u8",
+        "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_hvso15l5/format/applehttp/protocol/https/desiredFileName.m3u8"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/tlyntlqn/640x360-169-with-logo_אינתיפאדה.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-729641/934022/",
+        "play_next_feed_url": "",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 729641,
+          "show_name": "אינתיפאדה",
+          "cq_id": null,
+          "kantar_content_id": null,
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": "דוקו",
+          "season": 0,
+          "episode_number": 0,
+          "episode_title": "טריילר",
+          "duration": "00:00:51",
+          "program_type": "טלויזיה",
+          "program_genre": "דוקו",
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "אינתיפאדה | טריילר",
+          "item_author": "",
+          "content_id": "729641",
+          "content_program": "אינתיפאדה",
+          "content_tvShow": "אינתיפאדה",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": "דוקו",
+          "content_season": "0",
+          "content_episodeTitle": "טריילר",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "0",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "25-09-2025",
+          "content_customDimension_8": null
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "טריילר",
+          "description": "החיילים ששירתו באותם ימים מדממים חוזרים לתקופת האינתיפאדה",
+          "show_name": "אינתיפאדה"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": null,
+        "duration_length": "51",
+        "duration_date": "22.07.25 | ",
+        "mainid": null
+      },
+      "programId": "729641",
+      "id": "934022",
+      "title": "טריילר",
+      "description": "החיילים ששירתו באותם ימים מדממים חוזרים לתקופת האינתיפאדה",
+      "summary": "החיילים ששירתו באותם ימים מדממים חוזרים לתקופת האינתיפאדה",
+      "published": "2025-07-22T13:26:33+03:00",
+      "updated": "19.11.2025 17:20:33",
+      "published_date": "13:26",
+      "credit": "‏19 בנובמבר 2025",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-729641/934022/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/1nynni5n/אינתיפאדה-הצצה.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/1nynni5n/אינתיפאדה-הצצה.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/1nynni5n/אינתיפאדה-הצצה.jpg?width=480&height=480&v=1dc0a13454553e0",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/1nynni5n/אינתיפאדה-הצצה.jpg?width=468&v=1dc0a13454553e0",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/1nynni5n/אינתיפאדה-הצצה.jpg?width=480&height=480&v=1dc0a13454553e0&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/1nynni5n/אינתיפאדה-הצצה.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "video"
+      },
+      "content": {
+        "type": "video/hls",
+        "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId//format/applehttp/protocol/https/desiredFileName.m3u8",
+        "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId//format/applehttp/protocol/https/desiredFileName.m3u8"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    }
+  ]
+}

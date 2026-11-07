@@ -1,0 +1,1133 @@
+{
+  "title": "אירוויזיון 2026 - השיר של ישראל",
+  "type": {
+    "value": "feed"
+  },
+  "entry": [
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007369/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=1006421&subid=1007199",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "S0563788_item1",
+          "kantar_content_id": "S0563788_item1",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 1,
+          "episode_title": "New Day Will Rise - נועם בתן ויובל רפאל",
+          "duration": "00:03:00",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "New Day Will Rise - נועם בתן ויובל רפאל",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "New Day Will Rise - נועם בתן ויובל רפאל",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "1",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "05-03-2026",
+          "content_customDimension_8": "S0563788_item1"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "New Day Will Rise - נועם בתן ויובל רפאל",
+          "description": "יובל רפאל מבצעת את \"New Day Will Rise\" עם נועם בתן, הנציג שלנו ל-2026",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 3,
+        "duration_length": "3:00",
+        "duration_date": "05.03.26 | 3",
+        "mainid": "S0563788_item1"
+      },
+      "programId": "1006421",
+      "id": "1007369",
+      "title": "New Day Will Rise - נועם בתן ויובל רפאל",
+      "description": "יובל רפאל מבצעת את \"New Day Will Rise\" עם נועם בתן, הנציג שלנו ל-2026",
+      "summary": "יובל רפאל מבצעת את \"New Day Will Rise\" עם נועם בתן, הנציג שלנו ל-2026",
+      "published": "2026-03-05T20:26:11+02:00",
+      "updated": "5.3.2026 21:48:24",
+      "published_date": "20:26",
+      "credit": "‏05 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007369/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/nz2ficlw/ndwr.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nz2ficlw/ndwr.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nz2ficlw/ndwr.jpg?width=480&height=480&v=1dcace891434f90",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nz2ficlw/ndwr.jpg?width=468&v=1dcace891434f90",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nz2ficlw/ndwr.jpg?width=480&height=480&v=1dcace891434f90&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nz2ficlw/ndwr.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "youtube"
+      },
+      "content": {
+        "type": "youtube-id",
+        "src": "pEQ4w8UzIiM",
+        "teaser": "pEQ4w8UzIiM"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007199/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=1006421&subid=1007413",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "s0563788_item2",
+          "kantar_content_id": "s0563788_item2",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 2,
+          "episode_title": "תגידו קצר",
+          "duration": "00:05:09",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "מה שתגידו | ספיישל אירווזיון 2026",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "תגידו קצר",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "2",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "05-03-2026",
+          "content_customDimension_8": "s0563788_item2"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "תגידו קצר",
+          "description": "האנשים הכי חריפים במדינה פותחים את הפה על האירוויזיון",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 5,
+        "duration_length": "5:09",
+        "duration_date": "05.03.26 | 5",
+        "mainid": "s0563788_item2"
+      },
+      "programId": "1006421",
+      "id": "1007199",
+      "title": "תגידו קצר",
+      "description": "האנשים הכי חריפים במדינה פותחים את הפה על האירוויזיון",
+      "summary": "האנשים הכי חריפים במדינה פותחים את הפה על האירוויזיון",
+      "published": "2026-03-05T12:42:09+02:00",
+      "updated": "5.3.2026 21:46:20",
+      "published_date": "12:42",
+      "credit": "‏05 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007199/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/s1ol2ckj/נקי.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/s1ol2ckj/נקי.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/s1ol2ckj/נקי.jpg?width=480&height=480&v=1dcac9ff35df1b0",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/s1ol2ckj/נקי.jpg?width=468&v=1dcac9ff35df1b0",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/s1ol2ckj/נקי.jpg?width=480&height=480&v=1dcac9ff35df1b0&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/s1ol2ckj/נקי.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "youtube"
+      },
+      "content": {
+        "type": "youtube-id",
+        "src": "zPh20_Nuhl0",
+        "teaser": "zPh20_Nuhl0"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007413/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=1006421&subid=1006640",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "S0563788_item3",
+          "kantar_content_id": "S0563788_item3",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 3,
+          "episode_title": "RISE LIKE A PHOENIX - עדן גולן",
+          "duration": "00:02:35",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "RISE LIKE A PHOENIX - עדן גולן",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "RISE LIKE A PHOENIX - עדן גולן",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "3",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "05-03-2026",
+          "content_customDimension_8": "S0563788_item3"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "RISE LIKE A PHOENIX - עדן גולן",
+          "description": "עדן גולן, הנציגה שלנו לאירוויזיון 2024, בביצוע לשיר של קונצ'יטה",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 2,
+        "duration_length": "2:35",
+        "duration_date": "05.03.26 | 2",
+        "mainid": "S0563788_item3"
+      },
+      "programId": "1006421",
+      "id": "1007413",
+      "title": "RISE LIKE A PHOENIX - עדן גולן",
+      "description": "עדן גולן, הנציגה שלנו לאירוויזיון 2024, בביצוע לשיר של קונצ'יטה",
+      "summary": "עדן גולן, הנציגה שלנו לאירוויזיון 2024, בביצוע לשיר של קונצ'יטה",
+      "published": "2026-03-05T21:55:15+02:00",
+      "updated": "5.3.2026 22:26:01",
+      "published_date": "21:55",
+      "credit": "‏05 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007413/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/k3gnqmba/s0563788_item300_00_41_12still001.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/k3gnqmba/s0563788_item300_00_41_12still001.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/k3gnqmba/s0563788_item300_00_41_12still001.jpg?width=480&height=480&v=1dcacebb9cec4a0",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/k3gnqmba/s0563788_item300_00_41_12still001.jpg?width=468&v=1dcacebb9cec4a0",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/k3gnqmba/s0563788_item300_00_41_12still001.jpg?width=480&height=480&v=1dcacebb9cec4a0&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/k3gnqmba/s0563788_item300_00_41_12still001.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "youtube"
+      },
+      "content": {
+        "type": "youtube-id",
+        "src": "kCgqhw3Jw14",
+        "teaser": "kCgqhw3Jw14"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1006640/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=1006421&subid=1007416",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "S0563788_item2",
+          "kantar_content_id": "S0563788_item2",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 4,
+          "episode_title": "פגישה עם נועם",
+          "duration": "00:07:26",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "פגישה עם נועם",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "פגישה עם נועם",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "4",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "04-03-2026",
+          "content_customDimension_8": "S0563788_item2"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "פגישה עם נועם",
+          "description": "נועם בתן הנציג שלנו לאירוויזיון מגיע לקיר האייקוני של רוני קובן",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 7,
+        "duration_length": "7:26",
+        "duration_date": "04.03.26 | 7",
+        "mainid": "S0563788_item2"
+      },
+      "programId": "1006421",
+      "id": "1006640",
+      "title": "פגישה עם נועם",
+      "description": "נועם בתן הנציג שלנו לאירוויזיון מגיע לקיר האייקוני של רוני קובן",
+      "summary": "נועם בתן הנציג שלנו לאירוויזיון מגיע לקיר האייקוני של רוני קובן",
+      "published": "2026-03-04T15:45:10+02:00",
+      "updated": "5.3.2026 22:04:20",
+      "published_date": "15:45",
+      "credit": "‏05 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1006640/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/urdhmrux/פגישה-עם-נועם.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/urdhmrux/פגישה-עם-נועם.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/urdhmrux/פגישה-עם-נועם.jpg?rxy=0.4858468648356754,0.3079770015592163&width=480&height=480&v=1dcabeed8742a10",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/urdhmrux/פגישה-עם-נועם.jpg?rxy=0.4858468648356754,0.3079770015592163&width=468&v=1dcabeed8742a10",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/urdhmrux/פגישה-עם-נועם.jpg?rxy=0.4858468648356754,0.3079770015592163&width=480&height=480&v=1dcabeed8742a10&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/urdhmrux/פגישה-עם-נועם.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "youtube"
+      },
+      "content": {
+        "type": "youtube-id",
+        "src": "0ibXROHjsmk",
+        "teaser": "0ibXROHjsmk"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007416/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=1006421&subid=1007426",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "S0563788_item8",
+          "kantar_content_id": "S0563788_item8",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 5,
+          "episode_title": "היום - נועם בתן",
+          "duration": "00:01:21",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "היום - נועם בתן",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "היום - נועם בתן",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "5",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "05-03-2026",
+          "content_customDimension_8": "S0563788_item8"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "היום - נועם בתן",
+          "description": "נועם בתן, הנציג החדש שלנו לאירוויזיון 2026, בביצוע לשיר מקורי שלו",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 1,
+        "duration_length": "1:21",
+        "duration_date": "05.03.26 | 1",
+        "mainid": "S0563788_item8"
+      },
+      "programId": "1006421",
+      "id": "1007416",
+      "title": "היום - נועם בתן",
+      "description": "נועם בתן, הנציג החדש שלנו לאירוויזיון 2026, בביצוע לשיר מקורי שלו",
+      "summary": "נועם בתן, הנציג החדש שלנו לאירוויזיון 2026, בביצוע לשיר מקורי שלו",
+      "published": "2026-03-05T22:06:00+02:00",
+      "updated": "5.3.2026 22:29:09",
+      "published_date": "22:06",
+      "credit": "‏05 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007416/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/ja3m52vt/908a4244-e012-434a-9ee2-06c84d22c558.jpeg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ja3m52vt/908a4244-e012-434a-9ee2-06c84d22c558.jpeg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ja3m52vt/908a4244-e012-434a-9ee2-06c84d22c558.jpeg?width=480&height=480&v=1dcaced2ddeb930",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ja3m52vt/908a4244-e012-434a-9ee2-06c84d22c558.jpeg?width=468&v=1dcaced2ddeb930",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ja3m52vt/908a4244-e012-434a-9ee2-06c84d22c558.jpeg?width=480&height=480&v=1dcaced2ddeb930&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/ja3m52vt/908a4244-e012-434a-9ee2-06c84d22c558.jpeg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "video"
+      },
+      "content": {
+        "type": "video/hls",
+        "src": "",
+        "teaser": ""
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007426/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=1006421&subid=1006639",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "S0563788_item6",
+          "kantar_content_id": "S0563788_item6",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 6,
+          "episode_title": "השקט שנשאר - נציגי ישראל לאירוויזיון",
+          "duration": "00:03:44",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "השקט שנשאר - נציגי ישראל לאירוויזיון",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "השקט שנשאר - נציגי ישראל לאירוויזיון",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "6",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "05-03-2026",
+          "content_customDimension_8": "S0563788_item6"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "השקט שנשאר - נציגי ישראל לאירוויזיון",
+          "description": "שלישיית האירוויזיון שלנו: עושים כבוד לשירי מימון עם ביצוע ל\"שקט שנשאר\"",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 3,
+        "duration_length": "3:44",
+        "duration_date": "05.03.26 | 3",
+        "mainid": "S0563788_item6"
+      },
+      "programId": "1006421",
+      "id": "1007426",
+      "title": "השקט שנשאר - נציגי ישראל לאירוויזיון",
+      "description": "שלישיית האירוויזיון שלנו: עושים כבוד לשירי מימון עם ביצוע ל\"שקט שנשאר\"",
+      "summary": "שלישיית האירוויזיון שלנו: עושים כבוד לשירי מימון עם ביצוע ל\"שקט שנשאר\"",
+      "published": "2026-03-05T22:14:00+02:00",
+      "updated": "5.3.2026 22:28:32",
+      "published_date": "22:14",
+      "credit": "‏05 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007426/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/nwzfuwmu/artboard-1.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nwzfuwmu/artboard-1.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nwzfuwmu/artboard-1.jpg?rxy=0.5407477375330711,0.311532147792391&width=480&height=480&v=1dcacedec804c50",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nwzfuwmu/artboard-1.jpg?rxy=0.5407477375330711,0.311532147792391&width=468&v=1dcacedec804c50",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nwzfuwmu/artboard-1.jpg?rxy=0.5407477375330711,0.311532147792391&width=480&height=480&v=1dcacedec804c50&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/nwzfuwmu/artboard-1.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "youtube"
+      },
+      "content": {
+        "type": "youtube-id",
+        "src": "4RyQKcaE29Q",
+        "teaser": "4RyQKcaE29Q"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1006639/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=1006421&subid=1007417",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "S0563788_item7",
+          "kantar_content_id": "S0563788_item7",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 7,
+          "episode_title": "חברי \"קופה ראשית\" מתכוננים לאירוויזיון",
+          "duration": "00:02:30",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "חברי \"קופה ראשית\" מתכוננים לאירוויזיון",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "חברי \"קופה ראשית\" מתכוננים לאירוויזיון",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "7",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "04-03-2026",
+          "content_customDimension_8": "S0563788_item7"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "חברי \"קופה ראשית\" מתכוננים לאירוויזיון",
+          "description": "ב\"שפע יששכר\" מתרגשים ונערכים בנעימים לתחרות השירים הגדולה בעולם",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 2,
+        "duration_length": "2:30",
+        "duration_date": "04.03.26 | 2",
+        "mainid": "S0563788_item7"
+      },
+      "programId": "1006421",
+      "id": "1006639",
+      "title": "חברי \"קופה ראשית\" מתכוננים לאירוויזיון",
+      "description": "ב\"שפע יששכר\" מתרגשים ונערכים בנעימים לתחרות השירים הגדולה בעולם",
+      "summary": "ב\"שפע יששכר\" מתרגשים ונערכים בנעימים לתחרות השירים הגדולה בעולם",
+      "published": "2026-03-04T15:44:10+02:00",
+      "updated": "5.3.2026 22:15:46",
+      "published_date": "15:44",
+      "credit": "‏05 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1006639/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/gv5ivbs5/קופה-ראשית.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/gv5ivbs5/קופה-ראשית.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/gv5ivbs5/קופה-ראשית.jpg?rxy=0.5957314546208039,0.26278232549205705&width=480&height=480&v=1dcabee3c75ee00",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/gv5ivbs5/קופה-ראשית.jpg?rxy=0.5957314546208039,0.26278232549205705&width=468&v=1dcabee3c75ee00",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/gv5ivbs5/קופה-ראשית.jpg?rxy=0.5957314546208039,0.26278232549205705&width=480&height=480&v=1dcabee3c75ee00&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/gv5ivbs5/קופה-ראשית.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "youtube"
+      },
+      "content": {
+        "type": "youtube-id",
+        "src": "XO5JwEQD6ac",
+        "teaser": "XO5JwEQD6ac"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007417/",
+        "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=1006421&subid=1007449",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "S0563788_item8",
+          "kantar_content_id": "S0563788_item8",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 8,
+          "episode_title": "MICHELLE - נועם בתן",
+          "duration": "00:03:06",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "MICHELLE - נועם בתן",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "MICHELLE - נועם בתן",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "8",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "05-03-2026",
+          "content_customDimension_8": "S0563788_item8"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "MICHELLE - נועם בתן",
+          "description": "נועם בתן בביצוע השיר שלנו לאירוויזיון 2026",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 3,
+        "duration_length": "3:06",
+        "duration_date": "05.03.26 | 3",
+        "mainid": "S0563788_item8"
+      },
+      "programId": "1006421",
+      "id": "1007417",
+      "title": "MICHELLE - נועם בתן",
+      "description": "נועם בתן בביצוע השיר שלנו לאירוויזיון 2026",
+      "summary": "נועם בתן בביצוע השיר שלנו לאירוויזיון 2026",
+      "published": "2026-03-05T22:07:00+02:00",
+      "updated": "5.3.2026 22:39:50",
+      "published_date": "22:07",
+      "credit": "‏05 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007417/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/wwhlq5fg/מישל.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/wwhlq5fg/מישל.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/wwhlq5fg/מישל.jpg?rxy=0.4813361401062616,0.2978344703040045&width=480&height=480&v=1dcacee32ce0a30",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/wwhlq5fg/מישל.jpg?rxy=0.4813361401062616,0.2978344703040045&width=468&v=1dcacee32ce0a30",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/wwhlq5fg/מישל.jpg?rxy=0.4813361401062616,0.2978344703040045&width=480&height=480&v=1dcacee32ce0a30&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/wwhlq5fg/מישל.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "video"
+      },
+      "content": {
+        "type": "video/hls",
+        "src": "",
+        "teaser": ""
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    },
+    {
+      "extensions": {
+        "audio_player_background_image": "https://mobapi.kan.org.il/media/mduhy0hf/640x360-169-with-logo_חשיפת-השיר-שלנו-לאירוויזיון_.jpg?width=480",
+        "share_url": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007449/",
+        "play_next_feed_url": "",
+        "recommendation": {
+          "more_type": {
+            "value": null
+          }
+        },
+        "analyticsCustomProperties": {
+          "programId": 1006421,
+          "show_name": "אירוויזיון 2026 - השיר של ישראל",
+          "cq_id": "S0563788",
+          "kantar_content_id": "S0563788",
+          "kantar_stream_id": "od/Channel11",
+          "channel_name": "כאן 11",
+          "document_type": "Video",
+          "general_tags": null,
+          "genre_tags": null,
+          "season": 1,
+          "episode_number": 9,
+          "episode_title": "השיר שלנו לאירוויזיון 2026 | המשדר המלא",
+          "duration": "00:57:35",
+          "program_type": "טלויזיה",
+          "program_genre": null,
+          "program_format": "סדרה",
+          "article_type": "",
+          "page_name": "השיר שלנו לאירוויזיון 2026 | המשדר המלא",
+          "item_author": "",
+          "content_id": "1006421",
+          "content_program": "אירוויזיון 2026 - השיר של ישראל",
+          "content_tvShow": "אירוויזיון 2026 - השיר של ישראל",
+          "content_channel": "כאן 11",
+          "content_type": "Video",
+          "content_genre": null,
+          "content_season": "1",
+          "content_episodeTitle": "השיר שלנו לאירוויזיון 2026 | המשדר המלא",
+          "stream_type": "video",
+          "content_customDimension_1": "1",
+          "content_customDimension_2": "9",
+          "content_customDimension_3": null,
+          "content_customDimension_4": "סדרה",
+          "content_customDimension_6": "",
+          "content_customDimension_7": "05-03-2026",
+          "content_customDimension_8": "S0563788"
+        },
+        "tag": null,
+        "on_demand": {
+          "title": "השיר שלנו לאירוויזיון 2026 | המשדר המלא",
+          "description": "משדר חגיגי של חשיפת השיר שייצג את ישראל באירוויזיון 2026",
+          "show_name": "אירוויזיון 2026 - השיר של ישראל"
+        },
+        "open_with_plugin_id": "kan_player",
+        "isLive": false,
+        "duration": 57,
+        "duration_length": "57:35",
+        "duration_date": "05.03.26 | 57",
+        "mainid": "S0563788"
+      },
+      "programId": "1006421",
+      "id": "1007449",
+      "title": "השיר שלנו לאירוויזיון 2026 | המשדר המלא",
+      "description": "משדר חגיגי של חשיפת השיר שייצג את ישראל באירוויזיון 2026",
+      "summary": "משדר חגיגי של חשיפת השיר שייצג את ישראל באירוויזיון 2026",
+      "published": "2026-03-05T22:39:01+02:00",
+      "updated": "7.3.2026 13:19:47",
+      "published_date": "22:39",
+      "credit": "‏07 במרץ 2026",
+      "author": {
+        "name": ""
+      },
+      "classification": "",
+      "link": {
+        "rel": "alternate",
+        "href": "https://www.kan.org.il/content/kan/kan-11/p-1006421/s1/1007449/?app=true"
+      },
+      "media_group": [
+        {
+          "type": "image",
+          "media_item": [
+            {
+              "src": "https://mobapi.kan.org.il/media/0nkbwngn/אירוויזיון-2026-משדר-חשיפת-השיר.jpg?width=480",
+              "key": "image_base",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/0nkbwngn/אירוויזיון-2026-משדר-חשיפת-השיר.jpg?width=480",
+              "key": "image_base_16x9",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/0nkbwngn/אירוויזיון-2026-משדר-חשיפת-השיר.jpg?rxy=0.42116822259106723,0.3936712431027318&width=480&height=480&v=1dcacf11ccc7750",
+              "key": "image_base_1x1",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/0nkbwngn/אירוויזיון-2026-משדר-חשיפת-השיר.jpg?rxy=0.42116822259106723,0.3936712431027318&width=468&v=1dcacf11ccc7750",
+              "key": "image_base_468",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/0nkbwngn/אירוויזיון-2026-משדר-חשיפת-השיר.jpg?rxy=0.42116822259106723,0.3936712431027318&width=480&height=480&v=1dcacf11ccc7750&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_1x1_icon",
+              "type": "image"
+            },
+            {
+              "src": "https://mobapi.kan.org.il/media/0nkbwngn/אירוויזיון-2026-משדר-חשיפת-השיר.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+              "key": "image_base_16x9_icon",
+              "type": "image"
+            }
+          ]
+        }
+      ],
+      "type": {
+        "value": "youtube"
+      },
+      "content": {
+        "type": "youtube-id",
+        "src": "dFtmZ8wzlAw",
+        "teaser": "dFtmZ8wzlAw"
+      },
+      "media_component": null,
+      "isShowStaticLabel": false
+    }
+  ]
+}
