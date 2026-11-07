@@ -975,7 +975,11 @@ export function kanCrawlOptions(
     pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
     airingWindowDays: config.schedule.airingWindowDays,
     artworkDir: kanArtworkDir(config),
-    profileDir: join(dirname(config.store.path), 'kan-browser'),
+    // One profile per proxy exit: Cloudflare's clearance is tied to the exit's address.
+    profileDir: join(
+      dirname(config.store.path),
+      `kan-browser${proxy ? `-${new URL(proxy.server).hostname.split('.')[0]}` : ''}`,
+    ),
     // Kan's live channels' guide comes through this browser too (epg.ts).
     guide: config.sources.live,
     log,

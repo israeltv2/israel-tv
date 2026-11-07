@@ -1608,7 +1608,7 @@ Kan's pages and images sit behind Cloudflare. Measured from outside Israel throu
   a placeholder. It also cost a new proxy session per page, which is why pages were spaced 75 s apart.
 - **Chosen: [patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright) (`patchright-core`, Apache-2.0), a
   drop-in Playwright build that removes the automation giveaways** (`navigator.webdriver`, `--enable-automation`,
-  the `Runtime.enable` leak), with **one persistent profile** (`kan-browser/` next to the database) reused across
+  the `Runtime.enable` leak), with **one persistent profile per proxy exit** (`kan-browser-<exit>/` next to the database) reused across
   slices, the sandbox on (no `--no-sandbox` bar), no custom user agent or viewport, Israeli locale and time zone,
   and **one sticky proxy exit** (the first configured one; Cloudflare's `cf_clearance` cookie is tied to the exit's
   address). The managed check then clears on its own on the first page, as for a person's browser; we never click
@@ -1634,7 +1634,7 @@ Kan's pages and images sit behind Cloudflare. Measured from outside Israel throu
   `botCheck`: pages, challenged, images, images challenged; two weeks), and `/status` says how many page loads the
   check stopped today when it stopped any.
 - **Tuning:** `scraping.browserPagesPerRun` and `scraping.browserPageIntervalSec` (docs/configuration.md). If the
-  tally shows challenges: delete `kan-browser/` (a fresh profile clears again), check that the first `geo.urls`
+  tally shows challenges: delete `kan-browser-<exit>/` (a fresh profile clears again), check that the first `geo.urls`
   entry still answers, then slow the pace. Only one process may use the profile at a time (Chrome locks it): run
   `israel-tv kan` by hand only while the daemon is stopped.
 
