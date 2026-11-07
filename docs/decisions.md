@@ -1743,3 +1743,24 @@ only app-named episodes could be added, real stream checks through the geo proxy
 their ids and S/E numbers (0 changed, 0 gone); 208 new episodes named by the app** (214 stream checks). In production
 about 735 more follow once their shows' two evidence pages are read; the rest of the 2,348 waiting pages (shows the
 app plays from YouTube, shows that disagree, withdrawn episodes) are read as pages, as before.
+
+## Kan's queue and pace with the app API (2026-11-07)
+
+**Measured after 0.5.0:** three slices gave +13 (8 named by the app), +51 (47) and +3 (0) episodes: the queue still
+put shows with the fewest episodes first, and those had no evidence yet, so most slices read pages for shows the app
+could not name yet.
+
+**Queue** (after newly published episodes, which stay first):
+
+1. Shows still giving their evidence (fewer than two episodes, the app's verdict unknown): at most two pages each per
+   turn, so every show unlocks (or fails to unlock) the app quickly.
+2. Shows the app is trusted for: filled from the app in bulk, outside the page budget (each episode still checked).
+3. Page-only shows: the app disagrees with their pages, or does not list them. Their pages, as before.
+
+Each show's verdict (`trusted`, `disagrees`, `unlisted`) is kept in the crawl state; "disagrees" is final (the app is
+never used for that show), "trusted" is re-checked against the episodes read in every slice.
+
+**Pace:** after 228 pages and 420 images in a day with no challenge, the default is now 20 pages per 10-minute slice,
+12 s apart (was 12, 20 s). **Rule:** the moment a page, image or app request meets Kan's bot check, the slice stops
+and waits 45 minutes (unchanged), and for the next 24 hours slices run at half the pages and twice the pause (10 pages,
+24 s with the defaults); `/status` and the log say "calm pace". The per-day tally (`botCheck`) shows whether to tune.

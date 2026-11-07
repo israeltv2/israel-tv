@@ -13,5 +13,5 @@
     "kanCrawl": "*/10 * * * *",
     "airingWindowDays": 14
   },
-  "scraping": { "delayMs": 1000, "browserPagesPerRun": 12, "browserPageIntervalSec": 20 }
+  "scraping": { "delayMs": 1000, "browserPagesPerRun": 20, "browserPageIntervalSec": 12 }
 }
