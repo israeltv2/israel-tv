@@ -452,7 +452,6 @@ async function main(argv: string[]): Promise<number> {
       case 'remote-url':
         console.log(remoteUrl(config));
         console.error(remoteUrlHint(config));
-        console.error(remoteUrlHint(config));
         return 0;
       case 'admin-url': {
         const token = adminToken(config, store);
