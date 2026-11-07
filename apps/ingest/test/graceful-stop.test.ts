@@ -181,3 +181,28 @@ test('/status and the run history ignore runs stopped for a restart', () => {
     store.finishedRunsSince('2000-01-01', ['crawl', 'full', 'publish']).map((r) => r.status),
   ).not.toContain('stopped');
 });
+
+test('a Kan slice whose browser closes under it during a restart is stopped, not a Kan outage', async () => {
+  // Live 2026-11-07: "page.waitForTimeout: Target page, context or browser has been closed" made the slice failed
+  // and backed Kan off 45 minutes.
+  const store = Store.open(':memory:');
+  const stop = new AbortController();
+  const loader: PageLoader = {
+    async load() {
+      stop.abort();
+      throw new Error('page.waitForTimeout: Target page, context or browser has been closed');
+    },
+    async close() {},
+  };
+  await crawlKan(store, {
+    browser: { type: 'chrome', headed: true },
+    pagesPerRun: 10,
+    pageIntervalMs: 0,
+    airingWindowDays: 14,
+    loader,
+    guide: false,
+    signal: stop.signal,
+  });
+  expect(store.lastRun('crawl', 'kan')?.status).toBe('stopped');
+  expect(store.getState<{ backoffUntil?: string }>('kan:crawl')?.backoffUntil).toBeUndefined();
+});

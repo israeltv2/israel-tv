@@ -1049,7 +1049,9 @@ export async function crawlKan(
       ...(issues.length > 0 ? { showsFailed: problems, error: `${issues.join('; ')} (see warnings)` } : {}),
     });
   } catch (err) {
-    if (err instanceof StopRequested) {
+    // Any error once the service is stopping is the stop itself (a restart also closes the browser under a page
+    // load: "Target page, context or browser has been closed"), never a Kan outage to back off from.
+    if (err instanceof StopRequested || opts.signal?.aborted) {
       // The service is stopping: what was read is kept (the state is saved below), nothing backs off, and the next
       // slice goes on from the queue. Not a failure.
       note = `${STOPPED_FOR_RESTART} after ${pages} ${pages === 1 ? 'page' : 'pages'} + ${feeds} app lists, +${newEpisodes} episodes`;
