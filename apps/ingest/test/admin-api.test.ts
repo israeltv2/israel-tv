@@ -158,3 +158,62 @@ test('the dashboard page: served with a strict policy and a fresh nonce; its bui
   expect(first).toMatch(/event: live/);
   await reader?.cancel();
 });
+
+test("every row's image is the one the catalog publishes: a show's poster, a channel's logo (square), never the placeholder", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { artOf } = await import('../src/admin-api.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'iltv-art-'));
+  const put = (type: string, id: string, meta: object) => {
+    mkdirSync(join(dir, 'meta', type), { recursive: true });
+    writeFileSync(join(dir, 'meta', type, `${id}.json`), JSON.stringify({ meta }));
+  };
+  const site = 'https://addon.example.workers.dev';
+  put('series', 'iltv_mako_1', { poster: 'https://img.example/p.jpg' });
+  put('series', 'iltv_kan_2', { poster: `${site}/art/iltv_kan_2.jpg` });
+  // A Kan show whose image could not be copied yet: the catalog shows its generic placeholder.
+  put('series', 'iltv_kan_17', { poster: `${site}/art/placeholder-poster.jpg` });
+  put('series', 'iltv_reshet_3', { poster: '{{israel-tv-origin}}/art/iltv_reshet_3-poster.jpg' });
+  put('tv', 'iltv_live_keshet12', {
+    posterShape: 'square',
+    poster: `${site}/logos/iltv_live_keshet12.png`,
+    logo: `${site}/logos/iltv_live_keshet12.png`,
+  });
+  const config = parseConfig({ publisher: { type: 'cloudflare', dir, publicUrl: site } });
+  const d = new Daemon(config, Store.open(':memory:'), EventStore.open(':memory:'), quiet);
+  expect(artOf(d, 'iltv_mako_1')).toEqual({ poster: 'https://img.example/p.jpg' });
+  expect(artOf(d, 'iltv_kan_2')).toEqual({ poster: `${site}/art/iltv_kan_2.jpg` });
+  expect(artOf(d, 'iltv_kan_17')).toEqual({});
+  expect(artOf(d, 'iltv_reshet_3')).toEqual({ poster: `${site}/art/iltv_reshet_3-poster.jpg` });
+  // Live channels are published as `tv`, not `series`: their logo, marked square.
+  expect(artOf(d, 'iltv_live_keshet12')).toEqual({
+    poster: `${site}/logos/iltv_live_keshet12.png`,
+    posterShape: 'square',
+  });
+  expect(artOf(d, 'iltv_mako_404')).toEqual({});
+  expect(artOf(d, '../../etc/passwd')).toEqual({});
+  expect(artOf(d, undefined)).toEqual({});
+});
+
+test('nothing the admin app answers is indexed', async () => {
+  const { app } = setup();
+  for (const path of ['/dash/', '/api/v1/session', '/status', '/nope'])
+    expect((await app.request(path, { headers: bearer }, env)).headers.get('x-robots-tag'), path).toBe(
+      'noindex, nofollow',
+    );
+  // Its own icons (told apart from the public pages' tab), linked from the page.
+  const page = await (await app.request('/dash/', { headers: bearer }, env)).text();
+  for (const icon of ['favicon-32.png', 'favicon-192.png', 'apple-touch-icon.png']) {
+    expect(page).toContain(`/dash/${icon}`);
+    const r = await app.request(`/dash/${icon}`, { headers: bearer }, env);
+    expect(r.status, icon).toBe(200);
+    expect(r.headers.get('content-type')).toBe('image/png');
+  }
+  expect(page).toMatch(/<meta name="robots" content="noindex, nofollow"/);
+  expect(page).toMatch(/<meta name="theme-color"/);
+  // Refused requests too (no token).
+  expect((await app.request('/dash/', { headers: host }, env)).headers.get('x-robots-tag')).toBe(
+    'noindex, nofollow',
+  );
+});

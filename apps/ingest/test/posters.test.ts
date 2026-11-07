@@ -175,6 +175,81 @@ test('every series row is shaped "poster", every poster is portrait and reachabl
   expect(meta('mako-tall').poster).toBe('https://img.example/tall.jpg');
 });
 
+test('what the image audit found: stock posters, missing backdrops, square tiles stretched, blank row notices', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'site-'));
+  const store = Store.open(join(dir, 'israel-tv.sqlite'));
+  const still = (s: ScrapedShow, day: string, thumbnail: string): ScrapedShow => ({
+    ...s,
+    seasons: [
+      {
+        key: `${s.key}|s1`,
+        title: '',
+        episodes: [
+          ...(s.seasons[0]?.episodes ?? []),
+          { key: `${s.key}|${day}`, title: day, airDate: day, streams: [], thumbnail },
+        ],
+      },
+    ],
+  });
+  const noBackdrop = ({ background: _, ...s }: ScrapedShow): ScrapedShow => s;
+  const shows = [
+    // Reshet's own "default poster" stand-in, and no backdrop: the newest episode's still is the backdrop.
+    still(
+      noBackdrop(
+        show(
+          'reshet',
+          'reshet-stock',
+          'iltv_reshet13',
+          'https://media.reshet.tv/x/Deafult_poster_image_black.jpg',
+        ),
+      ),
+      '2026-11-06',
+      'https://img.example/newest.jpg',
+    ),
+    // A Kan show whose copy is a small square tile (its own image refused abroad).
+    show('kan', 'kan-square', 'iltv_kankids', 'https://www.kan.org.il/sq.jpg'),
+  ];
+  for (const s of shows) {
+    const id = store.seriesIdFor(s.source, s.key);
+    store.saveShow(id, s, assignNumbers(s, store.assignments(id)).added, '2026-11-05', true);
+  }
+  mkdirSync(join(dir, 'artwork'));
+  writeFileSync(join(dir, 'artwork', 'sq.jpg'), photo(200, 200));
+  store.setState('kan:crawl', {
+    shows: {
+      'kan-square': {
+        origin: 'o',
+        catalog: 'c',
+        pending: [],
+        failed: [],
+        art: { from: 'x', file: 'sq.jpg' },
+      },
+    },
+  });
+  const config = ConfigSchema.parse({
+    store: { path: join(dir, 'israel-tv.sqlite') },
+    publisher: { type: 'local' },
+  });
+  const files = renderFromStore(store, config);
+  const id = (s: ScrapedShow) => store.findSeriesId(s.source, s.key) ?? '';
+  const meta = (s: ScrapedShow) => JSON.parse(String(files.get(`meta/series/${id(s)}.json`))).meta;
+  const [stock, square] = shows as [ScrapedShow, ScrapedShow];
+  expect(meta(stock).poster).toBe('{{israel-tv-origin}}/art/placeholder-poster.jpg');
+  expect(meta(stock).background).toBe('https://img.example/newest.jpg');
+  expect(meta(stock).videos.map((v: { thumbnail?: string }) => v.thumbnail)).not.toContain(
+    'https://media.reshet.tv/x/Deafult_poster_image_black.jpg',
+  );
+  // The square copy is its poster's source, never its backdrop or every episode's still.
+  expect(meta(square).background).toBeUndefined();
+  expect(meta(square).videos.every((v: { thumbnail?: string }) => !v.thumbnail)).toBe(true);
+  // A row's notice (Kan kids still filling, here) is a tile with the generic poster, never a blank one.
+  for (const [path, body] of files) {
+    if (!path.startsWith('catalog/') || typeof body !== 'string') continue;
+    for (const m of JSON.parse(body).metas as { id: string; poster?: string }[])
+      expect(m.poster, `${path} ${m.id}`).toBeTruthy();
+  }
+});
+
 test('the local publisher serves our posters and the placeholder', async () => {
   const { localAddonApp } = await import('../src/local-server.ts');
   const dir = mkdtempSync(join(tmpdir(), 'local-'));

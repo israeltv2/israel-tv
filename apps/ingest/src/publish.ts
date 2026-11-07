@@ -38,7 +38,15 @@ import {
 } from './kan.ts';
 import { LIVE_CHECK_KEY, type LiveCheck, liveRender } from './live.ts';
 import { checkNumbering } from './numbering-guard.ts';
-import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster } from './posters.ts';
+import {
+  imageSize,
+  isStockImage,
+  localPoster,
+  measurePosters,
+  posterDir,
+  reachableAbroad,
+  remotePoster,
+} from './posters.ts';
 import { BLOCK_RETRIES, type BlockedRetry, emptyShowsKey, episodeCount, retryKey } from './runner.ts';
 import { probeResults } from './stream-probe.ts';
 import { ALIASES_KEY } from './tmdb.ts';
@@ -299,24 +307,35 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   const kanArt = config.sources.kan ? kanArtwork(store, kanArtworkDir(config)) : new Map<string, string>();
   const postersAt = posterDir(config);
   const placeholder = `${ORIGIN_TOKEN}/${sitePaths.posterPlaceholder}`;
-  let placeholderUsed = false;
-  const reachable = (u: string | undefined) => (u && reachableAbroad(u) ? u : undefined);
+  const reachable = (u: string | undefined) => (u && reachableAbroad(u) && !isStockImage(u) ? u : undefined);
   const withArtwork = (r: (typeof rows)[number]) => {
     const file = r.show.source === 'kan' ? kanArt.get(r.show.key) : undefined;
     const own = file ? `${ORIGIN_TOKEN}/${sitePaths.artwork(r.seriesId)}` : undefined;
-    if (file) assets.set(sitePaths.artwork(r.seriesId), readFileSync(file));
+    const body = file ? readFileSync(file) : undefined;
+    if (body) assets.set(sitePaths.artwork(r.seriesId), body);
+    // Our copy stands in for the show's backdrop and episode stills, unless it is a square tile (Kan kids' lobby
+    // images: stretched over a backdrop, or as every episode's still, worse than none).
+    const size = body ? imageSize(body) : undefined;
+    const wide = own && size && !(size.w / size.h > 0.8 && size.w / size.h < 1.25) ? own : undefined;
     const show = {
       ...r.show,
       seasons: r.show.seasons.map((s) => ({
         ...s,
         episodes: s.episodes.map((e) => {
           const { thumbnail, ...rest } = e;
-          const t = own ?? reachable(thumbnail);
+          const t = wide ?? reachable(thumbnail);
           return t ? { ...rest, thumbnail: t } : rest;
         }),
       })),
     };
-    const background = own ?? reachable(r.show.background);
+    // No backdrop of its own (most Reshet shows): its newest episode's still, which is the show and is landscape.
+    const newest = show.seasons
+      .flatMap((s) => s.episodes)
+      .map((e) => ({ at: e.airDate ?? '', still: 'thumbnail' in e ? e.thumbnail : undefined }))
+      .filter((e) => e.still)
+      .sort((a, b) => b.at.localeCompare(a.at))[0]?.still;
+    // With a copy of ours, the source's own backdrop is that same image: the copy decides.
+    const background = wide ?? (file ? undefined : reachable(r.show.background)) ?? newest;
     if (background) show.background = background;
     else delete show.background;
     // The poster: portrait, and reachable from anywhere.
@@ -336,7 +355,6 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
         poster = `${ORIGIN_TOKEN}/${sitePaths.poster(r.seriesId)}`;
       }
     }
-    if (!poster) placeholderUsed = true;
     return { ...show, poster: poster ?? placeholder };
   };
   const aliases = store.getState<Record<string, string[]>>(ALIASES_KEY) ?? {};
@@ -361,7 +379,8 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   for (const [path, name] of [
     [sitePaths.logo, 'logo'],
     [sitePaths.background, 'background'],
-    ...(placeholderUsed ? ([[sitePaths.posterPlaceholder, 'poster-placeholder']] as const) : []),
+    // Always: shows without an image of their own and the rows' notices use it.
+    [sitePaths.posterPlaceholder, 'poster-placeholder'],
   ] as const) {
     const img = brandImage(config.branding.dir, name);
     if (img) assets.set(path, img.body);

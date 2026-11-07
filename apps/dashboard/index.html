@@ -5,9 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <meta name="csp-nonce" content="__CSP_NONCE__" />
-    <meta name="robots" content="noindex" />
+    <meta name="robots" content="noindex, nofollow" />
     <title>Israel TV · Dashboard</title>
-    <link rel="icon" href="data:," />
+    <!-- The project logo with an amber dashboard badge: this tab is told apart from the public pages. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/dash/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/dash/favicon-192.png" />
+    <link rel="apple-touch-icon" href="/dash/apple-touch-icon.png" />
+    <meta name="theme-color" content="#f9fafb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)" />
     <!-- Sets the theme before the first paint (a file, not inline: the CSP allows no inline script). -->
     <script src="/dash/theme.js"></script>
   </head>

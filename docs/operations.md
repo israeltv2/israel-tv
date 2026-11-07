@@ -240,6 +240,27 @@ minutes, 1 hour and 2 hours. The source stays green while retries are pending or
 only for shows still refused after the third retry (named on `/status`, and in `blocked` per source). Other
 failures in the run are not retried and show as before.
 
+### Images: checking what viewers see
+
+`pnpm audit:images` checks every image the public catalog shows, the way a viewer's app loads it, from wherever
+it runs (run it outside Israel, without a VPN: most viewers' case). It walks the manifest, every row's first page
+(posters, live tiles, row notices), a sample of each row's metas (backdrops, channel logos, two episode stills
+each), and reports per source and kind: **missing** (no image at all), **placeholder** (the generic poster, ours or
+a broadcaster's own stand-in: the show has no image of its own yet), **broken** (not 200, not an image,
+unreadable), **refused abroad** (403 from a broadcaster's own host, Kan's), **tiny** and **wrong shape** (posters
+2:3, logos square, backdrops and stills landscape). It is polite: at most 4 requests at once and `--max` requests
+in all (600 by default), and only the first bytes of each image.
+
+```sh
+pnpm audit:images                                  # the public addon
+pnpm audit:images --base https://<your-addon> --max 300 --metas 6 --json audit.json
+```
+
+What it finds is fixed where the image is chosen (apps/ingest/src/publish.ts, posters.ts, packages/render), and
+shows after the next publish. Kan shows whose image could not be copied yet (Kan refuses its images abroad, and
+sometimes the copy too) carry the placeholder until a later crawl copies it; the dashboard draws a tile with the
+show's first letter for them instead of the generic poster.
+
 ### A catalog row says it is old
 
 The public addon adds "⚠ הקטלוג לא עודכן מאז …" (catalog not updated since …) at the top of a row by itself,

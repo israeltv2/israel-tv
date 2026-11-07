@@ -7,6 +7,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   type TooltipContentProps,
@@ -31,17 +32,19 @@ function ChartTooltip({
   return (
     <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs shadow-lg">
       <div className="mb-1 font-medium">{typeof label === 'string' ? dayLabel(label, 'weekday') : label}</div>
-      {payload.map((p) => (
-        <div key={String(p.dataKey)} className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-sm" style={{ background: p.color }} />
-            {p.name}
-          </span>
-          <span className="num font-medium">
-            {unit === 'ms' ? ms(Number(p.value)) : num(Number(p.value))}
-          </span>
-        </div>
-      ))}
+      {payload
+        .filter((p) => p.value !== null && p.value !== undefined)
+        .map((p) => (
+          <div key={String(p.dataKey)} className="flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-sm" style={{ background: p.color }} />
+              {p.name}
+            </span>
+            <span className="num font-medium">
+              {unit === 'ms' ? ms(Number(p.value)) : num(Number(p.value))}
+            </span>
+          </div>
+        ))}
     </div>
   );
 }
@@ -73,7 +76,7 @@ function SrTable({
             <tr key={String(r.day)}>
               <td>{String(r.day)}</td>
               {series.map((s) => (
-                <td key={s.key}>{String(r[s.key] ?? 0)}</td>
+                <td key={s.key}>{r[s.key] === null ? 'no data' : String(r[s.key] ?? 0)}</td>
               ))}
             </tr>
           ))}
@@ -130,25 +133,54 @@ export function StackedDays({
   );
 }
 
-/** Lines per day (home vs public viewers, p50/p95 latency). */
+/**
+ * Lines per day (home vs public viewers, p50/p95 latency). Days before `noDataBefore` were not counted: they are
+ * hatched and labelled, and a series has no point there (null), never a flat zero.
+ */
 export function DayLines({
   rows,
   series,
   caption,
   unit,
   height = 220,
+  noDataBefore,
 }: {
   rows: Record<string, unknown>[];
   series: (Series & { dashed?: boolean })[];
   caption: string;
   unit?: 'ms';
   height?: number;
+  noDataBefore?: string | undefined;
 }) {
+  const days = rows.map((r) => String(r.day));
+  const gapEnd = noDataBefore ? days.filter((d) => d < noDataBefore).at(-1) : undefined;
   return (
     <figure aria-label={caption} className="relative">
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} accessibilityLayer>
+          <defs>
+            <pattern
+              id="no-data"
+              width="6"
+              height="6"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <rect width="6" height="6" fill="var(--surface-2)" />
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--border)" strokeWidth="2" />
+            </pattern>
+          </defs>
           <CartesianGrid vertical={false} />
+          {gapEnd && days[0] ? (
+            <ReferenceArea
+              x1={days[0]}
+              x2={gapEnd}
+              fill="url(#no-data)"
+              fillOpacity={1}
+              ifOverflow="hidden"
+              label={{ value: 'not counted yet', position: 'insideTop', fontSize: 11, fill: 'var(--muted)' }}
+            />
+          ) : null}
           <XAxis dataKey="day" {...axis} tickFormatter={(d: string) => dayLabel(d)} minTickGap={16} />
           <YAxis
             {...axis}

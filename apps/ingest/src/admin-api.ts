@@ -6,6 +6,7 @@ import { existsSync, readFileSync, statfsSync, statSync } from 'node:fs';
 import { arch, freemem, platform, totalmem } from 'node:os';
 import { join } from 'node:path';
 import type {
+  Art,
   Deploys,
   Failures,
   Health,
@@ -19,7 +20,15 @@ import type {
   Trace,
 } from '@israel-tv/admin-contract';
 import { ADMIN_API } from '@israel-tv/admin-contract';
-import { apiWorkerName, type Freshness, LIVE_CHANNELS, roleOf, staleSince } from '@israel-tv/core';
+import {
+  apiWorkerName,
+  type Freshness,
+  LIVE_CHANNELS,
+  ORIGIN_TOKEN,
+  roleOf,
+  sitePaths,
+  staleSince,
+} from '@israel-tv/core';
 import type { DailyRow, EventRow } from '@israel-tv/events';
 import { RELEASE_VERSION } from '@israel-tv/runtime';
 import { Hono } from 'hono';
@@ -99,33 +108,47 @@ function titleOf(d: Daemon, showId: string | null | undefined): string | undefin
   return d.store.getShow(showId)?.title ?? LIVE_CHANNELS.find((c) => c.id === showId)?.name;
 }
 
-const posters = new Map<string, { at: number; url: string | undefined }>();
+const arts = new Map<string, { at: number; art: Art }>();
 
-/** A show's poster as the public catalog publishes it (read from the published meta; cached 10 minutes). */
-function posterOf(d: Daemon, showId: string): string | undefined {
-  const hit = posters.get(showId);
-  if (hit && Date.now() - hit.at < 600_000) return hit.url;
-  let url: string | undefined;
+/**
+ * A show's (or live channel's) image as the public catalog publishes it, read from its published meta (cached ten
+ * minutes): the poster, or a channel's logo. The generic placeholder is not the show's image: none then.
+ */
+export function artOf(d: Daemon, showId: string | null | undefined): Art {
+  if (!showId) return {};
+  const key = `${d.config.publisher.dir}|${showId}`;
+  const hit = arts.get(key);
+  if (hit && Date.now() - hit.at < 600_000) return hit.art;
+  let art: Art = {};
   if (/^[A-Za-z0-9_]+$/.test(showId)) {
+    const type = LIVE_CHANNELS.some((c) => c.id === showId) ? 'tv' : 'series';
     try {
-      const meta = JSON.parse(
-        readFileSync(join(d.config.publisher.dir, 'meta', 'series', `${showId}.json`), 'utf8'),
-      ) as {
-        meta?: { poster?: string };
-      };
-      const p = meta.meta?.poster;
-      const origin = d.config.publisher.type === 'cloudflare' ? d.config.publisher.publicUrl : undefined;
-      url =
-        p && /^https:\/\//.test(p)
-          ? p
-          : p?.startsWith('/') && origin
-            ? `${origin.replace(/\/$/, '')}${p}`
-            : undefined;
+      const { meta } = JSON.parse(
+        readFileSync(join(d.config.publisher.dir, sitePaths.meta(type, showId)), 'utf8'),
+      ) as { meta?: { poster?: string; logo?: string; posterShape?: string } };
+      const url = absoluteArt(d, meta?.poster ?? meta?.logo);
+      const shape = meta?.posterShape;
+      if (url)
+        art = {
+          poster: url,
+          ...(shape === 'square' || shape === 'landscape' ? { posterShape: shape } : {}),
+        };
     } catch {}
   }
-  posters.set(showId, { at: Date.now(), url });
-  if (posters.size > 500) posters.delete(posters.keys().next().value as string);
-  return url;
+  arts.set(key, { at: Date.now(), art });
+  if (arts.size > 500) arts.delete(arts.keys().next().value as string);
+  return art;
+}
+
+/** An image address from a published file: absolute, https (loads on any network), never the placeholder. */
+function absoluteArt(d: Daemon, p: string | undefined): string | undefined {
+  if (!p || p.endsWith(`/${sitePaths.posterPlaceholder}`)) return undefined;
+  if (/^https:\/\//.test(p)) return p;
+  const origin = d.config.publisher.type === 'cloudflare' ? d.config.publisher.publicUrl : undefined;
+  if (!origin) return undefined;
+  const base = origin.replace(/\/$/, '');
+  if (p.startsWith(`${ORIGIN_TOKEN}/`)) return `${base}${p.slice(ORIGIN_TOKEN.length)}`;
+  return p.startsWith('/') ? `${base}${p}` : undefined;
 }
 
 export function session(d: Daemon, csrf: string, revision: string): Session {
@@ -223,17 +246,16 @@ export function overview(d: Daemon, now = Date.now()): Overview {
     });
   };
   const home = perDay('home');
+  const homeSince = d.events.countedSince('home');
+  const publicSince = d.events.countedSince('public');
   const minutes = (n: number) => home.slice(-n).reduce((m, r) => m + r.minutes, 0);
-  const line = (s: { showId: string; title?: string; plays: number; source: string }) => {
-    const poster = posterOf(d, s.showId);
-    return {
-      showId: s.showId,
-      plays: s.plays,
-      source: s.source,
-      ...(s.title ? { title: s.title } : {}),
-      ...(poster ? { poster } : {}),
-    };
-  };
+  const line = (s: { showId: string; title?: string; plays: number; source: string }) => ({
+    showId: s.showId,
+    plays: s.plays,
+    source: s.source,
+    ...(s.title ? { title: s.title } : {}),
+    ...artOf(d, s.showId),
+  });
   const home7 = dash.home.d7;
   const status = d.status();
   const fresh = freshness(d);
@@ -246,12 +268,14 @@ export function overview(d: Daemon, now = Date.now()): Overview {
       d7: totals(home7, minutes(7)),
       d30: totals(dash.home.d30, minutes(30)),
       perDay: home,
+      ...(homeSince ? { countedSince: homeSince } : {}),
       topShows: dash.home.topShows.filter((t) => t.plays > 0).map(line),
     },
     public: {
       counted: dash.public.via === 'analytics-engine',
       ...(dash.public.note ? { note: dash.public.note } : {}),
       ...(dash.public.lastDay ? { lastDay: dash.public.lastDay } : {}),
+      ...(publicSince ? { countedSince: publicSince } : {}),
       d7: totals(dash.public.d7),
       d30: totals(dash.public.d30),
       perDay: perDay('public'),
@@ -322,6 +346,7 @@ export function sources(d: Daemon, now = Date.now()): Sources {
           return {
             id: c.id,
             name: c.name,
+            ...artOf(d, c.id),
             streams: (check?.channels[c.id] ?? []).map((x) => ({
               title: x.title,
               via: x.via,
@@ -427,6 +452,7 @@ function playLine(d: Daemon, e: EventRow): PlayLine {
     ...(e.latencyMs !== null ? { latencyMs: e.latencyMs } : {}),
     ...(e.status !== null ? { status: e.status } : {}),
     ...(typeof x.reason === 'string' ? { reason: x.reason.slice(0, 200) } : {}),
+    ...artOf(d, e.showId),
   };
 }
 
@@ -474,13 +500,12 @@ export function plays(d: Daemon, now = Date.now()): Plays {
       .slice(0, 8)
       .map(([showId, v]) => {
         const title = titleOf(d, showId);
-        const poster = posterOf(d, showId);
         return {
           showId,
           source: v.source,
           plays: v.plays,
           ...(title ? { title } : {}),
-          ...(poster ? { poster } : {}),
+          ...artOf(d, showId),
         };
       }),
     topEpisodes: [...byEpisode]
@@ -489,13 +514,12 @@ export function plays(d: Daemon, now = Date.now()): Plays {
       .map(([episodeId, v]) => {
         const show = episodeId.split(':')[0] ?? '';
         const t = titleOf(d, show);
-        const poster = posterOf(d, show);
         return {
           episodeId,
           plays: v.n,
           ...(t ? { title: t } : {}),
           ...(v.source ? { source: v.source } : {}),
-          ...(poster ? { poster } : {}),
+          ...artOf(d, show),
         };
       }),
     firstPlaylistMs: {
@@ -596,6 +620,7 @@ export function live(d: Daemon, now = Date.now()): Live {
         ...(s.showId ? { showId: s.showId } : {}),
         ...(s.episodeId ? { episodeId: s.episodeId } : {}),
         ...(title ? { title } : {}),
+        ...artOf(d, s.showId),
       };
     }),
   };
@@ -628,7 +653,7 @@ export function deploys(d: Daemon): Deploys {
       ...(r.error ? { detail: r.error.slice(0, 300) } : {}),
     })),
     ...(status.audit ? { audit: status.audit } : {}),
-    failingShows: status.failingShows,
+    failingShows: status.failingShows.map((s) => ({ ...s, ...artOf(d, s.id) })),
     ...(p.type === 'cloudflare'
       ? {
           cloudflare: {

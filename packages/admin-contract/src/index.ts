@@ -39,13 +39,24 @@ export const TotalsSchema = z.object({
   minutesWatched: z.number(),
 });
 
+/**
+ * A show's (or live channel's) image, as the public catalog publishes it: its poster, or a channel's logo. Absent
+ * when the catalog has none of its own for it (only the generic placeholder): the dashboard draws a tile then.
+ */
+const art = {
+  /** Image URL (the public catalog's own copy, or the broadcaster's when reachable from anywhere). */
+  poster: z.string().optional(),
+  /** Its shape: `poster` 2:3 (default), `square` (channel logos), `landscape` 16:9. */
+  posterShape: z.enum(['poster', 'square', 'landscape']).optional(),
+};
+const ArtSchema = z.object(art);
+
 const showLine = z.object({
   showId: z.string(),
   title: z.string().optional(),
   plays: z.number(),
   source: z.string(),
-  /** Poster URL (the public catalog's own copy, or the broadcaster's). */
-  poster: z.string().optional(),
+  ...art,
 });
 const perDay = z.object({
   day,
@@ -62,12 +73,16 @@ export const OverviewSchema = z.object({
     d7: TotalsSchema,
     d30: TotalsSchema,
     perDay: z.array(perDay),
+    /** The first day this home's plays were counted (its first event); earlier days have no data, not zero. */
+    countedSince: day.optional(),
     topShows: z.array(showLine),
   }),
   public: z.object({
     counted: z.boolean(),
     note: z.string().optional(),
     lastDay: day.optional(),
+    /** The first day the public addon was counted (its first daily total); earlier days have no data, not zero. */
+    countedSince: day.optional(),
     d7: TotalsSchema,
     d30: TotalsSchema,
     perDay: z.array(perDay),
@@ -182,6 +197,7 @@ export const SourcesSchema = z.object({
         z.object({
           id: z.string(),
           name: z.string(),
+          ...art,
           streams: z.array(
             z.object({
               title: z.string(),
@@ -212,6 +228,7 @@ const playLine = z.object({
   latencyMs: z.number().optional(),
   status: z.number().optional(),
   reason: z.string().optional(),
+  ...art,
 });
 
 export const PlaysSchema = z.object({
@@ -224,7 +241,7 @@ export const PlaysSchema = z.object({
       title: z.string().optional(),
       plays: z.number(),
       source: z.string().optional(),
-      poster: z.string().optional(),
+      ...art,
     }),
   ),
   firstPlaylistMs: z.object({ p50: z.number().optional(), p95: z.number().optional(), n: z.number() }),
@@ -286,6 +303,7 @@ export const LiveSchema = z.object({
       showId: z.string().optional(),
       episodeId: z.string().optional(),
       title: z.string().optional(),
+      ...art,
       segments: z.number(),
       bytes: z.number(),
     }),
@@ -308,7 +326,9 @@ export const DeploysSchema = z.object({
     })
     .optional(),
   /** Shows whose last read failed (their last good data is still published). */
-  failingShows: z.array(z.object({ id: z.string(), title: z.string(), error: z.string(), lastOkAt: iso })),
+  failingShows: z.array(
+    z.object({ id: z.string(), title: z.string(), error: z.string(), lastOkAt: iso, ...art }),
+  ),
   cloudflare: z
     .object({
       dataWorker: z.string(),
@@ -375,6 +395,7 @@ export type Deploys = z.infer<typeof DeploysSchema>;
 export type System = z.infer<typeof SystemSchema>;
 export type Action = z.infer<typeof ActionSchema>;
 export type PlayLine = z.infer<typeof playLine>;
+export type Art = z.infer<typeof ArtSchema>;
 
 /** What each GET route answers (the dashboard's typed client; the daemon's handlers are checked against it). */
 export interface Responses {

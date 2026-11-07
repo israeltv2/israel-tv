@@ -30,6 +30,16 @@ export function isPortrait(s: Size): boolean {
   return s.h >= s.w * 1.2;
 }
 
+/**
+ * A broadcaster's own stand-in for a show with no artwork (Reshet's black "default poster"): not the show's image,
+ * so never published as its poster (ours is used instead, and the dashboard draws its tile).
+ */
+const STOCK_IMAGE = /(?:deafult|default)_poster_image/i;
+
+export function isStockImage(url: string): boolean {
+  return STOCK_IMAGE.test(url);
+}
+
 /** Our own files (the site's address token) and any host not on the refused list. */
 export function reachableAbroad(url: string): boolean {
   if (url.startsWith(`${ORIGIN_TOKEN}/`)) return true;
@@ -178,7 +188,7 @@ export function localPoster(file: string, dir: string): 'same' | Uint8Array | un
 export type RemotePoster = { url: string } | { file: string } | { none: true };
 
 export function remotePoster(store: Store, dir: string, url: string): RemotePoster {
-  if (!reachableAbroad(url)) return { none: true };
+  if (!reachableAbroad(url) || isStockImage(url)) return { none: true };
   const m = store.getState<PosterState>(STATE_KEY)?.[url];
   if (!m || !('w' in m) || isPortrait(m)) return { url };
   return m.file && existsSync(join(dir, m.file)) ? { file: join(dir, m.file) } : { none: true };
@@ -198,7 +208,7 @@ export async function measurePosters(
   const now = opts.now ?? Date.now();
   const state = { ...(store.getState<PosterState>(STATE_KEY) ?? {}) };
   const due = [...new Set(urls)].filter((u) => {
-    if (!reachableAbroad(u)) return false;
+    if (!reachableAbroad(u) || isStockImage(u)) return false;
     const m = state[u];
     return !m || ('error' in m && now - Date.parse(m.at) > RETRY_FAILED_MS);
   });

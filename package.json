@@ -26,6 +26,7 @@
     "e2e:dashboard": "node tools/dashboard-e2e.mjs",
     "budget:workers": "node tools/worker-budget.mjs",
     "shots:dashboard": "node tools/dashboard-shots.mjs",
+    "audit:images": "node tools/image-audit.mjs",
     "build": "pnpm --filter @israel-tv/dashboard build"
   },
   "devDependencies": {

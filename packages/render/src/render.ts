@@ -472,12 +472,23 @@ export function renderSite(input: RenderInput): SiteFiles {
     rows.set('iltv_live', row);
   }
 
+  // A row's notices are tiles like any other: the generic poster, so a row never has a blank one.
+  const noticeArt = input.assets?.has(sitePaths.posterPlaceholder)
+    ? { poster: `${ORIGIN_TOKEN}/${sitePaths.posterPlaceholder}`, posterShape: SHAPE }
+    : {};
+
   // A row still filling says so first (Kan's first fill takes days).
   for (const [catalog, text] of Object.entries(input.catalogFilling ?? {})) {
     const def = CATALOGS.find((c) => c.id === catalog);
     if (!def || !rows.get(catalog)?.length) continue;
     const id = `${STATUS_ID_PREFIX}${catalog}_filling`;
-    const item: MetaPreview = { id, type: def.type, name: rtl(`⏳ ${text}`), description: rtl(text) };
+    const item: MetaPreview = {
+      id,
+      type: def.type,
+      name: rtl(`⏳ ${text}`),
+      description: rtl(text),
+      ...noticeArt,
+    };
     rows.set(catalog, [item, ...(rows.get(catalog) ?? [])]);
     files.set(sitePaths.meta(def.type, id), json({ meta: { ...item, videos: [] } }));
   }
@@ -492,6 +503,7 @@ export function renderSite(input: RenderInput): SiteFiles {
       type: def.type,
       name: rtl(`⚠ ${text}`),
       description: rtl(`${text}\nפרטים: /status`),
+      ...noticeArt,
     };
     rows.set(catalog, [item, ...(rows.get(catalog) ?? [])]);
     files.set(sitePaths.meta(def.type, id), json({ meta: { ...item, videos: [] } }));
@@ -509,6 +521,7 @@ export function renderSite(input: RenderInput): SiteFiles {
       type: def.type,
       name: `⏳ ${text}`,
       description: `${text}\nפרטים: /status`,
+      ...noticeArt,
     };
     rows.set(def.id, [item]);
     files.set(sitePaths.meta(def.type, id), json({ meta: { ...item, videos: [] } }));

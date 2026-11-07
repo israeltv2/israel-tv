@@ -23,12 +23,21 @@ export function Overview() {
   const fresh = o.freshness.filter((f) => !f.stale && f.health === 'ok').length;
   const worst =
     o.freshness.find((f) => f.health === 'error' || f.stale) ?? o.freshness.find((f) => f.health === 'warn');
-  // The public addon is counted a day later: days not read yet have no point (not a zero).
+  // Days before counting started, and the public addon's days not read yet (it is counted a day later), have no
+  // point: no data is not zero plays.
+  const homeSince = home.countedSince;
+  const publicSince = o.public.countedSince;
   const rows = home.perDay.map((d, i) => ({
     day: d.day,
-    home: d.plays,
-    public: o.public.lastDay && d.day <= o.public.lastDay ? (o.public.perDay[i]?.plays ?? 0) : null,
+    home: homeSince && d.day >= homeSince ? d.plays : null,
+    public:
+      publicSince && d.day >= publicSince && o.public.lastDay && d.day <= o.public.lastDay
+        ? (o.public.perDay[i]?.plays ?? 0)
+        : null,
   }));
+  const shown = [homeSince, ...(o.public.counted ? [publicSince] : [])];
+  // Hatched up to the first day any line has data.
+  const noDataBefore = shown.every(Boolean) ? (shown as string[]).sort()[0] : undefined;
   const attempts = home.d7.plays + home.d7.failures;
   return (
     <section className="space-y-5">
@@ -160,6 +169,7 @@ export function Overview() {
           <Suspense fallback={<Skeleton className="h-[220px]" />}>
             <DayLines
               rows={rows}
+              noDataBefore={noDataBefore}
               caption="Plays per day, last 30 days"
               series={[
                 { key: 'home', name: 'Home', color: 'var(--accent)' },
@@ -194,7 +204,7 @@ export function Overview() {
                 {home.topShows.slice(0, 6).map((s, i) => (
                   <li key={s.showId} className="flex items-center gap-3">
                     <span className="num w-4 text-end text-muted text-xs">{i + 1}</span>
-                    <Poster url={s.poster} source={s.source} className="w-8" />
+                    <Poster art={s} source={s.source} title={s.title} className="w-8" />
                     <div className="min-w-0 flex-1">
                       <Title className="block font-medium">{s.title ?? s.showId}</Title>
                       <SourceTag source={s.source} />
