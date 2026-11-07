@@ -1865,3 +1865,40 @@ below.
   it lists before their episodes arrive.
 - Row cards share rows (CSS subgrid): header, counts, where it plays, posters line up across a row of cards. Five
   cards are laid out as two wide and three narrow, four as two by two.
+
+## Round 10, live and publishing: only real problems are errors (2026-11-07)
+
+Measured on the home instance (runs, warnings, events.sqlite, logs; last 3 days) before changing anything.
+
+- **Kan live channels "not answering (HTTP 403)"** (Kan Educational ×5 2026-11-06 06:00–06:22 UTC, Makan 33 08:34,
+  Kan 11 2026-11-07 02:05). Cause: the old live check (before 0.3.0) read only each first master playlist with a
+  bare `Mozilla/5.0` and called any 403 "down", even from abroad. Since 0.3.0 (deployed 2026-11-07 04:00 UTC) every
+  stream is played like a player (ExoPlayer user agent, playlist → variant → segment) and a refusal abroad is a
+  label: no such failure since. The refusals themselves were real and by programme: Kan Educational was refused for
+  22 minutes straight, then played; a watch from the home instance (abroad) on 2026-11-07 (every 2 minutes, four Kan streams; a first pass with four
+  user agents and none) saw every play 200/200/206, so it is not the user agent or a token. Decision: a stream that
+  fails is played once more 30 s later (a refusal abroad is not: a programme's block lasts); each stream keeps
+  its last 20 outcomes; the label says "זמין לצפייה רק בישראל" only for a stream never played abroad and "לפעמים
+  זמין רק בישראל" for one refused sometimes; Kan's three channels (`geo`) always say at least "sometimes" (the home
+  helper relays them when refused). Before, a single refusal turned a stream "Israel only" until the next check.
+- **Channel 14 "variant is not a playlist"** (one run, 2026-11-07 02:09 UTC, with ynet 720p). Cause: its address is
+  a media playlist (segments, no variants) and the old check took its first segment for a variant. Fixed in #117
+  (0.3.0); every check since plays it; test with a trimmed copy of the real playlist.
+- **Cloudflare publish failures** (9 in 8 minutes on 2026-11-06 09:25–09:33 UTC, "malformed response … no healthy
+  upstream"; the next one passed). A publish now retries Cloudflare's own trouble 4 times with growing, jittered
+  pauses (15 s → 3 min); a try resumes the uploads of the last one (assets go up by content hash). `/status` raises
+  it only after 3 failed publishes in a row (a token or account problem at once, with the token hint, which outages
+  no longer get). The one "versions API" error (Analytics Engine not enabled, 2026-11-06 11:47) is the API Worker's
+  setup and handled since round 3 (deploys without it, `/status` says so).
+- **Resolver "no stream for this id here" as `error`** (14 in 3 days: Channel 13 ×13, Channel 14 ×1, last
+  2026-11-07 03:10). Apps ask every installed addon for every id, so the helper is asked for titles it has nothing
+  to add to. Now outcome `not-mine` (never counted as a failure); `error` only where the helper had a job and failed
+  it: Mako (a ticket per play), a relay it should have offered, or one of our own titles it does not know. Channel 13 and 14 already answered "none needed" since #124; the 14 old events were
+  relabelled once at start-up (`fix:not-mine`).
+- **Old Mako failures** (2026-11-06 12:09–12:13 UTC: master 403, then 502 "Invalid URL", two of them a viewer's): the
+  round-6 bug, fixed by Mako's CloudFront fallback (#111, 2026-11-07). None since (checked in events.sqlite). The
+  dashboard lists them as "fixed" with what was done and leaves them out of every count of open problems (failures,
+  rate, since this version, health line; `KNOWN_FIXES`); the canary's own plays
+  were already relabelled.
+- **Not done:** the live check does not play refused Kan streams through the relay (each relay play is a geo proxy session, and the
+  proxy provider locks the login after ~10 quick sessions); the daily canary already plays a relayed Kan title.

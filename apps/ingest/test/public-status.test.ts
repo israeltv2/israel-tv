@@ -62,6 +62,25 @@ test('live channels: up, down or unchecked, never a stream address', () => {
   expect(live?.channels.find((x) => x.id === b.id)).toMatchObject({ state: 'down' });
   expect(live?.channels.find((x) => x.id === c.id)).toMatchObject({ state: 'unchecked' });
   expect(JSON.stringify(live)).not.toMatch(/cdn\.example|box\.local|statuses/);
+  // A channel that played abroad before and is refused now (a programme blocked abroad) is not "Israel only".
+  const once = liveChannels({
+    at: '2026-11-07T03:00:00Z',
+    abroad: true,
+    channels: {
+      [a.id]: [
+        {
+          title: 'x',
+          via: 'direct',
+          url: 'https://cdn.example/a.m3u8',
+          outcome: 'refused',
+          statuses: [403],
+          recent: 'ooor',
+        },
+      ],
+    },
+  });
+  expect(once?.channels.find((x) => x.id === a.id)).toMatchObject({ state: 'up' });
+  expect(once?.channels.find((x) => x.id === a.id)?.israelOnly).toBeUndefined();
   expect(liveChannels(undefined)).toBeUndefined();
 });
 

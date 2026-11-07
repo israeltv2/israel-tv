@@ -1,6 +1,7 @@
 // Live channels: render entries, and the daily check that plays every one of their streams.
 import {
   ISRAEL_ONLY,
+  ISRAEL_ONLY_SOMETIMES,
   LIVE_CHANNELS,
   type LiveChannel,
   ORIGIN_TOKEN,
@@ -23,6 +24,10 @@ export interface LiveStreamCheck {
   outcome: 'ok' | 'refused' | 'failed';
   statuses: number[];
   detail?: string;
+  /** The first try failed and this is the second, a little later (what a viewer pressing play again sees). */
+  retried?: boolean;
+  /** This stream's latest outcomes, oldest first, this check last: `o` played, `r` refused, `f` failed (≤ 20). */
+  recent?: string;
 }
 export interface LiveCheck {
   at: string;
@@ -31,10 +36,32 @@ export interface LiveCheck {
   channels: Record<string, LiveStreamCheck[]>;
 }
 
+/** How many of a stream's latest outcomes are kept (`recent`). */
+export const LIVE_HISTORY = 20;
+const LETTER = { ok: 'o', refused: 'r', failed: 'f' } as const;
+
+/** A stream's outcomes, oldest first (a check from before histories were kept counts as its one outcome). */
+const historyOf = (x: LiveStreamCheck | undefined): string => (x ? (x.recent ?? LETTER[x.outcome]) : '');
+
+/**
+ * Whether a stream plays outside Israel, from the checks made abroad: `always` refused (never played), `sometimes`
+ * (refused in some checks, played in others: the broadcaster blocks some programmes only), or undefined (no
+ * refusal seen). A channel known to block some programmes (`geo`: Kan's) is at least `sometimes`; an instance in
+ * Israel cannot tell, so it goes by that alone. One refusal never turns a stream that plays into "Israel only".
+ */
+export function israelOnly(
+  channel: Pick<LiveChannel, 'geo'>,
+  seen: LiveStreamCheck | undefined,
+  abroad: boolean,
+): 'always' | 'sometimes' | undefined {
+  const recent = historyOf(seen);
+  if (abroad && recent.includes('r')) return recent.includes('o') ? 'sometimes' : 'always';
+  return channel.geo ? 'sometimes' : undefined;
+}
+
 /**
  * Live channels for rendering; `logos` are the channel ids that have a logo tile among the site's images. A stream
- * says it plays only in Israel when the last check, made from abroad, was refused; without such a check, the
- * channels the broadcaster sometimes geo-blocks say so.
+ * says when it plays only in Israel, always or for some programmes (israelOnly).
  */
 export function liveRender(logos: ReadonlySet<string> = new Set(), check?: LiveCheck): LiveChannelRender[] {
   return LIVE_CHANNELS.map((c) => ({
@@ -43,12 +70,14 @@ export function liveRender(logos: ReadonlySet<string> = new Set(), check?: LiveC
     ...(logos.has(c.id) ? { logo: `${ORIGIN_TOKEN}/${sitePaths.channelLogo(c.id)}` } : {}),
     description: c.description,
     streams: c.direct.map((l) => {
-      const seen = check?.abroad ? check.channels[c.id]?.find((x) => x.url === l.url) : undefined;
-      const israelOnly = seen ? seen.outcome === 'refused' : !check?.abroad && !!c.geo;
+      const seen = check?.channels[c.id]?.find((x) => x.via === 'direct' && x.url === l.url);
+      const only = israelOnly(c, seen, !!check?.abroad);
+      const label =
+        only === 'always' ? ISRAEL_ONLY : only === 'sometimes' ? ISRAEL_ONLY_SOMETIMES : undefined;
       return {
         url: l.url,
         name: c.name,
-        title: israelOnly ? `${l.title} · ${ISRAEL_ONLY}` : l.title,
+        title: label ? `${l.title} · ${label}` : l.title,
         // DASH: apps that cannot play it themselves (Stremio in a browser) hand it to their streaming server.
         ...(/\/livedash\//.test(l.url) ? { behaviorHints: { notWebReady: true } } : {}),
       };
@@ -56,7 +85,7 @@ export function liveRender(logos: ReadonlySet<string> = new Set(), check?: LiveC
   }));
 }
 
-const judge = (r: Awaited<ReturnType<typeof playCheck>>): LiveStreamCheck['outcome'] => {
+const judge = (r: { step?: string; statuses: number[] }): LiveStreamCheck['outcome'] => {
   if (!r.step) return 'ok';
   const last = r.statuses.at(-1);
   return last === 403 || last === 451 ? 'refused' : 'failed';
@@ -69,6 +98,8 @@ export interface LiveCheckOptions {
   abroad?: boolean;
   fetchImpl?: typeof fetch;
   channels?: readonly LiveChannel[];
+  /** Pause before playing a stream that did not play a second time (ms). */
+  retryDelayMs?: number;
 }
 
 /**
@@ -86,20 +117,43 @@ export async function checkLive(
   const failed: string[] = [];
   const streamsFailed: string[] = [];
   const results: LiveCheck['channels'] = {};
+  const before = store.getState<LiveCheck>(LIVE_CHECK_KEY);
+  const delay = opts.retryDelayMs ?? 30_000;
+  /**
+   * Play a stream; one that fails is played again a little later, as a viewer would press play again. A refusal
+   * from abroad is not tried again: it is the broadcaster's limit for the programme on air (measured: 22 minutes).
+   */
+  const play = async (url: string) => {
+    const first = await playCheck(url, f);
+    if (!first.step || (opts.abroad && judge(first) === 'refused')) return { ...first, retried: false };
+    await new Promise((r) => setTimeout(r, delay));
+    return { ...(await playCheck(url, f)), retried: true };
+  };
+  /** The result, with this stream's outcomes from earlier checks before it. */
+  const entry = (
+    c: LiveChannel,
+    x: Omit<LiveStreamCheck, 'outcome' | 'statuses' | 'recent' | 'retried'>,
+    r: { statuses: number[]; step?: string; detail?: string; retried?: boolean },
+  ): LiveStreamCheck => {
+    const outcome = judge(r);
+    const prev = before?.channels[c.id]?.find((p) =>
+      x.via === 'direct' ? p.via === 'direct' && p.url === x.url : p.via === x.via && p.title === x.title,
+    );
+    const past = historyOf(prev);
+    return {
+      ...x,
+      outcome,
+      statuses: r.statuses,
+      ...(r.detail ? { detail: r.detail } : {}),
+      ...(r.retried ? { retried: true } : {}),
+      recent: `${past}${LETTER[outcome]}`.slice(-LIVE_HISTORY),
+    };
+  };
   let ok = 0;
   for (const c of channels) {
     const list: LiveStreamCheck[] = [];
-    for (const l of c.direct) {
-      const r = await playCheck(l.url, f);
-      list.push({
-        title: l.title,
-        via: 'direct',
-        url: l.url,
-        outcome: judge(r),
-        statuses: r.statuses,
-        ...(r.detail ? { detail: r.detail } : {}),
-      });
-    }
+    for (const l of c.direct)
+      list.push(entry(c, { title: l.title, via: 'direct', url: l.url }, await play(l.url)));
     if (c.mako?.length && opts.resolverBase) {
       let urls: string[] = [];
       try {
@@ -113,23 +167,16 @@ export async function checkLive(
       for (const [i, m] of c.mako.entries()) {
         const url = urls.find((u) => u.includes(`/play/mako-live/${c.id}/${i}.m3u8`));
         if (!url) {
-          list.push({
-            title: m.title,
-            via: 'helper',
-            outcome: 'failed',
-            statuses: [],
-            detail: 'no stream offered',
-          });
+          list.push(
+            entry(
+              c,
+              { title: m.title, via: 'helper' },
+              { statuses: [], step: 'stream', detail: 'no stream offered' },
+            ),
+          );
           continue;
         }
-        const r = await playCheck(url, f);
-        list.push({
-          title: m.title,
-          via: 'helper',
-          outcome: judge(r),
-          statuses: r.statuses,
-          ...(r.detail ? { detail: r.detail } : {}),
-        });
+        list.push(entry(c, { title: m.title, via: 'helper' }, await play(url)));
       }
     }
     results[c.id] = list;

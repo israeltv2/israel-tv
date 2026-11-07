@@ -21,6 +21,8 @@ export type EventKind =
   /** The daily playback canary checked one title end to end. */
   | 'canary';
 
+export type EventOutcome = 'ok' | 'error' | 'not-mine';
+
 /** Which part of the system recorded it. */
 export type Component = 'resolver' | 'mako-auth' | 'geo-relay' | 'ingest' | 'canary';
 
@@ -29,7 +31,12 @@ export interface UsageEvent {
   ts: string;
   kind: EventKind;
   component: Component;
-  outcome: 'ok' | 'error';
+  /**
+   * `not-mine`: the home helper was asked for an id it has nothing to add to (another addon's title, or a channel
+   * the public addon already plays). Apps ask every installed addon for every id: that is normal, not a failure,
+   * and never counts in failure rates.
+   */
+  outcome: EventOutcome;
   playId?: string;
   source?: string;
   /** Series id (iltv_…) or live channel id. */

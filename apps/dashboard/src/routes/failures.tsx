@@ -36,18 +36,18 @@ export function Failures() {
   const { data: o } = useApi('overview');
   if (error && !f) return <LoadError error={error} retry={() => void refetch()} />;
   if (!f) return <Skeleton className="h-96" />;
-  const total = f.groups.reduce((n, g) => n + g.n, 0);
-  const episodeOnly = f.groups.filter((g) => g.blame === 'episode').reduce((n, g) => n + g.n, 0);
+  // Failures whose cause was fixed since are listed (dimmed, with the fix) but not counted as open problems.
+  const open = f.groups.filter((g) => !g.fixed);
+  const fixedCount = f.groups.filter((g) => g.fixed).reduce((n, g) => n + g.n, 0);
+  const total = open.reduce((n, g) => n + g.n, 0);
+  const episodeOnly = open.filter((g) => g.blame === 'episode').reduce((n, g) => n + g.n, 0);
   const rows = f.days.map((day, i) => ({
     day,
     ...Object.fromEntries(
-      SOURCES.map((s) => [
-        s,
-        f.groups.filter((g) => g.source === s).reduce((n, g) => n + (g.perDay[i] ?? 0), 0),
-      ]),
+      SOURCES.map((s) => [s, open.filter((g) => g.source === s).reduce((n, g) => n + (g.perDay[i] ?? 0), 0)]),
     ),
   }));
-  const used = SOURCES.filter((s) => f.groups.some((g) => g.source === s));
+  const used = SOURCES.filter((s) => open.some((g) => g.source === s));
   const attempts = (o?.home.d7.plays ?? 0) + (o?.home.d7.failures ?? 0);
   return (
     <section className="space-y-5">
@@ -56,7 +56,12 @@ export function Failures() {
         description="Plays that did not start, grouped by where and why. The project's own checks are not counted here."
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi label="Failed plays · 7 days" value={num(total)} {...(total ? { tone: 'var(--error)' } : {})} />
+        <Kpi
+          label="Failed plays · 7 days"
+          value={num(total)}
+          {...(total ? { tone: 'var(--error)' } : {})}
+          {...(fixedCount ? { sub: `and ${num(fixedCount)} from a cause fixed since` } : {})}
+        />
         <Kpi
           label="Failure rate · 7 days"
           value={attempts ? pct(o?.failureRate7d ?? 0, 1) : '—'}
@@ -68,7 +73,7 @@ export function Failures() {
                 : 'no plays'
           }
         />
-        <Kpi label="Kinds of failure" value={num(f.groups.length)} sub="source · stage · status · reason" />
+        <Kpi label="Kinds of failure" value={num(open.length)} sub="source · stage · status · reason" />
         <Kpi
           label="Single title refused"
           value={num(episodeOnly)}
@@ -88,7 +93,10 @@ export function Failures() {
               />
             </Suspense>
           ) : (
-            <Empty>No failed plays in the last 7 days.</Empty>
+            <Empty>
+              No failed plays in the last 7 days
+              {fixedCount ? ' (apart from ones whose cause was fixed since)' : ''}.
+            </Empty>
           )}
         </CardBody>
       </Card>
@@ -102,8 +110,8 @@ export function Failures() {
             <ul className="divide-y divide-border">
               {f.groups.map((g) => (
                 <li
-                  key={`${g.source}|${g.stage}|${g.status}|${g.reason}`}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3"
+                  key={`${g.source}|${g.stage}|${g.status}|${g.reason}|${g.fixed ?? ''}`}
+                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 py-3${g.fixed ? ' opacity-60' : ''}`}
                 >
                   <div className="min-w-0 flex-1 basis-64">
                     <div className="flex flex-wrap items-center gap-2">
@@ -113,10 +121,13 @@ export function Failures() {
                       {g.blame === 'episode' ? (
                         <Badge style={{ color: 'var(--warn)' }}>one title</Badge>
                       ) : null}
+                      {g.fixed ? <Badge style={{ color: 'var(--ok)' }}>fixed</Badge> : null}
                     </div>
-                    <p className="mt-1 break-words text-sm">
+                    {g.plain ? <p className="mt-1 text-sm">{g.plain}</p> : null}
+                    <p className="mt-0.5 break-words font-mono text-muted text-xs">
                       <bdi dir="auto">{g.reason || 'no reason recorded'}</bdi>
                     </p>
+                    {g.fixed ? <p className="mt-0.5 text-[var(--ok)] text-xs">{g.fixed}</p> : null}
                   </div>
                   <MiniBars values={g.perDay} days={f.days} />
                   <div className="w-28 text-end">

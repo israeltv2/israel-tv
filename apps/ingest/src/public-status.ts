@@ -15,7 +15,7 @@ import {
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { kanRowProgress, stillFilling } from './kan.ts';
-import { LIVE_CHECK_KEY, type LiveCheck } from './live.ts';
+import { israelOnly, LIVE_CHECK_KEY, type LiveCheck } from './live.ts';
 import { episodeCount } from './runner.ts';
 
 /** Days of history on the status page (runs are kept 60 days; store.prune). */
@@ -86,13 +86,17 @@ export function liveChannels(check: LiveCheck | null | undefined): StatusFile['l
   const channels: StatusLiveChannel[] = LIVE_CHANNELS.map((c) => {
     const list = check.channels[c.id] ?? [];
     const fine = list.filter((x) => x.outcome === 'ok' || (check.abroad && x.outcome === 'refused'));
-    const israelOnly = check.abroad && fine.length > 0 && fine.every((x) => x.outcome === 'refused');
+    // "Israel only" when none of the channel's streams ever played abroad (one refusal is not enough).
+    const onlyHere =
+      check.abroad &&
+      fine.length > 0 &&
+      fine.every((x) => x.outcome === 'refused' && israelOnly({}, x, true) === 'always');
     return {
       id: c.id,
       name: c.name,
       state: list.length === 0 ? 'unchecked' : fine.length > 0 ? 'up' : 'down',
       helper: c.direct.length === 0,
-      ...(israelOnly ? { israelOnly: true } : {}),
+      ...(onlyHere ? { israelOnly: true } : {}),
     };
   });
   return { at: check.at, abroad: check.abroad, channels };

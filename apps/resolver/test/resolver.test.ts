@@ -678,12 +678,40 @@ test('a live channel with neither a Mako ticket nor a geo limit needs nothing he
   const s = await (await app.request('/stream/tv/iltv_live_reshet13.json')).json();
   expect(s.streams).toEqual([]);
   expect(events.at(-1)).toMatchObject({ outcome: 'ok', detail: { offered: 'none needed' } });
-  // A geo-limited channel with no relay configured here still says it has nothing to offer.
+  // A geo-limited channel with no relay configured here has nothing to add: the public addon's streams are the
+  // viewer's. Not an error (the app asks every addon for every id).
   await app.request('/stream/tv/iltv_live_kan11.json');
   expect(events.at(-1)).toMatchObject({
-    outcome: 'error',
+    outcome: 'not-mine',
     detail: { offered: 'no stream for this id here' },
   });
+});
+
+test('ids the helper has nothing to add to are "not-mine"; a Mako title it cannot play is an error', async () => {
+  const events: { outcome: string; showId?: string }[] = [];
+  const app = createResolverApp({
+    episode: () => undefined,
+    onEvent: (e) => events.push(e),
+    fetch: async () => new Response('', { status: 404 }),
+  });
+  // Another addon's title (a Cinemeta id we do not map).
+  await app.request('/stream/series/tt0903747:1:1.json');
+  expect(events.at(-1)?.outcome).toBe('not-mine');
+  // One of our own titles this helper does not know (a stale copy), and Mako (needs this helper for every play):
+  // nothing offered is a real failure.
+  for (const id of ['iltv_reshet_5:1:1', 'iltv_kan_9:2:3', 'iltv_mako_1:1:1']) {
+    await app.request(`/stream/series/${id}.json`);
+    expect(events.at(-1)?.outcome, id).toBe('error');
+  }
+  // A Reshet episode it knows that plays from here, with no relay configured: nothing to add.
+  const known = createResolverApp({
+    episode: async () =>
+      ({ key: 'k', streams: [{ kind: 'direct', url: 'https://cdn.example/a.m3u8' }] }) as never,
+    onEvent: (e) => events.push(e),
+    fetch: async () => new Response('', { status: 404 }),
+  });
+  await known.request('/stream/series/iltv_reshet_5:1:1.json');
+  expect(events.at(-1)?.outcome).toBe('not-mine');
 });
 
 test('a relay refused through one exit is tried once through the next', async () => {

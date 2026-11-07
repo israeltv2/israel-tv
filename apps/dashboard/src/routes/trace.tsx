@@ -1,12 +1,15 @@
 import { Link, useParams } from '@tanstack/react-router';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { Empty, LoadError, PageHeader, SourceTag, Title, When } from '#components/bits.tsx';
-import { HealthDot, HealthPill } from '#components/health.tsx';
+import { HealthDot, HealthPill, type HealthState } from '#components/health.tsx';
 import { Badge } from '#components/ui/badge.tsx';
 import { Card, CardBody } from '#components/ui/card.tsx';
 import { Skeleton } from '#components/ui/skeleton.tsx';
 import { useApi } from '#lib/api.ts';
 import { clock, ms } from '#lib/format.ts';
+
+/** `not-mine`: the helper was asked for an id it has nothing to add to (normal; grey, never red). */
+const OUTCOME_STATE: Record<string, HealthState> = { ok: 'ok', error: 'error', 'not-mine': 'unknown' };
 
 const COMPONENT_COLOR: Record<string, string> = {
   resolver: 'var(--accent)',
@@ -88,7 +91,7 @@ export function TracePage() {
                       <span className="num w-20 shrink-0 font-mono text-muted text-xs" title={clock(e.ts)}>
                         +{ms(at)}
                       </span>
-                      <HealthDot state={e.outcome === 'ok' ? 'ok' : 'error'} />
+                      <HealthDot state={OUTCOME_STATE[e.outcome] ?? 'error'} />
                       <Badge style={{ color: COMPONENT_COLOR[e.component] ?? 'inherit' }}>
                         {e.component}
                       </Badge>
@@ -109,7 +112,9 @@ export function TracePage() {
                           background:
                             e.outcome === 'ok'
                               ? (COMPONENT_COLOR[e.component] ?? 'var(--accent)')
-                              : 'var(--error)',
+                              : e.outcome === 'not-mine'
+                                ? 'var(--unknown)'
+                                : 'var(--error)',
                         }}
                       />
                     </div>
@@ -118,7 +123,7 @@ export function TracePage() {
                         {upstream ? <span className="text-muted">{upstream}</span> : null}
                         {upstream && reason ? ' — ' : null}
                         {reason ? (
-                          <span style={{ color: e.outcome === 'ok' ? undefined : 'var(--error)' }}>
+                          <span style={{ color: e.outcome === 'error' ? 'var(--error)' : undefined }}>
                             {reason}
                           </span>
                         ) : null}
