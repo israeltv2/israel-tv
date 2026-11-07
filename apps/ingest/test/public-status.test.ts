@@ -97,7 +97,7 @@ describe('nothing private reaches status.json or /status', () => {
     ['deploy: https://dash.cloudflare.com/0123abcd/workers/x', /cloudflare|0123abcd/],
     ['play https://user:secret@www.mako.co.il/x?ticket=SECRET#frag', /user|secret|SECRET|ticket|frag/],
     ['resolver mac-mini:7703 did not answer', /mac-mini|7703/],
-    ['wrote /Library/Application Support/israel-tv/x.db', /Library/],
+    ['wrote /Library/Application Support/israel-tv/x.db', /\/Library\/|Application Support/],
     ['wrote /Users/someone/israel-tv/data/catalog.db', /someone/],
     ['wrote C:/Users/someone/israel-tv/catalog.db', /someone/],
     ['wrote C:\\Users\\someone\\catalog.db', /someone/],

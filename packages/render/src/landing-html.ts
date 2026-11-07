@@ -2,10 +2,12 @@
 // what is in it (the real rows, counts and live channels, written in when the site is rendered), how to add it in
 // one click, the home helper and watching from abroad in plain words, questions, and where the project lives.
 // Pre-rendered: the page reads complete without its few lines of script.
-import { sitePaths } from '@israel-tv/core';
+import { type GuideFile, sitePaths } from '@israel-tv/core';
+import { channelGuide, plain, rowHref } from './library-html.ts';
 import { CATALOG_LOGO, catalogAppName, catalogName } from './names.ts';
 import {
   absolute,
+  BRAND,
   bdi,
   DOCS_URL,
   esc,
@@ -17,6 +19,8 @@ import {
   LICENSE_URL,
   num,
   PROJECT_URL,
+  siteNav,
+  sized,
   topBar,
 } from './page.ts';
 import type { Overall } from './status-html.ts';
@@ -39,6 +43,12 @@ export interface LandingInput {
   status?: Overall;
   /** The addon's public address when known (else the page's script fills in the install links). */
   publicUrl?: string;
+  /** Each row's newest posters (shown fanned out on its card). */
+  rowPosters?: Record<string, string[]>;
+  /** Show posters for the header's moving wall. */
+  wall?: { name: string; poster: string }[];
+  /** The live guide, for "on the air now" (the page's script shows what is on). */
+  guide?: GuideFile;
 }
 
 const HELPER_DOC = `${PROJECT_URL}/blob/main/docs/setup/home-helper.md`;
@@ -66,50 +76,85 @@ const WHERE: Record<string, Record<Lang, { israel: string; abroad: string; helpe
 };
 
 const LANDING_CSS = `
-.hero{position:relative;color:var(--hero-fg);background:#0b1730 url(/${sitePaths.heroImage}) center 78%/cover no-repeat;isolation:isolate}
-.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgb(7 15 33/55%) 0%,rgb(7 15 33/35%) 45%,rgb(7 15 33/88%) 100%)}
-.hero .wrap{padding-block:104px 56px;display:grid;gap:20px}
-@media (min-width:900px){.hero .wrap{padding-block:136px 84px}}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.85rem;font-weight:600;color:var(--hero-muted);letter-spacing:.02em}
-.hero h1{font-size:clamp(2.1rem,6.4vw,3.6rem);line-height:1.05;margin:0;max-width:16ch;letter-spacing:-.025em}
-.hero .lead{font-size:clamp(1.05rem,2.4vw,1.25rem);color:var(--hero-muted);max-width:40rem;margin:0}
-.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
-.link-box{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:rgb(255 255 255/8%);border:1px solid rgb(255 255 255/20%);border-radius:14px;padding:12px 14px;max-width:44rem;backdrop-filter:blur(6px)}
-.link-box code{background:transparent;color:#fff;font-size:clamp(.8rem,3.4vw,.95rem);padding:0;direction:ltr;unicode-bidi:isolate}
+.hero{position:relative;overflow:hidden;color:var(--hero-fg);background:#0b0a10;isolation:isolate}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to left,#0b0a10 0%,rgb(11 10 16/92%) 38%,rgb(11 10 16/35%) 72%,rgb(11 10 16/15%) 100%),linear-gradient(to top,#0b0a10 0%,transparent 30%)}
+[dir=ltr] .hero::before{background:linear-gradient(to right,#0b0a10 0%,rgb(11 10 16/92%) 38%,rgb(11 10 16/35%) 72%,rgb(11 10 16/15%) 100%),linear-gradient(to top,#0b0a10 0%,transparent 30%)}
+@media (max-width:719px){.hero::before,[dir=ltr] .hero::before{background:linear-gradient(to top,#0b0a10 0%,rgb(11 10 16/90%) 55%,rgb(11 10 16/55%) 100%)}}
+.wall{position:absolute;inset:-14% -12%;z-index:-2;display:grid;gap:16px;align-content:center;transform:rotate(-7deg);direction:ltr;opacity:.8;animation:wall-in 1.4s var(--ease-out) both}
+.lane{display:flex}
+.drift{display:flex;gap:16px;flex:none;padding-inline-end:16px;animation:drift 140s linear infinite}
+.lane:nth-child(2) .drift{animation-duration:170s;animation-direction:reverse}
+.lane:nth-child(3) .drift{animation-duration:155s}
+.drift img{width:clamp(100px,12vw,190px);height:auto;aspect-ratio:2/3;object-fit:cover;border-radius:10px;background:#1b1922;flex:none}
+@keyframes drift{to{transform:translateX(-100%)}}
+@keyframes wall-in{from{opacity:0;transform:rotate(-7deg) scale(1.05)}}
+.hero-copy{display:grid;gap:20px;justify-items:start;padding-block:128px 40px}
+@media (min-width:900px){.hero-copy{padding-block:176px 56px}}
+.hero-copy>*{animation:rise .6s var(--ease-out) both}
+.hero-copy>:nth-child(2){animation-delay:.06s}.hero-copy>:nth-child(3){animation-delay:.12s}.hero-copy>:nth-child(4){animation-delay:.18s}.hero-copy>:nth-child(n+5){animation-delay:.24s}
+@keyframes rise{from{opacity:.001;transform:translateY(14px)}}
+.kicker{display:inline-flex;align-items:center;gap:10px;font-size:.95rem;color:var(--hero-muted)}
+.kicker img{width:26px;height:26px}
+.hero h1{font-size:clamp(3.4rem,9.5vw,7.4rem);line-height:.86;margin:0;max-width:12ch;letter-spacing:0;text-shadow:0 4px 40px rgb(0 0 0/45%)}
+.hero .lead{font-size:clamp(1.05rem,2.4vw,1.28rem);color:var(--hero-muted);max-width:38rem;margin:0}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+.link-box{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;background:rgb(255 255 255/6%);border:1px solid rgb(255 255 255/16%);border-radius:14px;padding:12px 16px;max-width:42rem;backdrop-filter:blur(8px)}
+.link-box code{background:transparent;color:var(--hero-fg);font-size:clamp(.8rem,3.4vw,.95rem);padding:0;direction:ltr;unicode-bidi:isolate}
 .link-box .small{color:var(--hero-muted);flex-basis:100%}
-.status-chip{display:inline-flex;align-items:center;gap:8px;color:#fff;text-decoration:none;font-size:.92rem;background:rgb(255 255 255/10%);border:1px solid rgb(255 255 255/22%);padding:6px 12px;border-radius:999px;justify-self:start}
-.status-chip:hover{background:rgb(255 255 255/16%)}
+.stats{display:flex;flex-wrap:wrap;gap:12px 36px;margin:6px 0 0;padding:0;list-style:none}
+.stats li{display:flex;flex-direction:column}
+.stats strong{font:700 clamp(2.4rem,5vw,3.2rem)/1 var(--display);font-variant-numeric:tabular-nums;color:${BRAND.stone}}
+.stats span{color:var(--hero-muted);font-size:.88rem}
+.status-chip{display:inline-flex;align-items:center;gap:8px;color:var(--hero-fg);text-decoration:none;font-size:.9rem;background:rgb(255 255 255/8%);border:1px solid rgb(255 255 255/18%);padding:6px 12px;border-radius:999px}
+.status-chip:hover{background:rgb(255 255 255/14%)}
 .status-chip i{width:9px;height:9px;border-radius:50%;background:#4fd39b;box-shadow:0 0 0 3px rgb(79 211 155/25%)}
 .status-chip.warn i,.status-chip.info i{background:#f5bd4f;box-shadow:0 0 0 3px rgb(245 189 79/25%)}
 .status-chip.error i{background:#ff7b6e;box-shadow:0 0 0 3px rgb(255 123 110/25%)}
-.stats{display:flex;flex-wrap:wrap;gap:10px 28px;margin:0;padding:0;list-style:none}
-.stats li{display:flex;flex-direction:column}
-.stats strong{font-size:1.6rem;font-variant-numeric:tabular-nums;line-height:1.1}
-.stats span{color:var(--hero-muted);font-size:.85rem}
-.section-lead{color:var(--muted);max-width:44rem;margin-bottom:20px}
-.rows-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
-.row{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center}
+.lower{display:flex;align-items:stretch;border-top:1px solid rgb(255 255 255/12%);background:rgb(8 7 12/72%);backdrop-filter:blur(10px)}
+.lower .label{flex:none;display:flex;align-items:center;padding:12px 16px;background:${BRAND.onAir};color:#fff;font:700 1.35rem/1 var(--display);letter-spacing:.03em;gap:8px}
+.lower .label::before{content:"";width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1.6s steps(2,jump-none) infinite}
+@keyframes blink{50%{opacity:.25}}
+.tick{flex:1;min-width:0;overflow:hidden;display:flex;direction:ltr;mask-image:linear-gradient(to right,transparent,#000 4%,#000 96%,transparent)}
+.tick .drift{animation:none;gap:0;padding:0}
+.tick.on .drift{animation:drift 80s linear infinite}
+.tick:hover .drift,.tick:focus-within .drift{animation-play-state:paused}
+.tk{display:inline-flex;align-items:center;gap:10px;padding:10px 22px;color:var(--hero-fg);text-decoration:none;white-space:nowrap;border-inline-end:1px solid rgb(255 255 255/12%);direction:rtl}
+.tk:hover b{color:${BRAND.stone}}
+.tk img{width:26px;height:26px;border-radius:6px;background:#fff1}
+.tk .g{color:var(--hero-muted)}
+.tk .g.empty{display:none}
+.section-lead{color:var(--muted);max-width:44rem;margin-bottom:24px;font-size:1.05rem}
+.rows-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
+.row{position:relative;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;transition:border-color .2s var(--ease-out)}
+.row:hover{border-color:var(--accent)}
 .row img{grid-row:span 2;border-radius:12px;background:var(--surface-2)}
-.row h3{margin:0;font-size:1.2rem}
+.row h3{margin:0;font:700 1.9rem/1 var(--display)}
+.row h3 a{color:var(--fg);text-decoration:none}
+.row h3 a::after{content:"";position:absolute;inset:0;border-radius:inherit}
 .row .en{color:var(--muted);font-size:.9rem}
 .row dl{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0 0;font-size:.9rem}
 .row dt{color:var(--muted)}.row dd{margin:0}
 .row .counts{grid-column:1/-1;font-size:.95rem;margin:6px 0 0}
+.row .posters{grid-column:1/-1;display:flex;margin-top:12px;direction:ltr}
+.row .posters img{width:23%;height:auto;aspect-ratio:2/3;object-fit:cover;border-radius:8px;margin-inline-end:-6%;box-shadow:0 6px 18px rgb(0 0 0/40%);border:2px solid var(--surface);transition:transform .3s var(--ease-out)}
+@media (hover:hover){.row:hover .posters img{transform:translateY(-4px) rotate(-2deg)}.row:hover .posters img:nth-child(2n){transform:translateY(-6px) rotate(2deg)}}
 .home{color:var(--warn);font-weight:600}
-.channels{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr))}
-.channels li{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px;font-weight:550}
+.channels{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr))}
+.channels li a{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px;font-weight:600;color:var(--fg);text-decoration:none;height:100%;transition:border-color .2s var(--ease-out)}
+.channels li a:hover{border-color:var(--accent)}
 .channels img{border-radius:8px;flex:none;background:var(--surface-2)}
 .channels .nm{display:flex;flex-direction:column;align-items:flex-start;min-width:0;line-height:1.3}
 .channels .tag{font-size:.7rem;font-weight:600;color:var(--warn);border:1px solid currentColor;border-radius:6px;padding:0 6px;margin-top:3px;white-space:nowrap}
 .filling{grid-column:1/-1;margin:4px 0 0;font-size:.85rem;color:var(--accent)}
-.steps{counter-reset:s;list-style:none;margin:0;padding:0;display:grid;gap:12px}
-.steps li{counter-increment:s;display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:start}
-.steps li::before{content:counter(s);width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--accent-soft);color:var(--accent)}
-.alt{background:var(--surface-2);border-block:1px solid var(--border)}
-.callout{border-inline-start:4px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:12px 16px;margin:16px 0}
+.steps{counter-reset:s;list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
+.steps li::before{content:counter(s);width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:700 1.3rem/1 var(--display);background:var(--accent-soft);color:var(--accent)}
+.alt{background:var(--bg-2);border-block:1px solid var(--border)}
+.callout{border-inline-start:3px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:12px 16px;margin:18px 0 0}
 .he-label{font-weight:700}
 .faq details{background:var(--surface)}
-.oss{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.oss{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.browse{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 `;
 
 const t = (lang: Lang, en: string, he: string) => (lang === 'he' ? he : en);
@@ -170,8 +215,9 @@ export function renderLandingHtml(input: LandingInput, lang: Lang = 'en'): strin
     .map((c) => {
       const where = WHERE[c.source]?.[lang];
       const logo = input.live.length ? CATALOG_LOGO[c.id] : undefined;
+      const posters = (input.rowPosters?.[c.id] ?? []).slice(0, 5);
       return `<article class="card row">${logo ? `<img src="/${esc(sitePaths.channelLogo(logo))}" alt="" width="52" height="52" loading="lazy">` : ''}
-<h3><bdi lang="he" dir="rtl">${esc(catalogAppName(c.id))}</bdi></h3>${he ? '' : `<span class="en">${esc(catalogName(c.id, 'en'))}</span>`}
+<h3><a href="${rowHref(c.id)}"><bdi lang="he" dir="rtl">${esc(catalogAppName(c.id))}</bdi></a></h3>${he ? '' : `<span class="en">${esc(catalogName(c.id, 'en'))}</span>`}
 <p class="counts"><strong>${num(c.shows, lang)}</strong> ${t(lang, 'shows', 'תוכניות')} · <strong>${num(c.episodes, lang)}</strong> ${t(lang, 'episodes', 'פרקים')}</p>
 ${
   c.filling
@@ -186,6 +232,10 @@ ${
   where
     ? `<dl><dt>${t(lang, 'In Israel', 'בישראל')}</dt><dd${where.helper ? ' class="home"' : ''}>${esc(where.israel)}</dd><dt>${t(lang, 'Abroad', 'בחו״ל')}</dt><dd${where.helper ? ' class="home"' : ''}>${esc(where.abroad)}</dd></dl>`
     : ''
+}${
+  posters.length
+    ? `<div class="posters" aria-hidden="true">${posters.map((u) => `<img src="${esc(sized(u, 160))}" alt="" width="80" height="120" loading="lazy" decoding="async">`).join('')}</div>`
+    : ''
 }</article>`;
     })
     .join('');
@@ -193,9 +243,9 @@ ${
   const channels = input.live
     .map(
       (c) =>
-        `<li>${c.logo ? `<img src="/${esc(sitePaths.channelLogo(c.id))}" alt="" width="36" height="36" loading="lazy">` : ''}<span class="nm">${bdi(c.name)}${
+        `<li><a href="/live/#${esc(c.id)}">${c.logo ? `<img src="/${esc(sitePaths.channelLogo(c.id))}" alt="" width="36" height="36" loading="lazy">` : ''}<span class="nm">${bdi(c.name)}${
           c.helper ? `<span class="tag">${t(lang, 'home helper', 'עוזר ביתי')}</span>` : ''
-        }</span></li>`,
+        }</span></a></li>`,
     )
     .join('');
 
@@ -266,16 +316,46 @@ ${
         ],
       ];
 
-  const nav = [
-    { href: '#watch', label: t(lang, 'What’s on', 'מה יש'), optional: true },
-    { href: '#install', label: t(lang, 'Install', 'התקנה') },
-    { href: '#abroad', label: t(lang, 'Abroad', 'בחו״ל'), optional: true },
-    { href: '#faq', label: t(lang, 'Questions', 'שאלות'), optional: true },
-    { href: '/status', label: t(lang, 'Status', 'מצב') },
-    he
-      ? { href: '/', label: 'English', hreflang: 'en' as const }
-      : { href: '/he/', label: 'עברית', hreflang: 'he' as const },
-  ];
+  const nav = siteNav(lang, 'home', [
+    { href: '#install', label: t(lang, 'Install', 'התקנה'), optional: true },
+  ]);
+
+  // The header's wall: three lanes of posters drifting past (decoration: hidden from screen readers).
+  const wall = input.wall ?? [];
+  const lanes =
+    wall.length >= 6
+      ? [0, 1, 2]
+          .map((k) => {
+            const lane = wall.filter((_, i) => i % 3 === k);
+            const imgs = lane
+              .map(
+                (w) =>
+                  `<img src="${esc(sized(w.poster, 220))}" alt="" width="150" height="225" decoding="async" fetchpriority="low">`,
+              )
+              .join('');
+            return `<div class="lane"><div class="drift">${imgs}</div><div class="drift">${imgs}</div></div>`;
+          })
+          .join('')
+      : '';
+  // "On the air now": each live channel with a guide, as a lower third (the script keeps it current).
+  const onAir = input.live
+    .map((c) => ({ c, rows: channelGuide(input.guide, c.id) }))
+    .filter((x) => x.rows.length > 0);
+  const ticker = () =>
+    onAir
+      .map(
+        ({ c, rows }) =>
+          `<a class="tk" href="/live/#${esc(c.id)}">${c.logo ? `<img src="/${esc(sitePaths.channelLogo(c.id))}" alt="" width="26" height="26" loading="lazy">` : ''}<b dir="auto">${esc(plain(c.name))}</b><span class="g" data-guide="1">${rows
+            .map(
+              (r, i) =>
+                `<span data-s="${r[0]}" data-e="${r[1]}"${i > 0 ? ' hidden' : ''} dir="auto">${esc(plain(r[2]))}</span>`,
+            )
+            .join('')}</span></a>`,
+      )
+      .join('');
+  const lower = onAir.length
+    ? `<div class="lower"><span class="label">${t(lang, 'On air', 'בשידור')}</span><div class="tick" role="region" aria-label="${t(lang, 'On the air now', 'משודר עכשיו')}"><div class="drift">${ticker()}</div></div></div>`
+    : '';
 
   return `${head(
     {
@@ -285,14 +365,13 @@ ${
       path: he ? 'he/' : '',
       alternates: { en: '', he: 'he/' },
       jsonLd,
-      preload: `/${sitePaths.heroImage}`,
     },
     LANDING_CSS,
   )}<body>
 ${topBar(lang, nav, { over: true, home })}
 <main id="main">
-<div class="hero"><div class="wrap">
-<span class="eyebrow">${t(lang, 'Free addon for Stremio and Nuvio', 'תוסף חינמי ל-Stremio ול-Nuvio')}</span>
+<div class="hero">${lanes ? `<div class="wall" aria-hidden="true">${lanes}</div>` : ''}<div class="wrap hero-copy">
+<span class="kicker">${t(lang, 'A free addon for Stremio and Nuvio', 'תוסף חינמי ל-Stremio ול-Nuvio')}</span>
 <h1>${t(lang, 'Israeli TV, in the app you already use', 'טלוויזיה ישראלית, באפליקציה שכבר יש לכם')}</h1>
 <p class="lead">${t(
     lang,
@@ -302,6 +381,7 @@ ${topBar(lang, nav, { over: true, home })}
 <div class="actions">
 <a class="btn btn-primary" href="${esc(stremio)}" data-stremio>${ICONS.play}${t(lang, 'Install in Stremio', 'התקנה ב-Stremio')}</a>
 <button class="btn btn-ghost" type="button" data-copy="manifest-url" data-done="${t(lang, 'Copied', 'הועתק')}">${ICONS.copy}<span>${t(lang, 'Copy the link', 'העתקת הקישור')}</span></button>
+<a class="btn btn-ghost" href="/library/">${t(lang, 'Browse the library', 'לספרייה')}</a>
 </div>
 <div class="link-box"><span class="small">${t(lang, 'Or paste this link into your app’s addon search (Nuvio too):', 'או הדביקו את הקישור הזה בחיפוש התוספים של האפליקציה (גם ב-Nuvio):')}</span><code id="manifest-url" data-origin>${esc(manifestUrl)}</code></div>
 <ul class="stats" aria-label="${t(lang, 'In the catalog now', 'בקטלוג עכשיו')}">
@@ -310,7 +390,7 @@ ${topBar(lang, nav, { over: true, home })}
 ${liveCount ? `<li><strong>${num(liveCount, lang)}</strong><span>${t(lang, 'live channels', 'ערוצים בשידור חי')}</span></li>` : ''}
 </ul>
 ${statusChip}
-</div></div>
+</div>${lower}</div>
 
 <section id="watch" aria-labelledby="watch-h"><div class="wrap">
 <h2 id="watch-h">${t(lang, 'What you can watch', 'מה אפשר לראות')}</h2>
@@ -331,6 +411,7 @@ ${
 <ul class="channels">${channels}</ul>`
     : ''
 }
+<div class="browse"><a class="btn btn-primary" href="/library/">${t(lang, 'Browse every show', 'לכל התוכניות')}</a><a class="btn btn-plain" href="/live/">${t(lang, 'What’s on live now', 'מה משודר עכשיו')}</a><a class="btn btn-plain" href="/search/">${ICONS.search}${t(lang, 'Search', 'חיפוש')}</a></div>
 </div></section>
 
 <section id="install" class="alt" aria-labelledby="install-h"><div class="wrap">

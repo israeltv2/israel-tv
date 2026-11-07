@@ -1647,7 +1647,8 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
   hand-drawn `icon.svg` of the logo (crisper at 16 px than a scaled bitmap).
 - **Not indexed:** the addon's JSON (`X-Robots-Tag: noindex` from the app and in `_headers`; `Disallow` in
   robots.txt). The pages say `index,follow`.
-- **No analytics, no donation links, no web fonts** (system fonts with Hebrew fallbacks).
+- **No analytics, no donation links, no web fonts** (system fonts with Hebrew fallbacks). _Fonts superseded in round 9:
+  two self-hosted families, see below._
 
 ## Kan's bot check (2026-11-07)
 
@@ -1773,3 +1774,69 @@ never used for that show), "trusted" is re-checked against the episodes read in 
 12 s apart (was 12, 20 s). **Rule:** the moment a page, image or app request meets Kan's bot check, the slice stops
 and waits 45 minutes (unchanged), and for the next 24 hours slices run at half the pages and twice the pause (10 pages,
 24 s with the defaults); `/status` and the log say "calm pace". The per-day tally (`botCheck`) shows whether to tune.
+
+## Round 9: the website (2026-11-07)
+
+**Redesign.** The owner asked for a dark, distinctive look instead of the generic blue one, with motion.
+
+- **Palette from the branding's night picture:** night `#0d0c12` as the ground, the lamp-lit stone of Jerusalem's
+  walls `#e8b96a` as the one accent, and red `#ff5141` kept for a single meaning, "on the air now". Dark is the
+  default; light (warm paper `#f5f0e7`, accent `#83540c`) is a choice the theme button remembers. The logo keeps its
+  own blues.
+- **Type with Hebrew, self-hosted:** IBM Plex Sans Hebrew (400/600) for reading, Karantina (700, condensed, a
+  broadcast-title voice) for headlines and numbers. Six WOFF2 files, Hebrew and Latin subsets, 49 KB in all
+  (`assets/site/fonts`, SIL OFL licences beside them); the page's language preloads its two. No request to a font
+  service (privacy) and no layout shift measured.
+- **One bold element, motion with a job:** the home page's header is a wall of real show posters drifting in three
+  lanes behind the headline, and under it a "lower third" ticker of what every live channel is airing now. The
+  headline lines rise in once on load (60 ms stagger). Everything else answers the reader: poster lift on hover
+  (pointer devices only), button press scale 0.97, a pulsing on-air dot, and cross-document View Transitions (a
+  poster on a row page grows into the show page's poster; the theme switch cross-fades). CSS and the View Transition
+  API only, no library; easing `cubic-bezier(.23,1,.32,1)`, UI motion under 300 ms; `prefers-reduced-motion` turns
+  all of it off (the wall and ticker stand still).
+- Skills used for the design pass (installed for this agent in the working copy only, not committed):
+  `frontend-design`, plus from the skills.sh ecosystem `emilkowalski/skills` (improve-animations,
+  review-animations: easing and duration values), `vercel-labs/agent-skills` web-design-guidelines, and
+  `addyosmani/web-quality-skills` (accessibility, performance, seo).
+
+**The library on the website: yes.** Pre-rendered Hebrew pages for every row, every show (seasons and episode lists
+with stills), the live channels with now/next, and search (details in operations.md, "The library on the website").
+
+- **Static and deterministic.** Each page is a file next to the catalog (~1,100 pages for ~1,060 shows; the free
+  plan's 20,000-file limit has room). The publisher uploads only changed files, so nothing in a page depends on the
+  moment of rendering: the live guide is written in for its first 36 hours by the guide's own start time, and a
+  few lines of script show what is on, hide what ended and draw progress. A test renders twice at different times and
+  compares.
+- **Stable addresses** from the series ids (`/show/iltv_reshet_10/`), never list positions; rows by their catalog id.
+- **SEO:** per-page title, description, canonical, share card (the show's poster), `TVSeries` with `TVSeason` /
+  `TVEpisode` and a breadcrumb on show pages, `ItemList` on rows, `BroadcastService` for live channels; every row and
+  show page is in `sitemap.xml`. Search is a tool and stays out of the sitemap.
+- **Images stay where they are hosted**, sized on request where the host can (Reshet's Cloudinary `w_…`, Kan's
+  `width=`): a 1.2 MB Reshet poster comes down as ~30 KB. Mako's are used as they are.
+- **Links out, not in:** "Watch in Stremio" opens the show (or episode, or channel) with a `stremio:///detail/…`
+  link; Nuvio has no such link, so the page says to add the addon and search the title; "Watch on the broadcaster's
+  site" uses the show's own page from the source, and for live channels only pages known to be the channel's.
+
+**No playback on the website** (supervisor decision). Reasons:
+
+- Keshet 12 plays only with a per-viewer ticket bound to the network of the player that asked for it; only the
+  viewer's own home helper can get one.
+- Kan and some Reshet titles are refused outside Israel.
+- The broadcasters' video servers do not send CORS headers for our address, so a player on our page could only play
+  them if we relayed the video. We never do that: it costs bandwidth the free plan does not have, and it would turn a
+  link index into a re-streaming site, a legal exposure an addon pointing apps at the broadcasters does not have.
+  The website links to the broadcaster's own player instead.
+
+**Measured** (Lighthouse 12.8, mobile, against the local preview server on a copy of the live data, uncompressed):
+
+| Page                             | Performance | Accessibility | Best practices | SEO |
+| -------------------------------- | ----------- | ------------- | -------------- | --- |
+| `/`, `/he/`                      | 99          | 100           | 100            | 100 |
+| `/library/`                      | 99          | 100           | 100            | 100 |
+| `/library/keshet12/` (660 shows) | 84          | 100           | 100            | 100 |
+| a show page                      | 98          | 100           | 100            | 100 |
+| `/live/`, `/search/`             | 98–99       | 100           | 100            | 100 |
+| `/status`                        | 98          | 100           | 100            | 100 |
+
+The large row's score is its first Mako poster (not resizable) on a server without compression; see the live numbers
+below.

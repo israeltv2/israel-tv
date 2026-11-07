@@ -29,7 +29,8 @@
     "audit:images": "node tools/image-audit.mjs",
     "shots:site": "node tools/site-shots.mjs",
     "images:site": "node tools/site-images.mjs",
-    "build": "pnpm --filter @israel-tv/dashboard build"
+    "build": "pnpm --filter @israel-tv/dashboard build",
+    "preview:site": "node tools/site-preview.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

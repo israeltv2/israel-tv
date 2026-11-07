@@ -116,9 +116,25 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
   app.get(`/${sitePaths.sitemap}`, file(sitePaths.sitemap, CACHE.list, 'application/xml; charset=utf-8'));
   app.get(`/${sitePaths.webManifest}`, file(sitePaths.webManifest, CACHE.list, 'application/manifest+json'));
   app.get('/manifest.json', file(sitePaths.manifest, CACHE.manifest));
+  // The library pages (each is <path>/index.html; the address without the slash moves to the one with it).
+  const pageAt = (path: string) => file(path, CACHE.list, 'text/html; charset=utf-8');
+  for (const [route, path] of [
+    ['/library/', sitePaths.library],
+    ['/live/', sitePaths.livePage],
+    ['/search/', sitePaths.searchPage],
+  ] as const) {
+    app.get(route, pageAt(path));
+    app.get(route.slice(0, -1), (c) => c.redirect(route, 301));
+  }
+  app.get('/library/:row{[a-z0-9]+}', (c) => c.redirect(`/library/${c.req.param('row')}/`, 301));
+  app.get('/library/:row{[a-z0-9]+}/', (c) => pageAt(sitePaths.libraryRow(c.req.param('row')))(c));
+  app.get('/show/:id{iltv_[a-z0-9]+_[0-9]+}', (c) => c.redirect(`/show/${c.req.param('id')}/`, 301));
+  app.get('/show/:id{iltv_[a-z0-9]+_[0-9]+}/', (c) => pageAt(sitePaths.showPage(c.req.param('id')))(c));
   app.get('/status', file(sitePaths.statusPage, CACHE.none, 'text/html; charset=utf-8'));
   app.get('/status.json', file(sitePaths.status, CACHE.none));
   app.get('/registry.json', file(sitePaths.registry, CACHE.list));
+  // The search index, for the website's search page.
+  app.get(`/${sitePaths.search}`, file(sitePaths.search, CACHE.list));
   app.get('/freshness.json', file(sitePaths.freshness, CACHE.none));
   // The catalog ↔ resolver contract (docs/contract.md): what a resolver pointed at this catalog reads.
   app.get(`/${sitePaths.contract}`, file(sitePaths.contract, CACHE.list));

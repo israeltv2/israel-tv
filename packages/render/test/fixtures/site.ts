@@ -2,6 +2,7 @@
 // history), used by the renderer tests and by `pnpm shots:site` (screenshots, Lighthouse).
 import { LIVE_CHANNELS, type StatusFile } from '@israel-tv/core';
 import type { LandingInput } from '../../src/landing-html.ts';
+import type { LibraryInput } from '../../src/library-html.ts';
 import { overall } from '../../src/status-html.ts';
 
 export const NOW = Date.parse('2026-11-07T07:00:00Z');
@@ -164,4 +165,70 @@ export const LANDING: LandingInput = {
   catalogs: SITE_STATUS.catalogs ?? [],
   live: LIVE_CHANNELS.map((c) => ({ id: c.id, name: c.name, logo: true, helper: c.direct.length === 0 })),
   status: overall(SITE_STATUS),
+};
+
+const H = 3_600_000;
+const episodes = (n: number, title: (i: number) => string) =>
+  Array.from({ length: n }, (_, i) => ({
+    id: `iltv_reshet_1:1:${i + 1}`,
+    title: title(i + 1),
+    season: 1,
+    episode: i + 1,
+    released: `2026-10-${String(1 + i).padStart(2, '0')}T00:00:00.000Z`,
+    overview: 'פרק שבו קורים דברים, ואחריו עוד פרק.',
+  }));
+
+/** The library pages' fixture: two rows, three shows without pictures, two live channels with a guide around NOW. */
+export const LIBRARY: LibraryInput = {
+  rows: [
+    {
+      id: 'iltv_keshet12',
+      source: 'mako',
+      shows: [
+        {
+          source: 'mako',
+          meta: {
+            id: 'iltv_mako_1',
+            type: 'series',
+            name: 'הכוכב הבא',
+            genres: ['ריאליטי', 'מוזיקה'],
+            releaseInfo: '2015–2026',
+            description: 'תחרות שירה.',
+            videos: [],
+          },
+        },
+      ],
+    },
+    {
+      id: 'iltv_reshet13',
+      source: 'reshet',
+      shows: [
+        {
+          source: 'reshet',
+          meta: {
+            id: 'iltv_reshet_1',
+            type: 'series',
+            name: 'חתונה ממבט ראשון',
+            genres: ['ריאליטי'],
+            releaseInfo: '2017–2026',
+            status: 'Returning Series',
+            description: 'זוגות שנפגשים לראשונה מתחת לחופה.',
+            links: [{ name: 'Source', category: 'Website', url: 'https://13tv.co.il/item/reality/example/' }],
+            videos: episodes(12, (i) => `פרק ${i}`),
+          },
+        },
+        {
+          source: 'reshet',
+          meta: { id: 'iltv_reshet_2', type: 'series', name: 'הישרדות', genres: ['ריאליטי'], videos: [] },
+        },
+      ],
+    },
+  ],
+  live: LANDING.live,
+  guide: {
+    [LIVE_CHANNELS[0]?.id ?? 'iltv_live_kan11']: [
+      [NOW - H, NOW + H, 'חדשות הערב'],
+      [NOW + H, NOW + 2 * H, 'סרט תעודה'],
+    ],
+  },
 };

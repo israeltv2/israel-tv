@@ -4,7 +4,7 @@
 // times relative.
 import { type Health, type StatusCatalog, type StatusFile, sitePaths } from '@israel-tv/core';
 import { CATALOG_LOGO, catalogAppName, catalogName, sourceName } from './names.ts';
-import { bdi, esc, footer, head, israelTime, num, topBar, when } from './page.ts';
+import { bdi, esc, footer, head, israelTime, num, siteNav, topBar, when } from './page.ts';
 import { type PublicTextOptions, publicStatus } from './public-text.ts';
 
 export type Level = Health | 'info';
@@ -379,11 +379,11 @@ function contributorDetails(status: StatusFile): string {
 const STATUS_CSS = `
 .hero-status{padding-block:28px 8px}
 .overall{display:flex;gap:16px;align-items:flex-start;padding:22px;border-radius:18px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow)}
-.overall .dot{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--ok-bg);color:var(--ok)}
+.overall .dot{flex:none;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--ok-bg);color:var(--ok)}
 .overall.warn .dot{background:var(--warn-bg);color:var(--warn)}.overall.error .dot{background:var(--error-bg);color:var(--error)}
 .overall.info .dot{background:var(--accent-soft);color:var(--accent)}
 .overall .dot svg{width:24px;height:24px}
-.overall h1{font-size:clamp(1.4rem,4vw,1.9rem);margin:2px 0 6px}
+.overall h1{font-size:clamp(2.1rem,5vw,2.9rem);margin:0 0 6px}
 .overall p{margin:0;color:var(--muted)}
 .updated{margin:12px 2px 0;font-size:.875rem;color:var(--muted)}
 .rows{padding-block:24px}
@@ -455,11 +455,7 @@ export function renderStatusHtml(raw: StatusFile, opts: PublicTextOptions = {}):
     },
     STATUS_CSS,
   )}<body>
-${topBar('en', [
-  { href: '/', label: 'Home' },
-  { href: '/#install', label: 'Install', optional: true },
-  { href: '/he/', label: 'עברית', hreflang: 'he' },
-])}
+${topBar('en', siteNav('en', 'status', [{ href: '/#install', label: 'Install', optional: true }]))}
 <main id="main">
 <div class="wrap hero-status">
 <div class="overall ${o.level}" role="status"><div class="dot">${LEVEL_ICON[o.level]}</div>

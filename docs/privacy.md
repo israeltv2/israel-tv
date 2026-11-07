@@ -11,6 +11,14 @@ stored. Opening a show page is not counted; loading a row is counted only as a n
 the project's Cloudflare account (Workers Analytics Engine keeps the counts; Workers Logs keeps debugging lines a few
 days, with the same daily code, never the address).
 
+## The website
+
+The website has no analytics, no cookies and no third-party scripts; its fonts are served from the site itself. Pages
+are plain files: opening one is not counted. The library pages show the shows' posters and pictures from the
+broadcasters' own image servers (as the apps do), so your browser asks those servers for them, as it would on the
+broadcasters' sites. Search runs in your browser on a list of titles; what you type is not sent anywhere. The theme
+you choose is remembered in your browser only.
+
 ## The home helper
 
 The home helper keeps a short record on your own computer of what it was asked for, what failed and why, with the
