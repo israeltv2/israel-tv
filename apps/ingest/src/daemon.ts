@@ -202,8 +202,8 @@ export class Daemon {
   private retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   /**
-   * Shows a source's last full run was refused (bot protection) are read again later the same night, after
-   * growing pauses (runner.ts BLOCK_RETRIES); each retry that reads something publishes.
+   * Shows a source's bot protection refused (in the last full run, or an airing or single-show read since) are read
+   * again later, after growing pauses (runner.ts BLOCK_RETRIES); each retry that reads something publishes.
    */
   scheduleRetries(): void {
     const adapters = createAdapters(this.config);
@@ -234,6 +234,8 @@ export class Daemon {
       for (const make of Object.values(adapters)) {
         await runAiring(this.store, make(), this.config.schedule.airingWindowDays, this.runOpts);
       }
+      // Shows the bot check refused wait on the retry list (runner.ts deferBlocked).
+      this.scheduleRetries();
       await this.probeStreams(300);
       await this.refreshGuides();
       this.requestPublish();
@@ -283,6 +285,7 @@ export class Daemon {
         { key: row.show.key, title: row.title, ...(poster ? { poster } : {}) },
         this.runOpts,
       );
+      this.scheduleRetries();
       await this.publish();
     });
   }

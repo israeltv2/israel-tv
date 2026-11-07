@@ -32,19 +32,52 @@ export interface FetcherOptions {
   proxies?: ProxyEndpoint[];
   /** Count of requests made, for run statistics. */
   onRequest?: (url: string, status: number, ms: number) => void;
+  /**
+   * Pauses (ms) before reading a JSON address again after the site answered with a bot-check page instead of data
+   * (Mako's Radware). Each pause gets ±25% jitter; every retry is a fresh request with new browser headers and no
+   * cookies. Default 5 s, 15 s, 30 s; [] turns block retries off.
+   */
+  blockBackoffMs?: readonly number[];
+  /** The clock's pause (tests). */
+  sleep?: (ms: number) => Promise<unknown>;
+  /** Answers requests instead of the network (tests replaying recorded pages). */
+  transport?: Transport;
+}
+
+/** One HTTP exchange: the final address after redirects, its status and body. */
+export type Transport = (req: {
+  url: string;
+  headers: Record<string, string>;
+}) => Promise<{ status: number; body: string; url: string }>;
+
+/** Bot-check pages met by one fetcher (one run). */
+export interface BlockStats {
+  /** Responses that were a bot-check page. */
+  pages: number;
+  /** Addresses read on a retry after at least one bot-check page. */
+  cleared: number;
+  /** Addresses still refused after every retry (BlockedError thrown). */
+  refused: number;
 }
 
 export interface Fetcher {
   text(url: string, headers?: Record<string, string>): Promise<{ status: number; body: string }>;
   json<T = unknown>(url: string, headers?: Record<string, string>): Promise<T>;
   readonly requests: number;
+  /** Bot-check pages met so far (absent on fetchers that cannot tell). */
+  readonly blocks?: BlockStats;
 }
 
+/** Where Radware sends a request it scores as a bot (HTTP 302 from the site, then a 200 block page). */
+const BLOCK_HOSTS = ['validate.perfdrive.com'];
 const BLOCK_MARKERS = [/radware/i, /captcha/i, /Just a moment/i, /רק רגע/, /cf-chl/i, /Access Denied/i];
 
 export function createFetcher(opts: FetcherOptions): Fetcher {
   const lastByHost = new Map<string, Promise<void>>();
   const retries = opts.retries ?? 3;
+  const blockBackoff = opts.blockBackoffMs ?? [5000, 15_000, 30_000];
+  const pause = opts.sleep ?? sleep;
+  const blocks: BlockStats = { pages: 0, cleared: 0, refused: 0 };
   let requests = 0;
   let proxyIndex = 0;
 
@@ -68,9 +101,15 @@ export function createFetcher(opts: FetcherOptions): Fetcher {
   async function once(
     url: string,
     headers: Record<string, string>,
-  ): Promise<{ status: number; body: string }> {
-    const proxy = opts.proxies?.[proxyIndex % (opts.proxies.length || 1)];
+  ): Promise<{ status: number; body: string; url: string }> {
     const t0 = Date.now();
+    if (opts.transport) {
+      const r = await opts.transport({ url, headers });
+      requests++;
+      opts.onRequest?.(url, r.status, Date.now() - t0);
+      return r;
+    }
+    const proxy = opts.proxies?.[proxyIndex % (opts.proxies.length || 1)];
     const res = await gotScraping({
       url,
       headers,
@@ -83,7 +122,7 @@ export function createFetcher(opts: FetcherOptions): Fetcher {
     });
     requests++;
     opts.onRequest?.(url, res.statusCode, Date.now() - t0);
-    return { status: res.statusCode, body: String(res.body) };
+    return { status: res.statusCode, body: String(res.body), url: res.url ?? url };
   }
 
   async function text(url: string, headers: Record<string, string> = {}) {
@@ -108,23 +147,46 @@ export function createFetcher(opts: FetcherOptions): Fetcher {
       } finally {
         done();
       }
-      if (attempt < retries) await sleep(Math.min(30_000, 2000 * 2 ** attempt));
+      if (attempt < retries) await pause(Math.min(30_000, 2000 * 2 ** attempt));
     }
     throw lastErr;
   }
 
+  /** Why a non-JSON answer is a bot-check page, or undefined when it is not one. */
+  function blockReason(r: { status: number; body: string; url: string }): string | undefined {
+    const marker = BLOCK_MARKERS.find((m) => m.test(r.body));
+    if (marker) return `page matches ${marker}`;
+    const host = URL.canParse(r.url) ? new URL(r.url).host : '';
+    return BLOCK_HOSTS.includes(host) ? `sent to ${host}` : undefined;
+  }
+
   async function json<T>(url: string, headers: Record<string, string> = {}): Promise<T> {
-    const r = await text(url, { accept: 'application/json, text/plain, */*', ...headers });
-    const trimmed = r.body.trimStart();
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
-      const marker = BLOCK_MARKERS.find((m) => m.test(r.body));
-      if (marker || r.status === 403)
-        throw new BlockedError(url, r.status, marker ? `page matches ${marker}` : 'not JSON');
+    let blockedBefore = false;
+    for (let attempt = 0; ; attempt++) {
+      const r = await text(url, { accept: 'application/json, text/plain, */*', ...headers });
+      const trimmed = r.body.trimStart();
+      if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+        const reason = blockReason(r);
+        if (reason) {
+          blocks.pages++;
+          blockedBefore = true;
+          // A bot-check page is scored per request, not a ban: a fresh request a little later is usually let through.
+          const wait = blockBackoff[attempt];
+          if (wait !== undefined) {
+            await pause(Math.round(wait * (0.75 + Math.random() * 0.5)));
+            continue;
+          }
+          blocks.refused++;
+          throw new BlockedError(url, r.status, reason);
+        }
+        if (r.status === 403) throw new BlockedError(url, r.status, 'not JSON');
+        if (r.status >= 400) throw new HttpError(url, r.status);
+        throw new BlockedError(url, r.status, `expected JSON, got ${trimmed.slice(0, 60)}`);
+      }
       if (r.status >= 400) throw new HttpError(url, r.status);
-      throw new BlockedError(url, r.status, `expected JSON, got ${trimmed.slice(0, 60)}`);
+      if (blockedBefore) blocks.cleared++;
+      return JSON.parse(r.body) as T;
     }
-    if (r.status >= 400) throw new HttpError(url, r.status);
-    return JSON.parse(r.body) as T;
   }
 
   return {
@@ -132,6 +194,9 @@ export function createFetcher(opts: FetcherOptions): Fetcher {
     json,
     get requests() {
       return requests;
+    },
+    get blocks() {
+      return { ...blocks };
     },
   };
 }

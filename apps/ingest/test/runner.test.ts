@@ -107,7 +107,11 @@ test('shows refused by bot protection are retried later that night; amber only i
   };
   const t0 = Date.parse('2026-11-07T01:00:00Z');
   const full = await runFull(store, make(), { ...opts, now: t0 });
-  expect(full).toMatchObject({ status: 'partial', blocked: [{ key: '/b' }] });
+  // Delayed, not failed: the run is ok and says so in a labelled note.
+  expect(full).toMatchObject({ status: 'ok', showsFailed: 0, blocked: [{ key: '/b' }] });
+  expect(store.recentWarnings(10).map((w) => w.message)).toContain(
+    "Mako's bot check delayed 1 show; retried at 01:30 UTC (last good data kept): /b",
+  );
   let mako = buildStatus(store, ['mako'], t0).sources[0];
   expect(mako?.health).toBe('ok');
   expect(mako?.notes.join(' ')).toMatch(
@@ -141,14 +145,10 @@ test('a failing show keeps its last good data and is marked', async () => {
     adapter(entries('/a'), { '/a': show('/a', [{ key: 's1', title: 'עונה 1', n: 3 }]) }),
     opts,
   );
-  const r = await runFull(
-    store,
-    adapter(entries('/a'), { '/a': new Error('blocked by www.mako.co.il') }),
-    opts,
-  );
+  const r = await runFull(store, adapter(entries('/a'), { '/a': new Error('unexpected page layout') }), opts);
   expect(r.status).toBe('failed');
   const row = store.getShow('iltv_mako_1');
-  expect(row?.lastError).toContain('blocked');
+  expect(row?.lastError).toContain('unexpected page layout');
   expect(row?.show.seasons[0]?.episodes.length).toBe(3);
 });
 

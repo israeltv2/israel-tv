@@ -56,7 +56,15 @@ import {
   remotePoster,
 } from './posters.ts';
 import { publicStatusExtras } from './public-status.ts';
-import { BLOCK_RETRIES, type BlockedRetry, emptyShowsKey, episodeCount, retryKey } from './runner.ts';
+import {
+  BLOCK_RETRIES,
+  type BlockedRetry,
+  type BotCheckDay,
+  botCheckKey,
+  emptyShowsKey,
+  episodeCount,
+  retryKey,
+} from './runner.ts';
 import { siteImages } from './site-images.ts';
 import { probeResults } from './stream-probe.ts';
 import { ALIASES_KEY } from './tmdb.ts';
@@ -103,42 +111,48 @@ export function buildStatus(
     } else if (last.status === 'failed') {
       health = read.failedIs;
       notes.push(`last full run failed: ${last.error ?? 'unknown error'}`);
-    } else if (last.status === 'partial') {
-      // Shows refused by the site's bot protection are retried later the same night: only shows still refused
-      // after every retry, or failures of another kind, make the source amber.
-      const retry = store.getState<BlockedRetry | null>(retryKey(source));
-      const r = retry?.runId === last.id ? retry : undefined;
-      if (r) {
-        const names = (list: string[]) =>
-          list.slice(0, 5).join(', ') + (list.length > 5 ? ` +${list.length - 5} more` : '');
-        const total = r.pending.length + r.recovered.length;
-        if (r.pending.length === 0)
-          notes.push(
-            `${total} ${total === 1 ? 'show was' : 'shows were'} refused by the site's bot protection in the full run and read on a retry`,
-          );
-        else if (r.nextAt)
-          notes.push(
-            `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} refused by the site's bot protection, retry ${r.attempts + 1} of ${BLOCK_RETRIES} at ${r.nextAt.slice(11, 16)} UTC: ${names(r.pending.map((p) => p.title))}`,
-          );
-        else {
-          health = 'warn';
-          notes.push(
-            `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} still refused by the site's bot protection after ${r.attempts} retries: ${names(r.pending.map((p) => p.title))}`,
-          );
-        }
-        if (r.others > 0) {
-          health = 'warn';
-          notes.push(`last full run: ${r.others} ${r.others === 1 ? 'show' : 'shows'} failed (not blocked)`);
-        }
-      } else {
+    }
+    // Shows refused by the site's bot protection (in the full run or a later airing read) wait for a retry with their
+    // last good data kept: only shows still refused after every retry, or failures of another kind, make it amber.
+    const retryState = store.getState<BlockedRetry | null>(retryKey(source));
+    const r = last && retryState?.runId === last.id ? retryState : undefined;
+    if (r) {
+      const names = (list: string[]) =>
+        list.slice(0, 5).join(', ') + (list.length > 5 ? ` +${list.length - 5} more` : '');
+      const total = r.pending.length + r.recovered.length;
+      if (r.pending.length === 0)
+        notes.push(
+          `${total} ${total === 1 ? 'show was' : 'shows were'} refused by the site's bot protection and read on a retry`,
+        );
+      else if (r.nextAt)
+        notes.push(
+          `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} refused by the site's bot protection, retry ${r.attempts + 1} of ${BLOCK_RETRIES} at ${r.nextAt.slice(11, 16)} UTC: ${names(r.pending.map((p) => p.title))}`,
+        );
+      else {
         health = 'warn';
         notes.push(
-          last.showsFailed > 0
-            ? `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`
-            : `last run partial: ${last.error ?? 'stopped early'}`,
+          `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} still refused by the site's bot protection after ${r.attempts} retries: ${names(r.pending.map((p) => p.title))}`,
         );
       }
     }
+    if (last?.status === 'partial') {
+      health = 'warn';
+      notes.push(
+        r && r.others > 0
+          ? `last full run: ${r.others} ${r.others === 1 ? 'show' : 'shows'} failed (not blocked)`
+          : last.showsFailed > 0
+            ? `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`
+            : `last run partial: ${last.error ?? 'stopped early'}`,
+      );
+    }
+    // The bot check's answer rate today, measured: said plainly, never a warning by itself.
+    const bot = store.getState<Record<string, BotCheckDay>>(botCheckKey(source))?.[
+      new Date(now).toISOString().slice(0, 10)
+    ];
+    if (bot?.pages)
+      notes.push(
+        `the site's bot check answered ${bot.pages} of ${bot.requests} requests today (${((100 * bot.pages) / Math.max(1, bot.requests)).toFixed(1)}%); ${bot.cleared} read on a quick retry, ${bot.delayed} ${bot.delayed === 1 ? 'show' : 'shows'} delayed to a later retry`,
+      );
     // Time since the last good run; for a source that never had one, since its first attempt.
     const everGood = store.lastGoodRun(read.kind, source);
     const ref = everGood ?? (last ? store.firstRun(read.kind, source) : undefined);

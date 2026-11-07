@@ -292,11 +292,17 @@ Episode pages are read breadth-first: newly published episodes, then the shows w
 
 ### Shows the site refused (bot protection)
 
-Mako and Reshet sometimes answer a show page with a bot-protection page in the nightly full read. Those shows are
-not lost: their last good data stays, and the daemon reads just those shows again later the same night, after 30
-minutes, 1 hour and 2 hours. The source stays green while retries are pending or once they succeed; it turns amber
-only for shows still refused after the third retry (named on `/status`, and in `blocked` per source). Other
-failures in the run are not retried and show as before.
+Mako and Reshet sometimes answer a show page with a bot-protection page (Mako's is Radware: a redirect to
+`validate.perfdrive.com`). The check scores each request, so a reader of the site's JSON (Mako's) first asks again a little later, with fresh
+browser headers and no cookies (after about 5, 15 and 30 seconds, with jitter); that usually gets the data. A show
+still refused is delayed, not lost, and the run is not marked partial or failed for it: its last good data stays, a
+labelled note says so ("Mako's bot check delayed N shows; retried at …"), and the daemon reads just those shows
+again later, after 30 minutes, 1 hour and 2 hours. This holds for the nightly full read, the airing checks and a
+single-show refresh. The source stays green while retries are pending or once they succeed; it turns amber only for
+shows still refused after the third retry (named on `/status`, in `blocked` per source, and listed as failing shows),
+or when the site refuses three shows in a row (the run stops there and is partial). `/status` also says how many of
+the day's requests met the bot check, how many a quick retry read, and how many shows were delayed. Other failures
+in the run are not retried and show as before.
 
 ### Images: checking what viewers see
 

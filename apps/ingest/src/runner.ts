@@ -16,7 +16,10 @@ export interface RunOptions {
 
 export interface RunSummary {
   runId: number;
-  /** Shows the site refused us (bot wall, rate limit) or that a stop after repeated blocks never reached. */
+  /**
+   * Shows the site refused us (bot wall, rate limit) or that a stop after repeated blocks never reached. They are
+   * deferred to a later retry with their last good data kept; on their own they never make a run partial or failed.
+   */
   blocked?: BlockedShow[];
   /** Shows that failed for any other reason. */
   otherFailures?: number;
@@ -119,7 +122,8 @@ export async function ingestShow(
     });
   } catch (err) {
     if (knownId && prev) {
-      store.markShowFailed(knownId, (err as Error).message);
+      // A bot-check refusal only delays the show (it is retried later, see deferBlocked); anything else marks it.
+      if (!isBlock(err)) store.markShowFailed(knownId, (err as Error).message);
       throw err;
     }
     // Listed by the source but its page is gone, and we never had it: nothing to publish or keep.
@@ -215,7 +219,6 @@ async function runShows(
 ): Promise<RunSummary> {
   const log = opts.log ?? (() => {});
   let showsOk = 0;
-  let showsFailed = 0;
   let newEpisodes = 0;
   const empty: string[] = [];
   let stoppedEarly = false;
@@ -236,14 +239,17 @@ async function runShows(
       newEpisodes += r.newEpisodes;
       if (r.newEpisodes > 0) log(`[${i + 1}/${list.length}] ${entry.title}: +${r.newEpisodes} episodes`);
     } catch (err) {
-      showsFailed++;
       const msg = `${entry.title}: ${(err as Error).message}`;
-      errors.push(msg);
-      log(`[${i + 1}/${list.length}] FAILED ${msg}`);
       // A blocking site keeps blocking: after three blocks in a row, stop instead of hammering it.
       consecutiveBlocks = isBlock(err) ? consecutiveBlocks + 1 : 0;
-      if (isBlock(err)) blocked.push({ ...entry, error: (err as Error).message.slice(0, 200) });
-      else otherFailures++;
+      if (isBlock(err)) {
+        blocked.push({ ...entry, error: (err as Error).message.slice(0, 200) });
+        log(`[${i + 1}/${list.length}] DELAYED ${msg}`);
+      } else {
+        otherFailures++;
+        errors.push(msg);
+        log(`[${i + 1}/${list.length}] FAILED ${msg}`);
+      }
       if (consecutiveBlocks >= 3) {
         errors.push(
           `stopped after ${consecutiveBlocks} blocked requests in a row; the rest waits for a retry`,
@@ -256,9 +262,13 @@ async function runShows(
       }
     }
   }
+  // Blocked shows wait for a retry (deferBlocked), so they do not count against the run. Only a wall (stopped after
+  // blocks in a row) does: partial when something was read, failed when nothing was.
+  const showsFailed = otherFailures + (stoppedEarly ? blocked.length : 0);
   const status = runStatus(showsOk, showsFailed);
   // A complete full read knows every listed show without episodes; /status lists them (see buildStatus).
   if (kind === 'full' && !opts.limit && !stoppedEarly) store.setState(emptyShowsKey(adapter.source), empty);
+  recordBlocks(store, adapter, blocked.length);
   const summary: RunSummary = {
     runId,
     ...(blocked.length ? { blocked } : {}),
@@ -282,7 +292,7 @@ async function runShows(
     ...(summary.error ? { error: summary.error } : {}),
   });
   log(
-    `${kind} ${adapter.source}: ${status}, ${showsOk} ok (${empty.length} without episodes), ${showsFailed} failed, +${newEpisodes} episodes, ${summary.requests} requests, ${Math.round(summary.ms / 1000)} s`,
+    `${kind} ${adapter.source}: ${status}, ${showsOk} ok (${empty.length} without episodes), ${showsFailed} failed, ${blocked.length} delayed by the bot check, +${newEpisodes} episodes, ${summary.requests} requests, ${Math.round(summary.ms / 1000)} s`,
   );
   return summary;
 }
@@ -321,20 +331,9 @@ export async function runFull(store: Store, adapter: SourceAdapter, opts: RunOpt
     store.syncListed(adapter.source, ids);
   }
   if (!opts.limit) {
-    const now = opts.now ?? Date.now();
-    store.setState(
-      retryKey(adapter.source),
-      summary.blocked?.length
-        ? ({
-            runId,
-            pending: summary.blocked,
-            recovered: [],
-            attempts: 0,
-            others: summary.otherFailures ?? 0,
-            nextAt: new Date(now + retryDelayMs(0)).toISOString(),
-          } satisfies BlockedRetry)
-        : null,
-    );
+    // A new full run starts the source's retry list afresh.
+    store.setState(retryKey(adapter.source), null);
+    deferBlocked(store, adapter.source, runId, summary, opts);
   }
   return summary;
 }
@@ -355,7 +354,9 @@ export async function runAiring(
     title: r.title,
     ...(r.show.poster ? { poster: r.show.poster } : {}),
   }));
-  return runShows(store, adapter, 'airing', entries, opts, true, runId, t0);
+  const summary = await runShows(store, adapter, 'airing', entries, opts, true, runId, t0);
+  deferBlocked(store, adapter.source, runId, summary, opts);
+  return summary;
 }
 
 /** One show, all seasons. */
@@ -367,7 +368,9 @@ export async function runOne(
 ): Promise<RunSummary> {
   const t0 = Date.now();
   const runId = store.startRun('show', `${adapter.source}:${entry.key}`);
-  return runShows(store, adapter, 'show', [entry], opts, false, runId, t0);
+  const summary = await runShows(store, adapter, 'show', [entry], opts, false, runId, t0);
+  deferBlocked(store, adapter.source, runId, summary, opts);
+  return summary;
 }
 
 /** A show a full run could not read because the site refused us. */
@@ -375,9 +378,12 @@ export interface BlockedShow extends ShowEntry {
   error: string;
 }
 
-/** Shows blocked in a source's last full run, retried later the same night with growing pauses. */
+/**
+ * Shows a source's bot check refused (after the fetcher's own quick retries), retried later with growing pauses and
+ * their last good data kept. Started by each full run; airing and single-show runs add to it.
+ */
 export interface BlockedRetry {
-  /** The full run they were blocked in. */
+  /** The source's latest full run (the one /status reports), or the run that started the list when there is none. */
   runId: number;
   pending: BlockedShow[];
   recovered: string[];
@@ -429,7 +435,95 @@ export async function runBlockedRetry(
       : {}),
   };
   store.setState(retryKey(adapter.source), next);
+  // Out of retries: the show keeps its last good data and is listed as failing until a later run reads it.
+  if (!next.nextAt)
+    for (const p of pending) {
+      const id = store.findSeriesId(adapter.source, p.key);
+      if (id)
+        store.markShowFailed(
+          id,
+          `kept last good data: refused by the site's bot check on ${attempts} retries (${p.error})`,
+        );
+    }
   return next;
+}
+
+const SOURCE_NAMES: Record<string, string> = { mako: 'Mako', reshet: 'Reshet', kan: 'Kan' };
+const sourceName = (source: string) => SOURCE_NAMES[source] ?? source;
+
+/**
+ * Put the shows a run's bot check refused on the source's retry list (runBlockedRetry reads them later), and record a
+ * labelled note. The run itself stays ok: a block delays a show, it never drops it.
+ */
+export function deferBlocked(
+  store: Store,
+  source: string,
+  runId: number,
+  summary: RunSummary,
+  opts: Pick<RunOptions, 'now'>,
+): BlockedRetry | undefined {
+  const blocked = summary.blocked ?? [];
+  if (blocked.length === 0) return undefined;
+  const now = opts.now ?? Date.now();
+  const fullId = store.lastRun('full', source)?.id ?? runId;
+  const prev = store.getState<BlockedRetry | null>(retryKey(source));
+  const base: BlockedRetry =
+    prev && prev.runId === fullId
+      ? prev
+      : { runId: fullId, pending: [], recovered: [], attempts: 0, others: 0 };
+  const keys = new Set(base.pending.map((p) => p.key));
+  const pending = [...base.pending, ...blocked.filter((b) => !keys.has(b.key))];
+  // A list whose retries were over starts counting again for the newly delayed shows.
+  const attempts = base.nextAt ? base.attempts : 0;
+  const next: BlockedRetry = {
+    ...base,
+    pending,
+    recovered: base.recovered.filter((t) => !blocked.some((b) => b.title === t)),
+    attempts,
+    others: base.others + (runId === fullId ? (summary.otherFailures ?? 0) : 0),
+    nextAt: base.nextAt ?? new Date(now + retryDelayMs(attempts)).toISOString(),
+  };
+  store.setState(retryKey(source), next);
+  const names = blocked.map((b) => b.title);
+  store.addWarnings(runId, null, [
+    {
+      code: 'bot-check',
+      message: `${sourceName(source)}'s bot check delayed ${blocked.length} ${blocked.length === 1 ? 'show' : 'shows'}; retried at ${next.nextAt?.slice(11, 16)} UTC (last good data kept): ${names.slice(0, 5).join(', ')}${names.length > 5 ? ` +${names.length - 5} more` : ''}`,
+    },
+  ]);
+  return next;
+}
+
+/** Bot-check pages a source met per day (UTC), for /status. */
+export interface BotCheckDay {
+  requests: number;
+  /** Responses that were a bot-check page. */
+  pages: number;
+  /** Addresses read on a quick retry after a bot-check page. */
+  cleared: number;
+  /** Shows delayed to a later retry. */
+  delayed: number;
+}
+
+export function botCheckKey(source: string): string {
+  return `bot-check:${source}`;
+}
+
+/** Add one run's bot-check counts to the source's daily tally (last 14 days kept). */
+function recordBlocks(store: Store, adapter: SourceAdapter, delayed: number): void {
+  const b = adapter.blocks;
+  if (!b) return;
+  const days = store.getState<Record<string, BotCheckDay>>(botCheckKey(adapter.source)) ?? {};
+  const day = new Date().toISOString().slice(0, 10);
+  const d = days[day] ?? { requests: 0, pages: 0, cleared: 0, delayed: 0 };
+  days[day] = {
+    requests: d.requests + adapter.requests,
+    pages: d.pages + b.pages,
+    cleared: d.cleared + b.cleared,
+    delayed: d.delayed + delayed,
+  };
+  const keep = Object.keys(days).sort().slice(-14);
+  store.setState(botCheckKey(adapter.source), Object.fromEntries(keep.map((k) => [k, days[k]])));
 }
 
 /** Store key of the titles a source lists without any episodes (from the last complete full read). */
