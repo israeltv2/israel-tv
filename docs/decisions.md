@@ -1885,7 +1885,7 @@ Measured on a copy of the live database and the runs/warnings of the three days 
   the backup and the report in `numbering:migrations:<id>`. Per season (never year seasons, never one whose printed
   numbers run against the air dates — the rules number those by date): printed numbers are taken; other episodes
   keep theirs unless a printed one claims it, then go after the season's highest. The owner accepted the one-time
-  watch-progress move. Dry run on the live copy: RESHET_DRY_RUN; Kan 7 episodes in 3 shows (זמן אמת, השופטים,
+  watch-progress move. Dry run on a copy of the live database after a full Reshet read with the fixed reader (270 shows, 0 failed): Reshet 1,183 episodes in 100 seasons of 58 shows (e.g. האח הגדול 1: "אירוע הפתיחה" was E9, now E1; משחקי השף 4: the final was E21, now E35), 1,105 "source-renumbered" warnings in that read and 0 after; no duplicate season/episode, guard consistent; Kan 7 episodes in 3 shows (זמן אמת, השופטים,
   מלכת השכונה). Not moved, on purpose: seasons where Kaltura's numbers are the only evidence and run against the
   upload dates (e.g. הישרדות 7). Their "air dates" are bulk upload dates (2015-11-0x, 2017-03-28, 2021-01-10,
   2023-03-30/04-03), so neither order is provable, and Kaltura's numbers were measured reversed in some seasons
