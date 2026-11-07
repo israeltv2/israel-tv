@@ -1,11 +1,18 @@
-// Browser adapter for Kan pages: a real Chrome/Chromium (configurable path), one fresh context per page
-// (Kan's Cloudflare lets the first navigation of a session through), images/fonts/media blocked to keep
-// proxy connections down, optional geo proxy.
-
-import { existsSync } from 'node:fs';
+// Browser adapter for Kan pages: a real Chrome/Chromium (configurable path) driven through patchright (Playwright
+// with the automation giveaways removed), one persistent profile kept between runs, optional geo proxy.
+//
+// Why (measured 2026-11-07, docs/decisions.md "Kan's bot check"): with stock Playwright, Cloudflare let the first page
+// of a fresh session through but challenged later pages of the same session (4 of 5) and nearly half of every page's
+// images (129 of 273), so each page needed a fresh session and show images could not be copied. With patchright and a
+// persistent profile the session clears the check once (a cf_clearance cookie, kept in the profile and tied to the
+// proxy exit) and then loads pages and images like a visitor: 0 challenges in 28 pages and ~2,900 images.
+import { existsSync, mkdirSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { BrowserConfig } from '@israel-tv/core';
 import type { ProxyEndpoint } from '@israel-tv/net';
-import { type Browser, chromium } from 'playwright-core';
+import { type BrowserContext, chromium } from 'patchright-core';
 import { isChallenge } from './parse.ts';
 
 export interface LoadedPage {
@@ -106,33 +113,57 @@ export function browserCandidates(
   return out;
 }
 
+export interface ChromeLoaderOptions {
+  /**
+   * Where the browser profile is kept between runs (cookies, including Cloudflare's clearance). Without one, a
+   * throwaway profile is used: it works, but every run has to clear the bot check again.
+   */
+  profileDir?: string;
+}
+
 export async function createChromeLoader(
   cfg: Extract<BrowserConfig, { type: 'chrome' }>,
   proxy: ProxyEndpoint | undefined,
+  opts: ChromeLoaderOptions = {},
 ): Promise<PageLoader> {
-  let browser: Browser | undefined;
+  let context: BrowserContext | undefined;
   let lastError: unknown;
+  const profile = opts.profileDir ?? (await mkdtemp(join(tmpdir(), 'israel-tv-kan-')));
+  mkdirSync(profile, { recursive: true });
   for (const candidate of browserCandidates(cfg.executablePath)) {
     try {
-      browser = await launch(candidate);
+      context = await launch(candidate);
       break;
     } catch (err) {
       lastError = err;
     }
   }
-  if (!browser) {
+  if (!context) {
     throw new Error(
       `could not start a browser for Kan (${((lastError as Error)?.message ?? '').split('\n')[0]}). ` +
         'Install Google Chrome (or Microsoft Edge, or Chromium on Linux), or set browser.executablePath in the config, or set browser.type to "none" to turn Kan off.',
     );
   }
-  return loaderFor(browser);
+  const loader = loaderFor(context);
+  return {
+    ...loader,
+    async close() {
+      await loader.close();
+      if (!opts.profileDir) await rm(profile, { recursive: true, force: true });
+    },
+  };
 
   function launch(candidate: BrowserCandidate) {
-    return chromium.launch({
+    // What a person's browser looks like: no custom user agent or viewport, the sandbox on (no "--no-sandbox"
+    // warning bar), the window off-screen. Israeli locale and time zone, like the pages' own visitors.
+    return chromium.launchPersistentContext(profile, {
       ...candidate,
       headless: !cfg.headed,
+      chromiumSandbox: true,
+      viewport: null,
       args: ['--window-position=-2400,-2400', '--window-size=1280,900', '--mute-audio'],
+      locale: 'he-IL',
+      timezoneId: 'Asia/Jerusalem',
       ...(proxy
         ? {
             proxy: {
@@ -146,16 +177,18 @@ export async function createChromeLoader(
   }
 }
 
-/** Pages loaded in a fresh context each, with heavy resources blocked except the images asked for. */
-function loaderFor(browser: Browser): PageLoader {
+/** Pages loaded one at a time in a new tab of the one profile, with heavy resources blocked except wanted images. */
+function loaderFor(context: BrowserContext): PageLoader {
   return {
     async load(url, opts = {}) {
-      const context = await browser.newContext({ locale: 'he-IL', timezoneId: 'Asia/Jerusalem' });
+      const tabs: { close(): Promise<void> }[] = [];
       try {
         // Heavy resources are not loaded, except the one image asked for (see `image`).
         const allowImage = new Set<string>();
         const wantsImages = !!(opts.image || opts.images);
-        await context.route('**/*', (route) => {
+        const page = await context.newPage();
+        tabs.push(page);
+        await page.route('**/*', (route) => {
           const req = route.request();
           const type = req.resourceType();
           // A page whose images are wanted loads its images like any visitor (Kan 11 refuses image requests from a
@@ -166,9 +199,8 @@ function loaderFor(browser: Browser): PageLoader {
               : type === 'font' || type === 'media';
           return blocked ? route.abort() : route.continue();
         });
-        const page = await context.newPage();
         // The images the page itself loaded, by URL: a wanted one is taken from here, not requested again.
-        const loaded = new Map<string, import('playwright-core').Response>();
+        const loaded = new Map<string, import('patchright-core').Response>();
         if (wantsImages)
           page.on('response', (r) => {
             if (r.request().resourceType() === 'image') loaded.set(r.url(), r);
@@ -206,7 +238,10 @@ function loaderFor(browser: Browser): PageLoader {
           if (answer && answered === 200) {
             const body = await answer.body();
             const type = (answer.headers()['content-type'] ?? 'image/jpeg').split(';')[0];
-            blank ??= await context.newPage();
+            if (!blank) {
+              blank = await context.newPage();
+              tabs.push(blank);
+            }
             got = await blank.evaluate(fetchResized, {
               src: `data:${type};base64,${body.toString('base64')}`,
               width: opts.imageWidth ?? 960,
@@ -235,9 +270,9 @@ function loaderFor(browser: Browser): PageLoader {
           ...(images.length ? { images } : {}),
         };
       } finally {
-        await context.close();
+        for (const tab of tabs) await tab.close().catch(() => {});
       }
     },
-    close: () => browser.close(),
+    close: () => context.close(),
   };
 }

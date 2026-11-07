@@ -1591,3 +1591,54 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
   Nuvio's optional catalog hints were not needed.
 - `stremioAddonsConfig`: config `addon.stremioAddonsConfig` puts stremio-addons.net's signature in the manifest once
   it is issued (the owner pastes it).
+
+## Kan's bot check (2026-11-07)
+
+Kan's pages and images sit behind Cloudflare. Measured from outside Israel through the Israeli proxy exits:
+
+| Setup                                                                                                                  | Pages challenged                      | Images challenged             |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------- |
+| Stock Playwright, fresh browser context per page (what ran until now; 2 days of logs)                                  | 0 of ~555                             | 129 of 273 on one lobby (47%) |
+| Stock Playwright, one persistent profile, pages in a row                                                               | 4 of 5 on kan.org.il (kankids passed) | –                             |
+| **patchright, one persistent profile** (Google Chrome and Chrome for Testing, two exits, a reused and a fresh profile) | **0 of 34**                           | **0 of ~3,000**               |
+
+- The per-page fresh session got pages through (Cloudflare lets the first navigation of a session in), but it never
+  earned a clearance, so nearly half of every page's own images were answered with `cf-mitigated: challenge`: that
+  is why 156 of 350 Kan shows had no copied poster ("could not copy its image (HTTP 403)") and the dashboard showed
+  a placeholder. It also cost a new proxy session per page, which is why pages were spaced 75 s apart.
+- **Chosen: [patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright) (`patchright-core`, Apache-2.0), a
+  drop-in Playwright build that removes the automation giveaways** (`navigator.webdriver`, `--enable-automation`,
+  the `Runtime.enable` leak), with **one persistent profile** (`kan-browser/` next to the database) reused across
+  slices, the sandbox on (no `--no-sandbox` bar), no custom user agent or viewport, Israeli locale and time zone,
+  and **one sticky proxy exit** (the first configured one; Cloudflare's `cf_clearance` cookie is tied to the exit's
+  address). The managed check then clears on its own on the first page, as for a person's browser; we never click
+  or solve anything, and no paid solving service is involved.
+- Pacing follows: one browser per slice, pages 20 s apart, 12 pages per 10-minute slice (about 1,700 pages a day at
+  most, less than one page a minute on average), concurrency 1. The first fill of every Kan row (about 2,200
+  episode pages plus the archive) takes days less than before.
+- **Considered and not taken:** a Kan JSON/app API without the check (none found that lists shows and episodes with
+  their streams); FlareSolverr/Byparr (an extra service to run, and they solve the same way a stealth browser does);
+  camoufox/nodriver/undetected-chromedriver (Python, or a different browser engine; patchright keeps the Playwright
+  API this code already uses); `cf_clearance` replay into plain HTTP (needs the same TLS fingerprint as the browser).
+- **Reported, not hidden:** a page that still meets the check is "blocked by Kan's bot check (Cloudflare)"; the
+  slice stops and waits 45 minutes, and no page is charged. The crawl keeps a per-day tally (`kan:crawl` →
+  `botCheck`: pages, challenged, images, images challenged; two weeks), and `/status` says how many page loads the
+  check stopped today when it stopped any.
+- **Tuning:** `scraping.browserPagesPerRun` and `scraping.browserPageIntervalSec` (docs/configuration.md). If the
+  tally shows challenges: delete `kan-browser/` (a fresh profile clears again), check that the first `geo.urls`
+  entry still answers, then slow the pace. Only one process may use the profile at a time (Chrome locks it): run
+  `israel-tv kan` by hand only while the daemon is stopped.
+
+**Episode pages that are not episodes.** The four pages reported as "no video player config on the page (layout
+changed?)" were none of them a layout change. Two were episodes Kan took down when their rights ended (a
+`rights-expired` overlay where the player was: "בשל הסכמי זכויות שידור, … כבר לא זמין לצפייה"); one was an interview
+article linked among the episodes (a VideoObject with an empty `contentUrl`); one show's episodes were all taken down.
+Episode pages are now classified: a video; the bot check (also when it answers 200); removed; not a video; or
+unknown. Removed and not-a-video pages are skipped at once, never retried, and counted on `/status`; only an
+unknown page is retried (three times, a day apart) and then given up visibly. A page with a Redge `contentUrl` but
+no player config is read from its VideoObject.
+
+**The archive row was empty** ("0 of 171 shows in the catalog, 0 episode pages to read") because its show pages, like
+its episodes, waited until every other Kan row had nothing left to read, which at the old pace was a week away. The
+archive's show pages are now read after the other rows' due ones in each slice, and episode pages of all rows share
+one queue: newly published first, then the show with the fewest episodes (the archive only loses ties).

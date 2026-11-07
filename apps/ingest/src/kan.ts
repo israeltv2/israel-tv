@@ -27,6 +27,7 @@ import {
   classifyEpisodePage,
   cleanKanTitle,
   createChromeLoader,
+  isChallenge,
   type KanEpisode,
   type LoadedPage,
   type LoadOptions,
@@ -126,6 +127,13 @@ interface ShowState {
  */
 const ART_METHOD = 3;
 
+export interface BotCheckDay {
+  pages: number;
+  challenged: number;
+  images: number;
+  imagesChallenged: number;
+}
+
 interface CrawlState {
   lobbiesAt?: string;
   /** Lobbies have been read since posters were taken from them (an older state reads them once more). */
@@ -140,6 +148,8 @@ interface CrawlState {
   subtitles?: { n: number; url: string; sample: string };
   /** Guide pages read (live programme guide): `<channel id>|<yyyy-mm-dd>` → when. */
   guideAt?: Record<string, string>;
+  /** Pages and images loaded per day (UTC) and how many of them met Cloudflare's bot check: the measured rate. */
+  botCheck?: Record<string, BotCheckDay>;
 }
 
 /** A guide page (one channel, one day) is read again after this long. */
@@ -192,6 +202,8 @@ export interface KanCrawlOptions {
   log?: (line: string) => void;
   /** Where to keep our copies of show images (none: images are not copied). */
   artworkDir?: string;
+  /** The browser profile kept between slices (Cloudflare's clearance lives in its cookies). */
+  profileDir?: string;
   /** Read Kan's live programme guide pages too (default true). */
   guide?: boolean;
 }
@@ -306,6 +318,21 @@ export async function crawlKan(
   let note = '';
 
   const origin = (url: string) => new URL(url).origin;
+  /** Count a loaded page (and its images) against Cloudflare's bot check; two weeks of days are kept. */
+  const tally = (r: LoadedPage) => {
+    const day = new Date().toISOString().slice(0, 10);
+    state.botCheck ??= {};
+    const days = state.botCheck;
+    days[day] ??= { pages: 0, challenged: 0, images: 0, imagesChallenged: 0 };
+    const d = days[day];
+    d.pages++;
+    if (r.challenged || isChallenge(r.html)) d.challenged++;
+    for (const img of [...(r.image ? [r.image] : []), ...(r.images ?? [])]) {
+      d.images++;
+      if (img.challenged) d.imagesChallenged++;
+    }
+    for (const k of Object.keys(days).sort().slice(0, -14)) delete days[k];
+  };
   const warn = (seriesId: string | null | undefined, message: string) =>
     store.addWarnings(runId, seriesId ?? null, [{ code: 'source-note', message }]);
   /** Show images Kan refused in this slice, by reason: one line per reason at the end, not one per show. */
@@ -346,6 +373,7 @@ export async function crawlKan(
       loader ??= await createChromeLoader(
         opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
         opts.proxy,
+        opts.profileDir ? { profileDir: opts.profileDir } : {},
       );
     } catch (err) {
       // No browser: the slice fails, not any page.
@@ -355,6 +383,7 @@ export async function crawlKan(
       r = await loader.load(url, loadOpts);
       lastImage = r.image;
       lastImages = r.images;
+      tally(r);
     } catch (err) {
       const message = `${url}: ${firstLine(err)}`;
       // The proxy or this machine's network is down, or the browser died: back off, charge nobody.
@@ -946,6 +975,7 @@ export function kanCrawlOptions(
     pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
     airingWindowDays: config.schedule.airingWindowDays,
     artworkDir: kanArtworkDir(config),
+    profileDir: join(dirname(config.store.path), 'kan-browser'),
     // Kan's live channels' guide comes through this browser too (epg.ts).
     guide: config.sources.live,
     log,
@@ -994,6 +1024,11 @@ export function kanArtwork(store: Store, dir: string): Map<string, string> {
     if (s.art && existsSync(join(dir, s.art.file))) out.set(key, join(dir, s.art.file));
   }
   return out;
+}
+
+/** Pages and images loaded per day and how many met Kan's bot check (newest last). */
+export function kanBotCheck(store: Pick<Store, 'getState'>): Record<string, BotCheckDay> {
+  return store.getState<CrawlState>(STATE_KEY)?.botCheck ?? {};
 }
 
 /** Episode pages skipped because Kan took the video down (rights ended) or the page holds no video. */

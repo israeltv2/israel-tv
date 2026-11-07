@@ -13,7 +13,7 @@
   "dependencies": {
     "@israel-tv/core": "workspace:*",
     "@israel-tv/net": "workspace:*",
-    "playwright-core": "catalog:",
+    "patchright-core": "catalog:",
     "zod": "catalog:"
   },
   "license": "AGPL-3.0-only",

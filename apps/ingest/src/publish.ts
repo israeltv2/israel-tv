@@ -31,6 +31,7 @@ import {
   KAN_LATER,
   kanArtwork,
   kanArtworkDir,
+  kanBotCheck,
   kanRowProgress,
   kanSkippedPages,
   stillFilling,
@@ -154,6 +155,12 @@ export function buildStatus(
       if (skipped.removed > 0)
         notes.push(
           `${skipped.removed} Kan episodes are no longer offered by Kan (their broadcast rights ended), so they are not in the catalog`,
+        );
+      // Kan's bot check, measured: any page it stopped today is said plainly (the crawl waits and tries again).
+      const today = kanBotCheck(store)[new Date().toISOString().slice(0, 10)];
+      if (today?.challenged)
+        notes.push(
+          `Kan's bot check stopped ${today.challenged} of ${today.pages} page loads today; the crawl waits and tries again`,
         );
       if (skipped.notVideo > 0)
         notes.push(

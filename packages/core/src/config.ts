@@ -214,8 +214,8 @@ export const ConfigSchema = z.strictObject({
       /** A run that finds fewer than this share of a source's previous shows is treated as failed. */
       minShareOfPrevious: z.number().min(0).max(1).default(0.8),
       /** Kan: browser pages per crawl slice, and the pause between pages (each page is a new browser session). */
-      browserPagesPerRun: z.number().int().min(2, 'must be at least 2 (Kan has two lobby pages)').default(5),
-      browserPageIntervalSec: z.number().int().min(0).default(75),
+      browserPagesPerRun: z.number().int().min(2, 'must be at least 2 (Kan has two lobby pages)').default(12),
+      browserPageIntervalSec: z.number().int().min(0).default(20),
     })
     .prefault({}),
   /** Optional log file for `start` (stdout is used otherwise). Trimmed to its newest half above maxMB. */
