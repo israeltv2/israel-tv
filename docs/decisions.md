@@ -1616,10 +1616,19 @@ Kan's pages and images sit behind Cloudflare. Measured from outside Israel throu
 - Pacing follows: one browser per slice, pages 20 s apart, 12 pages per 10-minute slice (about 1,700 pages a day at
   most, less than one page a minute on average), concurrency 1. The first fill of every Kan row (about 2,200
   episode pages plus the archive) takes days less than before.
-- **Considered and not taken:** a Kan JSON/app API without the check (none found that lists shows and episodes with
-  their streams); FlareSolverr/Byparr (an extra service to run, and they solve the same way a stealth browser does);
-  camoufox/nodriver/undetected-chromedriver (Python, or a different browser engine; patchright keeps the Playwright
-  API this code already uses); `cf_clearance` replay into plain HTTP (needs the same TLS fingerprint as the browser).
+- **Considered and not taken:** FlareSolverr/Byparr (an extra service to run, and they solve the same way a stealth
+  browser does); rebrowser-playwright-core (the same fix, kept as the fallback); camoufox/nodriver/undetected-chromedriver
+  (Python, or a different browser engine; patchright keeps the Playwright API this code already uses); `cf_clearance`
+  replay into plain HTTP (needs the same TLS fingerprint as the browser).
+- **Next step, measured but not built this round: Kan's app API** (`mobapi.kan.org.il/api/mobile/program?id=<show
+  page id>`, `…/subClass?id=<category>`; behaviour learned from the Idan Plus Kodi addon, no code taken). From
+  abroad it answers `403 cf-mitigated: challenge`; inside the cleared patchright session it answers 200 with every
+  episode of a show in one JSON: the same page ids as our episode keys, season, episode number, air date, duration,
+  and a Kaltura `playManifest` URL whose entry id is the one in the Redge URL we store (an entry with an empty id is
+  not a video). One request per show instead of one page per episode would make the first fill a matter of hours.
+  Not switched yet because it changes where every Kan stream URL comes from (Kaltura instead of Redge, to be
+  play-checked from Israel and abroad), and numbering is frozen: it needs its own round with fixtures and a
+  side-by-side comparison against what the pages gave.
 - **Reported, not hidden:** a page that still meets the check is "blocked by Kan's bot check (Cloudflare)"; the
   slice stops and waits 45 minutes, and no page is charged. The crawl keeps a per-day tally (`kan:crawl` →
   `botCheck`: pages, challenged, images, images challenged; two weeks), and `/status` says how many page loads the
