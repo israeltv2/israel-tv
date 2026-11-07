@@ -340,7 +340,7 @@ export function renumberPrinted(
   store: Store,
   backupDir: string,
   source: 'kan' | 'reshet',
-  opts: { readSince?: string; dryRun?: boolean } = {},
+  opts: { readSince?: string; dryRun?: boolean; fetched?: Record<string, string[]> } = {},
 ): PrintedReport | undefined {
   const id = source === 'kan' ? KAN_PRINTED : RESHET_PRINTED;
   const done = store.getState<string[]>(MIGRATIONS_KEY) ?? [];
@@ -349,6 +349,8 @@ export function renumberPrinted(
   const plans: { seriesId: string; show: ScrapedShow; next: Assignments; refreshed: boolean }[] = [];
   for (const row of store.listShows({ source })) {
     if (opts.readSince && row.lastOkAt < opts.readSince) continue;
+    // Only seasons the read returned: a season kept from the stored data still has the old reader's numbers.
+    const fresh = opts.fetched ? new Set(opts.fetched[row.seriesId] ?? []) : undefined;
     const show = source === 'kan' ? kanHintsFromTitles(row.show) : row.show;
     const a = store.assignments(row.seriesId);
     const seasonOf = new Map(a.seasons.map((s) => [s.key, s]));
@@ -356,7 +358,7 @@ export function renumberPrinted(
     let seasons = 0;
     for (const season of show.seasons) {
       const sa = seasonOf.get(season.key);
-      if (!sa || sa.kind === 'year') continue;
+      if (!sa || sa.kind === 'year' || (fresh && !fresh.has(season.key))) continue;
       const m = printedSeason(season, sa.number, a.episodes);
       if (!m) continue;
       seasons++;
@@ -407,7 +409,7 @@ export function renumberPrinted(
         const row = store.getShow(p.seriesId);
         store.saveShow(p.seriesId, p.show, { seasons: [], episodes: [] }, latestAirDate(p.show), false);
         // A data refresh is not a new read: keep the show's own read times.
-        if (row) store.restoreLastOk(p.seriesId, row.lastOkAt);
+        if (row) store.restoreShowState(p.seriesId, row);
       }
     }
     store.setState(MIGRATIONS_KEY, [...(store.getState<string[]>(MIGRATIONS_KEY) ?? []), id]);
@@ -439,9 +441,20 @@ export function afterFullRun(
   store: Store,
   backupDir: string,
   source: string,
-  run: { status: string; startedAt: string; limited?: boolean },
+  run: {
+    status: string;
+    startedAt: string;
+    limited?: boolean;
+    blocked?: unknown[];
+    fetched?: Record<string, string[]>;
+  },
 ): string | undefined {
-  if (source !== 'reshet' || run.status === 'failed' || run.limited) return undefined;
-  const r = renumberPrinted(store, backupDir, 'reshet', { readSince: run.startedAt });
+  // Only after a complete read (every show read, none delayed): the migration runs once, so a show this read missed
+  // would never be migrated. Otherwise it waits for the next full run.
+  if (source !== 'reshet' || run.status !== 'ok' || run.limited || run.blocked?.length) return undefined;
+  const r = renumberPrinted(store, backupDir, 'reshet', {
+    readSince: run.startedAt,
+    ...(run.fetched ? { fetched: run.fetched } : {}),
+  });
   return r ? printedLine(r) : undefined;
 }

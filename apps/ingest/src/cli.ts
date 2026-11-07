@@ -167,11 +167,13 @@ async function main(argv: string[]): Promise<number> {
     return runResolverOnly(config);
   }
   const store = Store.open(config.store.path);
-  // Recorded one-time renumbers (each runs once per database, after a backup).
-  const renumber = renumberKanReshet(store, config.backup.dir);
-  const named = renumberNamedSeasons(store, config.backup.dir);
-  const repair = repairReshetSplit(store);
-  const kanPrinted = renumberPrinted(store, config.backup.dir, 'kan');
+  // Recorded one-time renumbers (each runs once per database, after a backup). Only in the service itself, before
+  // it starts any work: another command (a deploy's `idle`, `deploy-api`) can run while the old service still writes.
+  const migrate = cmd === 'start';
+  const renumber = migrate ? renumberKanReshet(store, config.backup.dir) : undefined;
+  const named = migrate ? renumberNamedSeasons(store, config.backup.dir) : undefined;
+  const repair = migrate ? repairReshetSplit(store) : undefined;
+  const kanPrinted = migrate ? renumberPrinted(store, config.backup.dir, 'kan') : undefined;
   const renumberLine =
     [
       renumber

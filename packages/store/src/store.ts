@@ -363,9 +363,13 @@ export class Store {
     });
   }
 
-  /** Put back a show's last good read after a data-only rewrite (a recorded migration), which is not a read. */
-  restoreLastOk(seriesId: string, lastOkAt: string): void {
-    this.db.update(t.shows).set({ lastOkAt }).where(eq(t.shows.seriesId, seriesId)).run();
+  /** Put back a show's read state after a data-only rewrite (a recorded migration), which is not a read. */
+  restoreShowState(seriesId: string, row: Pick<ShowRow, 'lastOkAt' | 'lastError' | 'state'>): void {
+    this.db
+      .update(t.shows)
+      .set({ lastOkAt: row.lastOkAt, lastError: row.lastError, state: row.state })
+      .where(eq(t.shows.seriesId, seriesId))
+      .run();
   }
 
   /** A good read that changed nothing: clear an earlier failure. */
