@@ -9,6 +9,7 @@
     "includes": [
       "**",
       "!**/fixtures",
+      "!**/__snapshots__",
       "!**/build",
       "!**/drizzle/meta",
       "!CHANGELOG.md",
