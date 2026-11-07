@@ -123,9 +123,10 @@ interface ShowState {
 
 /**
  * Bumped when the way show images are copied changes (2: from the lobby, with the page's own images loaded;
- * 3: a show page's own still when the show has no lobby card).
+ * 3: a show page's own still when the show has no lobby card; 4: through a session that cleared Kan's bot check,
+ * which no longer refuses ~half the images).
  */
-const ART_METHOD = 3;
+const ART_METHOD = 4;
 
 export interface BotCheckDay {
   pages: number;
