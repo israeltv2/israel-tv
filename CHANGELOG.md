@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.7.4](https://github.com/israeltv2/israel-tv/compare/v0.7.3...v0.7.4) (2026-11-07)
+
+
+### Bug Fixes
+
+* only real problems are errors — live labels by history, Cloudflare retries, "not-mine" helper answers, fixed failures marked ([#145](https://github.com/israeltv2/israel-tv/issues/145)) ([0bcda81](https://github.com/israeltv2/israel-tv/commit/0bcda81306cc31f92c7a95fd9b4cbd513ccdf013))
+
 ## [0.7.3](https://github.com/israeltv2/israel-tv/compare/v0.7.2...v0.7.3) (2026-11-07)
 
 

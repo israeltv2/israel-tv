@@ -173,6 +173,8 @@ export function createResolverApp(deps: ResolverDeps) {
     const notes: string[] = [];
     /** Nothing offered on purpose: the direct stream (from the public addon) plays from here. */
     let directPlays = false;
+    /** This helper has a job for this id (a Mako ticket, a relay, or our own title it should know). */
+    let needed = false;
     const play = (): Play => ({ playId, info });
     // Shows opened from other catalogs (tt123:2:5 or tmdb:123:2:5) map onto ours, numbered seasons only.
     const ext = /^(tt\d+|tmdb:\d+):(\d+):(\d+)$/.exec(id);
@@ -185,11 +187,14 @@ export function createResolverApp(deps: ResolverDeps) {
       const source = parseSeriesId(v.series)?.source;
       info = { showId: v.series, episodeId: video, ...(source ? { source } : {}) };
       const ep = await deps.episode(v.series, v.season, v.episode);
+      // Mako always needs this helper; one of our own titles it does not know (a stale copy) is a failure too.
+      needed = source === 'mako' || (!ep && source !== undefined);
       if (ep && mako && v.series.startsWith('iltv_mako_') && ep.play?.vcmid)
         streams.push(...mako.streams(origin, play(), { video }));
       // Reshet and Kan video is geo-blocked outside Israel; the relay is offered only when it is refused here.
       const geoSource = source !== undefined && GEO_LIMITED.has(source);
       if (ep && relay && (geoSource || ep.availableAbroad === false)) {
+        needed = true;
         const direct = ep.streams.find((s) => s.kind === 'direct' || s.kind === 'resolver');
         if (direct) {
           const r = await relay.streamFor(
@@ -212,6 +217,7 @@ export function createResolverApp(deps: ResolverDeps) {
         // Neither a Mako ticket nor a geo limit (Channel 13, Channel 14): its direct streams from the public addon
         // play anywhere, so nothing is needed here.
         directPlays ||= !ch.mako?.length && !ch.geo;
+        needed = !!ch.mako?.length || (!!ch.geo && !!relay);
         if (mako) streams.push(...mako.streams(origin, play(), { channel: ch }));
         if (ch.geo && relay) {
           for (const l of ch.direct) {
@@ -238,11 +244,13 @@ export function createResolverApp(deps: ResolverDeps) {
         : directPlays
           ? 'none needed'
           : 'no stream for this id here';
+    // Apps ask every installed addon for every id they open: an id this helper has no job for (another addon's
+    // title, a channel or title the public addon plays) is `not-mine`, never an error.
     deps.onEvent?.({
       ts: new Date().toISOString(),
       kind: 'stream_request',
       component: 'resolver',
-      outcome: streams.length > 0 || directPlays ? 'ok' : 'error',
+      outcome: streams.length > 0 || directPlays ? 'ok' : needed ? 'error' : 'not-mine',
       playId,
       ...info,
       ...(info.episodeId || info.showId ? {} : { episodeId: id }),

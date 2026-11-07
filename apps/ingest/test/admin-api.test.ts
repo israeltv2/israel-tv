@@ -217,3 +217,61 @@ test('nothing the admin app answers is indexed', async () => {
     'noindex, nofollow',
   );
 });
+
+test('failures and health: only real problems count; each class has its own plain reason; fixed causes are marked', async () => {
+  const { failures, health, knownFix, plainReason } = await import('../src/admin-api.ts');
+  const events = EventStore.open(':memory:');
+  const now = Date.parse('2026-11-07T12:00:00Z');
+  const at = (h: number) => new Date(now - h * 3_600_000).toISOString();
+  const fail = (
+    playId: string,
+    ts: string,
+    source: string,
+    status: number,
+    detail: Record<string, unknown>,
+  ) =>
+    events.record({
+      ts,
+      kind: 'failure',
+      component: 'mako-auth',
+      outcome: 'error',
+      playId,
+      source,
+      status,
+      detail,
+    });
+  // The round-6 Mako bug (2026-11-06 12:10 UTC): a real failure, fixed since.
+  fail('v1', '2026-11-06T12:10:22.833Z', 'mako', 403, { stage: 'play', reason: 'Mako master HTTP 403' });
+  // A new failure of the same kind after the fix is open again.
+  fail('v2', at(1), 'mako', 403, { stage: 'play', reason: 'Mako master HTTP 403' });
+  // One title refused while its source plays.
+  fail('v3', at(2), 'reshet', 403, { stage: 'relay', reason: 'refused', blame: 'episode' });
+  // The canary's own play and the helper's "not mine" answers are not viewers' failures.
+  fail('canary-x', at(1), 'kan', 403, { stage: 'relay', reason: 'segment HTTP 403' });
+  events.record({
+    ts: at(1),
+    kind: 'stream_request',
+    component: 'resolver',
+    outcome: 'not-mine',
+    playId: 'v4',
+    source: 'live',
+    showId: 'iltv_live_reshet13',
+    detail: { offered: 'no stream for this id here' },
+  });
+  events.flush();
+  const d = new Daemon(parseConfig({}), Store.open(':memory:'), events, quiet);
+  const f = FailuresSchema.parse(failures(d, now));
+  const byPlay = (id: string) => f.groups.find((g) => g.lastPlayId === id);
+  expect(byPlay('v1')?.fixed).toMatch(/fixed 2026-11-07/);
+  expect(byPlay('v2')?.fixed).toBeUndefined();
+  expect(byPlay('v2')?.plain).toBe('The broadcaster refused the video.');
+  expect(byPlay('v3')?.plain).toMatch(/This one title/);
+  expect(f.groups.map((g) => g.lastPlayId).sort()).toEqual(['v1', 'v2', 'v3']);
+  const h = health(d, now);
+  expect(h.problems.find((p) => p.section === 'failures')?.message).toBe(
+    '2 plays failed in the last 24 hours (1 where only that title was refused)',
+  );
+  expect(knownFix({ source: 'mako', ts: '2026-11-06T12:13:25.411Z' }, 'Invalid URL')).toBeDefined();
+  expect(plainReason({ stage: 'play', status: 502, reason: 'Invalid URL' })).toMatch(/server failed/);
+  expect(plainReason({ stage: 'play', status: 404, reason: 'unknown episode' })).toMatch(/does not know/);
+});

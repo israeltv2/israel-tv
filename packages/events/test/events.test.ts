@@ -158,6 +158,38 @@ test('once, old failures for ids that are not episode ids at all are retagged as
   b.close();
 });
 
+test('once, old "no stream for this id here" answers become not-mine, except for Mako (which needs the helper)', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const path = join(mkdtempSync(join(tmpdir(), 'iltv-events-')), 'events.sqlite');
+  const a = EventStore.open(path);
+  const nothing = {
+    kind: 'stream_request',
+    outcome: 'error',
+    detail: { offered: 'no stream for this id here' },
+  } as const;
+  a.record(ev({ ...nothing, playId: 'r13', source: 'live', showId: 'iltv_live_reshet13' }));
+  a.record({
+    ts: `${day}T10:00:00.000Z`,
+    component: 'resolver',
+    ...nothing,
+    playId: 'tt',
+    episodeId: 'tt1:1:1',
+  });
+  a.record(
+    ev({ ...nothing, playId: 'm', source: 'mako', showId: 'iltv_mako_1', episodeId: 'iltv_mako_1:1:1' }),
+  );
+  a.record(ev({ ...nothing, playId: 'k12', source: 'live', showId: 'iltv_live_keshet12' }));
+  a.db.$client.exec("delete from meta where key = 'fix:not-mine'");
+  a.close();
+  const b = EventStore.open(path);
+  const by = Object.fromEntries(b.events({ kind: 'stream_request' }).map((e) => [e.playId, e.outcome]));
+  expect(by).toEqual({ r13: 'not-mine', tt: 'not-mine', m: 'error', k12: 'error' });
+  expect(b.events({ outcome: 'error' })).toHaveLength(2);
+  b.close();
+});
+
 test('once, the canary plays from before its plays were tagged are retagged, and their days rolled up again', async () => {
   const { mkdtempSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');

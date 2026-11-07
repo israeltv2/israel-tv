@@ -253,9 +253,10 @@ export function buildStatus(
     store.lastRun('publish', 'cloudflare', { settled: true }) ??
     store.lastRun('publish', 'local', { settled: true });
   const lastGoodPublish = store.lastGoodRun('publish', 'cloudflare') ?? store.lastGoodRun('publish', 'local');
+  const failing = failedPublishes(store);
   const publishNote =
-    lastPublish?.status === 'failed'
-      ? `last publish failed (${lastPublish.startedAt}): ${(lastPublish.error ?? '').split('\n')[0]}`
+    lastPublish?.status === 'failed' && failing.alert
+      ? `last publish failed (${lastPublish.startedAt})${failing.inRow > 1 ? `, ${failing.inRow} in a row` : ''}: ${(lastPublish.error ?? '').split('\n')[0]}`
       : lastGoodPublish && now - Date.parse(lastGoodPublish.startedAt) > STALE_PUBLISH_HOURS * HOUR_MS
         ? `the catalog has not been published since ${lastGoodPublish.startedAt}`
         : undefined;
@@ -284,6 +285,27 @@ export function buildStatus(
     failingShows,
     warnings,
   });
+}
+
+/** A run stopped by a restart (deploys restart the service): not a failure of the thing it was doing. */
+const STOPPED = /^interrupted|stopped for restart/i;
+
+/**
+ * Failed publishes in a row, newest first (runs stopped by a restart are skipped), and whether that is a problem
+ * yet: a setup problem (token, account) at once; Cloudflare's own outages only after PUBLISH_ALERT_AFTER failed
+ * publishes in a row (each already tried again with pauses). Until then the public copy is the last good one, a
+ * publish behind; a catalog not published for STALE_PUBLISH_HOURS is said either way.
+ */
+export function failedPublishes(store: Store): { inRow: number; alert: boolean } {
+  let inRow = 0;
+  let outagesOnly = true;
+  for (const r of store.runsOfKind('publish', PUBLISH_ALERT_AFTER + 10)) {
+    if (r.status === 'running' || (r.status === 'failed' && STOPPED.test(r.error ?? ''))) continue;
+    if (r.status !== 'failed') break;
+    inRow++;
+    outagesOnly &&= CLOUDFLARE_OUTAGE.test((r.error ?? '').split('\n')[0] ?? '');
+  }
+  return { inRow, alert: inRow > 0 && (!outagesOnly || inRow >= PUBLISH_ALERT_AFTER) };
 }
 
 /** Remove every secret from text (or strings inside a value): `.env` values, and Cloudflare account paths. */
@@ -604,6 +626,39 @@ export function writeSite(
 /** A publishing problem the user can fix (credentials, permissions); printed without a stack trace. */
 export class PublishError extends Error {
   override name = 'PublishError';
+  /** Cloudflare's own trouble (an outage), not a setup problem: worth trying again. */
+  readonly outage: boolean;
+  constructor(message: string, outage = false) {
+    super(message);
+    this.outage = outage;
+  }
+}
+
+/**
+ * Cloudflare's own trouble (5xx, "no healthy upstream", a malformed API answer, timeouts, a dropped connection):
+ * measured 2026-11-06, 9 publishes in 8 minutes failed with "malformed response … no healthy upstream" and the next
+ * one went through.
+ */
+export const CLOUDFLARE_OUTAGE =
+  /no healthy upstream|malformed response|(?:status|HTTP|code)[:\s]+5\d\d\b|\b5\d\d (?:Internal|Bad Gateway|Service Unavailable|Gateway Timeout)|timed? ?out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|fetch failed|socket hang up|service unavailable|bad gateway/i;
+
+/** How a publish retries Cloudflare's outages: tries in all, and the pause before each retry (grows, with jitter). */
+export interface PublishRetry {
+  attempts: number;
+  baseMs: number;
+  maxMs: number;
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+}
+export const PUBLISH_RETRY: PublishRetry = { attempts: 4, baseMs: 15_000, maxMs: 180_000 };
+
+/** Failed publishes in a row (each after its own retries) before /status calls it a problem. */
+export const PUBLISH_ALERT_AFTER = 3;
+
+/** The pause before retry `n` (1 = the first retry): ×4 each time up to the cap, then 50–100% of it (jitter). */
+export function retryDelay(n: number, r: PublishRetry = PUBLISH_RETRY): number {
+  const full = Math.min(r.maxMs, r.baseMs * 4 ** (n - 1));
+  return Math.round(full * (0.5 + 0.5 * (r.random ?? Math.random)()));
 }
 
 /** Terminal colour codes (wrangler prints them even with NO_COLOR). */
@@ -627,17 +682,15 @@ export function publishError(
   const reason = head
     ? `${head}${next && /^[A-Za-z]/.test(next) ? ` ${next}` : ''}`
     : (lines.at(-1) ?? `wrangler exited with ${code}`);
-  // Cloudflare's own trouble (5xx, "no healthy upstream", timeouts) is not a setup problem: say so, it is retried.
-  const outage =
-    /no healthy upstream|malformed response|status: 5\d\d|\b5\d\d\b|timed? ?out|ETIMEDOUT|ECONNRESET|fetch failed/i.test(
-      reason,
-    );
+  // Cloudflare's own trouble is not a setup problem: say so (it is retried); the token hint is for the rest.
+  const outage = CLOUDFLARE_OUTAGE.test(reason);
   const hint = outage
-    ? "This looks like a problem on Cloudflare's side; it is retried after the next run.\n"
+    ? "This looks like a problem on Cloudflare's side, not your setup; it is tried again.\n"
     : `Check ${p.apiTokenEnv} and ${p.accountIdEnv} in .env, that the token may edit Workers scripts, and that ` +
       `your workers.dev subdomain exists (docs/setup/host.md).\n`;
   return new PublishError(
     `Cloudflare deploy failed: ${reason}\n${hint}wrangler said:\n${lines.slice(-12).join('\n')}`,
+    outage,
   );
 }
 
@@ -934,6 +987,35 @@ export async function deploy(
   return deployCloudflare(p, env, originKnown);
 }
 
+/**
+ * Deploy, trying again after Cloudflare's own outages (growing pauses with jitter). Each try resumes where the
+ * last stopped: wrangler uploads static assets by content hash and Cloudflare answers which ones it still lacks,
+ * so files a failed try already uploaded are not sent again. Setup problems (token, account) fail at once.
+ */
+export async function deployWithRetries(
+  run: () => Promise<DeployResult>,
+  log: (line: string) => void,
+  retry: PublishRetry = PUBLISH_RETRY,
+): Promise<DeployResult> {
+  const sleep = retry.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (err) {
+      if (!(err instanceof PublishError && err.outage) || attempt >= retry.attempts) {
+        if (attempt > 1 && err instanceof Error)
+          err.message = err.message.replace(/\n/, ` (${attempt} tries)\n`);
+        throw err;
+      }
+      const wait = retryDelay(attempt, retry);
+      log(
+        `publish: Cloudflare outage (${(err as Error).message.split('\n')[0]}); try ${attempt + 1} of ${retry.attempts} in ${Math.round(wait / 1000)} s`,
+      );
+      await sleep(wait);
+    }
+  }
+}
+
 const PUBLISHED_URL = 'publish:url';
 
 /**
@@ -963,6 +1045,7 @@ export async function publishSite(
   store: Store,
   config: Config,
   log: (line: string) => void,
+  retries: PublishRetry = PUBLISH_RETRY,
 ): Promise<boolean> {
   const t0 = Date.now();
   const kind = config.publisher.type;
@@ -1012,7 +1095,7 @@ export async function publishSite(
   }
   const runId = store.startRun('publish', kind);
   try {
-    const d = await deploy(config, process.env, originKnown);
+    const d = await deployWithRetries(() => deploy(config, process.env, originKnown), log, retries);
     store.finishRun(runId, { status: 'ok' });
     if (d.versionId) store.setState(DATA_VERSION, d.versionId);
     if (worker) store.setState(WORKER_DEPLOYED, worker);

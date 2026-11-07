@@ -329,7 +329,27 @@ export function Sources() {
   );
 }
 
-const STREAM_STATE: Record<string, 'ok' | 'warn' | 'error'> = { ok: 'ok', refused: 'warn', failed: 'error' };
+/** A refusal from abroad is a label (the stream plays in Israel), not a fault: grey, never amber or red. */
+const STREAM_STATE: Record<string, 'ok' | 'unknown' | 'error'> = {
+  ok: 'ok',
+  refused: 'unknown',
+  failed: 'error',
+};
+
+const ONLY_HERE = { always: 'Israel only', sometimes: 'some programmes Israel only' } as const;
+
+/** What a stream's pill says on hover: the statuses, a retry, its history, and what plays abroad. */
+function streamHint(x: NonNullable<SourcesData['live']>['channels'][number]['streams'][number]): string {
+  return [
+    x.detail ?? x.statuses,
+    x.outcome === 'refused' ? 'refused from abroad now (plays in Israel; the helper relays it)' : undefined,
+    x.retried ? (x.outcome === 'ok' ? 'played on the second try' : 'failed twice, 30 s apart') : undefined,
+    x.israelOnly ? ONLY_HERE[x.israelOnly] : undefined,
+    x.recent ? `last ${x.recent.length} checks: ${x.recent}` : undefined,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 /** Every live channel: each stream's last daily check, and how far its programme guide reaches. */
 function LiveChannels({ live }: { live: NonNullable<SourcesData['live']> }) {
@@ -340,8 +360,9 @@ function LiveChannels({ live }: { live: NonNullable<SourcesData['live']> }) {
         description={
           live.checkedAt ? (
             <>
-              Every stream played (playlist → variant → segment) <Ago iso={live.checkedAt} />. A refusal from
-              abroad is the "Israel only" label, not a fault.
+              Every stream played (playlist → variant → segment) <Ago iso={live.checkedAt} />; one that does
+              not play is tried once more. A refusal from abroad (grey) is a label, not a fault: Kan blocks
+              some programmes outside Israel.
             </>
           ) : (
             'Not checked yet: the check runs with the nightly full run.'
@@ -380,7 +401,7 @@ function LiveChannels({ live }: { live: NonNullable<SourcesData['live']> }) {
                 <div className="flex flex-wrap justify-end gap-1">
                   {c.streams.length ? (
                     c.streams.map((x) => (
-                      <span key={`${x.via}:${x.title}`} title={x.detail ?? x.statuses ?? ''}>
+                      <span key={`${x.via}:${x.title}`} title={streamHint(x)}>
                         <HealthPill
                           state={STREAM_STATE[x.outcome] ?? 'unknown'}
                           label={x.via === 'helper' ? `helper: ${x.title}` : x.title}

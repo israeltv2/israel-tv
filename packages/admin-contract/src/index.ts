@@ -205,6 +205,12 @@ export const SourcesSchema = z.object({
               outcome: z.string(),
               statuses: z.string().optional(),
               detail: z.string().optional(),
+              /** The first try failed and this is the second, a little later (`outcome` says how it went). */
+              retried: z.boolean().optional(),
+              /** Latest outcomes, oldest first: o played, r refused (abroad), f failed. */
+              recent: z.string().optional(),
+              /** Plays outside Israel? `always` refused there, `sometimes` (some programmes). */
+              israelOnly: z.enum(['always', 'sometimes']).optional(),
             }),
           ),
           guide: z
@@ -268,6 +274,10 @@ export const FailuresSchema = z.object({
       perDay: z.array(z.number()),
       /** Whose fault: one title (`episode`) or the source itself (`source`). */
       blame: z.string().optional(),
+      /** What happened, in plain words. */
+      plain: z.string().optional(),
+      /** Set when these failures' cause was fixed after them: what was done. They are not open problems. */
+      fixed: z.string().optional(),
     }),
   ),
 });

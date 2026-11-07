@@ -716,7 +716,7 @@ function hostOf(origin: string): string | undefined {
 const EventsQuery = z.strictObject({
   playId: z.string().max(80).optional(),
   kind: z.string().max(40).optional(),
-  outcome: z.enum(['ok', 'error']).optional(),
+  outcome: z.enum(['ok', 'error', 'not-mine']).optional(),
   since: z.string().max(40).optional(),
   show: z.string().max(80).optional(),
   limit: z

@@ -36,7 +36,7 @@ import { streamSSE } from 'hono/streaming';
 import { csrfFor } from './admin-auth.ts';
 import { GUIDE_KEY, type GuideState } from './epg.ts';
 import { kanProgress } from './kan.ts';
-import { LIVE_CHECK_KEY, type LiveCheck } from './live.ts';
+import { israelOnly, LIVE_CHECK_KEY, type LiveCheck } from './live.ts';
 import { API_VERSION, DATA_VERSION } from './publish.ts';
 
 /** What the API reads from the running daemon (it does not import the daemon: no cycle). */
@@ -188,7 +188,9 @@ export function health(d: Daemon, now = Date.now()): Health {
   if (status.tmdb) add('deploys', 'warn', status.tmdb);
   for (const n of status.notes ?? []) add('system', 'warn', n);
   const day = new Date(now - DAY_MS).toISOString();
-  const failed = d.events.events({ kind: 'failure', since: day, limit: 1000, viewersOnly: true });
+  const failed = d.events
+    .events({ kind: 'failure', since: day, limit: 1000, viewersOnly: true })
+    .filter((e) => !knownFix(e, String(parseDetail(e.detail).reason ?? '')));
   if (failed.length) {
     const titles = failed.filter((e) => parseDetail(e.detail).blame === 'episode').length;
     add(
@@ -256,7 +258,9 @@ export function overview(d: Daemon, now = Date.now()): Overview {
     ...(s.title ? { title: s.title } : {}),
     ...artOf(d, s.showId),
   });
-  const home7 = dash.home.d7;
+  // Failures whose cause was fixed since are not open problems: left out of the 7-day figures, as on Failures.
+  const fixed7 = fixedFailures(d, d.events.dayRange(month[23] as string).from);
+  const home7 = { ...dash.home.d7, failures: Math.max(0, dash.home.d7.failures - fixed7) };
   const status = d.status();
   const fresh = freshness(d);
   const lastPublish = d.store.lastGoodRun('publish', d.config.publisher.type);
@@ -302,7 +306,9 @@ export function overview(d: Daemon, now = Date.now()): Overview {
           .events({ kind: 'relay_session', since, limit: 5000, viewersOnly: true })
           .filter((e) => e.outcome === 'ok'),
       ].length;
-      const failed = d.events.events({ kind: 'failure', since, limit: 5000, viewersOnly: true }).length;
+      const failed =
+        d.events.events({ kind: 'failure', since, limit: 5000, viewersOnly: true }).length -
+        fixedFailures(d, since);
       return { revision: d.release.revision, at: since, plays: ok, failures: failed };
     })(),
     ...(quota && quota.day === new Date(now).toISOString().slice(0, 10)
@@ -347,13 +353,19 @@ export function sources(d: Daemon, now = Date.now()): Sources {
             id: c.id,
             name: c.name,
             ...artOf(d, c.id),
-            streams: (check?.channels[c.id] ?? []).map((x) => ({
-              title: x.title,
-              via: x.via,
-              outcome: x.outcome,
-              ...(x.statuses.length ? { statuses: x.statuses.join('/') } : {}),
-              ...(x.detail ? { detail: x.detail } : {}),
-            })),
+            streams: (check?.channels[c.id] ?? []).map((x) => {
+              const only = x.via === 'direct' ? israelOnly(c, x, check?.abroad ?? false) : undefined;
+              return {
+                title: x.title,
+                via: x.via,
+                outcome: x.outcome,
+                ...(x.statuses.length ? { statuses: x.statuses.join('/') } : {}),
+                ...(x.detail ? { detail: x.detail } : {}),
+                ...(x.retried ? { retried: true } : {}),
+                ...(x.recent ? { recent: x.recent } : {}),
+                ...(only ? { israelOnly: only } : {}),
+              };
+            }),
             ...(g
               ? {
                   guide: {
@@ -542,6 +554,57 @@ export function plays(d: Daemon, now = Date.now()): Plays {
   };
 }
 
+/**
+ * Failures whose cause was found and fixed: the ones recorded before the fix are shown as fixed (with what was
+ * done), not as open problems. Only causes measured in the events, with the moment the fix went live.
+ */
+export const KNOWN_FIXES: { source: string; before: string; reason: RegExp; note: string }[] = [
+  {
+    // 2026-11-06 12:09–12:13 UTC: Akamai refused one airing episode's master; the next CDN Mako lists was not tried
+    // (403), then its address was built wrong ("Invalid URL", 502). Fixed in 0.2.x on 2026-11-07 (Mako's CloudFront
+    // fallback); none since.
+    source: 'mako',
+    before: '2026-11-07T00:00:00Z',
+    reason: /^Mako master HTTP 403$|^Invalid URL$/,
+    note: 'fixed 2026-11-07: when Akamai refuses an episode, the helper plays it from the next CDN Mako lists',
+  },
+];
+
+/** The fix that explains a failure recorded before it, if any. */
+export function knownFix(e: { source: string | null; ts: string }, reason: string): string | undefined {
+  return KNOWN_FIXES.find((f) => f.source === e.source && e.ts < f.before && f.reason.test(reason))?.note;
+}
+
+/** Viewers' failures since `since` whose cause was fixed after them (left out of every count of open problems). */
+function fixedFailures(d: Daemon, since: string): number {
+  return d.events
+    .events({ kind: 'failure', since, limit: 5000, viewersOnly: true })
+    .filter((e) => knownFix(e, String(parseDetail(e.detail).reason ?? ''))).length;
+}
+
+/** A failure group in plain words: what the viewer met, and whose doing it was. */
+export function plainReason(g: {
+  stage: string;
+  status: number | null;
+  reason: string;
+  blame?: string;
+}): string {
+  const r = g.reason;
+  if (g.blame === 'episode')
+    return 'This one title was refused by the broadcaster; other titles of the same source played.';
+  if (/unknown (episode|channel)/i.test(r)) return 'The app asked for a title this helper does not know.';
+  if (/ticket/i.test(r)) return 'Mako did not give a play ticket for this title.';
+  if (/HTTP 5\d\d|Invalid URL/i.test(r) || (g.status ?? 0) >= 500)
+    return "The broadcaster's server failed, or the helper built a wrong address.";
+  if (/HTTP 40[13]|refused/i.test(r) || g.status === 403)
+    return g.stage === 'relay'
+      ? "Refused through the Israeli connection too (the proxy exit or the broadcaster's limit)."
+      : 'The broadcaster refused the video.';
+  if (/timed? ?out|ETIMEDOUT|ECONNRESET|fetch failed/i.test(r))
+    return 'The broadcaster did not answer in time.';
+  return r ? 'Recorded as it happened; see its trace.' : 'No reason was recorded; see its trace.';
+}
+
 export function failures(d: Daemon, now = Date.now()): Failures {
   const week = d.events.lastDays(7, now);
   const since = d.events.dayRange(week[0] as string).from;
@@ -551,18 +614,19 @@ export function failures(d: Daemon, now = Date.now()): Failures {
     const detail = parseDetail(e.detail) as { stage?: string; reason?: string; blame?: string };
     const stage = detail.stage ?? e.component;
     const reason = (detail.reason ?? '').slice(0, 120);
-    const key = `${e.source}|${stage}|${e.status}|${reason}`;
+    const fixed = knownFix(e, reason);
+    const key = `${e.source}|${stage}|${e.status}|${reason}|${fixed ?? ''}`;
     let g = groups.get(key);
     if (!g) {
+      const base = { stage, status: e.status, reason, ...(detail.blame ? { blame: detail.blame } : {}) };
       g = {
         source: e.source ?? '',
-        stage,
-        status: e.status,
-        reason,
+        ...base,
         n: 0,
         last: e.ts,
         perDay: week.map(() => 0),
-        ...(detail.blame ? { blame: detail.blame } : {}),
+        plain: plainReason(base),
+        ...(fixed ? { fixed } : {}),
       };
       groups.set(key, g);
     }
