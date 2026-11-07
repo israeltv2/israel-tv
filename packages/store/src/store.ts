@@ -13,7 +13,7 @@ import {
   ScrapedShow as ScrapedShowSchema,
   type Source,
 } from '@israel-tv/core';
-import { and, desc, eq, gte, inArray, like, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, ne, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
 import * as t from './schema.ts';
@@ -49,6 +49,13 @@ export type RunKind = (typeof t.runs.$inferSelect)['kind'];
 export type RunStatus = (typeof t.runs.$inferSelect)['status'];
 export type RunRow = typeof t.runs.$inferSelect;
 export type WarningRow = typeof t.warnings.$inferSelect;
+/** kv key of the last deliberate stop (`noteShutdown`): which process began stopping, and when. */
+export const SHUTDOWN_KEY = 'shutdown:last';
+/** Error text of a run cut short by a deliberate stop (status `stopped`). */
+export const STOPPED_FOR_RESTART = 'stopped for restart';
+/** Error text of a run left open by a process that ended without a deliberate stop (a crash, a kill, a power cut). */
+export const INTERRUPTED = 'interrupted: the process ended without a clean stop (crash, kill or power cut)';
+
 /** kv key of the numbering guard's history (see apps/ingest/src/numbering-guard.ts). */
 export const NUMBERING_HISTORY = 'numbering:history';
 
@@ -594,7 +601,7 @@ export class Store {
       .all();
   }
 
-  /** Finished runs of these kinds started since `since` (ISO), oldest first: just what a day-by-day history needs. */
+  /** Finished runs of these kinds started since `since` (ISO), stopped ones left out, oldest first: just what a day-by-day history needs. */
   finishedRunsSince(
     since: string,
     kinds: RunKind[],
@@ -602,7 +609,14 @@ export class Store {
     return this.db
       .select({ kind: t.runs.kind, scope: t.runs.scope, startedAt: t.runs.startedAt, status: t.runs.status })
       .from(t.runs)
-      .where(and(gte(t.runs.startedAt, since), inArray(t.runs.kind, kinds), ne(t.runs.status, 'running')))
+      .where(
+        and(
+          gte(t.runs.startedAt, since),
+          inArray(t.runs.kind, kinds),
+          // Neither good nor bad: still going, or stopped for a restart.
+          notInArray(t.runs.status, ['running', 'stopped']),
+        ),
+      )
       .orderBy(t.runs.id)
       .all();
   }
@@ -618,11 +632,18 @@ export class Store {
       .all();
   }
 
-  lastRun(kind: RunKind, scope?: string): RunRow | undefined {
+  /** Newest run of a kind (and scope); `settled` leaves out runs stopped for a restart (they judge nothing). */
+  lastRun(kind: RunKind, scope?: string, opts: { settled?: boolean } = {}): RunRow | undefined {
     return this.db
       .select()
       .from(t.runs)
-      .where(scope ? and(eq(t.runs.kind, kind), eq(t.runs.scope, scope)) : eq(t.runs.kind, kind))
+      .where(
+        and(
+          eq(t.runs.kind, kind),
+          scope ? eq(t.runs.scope, scope) : undefined,
+          opts.settled ? ne(t.runs.status, 'stopped') : undefined,
+        ),
+      )
       .orderBy(desc(t.runs.id))
       .limit(1)
       .get();
@@ -650,26 +671,74 @@ export class Store {
       .get();
   }
 
-  /** Mark runs left `running` by a process that no longer exists as failed. */
-  closeStaleRuns(isAlive: (pid: number) => boolean = processAlive): number {
+  /**
+   * Record that this process is stopping on purpose (a service stop or restart), before it waits for its work to
+   * reach a safe point. A run it leaves open (the wait ran out, or the service manager killed it first) is then
+   * closed at the next start as stopped, not failed.
+   */
+  noteShutdown(pid = process.pid): void {
+    this.setState(SHUTDOWN_KEY, { pid, at: now() });
+  }
+
+  /** Runs in progress now: `running`, in a process that still exists (a deploy can wait for none). */
+  openRuns(isAlive: (pid: number) => boolean = processAlive): RunRow[] {
+    return this.db
+      .select()
+      .from(t.runs)
+      .where(eq(t.runs.status, 'running'))
+      .orderBy(t.runs.id)
+      .all()
+      .filter((r) => r.pid !== null && isAlive(r.pid));
+  }
+
+  /** Close this process's runs that are still open as stopped (the stop's wait ran out). Returns how many. */
+  stopOpenRuns(note: string = STOPPED_FOR_RESTART, pid = process.pid): number {
+    const open = this.db
+      .select({ id: t.runs.id })
+      .from(t.runs)
+      .where(and(eq(t.runs.status, 'running'), eq(t.runs.pid, pid)))
+      .all();
+    for (const r of open) this.finishRun(r.id, { status: 'stopped', error: note });
+    return open.length;
+  }
+
+  /**
+   * Close runs left `running` by a process that no longer exists: `stopped` when that process had begun a
+   * deliberate stop (noteShutdown), else `failed` with a label that says the process ended without one.
+   */
+  closeStaleRuns(isAlive: (pid: number) => boolean = processAlive): { stopped: number; failed: number } {
     const running = this.db
       .select({ id: t.runs.id, pid: t.runs.pid })
       .from(t.runs)
       .where(eq(t.runs.status, 'running'))
       .all();
-    let closed = 0;
+    const shutdown = this.getState<{ pid: number; at: string } | null>(SHUTDOWN_KEY);
+    const out = { stopped: 0, failed: 0 };
     for (const r of running) {
       // This process has not started any run yet when this is called, so a run with its pid is a leftover
       // from an earlier process that had the same pid (e.g. pid 1 in a container).
       if (r.pid !== null && r.pid !== process.pid && isAlive(r.pid)) continue;
+      const deliberate = shutdown?.pid !== undefined && r.pid === shutdown.pid;
       this.db
         .update(t.runs)
-        .set({ status: 'failed', error: 'interrupted (process stopped)', finishedAt: now() })
+        .set(
+          deliberate
+            ? {
+                status: 'stopped',
+                error: `${STOPPED_FOR_RESTART} (closed at the next start)`,
+                finishedAt: now(),
+              }
+            : { status: 'failed', error: INTERRUPTED, finishedAt: now() },
+        )
         .where(eq(t.runs.id, r.id))
         .run();
-      closed++;
+      out[deliberate ? 'stopped' : 'failed']++;
     }
-    return closed;
+    // Used once (a later process that happens to get the same pid must not inherit it), but only once that
+    // process is gone: a command run while the service is still stopping must not clear it.
+    if (shutdown && (shutdown.pid === process.pid || !isAlive(shutdown.pid)))
+      this.setState(SHUTDOWN_KEY, null);
+    return out;
   }
 
   /** Record warnings; one already recorded for the same show with the same text is not repeated. */

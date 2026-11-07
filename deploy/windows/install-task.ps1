@@ -23,6 +23,12 @@ function Stop-IsraelTv {
 }
 
 if ($Stop -or $Restart) {
+  # Windows cannot ask node to stop gently, so first wait (up to 5 minutes) until no run is in progress: nothing is
+  # cut short. (`idle` exits 3 when the wait runs out; the service is stopped anyway.)
+  if (-not $Resolver) {
+    Push-Location (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    try { & node 'apps\ingest\src\cli.ts' idle --wait 300 | Out-Host } finally { Pop-Location }
+  }
   Stop-IsraelTv
   if ($Restart) { Start-Sleep -Seconds 2; Start-ScheduledTask -TaskName $name; Write-Host "Restarted '$name'." }
   else { Write-Host "Stopped '$name'." }

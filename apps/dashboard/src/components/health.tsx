@@ -20,6 +20,19 @@ export function asHealth(s: string | undefined): HealthState {
         : 'unknown';
 }
 
+/**
+ * A run's status as a health colour. `stopped` (cut short by a restart, not a failure) and `running` are neither good
+ * nor bad: grey.
+ */
+export function runHealth(status: string): HealthState {
+  return status === 'ok' ? 'ok' : status === 'partial' ? 'warn' : status === 'failed' ? 'error' : 'unknown';
+}
+
+/** How a run's status reads: `stopped` says why. */
+export function runLabel(status: string): string {
+  return status === 'stopped' ? 'stopped for restart' : status;
+}
+
 /** Colour, icon and word together (never colour alone). */
 export function HealthPill({
   state,

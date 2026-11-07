@@ -187,6 +187,8 @@ export interface ProbeOptions {
   fetch?: ProbeFetch;
   now?: number;
   log?: (line: string) => void;
+  /** Aborted when the service is stopping: no new probe starts; results so far are kept. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -211,6 +213,7 @@ export async function probeStreams(
       // At most half the reads (three per title), so Reshet's qualities are measured in the same call.
       .slice(0, Math.max(0, Math.floor(budget / 6)));
     await pool(todo, 3, async (s) => {
+      if (opts.signal?.aborted) return;
       const eps = s.show.seasons.flatMap((x) => x.episodes).filter((e) => e.streams[0]);
       const newest = [...eps].sort((a, b) => (b.airDate ?? '').localeCompare(a.airDate ?? ''))[0];
       const url = newest?.streams[0]?.url;
@@ -245,6 +248,7 @@ export async function probeStreams(
       if (todo.length >= budget) break;
     }
     await pool(todo, 4, async ({ key, url }) => {
+      if (opts.signal?.aborted) return;
       const p = await probeHls(url, f, { segment: false });
       state[key] = { at: new Date(now).toISOString(), height: p.maxHeight ?? 0 };
       quality++;

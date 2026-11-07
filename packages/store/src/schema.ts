@@ -90,7 +90,8 @@ export const runs = sqliteTable('runs', {
   scope: text().notNull(),
   startedAt: text().notNull(),
   finishedAt: text(),
-  status: text({ enum: ['running', 'ok', 'partial', 'failed'] }).notNull(),
+  /** `stopped`: cut short on purpose (the service was stopped for a restart); not a failure. */
+  status: text({ enum: ['running', 'ok', 'partial', 'failed', 'stopped'] }).notNull(),
   requests: integer().notNull().default(0),
   showsOk: integer().notNull().default(0),
   showsFailed: integer().notNull().default(0),

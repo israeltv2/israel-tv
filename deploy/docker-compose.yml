@@ -19,6 +19,8 @@ services:
   israel-tv:
     build: ..
     restart: unless-stopped
+    # A stop lets the work in progress reach a safe point (up to 60 s) before it exits; Docker's default is 10 s.
+    stop_grace_period: 90s
     ports:
       - "7700:7700" # addon (local publisher only; drop this line with the Cloudflare publisher)
       - "7701:7701" # resolver (keep it off the internet: no login; plays Mako and relays through your proxy)

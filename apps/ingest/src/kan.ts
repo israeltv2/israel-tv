@@ -44,7 +44,7 @@ import {
   parseShowPage,
 } from '@israel-tv/kan';
 import { createGeoFetch, type ProxyEndpoint } from '@israel-tv/net';
-import type { Store } from '@israel-tv/store';
+import { STOPPED_FOR_RESTART, type Store } from '@israel-tv/store';
 import { KAN_GUIDE_CHANNELS, parseKanGuide, storeGuide } from './epg.ts';
 import { latestAirDate } from './runner.ts';
 
@@ -201,6 +201,12 @@ class KanLoadError extends Error {
     this.failure = failure;
   }
 }
+/** The service is stopping (a restart): the slice ends at this page boundary, saves its progress, and is `stopped`. */
+class StopRequested extends KanLoadError {
+  constructor() {
+    super(STOPPED_FOR_RESTART, 'outage');
+  }
+}
 /** Anything thrown that is not a load error (a page that does not parse) is the page's own problem. */
 const failureOf = (err: unknown): Failure => (err instanceof KanLoadError ? err.failure : 'page');
 const firstLine = (err: unknown) => (err as Error).message.split('\n')[0];
@@ -231,6 +237,11 @@ export interface KanCrawlOptions {
   maxStreamChecks?: number;
   /** Read Kan's live programme guide pages too (default true). */
   guide?: boolean;
+  /**
+   * Aborted when the service is stopping: the slice ends before its next page (pauses between pages are cut
+   * short), keeps what it read, and is recorded as `stopped`, not failed. The next slice goes on from the queue.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -297,6 +308,8 @@ export async function crawlKan(
   artSaved?: number;
   note: string;
   failed?: boolean;
+  /** Ended early because the service is stopping (see KanCrawlOptions.signal). */
+  halted?: boolean;
   readShows?: string[];
   attemptedShows?: string[];
 }> {
@@ -337,6 +350,8 @@ export async function crawlKan(
   let artSaved = 0;
   let problems = 0;
   let stopped = false;
+  /** Ended at a safe point because the service is stopping (not a failure). */
+  let halted = false;
   /** Server errors in a row, per site (kan.org.il and kankids.org.il fail independently). */
   const serverErrors = new Map<string, number>();
   /**
@@ -403,10 +418,19 @@ export async function crawlKan(
   let lastImage: LoadedPage['image'];
   /** The images fetched along with the last page that asked for several (a lobby's posters). */
   let lastImages: LoadedPage['images'];
+  /** A safe point (between pages): end the slice here when the service is stopping. */
+  const checkStop = () => {
+    if (opts.signal?.aborted) throw new StopRequested();
+  };
+  /** The pause between requests, cut short when the service is stopping. */
+  const pause = (ms: number) =>
+    sleep(ms, undefined, opts.signal ? { signal: opts.signal } : {}).catch(() => undefined);
   const load = async (url: string, kind: Kind = 'listing', loadOpts?: LoadOptions) => {
     lastImage = undefined;
     lastImages = undefined;
-    if (pages > 0) await sleep(opts.pageIntervalMs);
+    checkStop();
+    if (pages > 0) await pause(opts.pageIntervalMs);
+    checkStop();
     pages++;
     let r: Awaited<ReturnType<PageLoader['load']>>;
     try {
@@ -486,7 +510,9 @@ export async function crawlKan(
     if (!useApp || feeds >= opts.pagesPerRun) return undefined;
     // App lists are small JSON: a quarter of the page pause between them, and a budget of their own, so page reads
     // never starve the one request that lets the app name a show's episodes (measured on 0.6.1: 0 named per slice).
-    if (pages + feeds > 0) await sleep(Math.round(opts.pageIntervalMs / 4));
+    checkStop();
+    if (pages + feeds > 0) await pause(Math.round(opts.pageIntervalMs / 4));
+    checkStop();
     try {
       loader ??= await createChromeLoader(
         opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
@@ -694,6 +720,11 @@ export async function crawlKan(
           if (rows.length > 0) storeGuide(store, due.id, rows, now);
           else warn(null, `Kan guide ${url}: no programmes on the page (layout changed?)`);
         } catch (err) {
+          if (err instanceof StopRequested) {
+            // Not tried: due again next slice.
+            delete at[`${due.id}|${due.day}`];
+            throw err;
+          }
           warn(null, `Kan guide ${url}: ${(err as Error).message}`);
         }
       }
@@ -839,6 +870,7 @@ export async function crawlKan(
       const evidencePhase = !s.app && storedCount < APP_AGREEMENT;
       try {
         while (s.pending.length > 0) {
+          checkStop();
           const url = s.pending[0] as string;
           // Kan episodes are numbered in reading order (page-id order), so never read past a gap: a failing page
           // stays first, the show pauses, and the page is tried again later; only after several tries is it
@@ -998,17 +1030,25 @@ export async function crawlKan(
         : {}),
     });
   } catch (err) {
-    // An outage (challenge, proxy refusal, connection down, no browser, a site answering server errors): stop
-    // and wait well before trying again.
-    stopped = true;
-    state.backoffUntil = new Date(Date.now() + 45 * 60_000).toISOString();
-    note = `stopped: ${(err as Error).message}; next try after ${state.backoffUntil}`;
-    store.finishRun(runId, {
-      status: newEpisodes > 0 ? 'partial' : 'failed',
-      requests: pages,
-      newEpisodes,
-      error: note,
-    });
+    if (err instanceof StopRequested) {
+      // The service is stopping: what was read is kept (the state is saved below), nothing backs off, and the next
+      // slice goes on from the queue. Not a failure.
+      note = `${STOPPED_FOR_RESTART} after ${pages} ${pages === 1 ? 'page' : 'pages'} + ${feeds} app lists, +${newEpisodes} episodes`;
+      store.finishRun(runId, { status: 'stopped', requests: pages, newEpisodes, error: note });
+      halted = true;
+    } else {
+      // An outage (challenge, proxy refusal, connection down, no browser, a site answering server errors): stop
+      // and wait well before trying again.
+      stopped = true;
+      state.backoffUntil = new Date(Date.now() + 45 * 60_000).toISOString();
+      note = `stopped: ${(err as Error).message}; next try after ${state.backoffUntil}`;
+      store.finishRun(runId, {
+        status: newEpisodes > 0 ? 'partial' : 'failed',
+        requests: pages,
+        newEpisodes,
+        error: note,
+      });
+    }
   } finally {
     reportArt();
     store.setState(STATE_KEY, state);
@@ -1023,6 +1063,7 @@ export async function crawlKan(
     readShows,
     attemptedShows,
     ...(stopped ? { failed: true } : {}),
+    ...(halted ? { halted: true } : {}),
   };
 }
 

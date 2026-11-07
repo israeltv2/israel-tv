@@ -18,7 +18,7 @@ import type { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
 import { checkProxyAtStart, PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
 import { type Logger, lanAddresses, listen } from '@israel-tv/runtime';
-import type { Store } from '@israel-tv/store';
+import { STOPPED_FOR_RESTART, type Store } from '@israel-tv/store';
 import { Cron } from 'croner';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -97,9 +97,29 @@ interface Job {
   run: () => Promise<void>;
 }
 
+/**
+ * How long a stop (a restart) waits for the work in progress to reach a safe point before it closes what is still
+ * open as stopped and exits. The service manager must allow longer (launchd ExitTimeOut, systemd TimeoutStopSec,
+ * Docker stop_grace_period: 90 s in deploy/).
+ */
+export const SHUTDOWN_WAIT_MS = 60_000;
+
+/** kv key: sources a full run was asked to read and has not finished; `stopped` once a restart cut it short. */
+export const FULL_PENDING_KEY = 'full:pending';
+interface FullPending {
+  sources: Source[];
+  stopped?: boolean;
+}
+
 export class Daemon {
   private queue: Job[] = [];
   private running: string | undefined;
+  /** The job running now, to wait for when stopping. */
+  private current: Promise<void> | undefined;
+  /** The Kan slice running now, to wait for when stopping. */
+  private kanSlice: Promise<void> | undefined;
+  /** Aborted when the service is stopping: runs end at their next safe point and no new work starts. */
+  private readonly halt = new AbortController();
   private crons: Cron[] = [];
   private readonly sources: Source[];
   readonly config: Config;
@@ -121,11 +141,21 @@ export class Daemon {
   }
 
   private get runOpts(): RunOptions {
-    return { minShareOfPrevious: this.config.scraping.minShareOfPrevious, log: this.log };
+    return {
+      minShareOfPrevious: this.config.scraping.minShareOfPrevious,
+      log: this.log,
+      signal: this.halt.signal,
+    };
   }
 
-  /** Queue a job unless one with the same name is already waiting. */
+  /** True once a stop (a restart) has begun. */
+  get stopping(): boolean {
+    return this.halt.signal.aborted;
+  }
+
+  /** Queue a job unless one with the same name is already waiting. Nothing is queued once a stop has begun. */
   enqueue(name: string, run: () => Promise<void>): { queued: boolean; position: number } {
+    if (this.stopping) return { queued: false, position: 0 };
     const pos = this.queue.findIndex((j) => j.name === name);
     // Already waiting: no need to add it twice. (If it is running now, queue it once more: the running one
     // may have started before the change that asked for it.)
@@ -137,14 +167,17 @@ export class Daemon {
 
   private async drain(): Promise<void> {
     if (this.running) return;
-    for (let job = this.queue.shift(); job; job = this.queue.shift()) {
+    for (let job = this.queue.shift(); job && !this.stopping; job = this.queue.shift()) {
       this.running = job.name;
+      const name = job.name;
+      this.current = job.run().catch((err) => {
+        this.log(`job ${name} failed: ${(err as Error).stack ?? err}`);
+      });
       try {
-        await job.run();
-      } catch (err) {
-        this.log(`job ${job.name} failed: ${(err as Error).stack ?? err}`);
+        await this.current;
       } finally {
         this.running = undefined;
+        this.current = undefined;
       }
     }
   }
@@ -177,19 +210,48 @@ export class Daemon {
     }, wait);
   }
 
-  fullRun(): void {
-    this.enqueue('full', async () => {
-      const adapters = createAdapters(this.config);
-      for (const make of Object.values(adapters)) await runFull(this.store, make(), this.runOpts);
+  /**
+   * The nightly full read (or only `only`, to finish one a restart cut short). Each source still to read is kept in
+   * FULL_PENDING_KEY until its read ends, so a stop for a restart can be resumed at the next start.
+   */
+  fullRun(only?: Source[]): void {
+    const adapters = Object.entries(createAdapters(this.config)).filter(
+      ([source]) => !only || only.includes(source as Source),
+    );
+    const r = this.enqueue('full', async () => {
+      for (const [source, make] of adapters) {
+        if (this.stopping) return;
+        const summary = await runFull(this.store, make(), this.runOpts);
+        if (summary.status === 'stopped') return;
+        this.pendingFull(source as Source);
+      }
+      this.store.setState(FULL_PENDING_KEY, null);
+      // What follows is extra to the read and is not resumed after a restart; the next start publishes first.
+      if (this.stopping) return;
       if (this.config.sources.live) await checkLive(this.store, this.liveCheckOptions());
+      if (this.stopping) return;
       await this.probeStreams(1500);
+      if (this.stopping) return;
       await this.refreshGuides();
       const key = tmdbApiKey(this.config);
-      if (key) await matchShows(this.store, key, { log: this.log });
+      if (key && !this.stopping) await matchShows(this.store, key, { log: this.log });
+      if (this.stopping) return;
       this.store.prune();
       await this.publish();
       this.scheduleRetries();
     });
+    if (r.queued) {
+      const kept = this.store.getState<FullPending | null>(FULL_PENDING_KEY);
+      const sources = [...new Set([...(kept?.sources ?? []), ...adapters.map(([s]) => s as Source)])];
+      this.store.setState(FULL_PENDING_KEY, { sources } satisfies FullPending);
+    }
+  }
+
+  /** One source's full read ended (well or not): it is no longer waiting to be resumed. */
+  private pendingFull(done: Source): void {
+    const kept = this.store.getState<FullPending | null>(FULL_PENDING_KEY);
+    if (!kept) return;
+    this.store.setState(FULL_PENDING_KEY, { ...kept, sources: kept.sources.filter((s) => s !== done) });
   }
 
   private retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -206,7 +268,8 @@ export class Daemon {
       clearTimeout(this.retryTimers.get(source));
       this.retryTimers.delete(source);
       if (!make || !st?.nextAt || st.pending.length === 0) continue;
-      if (this.store.lastRun('full', source)?.id !== st.runId) continue;
+      // A full run stopped for a restart since then does not replace the run the retries belong to.
+      if (this.store.lastRun('full', source, { settled: true })?.id !== st.runId) continue;
       const wait = Math.max(0, Date.parse(st.nextAt) - Date.now());
       const timer = setTimeout(() => {
         this.retryTimers.delete(source);
@@ -224,10 +287,15 @@ export class Daemon {
   airingRun(): void {
     this.enqueue('airing', async () => {
       const adapters = createAdapters(this.config);
+      // A stop for a restart ends the check at its next show; the next scheduled check reads them all again, and
+      // what this one read goes out with the publish the next start makes first.
       for (const make of Object.values(adapters)) {
+        if (this.stopping) return;
         await runAiring(this.store, make(), this.config.schedule.airingWindowDays, this.runOpts);
       }
+      if (this.stopping) return;
       await this.probeStreams(300);
+      if (this.stopping) return;
       await this.refreshGuides();
       this.requestPublish();
     });
@@ -245,7 +313,7 @@ export class Daemon {
   /** Measure what is due (stream-probe.ts); a failure here never fails the run it follows. */
   private async probeStreams(budget: number): Promise<void> {
     try {
-      await probeStreams(this.store, this.config, { budget, log: this.log });
+      await probeStreams(this.store, this.config, { budget, log: this.log, signal: this.halt.signal });
     } catch (err) {
       this.log(`stream probes failed: ${(err as Error).stack ?? err}`);
     }
@@ -293,14 +361,18 @@ export class Daemon {
    * queue (airing checks and refreshes). It only writes Kan shows; publishing goes through the queue.
    */
   kanCrawl(): void {
-    if (!kanEnabled(this.config) || this.kanRunning) return;
+    if (!kanEnabled(this.config) || this.kanRunning || this.stopping) return;
     this.kanRunning = true;
     const proxies = proxyEndpoints(this.config.geo);
     const proxy = proxies[this.kanExit % Math.max(proxies.length, 1)];
     const priority = [...this.kanRefresh];
     this.kanRefresh.clear();
     // Handled below: failures are caught and logged; the last step cannot throw.
-    void crawlKan(this.store, { ...kanCrawlOptions(this.config, proxy, this.log), priority })
+    this.kanSlice = crawlKan(this.store, {
+      ...kanCrawlOptions(this.config, proxy, this.log),
+      priority,
+      signal: this.halt.signal,
+    })
       .then((r) => {
         if (r.failed) this.kanExit++;
         // Refreshes asked for while this slice ran get a slice of their own right away.
@@ -321,9 +393,10 @@ export class Daemon {
       })
       .then((read) => {
         this.kanRunning = false;
+        this.kanSlice = undefined;
         // Only refreshes that arrived during a slice that read pages start a slice right away, so this
         // can never spin; the rest wait for the scheduled slices.
-        if (read) setTimeout(() => this.kanCrawl(), 0);
+        if (read && !this.stopping) setTimeout(() => this.kanCrawl(), 0);
       });
   }
 
@@ -359,7 +432,13 @@ export class Daemon {
   }
 
   state() {
-    return { running: this.running ?? null, queued: this.queue.map((j) => j.name), next: this.nextRuns() };
+    return {
+      running: this.running ?? null,
+      queued: this.queue.map((j) => j.name),
+      next: this.nextRuns(),
+      ...(this.kanRunning ? { kanSlice: true } : {}),
+      ...(this.stopping ? { stopping: true } : {}),
+    };
   }
 
   /** Last outcome of relaying through the geo proxy (resolver), for /status. */
@@ -566,6 +645,51 @@ export class Daemon {
   stop(): void {
     for (const c of this.crons) c.stop();
     for (const t of this.retryTimers.values()) clearTimeout(t);
+    clearTimeout(this.publishTimer);
+    this.publishTimer = undefined;
+  }
+
+  /**
+   * Stop for a restart (SIGTERM / SIGINT): nothing new starts, the work in progress ends at its next safe point
+   * (the show being read, the Kan page being loaded, the publish being uploaded) and is recorded as `stopped`, not
+   * failed. Waits at most `waitMs`; whatever is still open then is closed as stopped too. Resolves when it is safe
+   * to exit. A full run that was cut short is read again at the next start (FULL_PENDING_KEY).
+   */
+  async shutdown(waitMs = SHUTDOWN_WAIT_MS): Promise<{ clean: boolean; closed: number }> {
+    if (!this.stopping) {
+      // Written first: if the service manager kills us before the end, the next start still knows it was a stop.
+      this.store.noteShutdown();
+      this.halt.abort();
+    }
+    this.stop();
+    this.queue.length = 0;
+    const busy = [this.current, this.kanSlice].filter((p) => p !== undefined);
+    if (busy.length > 0) {
+      const what = [this.running, this.kanRunning ? 'kan crawl' : undefined].filter(Boolean).join(' and ');
+      this.log(`stopping: waiting up to ${Math.round(waitMs / 1000)} s for ${what} to reach a safe point`);
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const clean = await Promise.race([
+      Promise.allSettled(busy).then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), waitMs);
+      }),
+    ]);
+    clearTimeout(timer);
+    const closed = this.store.stopOpenRuns(
+      clean
+        ? STOPPED_FOR_RESTART
+        : `${STOPPED_FOR_RESTART} (no safe point within ${Math.round(waitMs / 1000)} s)`,
+    );
+    // A full run that has not read every source is resumed at the next start (one cut short by a crash is not).
+    const pending = this.store.getState<FullPending | null>(FULL_PENDING_KEY);
+    if (pending?.sources.length) this.store.setState(FULL_PENDING_KEY, { ...pending, stopped: true });
+    this.log(
+      clean
+        ? 'stopped at a safe point'
+        : `stopping: ${closed} ${closed === 1 ? 'run' : 'runs'} cut short (closed as stopped)`,
+    );
+    return { clean, closed };
   }
 }
 
@@ -704,6 +828,7 @@ export async function startDaemon(
       ts: run.finishedAt ?? new Date().toISOString(),
       kind: 'run',
       component: 'ingest',
+      // Only a failed run is an error; one stopped for a restart is not (its detail says `stopped`).
       outcome: run.status === 'failed' ? 'error' : 'ok',
       source: run.scope,
       latencyMs: Date.parse(run.finishedAt ?? new Date().toISOString()) - Date.parse(run.startedAt),
@@ -807,7 +932,15 @@ export async function startDaemon(
   // Publish first, whatever else is due: a new release's manifest (its version, its code's output) goes out now,
   // not after a half-hour full run or the next batched publish.
   d.enqueue('publish', () => d.publish());
-  if (stale && opts.initialRun !== false) {
+  // A full run a restart cut short is finished now (its sources only, unless all are stale). One cut short by a crash
+  // is not resumed automatically (it could crash again): it waits for the schedule, or for the 24-hour rule below.
+  const pending = store.getState<FullPending | null>(FULL_PENDING_KEY);
+  const resume = pending?.stopped ? pending.sources.filter((s) => fullSources.includes(s)) : [];
+  store.setState(FULL_PENDING_KEY, null);
+  if (resume.length > 0 && opts.initialRun !== false) {
+    log(`resuming the full run a restart stopped: ${resume.join(', ')}`);
+    d.fullRun(stale ? undefined : resume);
+  } else if (stale && opts.initialRun !== false) {
     log('no full run in the last 24 hours: starting one now (about half an hour; see /status)');
     d.fullRun();
   } else if (stale)

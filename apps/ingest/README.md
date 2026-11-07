@@ -49,7 +49,7 @@ pnpm logs --errors --since 2h                # = israel-tv events
 pnpm usage                                   # = israel-tv usage
 ```
 Other commands: `airing`, `show`, `resolver`, `publish`, `deploy-api`, `deploy`, `versions`, `rollback`, `kan`,
-`check-proxy`, `match`, `status`, `paths`, `urls`, `admin-url`, `restore`, `remote-url` (see `help`).
+`check-proxy`, `match`, `status`, `idle`, `paths`, `urls`, `admin-url`, `restore`, `remote-url` (see `help`).
 
 ## Related
 

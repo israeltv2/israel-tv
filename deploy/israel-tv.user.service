@@ -17,6 +17,8 @@ ExecStart=/usr/bin/env node apps/ingest/src/cli.ts start
 # ExecStart=/usr/bin/xvfb-run -a /usr/bin/env node apps/ingest/src/cli.ts start
 Restart=always
 RestartSec=10
+# A stop lets the work in progress reach a safe point (up to 60 s) before it exits (docs/operations.md).
+TimeoutStopSec=90
 
 [Install]
 WantedBy=default.target
