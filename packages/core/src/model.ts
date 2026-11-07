@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { SOURCES } from './ids.ts';
-import { cleanDescription } from './tidy.ts';
+import { cleanDescription, isTrailer } from './tidy.ts';
 
 /** One playable rendition as the source reports it. */
 export const ScrapedStream = z.strictObject({
@@ -80,16 +80,19 @@ export function cleanShow(show: ScrapedShow): ScrapedShow {
       ),
       'pageUrl',
     ),
+    // Trailers and promos are not episodes: left out before they are numbered (they would take an episode's place).
     seasons: show.seasons.map((s) => ({
       ...s,
-      episodes: s.episodes.map((e) => {
-        let ep = optUrl(e, 'thumbnail');
-        if (ep.durationSec !== undefined && !(Number.isInteger(ep.durationSec) && ep.durationSec > 0)) {
-          const { durationSec: _, ...rest } = ep;
-          ep = rest;
-        }
-        return { ...ep, streams: ep.streams.filter((x) => isHttpUrl(x.url)) };
-      }),
+      episodes: s.episodes
+        .filter((e) => !isTrailer(e.title))
+        .map((e) => {
+          let ep = optUrl(e, 'thumbnail');
+          if (ep.durationSec !== undefined && !(Number.isInteger(ep.durationSec) && ep.durationSec > 0)) {
+            const { durationSec: _, ...rest } = ep;
+            ep = rest;
+          }
+          return { ...ep, streams: ep.streams.filter((x) => isHttpUrl(x.url)) };
+        }),
     })),
   };
   const r = ScrapedShow.safeParse(cleaned);
@@ -100,10 +103,20 @@ export function cleanShow(show: ScrapedShow): ScrapedShow {
   return r.data;
 }
 
+/** One name per genre across sources (Keshet and Reshet spell some differently). */
+const GENRE_NAMES: Record<string, string> = {
+  'לייף סטייל': 'לייפסטייל',
+  שעשועון: 'שעשועונים',
+  תעודה: 'דוקומנטרי',
+  'דוקו ותחקירים': 'דוקומנטרי',
+  תחקיר: 'תחקירים',
+  אוכל: 'בישול',
+};
+
 /**
- * Genres as a source gives them, cleaned for a filter: one spelling ("תוכניות" → "תכניות"), no "תכניות" prefix
- * ("תכניות אקטואליה" → "אקטואליה"), no site sections (anything with a channel number, "חדשות 13"), no empties or
- * repeats, at most 5.
+ * Genres as a source gives them, cleaned for a filter: one spelling ("תוכניות" → "תכניות", "לייף סטייל" →
+ * "לייפסטייל"), no "תכניות" prefix ("תכניות אקטואליה" → "אקטואליה"), no site sections (anything with a channel
+ * number, "חדשות 13"), no empties or repeats, at most 5.
  */
 export function cleanGenres(list: readonly (string | null | undefined)[] | null | undefined): string[] {
   const one = (g: string) =>
@@ -113,9 +126,12 @@ export function cleanGenres(list: readonly (string | null | undefined)[] | null 
       .replace(/תוכני/g, 'תכני')
       .replace(/^תכני(?:ו)?ת\s+/, '')
       .replace(/^מצויירים$/, 'מצוירים');
+  const named = (g: string) => GENRE_NAMES[g] ?? g;
   return [
     ...new Set(
-      (list ?? []).map((g) => one(g ?? '')).filter((g) => g.length > 0 && g.length <= 40 && !/\d/.test(g)),
+      (list ?? [])
+        .map((g) => named(one(g ?? '')))
+        .filter((g) => g.length > 0 && g.length <= 40 && !/\d/.test(g)),
     ),
   ].slice(0, 5);
 }

@@ -61,7 +61,24 @@ export const KAN_LOBBIES: KanLobby[] = [
     channelPath: 'kids/ktantanim-main',
     catalog: 'iltv_kankids',
   },
+  // The preschool lobby lists more of the little ones' shows than kids-teens does (2026-11-07: 29 vs a few).
+  {
+    url: 'https://www.kankids.org.il/lobby-kids/tiny/',
+    origin: 'https://www.kankids.org.il',
+    channelPath: 'kids/ktantanim-main',
+    catalog: 'iltv_kankids',
+  },
+  // Kan's archive: classic series of Israeli TV (183 shows, 2026-11-07). Read after everything else (KAN_LATER).
+  {
+    url: 'https://www.kan.org.il/lobby/series/',
+    origin: 'https://www.kan.org.il',
+    channelPath: 'archive1/vod',
+    catalog: 'iltv_kanarchive',
+  },
 ];
+
+/** Rows whose episodes are read only when no other Kan show has pages waiting (a large back catalogue). */
+export const KAN_LATER = new Set(['iltv_kanarchive']);
 
 interface ShowState {
   origin: string;
@@ -449,11 +466,16 @@ export async function crawlKan(
     // Refresh requests first, made due now; then everything else in order.
     const prio = new Set((opts.priority ?? []).filter((k) => state.shows[k]));
     const order = [...prio, ...Object.keys(state.shows).filter((k) => !prio.has(k))];
+    // The archive's show pages wait, like its episodes, until the other rows have nothing left to read.
+    const othersWaiting = Object.values(state.shows).some(
+      (x) => !KAN_LATER.has(x.catalog) && x.pending.length > 0,
+    );
     for (const key of order) {
       const s = state.shows[key];
       if (!s) continue;
       if (pages >= showBudget && !prio.has(key)) break;
       if (!prio.has(key) && !showDue(s, now, opts.airingWindowDays)) continue;
+      if (!prio.has(key) && othersWaiting && KAN_LATER.has(s.catalog)) continue;
       const id = store.findSeriesId('kan', key);
       const firstRead = !s.checkedAt;
       const path = new URL(key).pathname;
@@ -542,9 +564,7 @@ export async function crawlKan(
       const r = s.pending[0] ? s.retry?.[s.pending[0]] : undefined;
       return r ? Date.parse(r.at) + RETRY_GAP_MS : 0;
     };
-    const queue = Object.entries(state.shows)
-      .filter(([, s]) => s.pending.length > 0 && retryAfter(s) <= Date.now())
-      .sort(([, a], [, b]) => (b.checkedAt ?? '').localeCompare(a.checkedAt ?? ''));
+    const queue = episodeQueue(store, state.shows, Date.now(), retryAfter);
     for (const [key, s] of queue) {
       const seriesId = store.findSeriesId('kan', key);
       const batch: BatchItem[] = [];
@@ -676,6 +696,77 @@ export async function crawlKan(
     attemptedShows,
     ...(stopped ? { failed: true } : {}),
   };
+}
+
+export interface KanRowProgress {
+  /** Shows the lobbies list for this row. */
+  known: number;
+  /** Of them, shows with at least one episode stored (in the catalog). */
+  inCatalog: number;
+  /** Episode pages of the first fill still to read (not counting newly published ones). */
+  backlog: number;
+}
+
+/**
+ * How far the first fill of each Kan row has come: the crawl reads lobby by lobby, show by show, over days. A row
+ * whose shows are not all in yet says so (/status, and a ⏳ item first in the row).
+ */
+export function kanRowProgress(
+  store: Pick<Store, 'getState' | 'findSeriesId' | 'getShow'>,
+): Record<string, KanRowProgress> {
+  const state = store.getState<CrawlState>(STATE_KEY);
+  const out: Record<string, KanRowProgress> = {};
+  for (const [key, s] of Object.entries(state?.shows ?? {})) {
+    const row = out[s.catalog] ?? { known: 0, inCatalog: 0, backlog: 0 };
+    out[s.catalog] = row;
+    row.known++;
+    const id = store.findSeriesId('kan', key);
+    const eps = id ? (store.getShow(id)?.show.seasons.reduce((n, x) => n + x.episodes.length, 0) ?? 0) : 0;
+    // A show whose page lists no episodes at all (or was given up on) is not waited for.
+    if (eps > 0 || (s.pending.length === 0 && s.checkedAt)) row.inCatalog++;
+    const fresh = new Set(s.fresh ?? []);
+    row.backlog += s.pending.filter((u) => !fresh.has(u)).length;
+  }
+  return out;
+}
+
+/** A row still filling: some of its shows have nothing in the catalog yet. */
+export function stillFilling(p: KanRowProgress | undefined): boolean {
+  return !!p && p.inCatalog < p.known;
+}
+
+/**
+ * The order shows get their episode pages read in: newly published episodes first (an airing show stays current);
+ * then shows with the fewest episodes so far, so the first fill makes every show watchable before it completes any
+ * long back catalogue (Tehran waited behind shows with 100 pages); the archive row last. Ties keep the lobby order.
+ */
+export function episodeQueue(
+  store: Pick<Store, 'findSeriesId' | 'getShow'>,
+  shows: Record<string, ShowState>,
+  now: number,
+  retryAfter: (s: ShowState) => number,
+): [string, ShowState][] {
+  const have = (key: string) => {
+    const id = store.findSeriesId('kan', key);
+    return id ? (store.getShow(id)?.show.seasons.reduce((n, x) => n + x.episodes.length, 0) ?? 0) : 0;
+  };
+  const ready = Object.entries(shows).filter(([, s]) => s.pending.length > 0 && retryAfter(s) <= now);
+  const rank = new Map(
+    ready.map(([key, s], i) => [
+      key,
+      [KAN_LATER.has(s.catalog) ? 1 : 0, s.fresh?.length ? 0 : 1, have(key), i] as const,
+    ]),
+  );
+  const cmp = (a: string, b: string) => {
+    const x = rank.get(a) ?? [0, 0, 0, 0];
+    const y = rank.get(b) ?? [0, 0, 0, 0];
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return (x[i] ?? 0) - (y[i] ?? 0);
+    return 0;
+  };
+  const later = ready.filter(([, s]) => KAN_LATER.has(s.catalog));
+  const first = ready.filter(([, s]) => !KAN_LATER.has(s.catalog));
+  // The archive waits until nothing else has pages to read.
+  return (first.length > 0 ? first : later).sort(([a], [b]) => cmp(a, b));
 }
 
 function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[], runId: number): number {

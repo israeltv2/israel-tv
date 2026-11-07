@@ -98,6 +98,7 @@ export async function fetchShow(
     ...(entry.poster ? { poster: entry.poster } : {}),
     ...(parsed.genres ? { genres: parsed.genres } : {}),
     ...(parsed.description ? { description: parsed.description } : {}),
+    ...(parsed.background ? { background: parsed.background } : {}),
     seasons: out,
     pageUrl: `${RESHET_ORIGIN}${entry.key}`,
     ...(notes.length ? { notes } : {}),

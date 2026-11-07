@@ -115,6 +115,15 @@ const Program = z.looseObject({
   season: z.looseObject({ position: z.number(), name: z.string().nullish() }).nullish(),
   seasonsList: z.array(z.looseObject({ position: z.number(), name: z.string().nullish() })).nullish(),
   episodes: z.array(OldEpisode).nullish(),
+  /** The show's own record on Kaltura: its blurb and its pictures (16x9, 2x3, 9x16). */
+  programData: z
+    .looseObject({
+      description: z.string().nullish(),
+      images: z
+        .array(z.looseObject({ imageTypeName: z.string().nullish(), url: z.string().nullish() }))
+        .nullish(),
+    })
+    .nullish(),
 });
 
 const ShowPageData = z.looseObject({
@@ -149,11 +158,28 @@ export interface ParsedShowPage {
   seasons: ParsedSeason[];
   /** The show's genres, from its episodes' Kaltura tags (older template only). */
   genres?: string[];
-  /** The show's own blurb (the page's description meta). */
+  /** The show's own blurb (the page's description meta, else its Kaltura record). */
   description?: string;
+  /** A wide picture of the show (its Kaltura record's 16x9 image, 1280×720). */
+  background?: string;
 }
 
 const img = (o: z.infer<typeof ImageObj>) => o?.d ?? o?.m ?? undefined;
+
+/**
+ * Kaltura's image service sends 120×90 when no size is asked for (1,630 of 1,767 Reshet episodes, 2026-11-07):
+ * ask for 640×360, the size apps show episode stills at.
+ */
+export function episodeThumb(url: string | null | undefined): string | undefined {
+  return url ? kalturaImage(url, 640, 360) : undefined;
+}
+
+/** A Kaltura image-service address at a given size (unchanged when it is not one, or already sized). */
+export function kalturaImage(url: string, width: number, height: number): string {
+  if (/\/Service\.svc\/GetImage\//i.test(url) && !/\/width\/\d+/i.test(url))
+    return `${url.replace(/\/+$/, '')}/width/${width}/height/${height}`;
+  return url;
+}
 
 /** The common episode shape for both page templates. */
 function episode(
@@ -174,7 +200,7 @@ function episode(
     ...(f.numberHint && f.numberHint > 0 ? { numberHint: f.numberHint } : {}),
     ...(f.airDate ? { airDate: f.airDate } : {}),
     ...(f.description ? { description: f.description.trim() } : {}),
-    ...(f.thumb ? { thumbnail: f.thumb } : {}),
+    ...(episodeThumb(f.thumb) ? { thumbnail: episodeThumb(f.thumb) } : {}),
     ...(f.dur && f.dur > 0 ? { durationSec: Math.round(f.dur) } : {}),
     streams: [{ url: playManifestUrl(entryId), kind: 'direct' }],
     play: { entryId },
@@ -263,12 +289,16 @@ export function parseShowPage(html: string): ParsedShowPage {
     const genres = cleanGenres(
       (p.episodes ?? []).flatMap((e) => e.tags?.Genre?.objects?.map((o) => o.value) ?? []),
     );
+    // Daily news shows leave the page's description empty; their Kaltura record still has a blurb.
+    const own = tidyText(p.programData?.description ?? '');
+    const wide = p.programData?.images?.find((i) => i.imageTypeName === '16x9')?.url;
     return {
       template: 'program',
       seriesId: p.seriesId,
       seasons,
       ...(genres.length ? { genres } : {}),
-      ...blurb,
+      ...(description ? blurb : own.length >= 10 ? { description: own } : {}),
+      ...(wide && /^https:\/\//.test(wide) ? { background: kalturaImage(wide, 1280, 720) } : {}),
     };
   }
   // Pages with only article/clip grids (no episode list) are shows without VOD. They are noted, not failed;

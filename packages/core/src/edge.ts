@@ -7,7 +7,14 @@ export {
   staleItem,
   staleSince,
 } from './freshness.ts';
-export { normalizeForSearch } from './hebrew.ts';
+export { expandSearchKey, normalizeForSearch, searchMatches } from './hebrew.ts';
 export { parseSeriesId, parseVideoId } from './ids.ts';
-export { type ExtIds, type SearchRow, type SeasonStreams, sitePaths, withOrigin } from './site.ts';
+export {
+  CATALOG_PAGE_SIZE,
+  type ExtIds,
+  type SearchRow,
+  type SeasonStreams,
+  sitePaths,
+  withOrigin,
+} from './site.ts';
 export type { Stream } from './stremio.ts';

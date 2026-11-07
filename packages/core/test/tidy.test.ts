@@ -27,7 +27,35 @@ test('episode titles lose what the app already shows (the live cases)', () => {
 test('genres for a filter: one spelling, no "תכניות" prefix, no site sections', () => {
   expect(
     cleanGenres(['תכניות אקטואליה', 'אקטואליה', 'תוכניות אוכל', 'חדשות 13', 'דיגיטל 13', 'מצויירים']),
-  ).toEqual(['אקטואליה', 'אוכל', 'מצוירים']);
+  ).toEqual(['אקטואליה', 'בישול', 'מצוירים']);
+  // One name across sources.
+  expect(cleanGenres(['לייף סטייל', 'לייפסטייל', 'שעשועון', 'שעשועונים', 'תעודה'])).toEqual([
+    'לייפסטייל',
+    'שעשועונים',
+    'דוקומנטרי',
+  ]);
+});
+
+test('trailers and promos are not episodes', async () => {
+  const { isTrailer } = await import('../src/tidy.ts');
+  for (const t of [
+    'טריילר',
+    'ברנשטיין - הפרטיזן האחרון | טריילר',
+    'טריילר - עונה 2',
+    'הטריילר הרשמי',
+    'פרומו',
+  ])
+    expect(isTrailer(t), t).toBe(true);
+  for (const t of ['פרק 3', 'הטריילר שנעלם', 'מאחורי הקלעים', 'טריילרים בקולנוע הישראלי'])
+    expect(isTrailer(t), t).toBe(false);
+});
+
+test('a closing pointer to another page of the site is dropped', async () => {
+  const { cleanDescription } = await import('../src/tidy.ts');
+  expect(cleanDescription('סדרה על הכלא. כל תסריטי הסדרה מחכים לכם בעמוד כאן תסריטים >>')).toBe(
+    'סדרה על הכלא.',
+  );
+  expect(cleanDescription('סדרה על הכלא >> ועוד')).toBe('סדרה על הכלא >> ועוד');
 });
 
 test('descriptions lose what sites add for search engines (the live cases)', async () => {
@@ -64,4 +92,10 @@ test('filler endings go; "פרק N" stays', () => {
   expect(tidyEpisodeTitle('הגמר הגדול - התוכנית המלאה', 'x')).toBe('הגמר הגדול');
   expect(tidyEpisodeTitle('המהדורה המלאה', 'x')).toBe('המהדורה');
   expect(tidyEpisodeTitle('המלא', 'x')).toBe('המלא'); // never empty
+});
+
+test('every HTML entity is decoded (Reshet sends numeric ones)', () => {
+  expect(tidyText('הסיפור של ג&#x27;קי &#39;ו&#8211;עוד &hellip; &ndash; &Amp; &bogus;')).toBe(
+    "הסיפור של ג'קי 'ו–עוד … – & &bogus;",
+  );
 });

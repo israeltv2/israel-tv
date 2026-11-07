@@ -1,7 +1,9 @@
 // The public addon as a Hono app over the rendered site files. Used by both publishers:
 // Cloudflare (static assets answer plain file paths first; this app handles the rest) and local (Node).
 import {
+  CATALOG_PAGE_SIZE,
   type ExtIds,
+  expandSearchKey,
   type Freshness,
   normalizeForSearch,
   parseVideoId,
@@ -9,6 +11,7 @@ import {
   type SeasonStreams,
   STALE_ID_PREFIX,
   type Stream,
+  searchMatches,
   sitePaths,
   staleItem,
   staleSince,
@@ -66,6 +69,12 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     c.header('Access-Control-Allow-Headers', '*');
   });
 
+  // The addon is read-only.
+  app.use('*', async (c, next) => {
+    if (c.req.method === 'GET' || c.req.method === 'HEAD') return next();
+    return c.text('Israel TV is read-only: use GET or HEAD.\n', 405, { allow: 'GET, HEAD' });
+  });
+
   const file =
     (path: string, cacheControl: string, type = 'application/json; charset=utf-8') =>
     async (c: import('hono').Context) => {
@@ -74,7 +83,13 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
       return c.body(text, 200, { 'content-type': type, 'cache-control': cacheControl });
     };
 
-  app.get('/', (c) => c.redirect('/manifest.json'));
+  // A short page for people who open the address in a browser (rendered with the site); the manifest otherwise.
+  app.get('/', async (c) => {
+    const page = await reader.read(sitePaths.landing);
+    return page === undefined
+      ? c.redirect('/manifest.json')
+      : c.body(page, 200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': CACHE.list });
+  });
   app.get('/manifest.json', file(sitePaths.manifest, CACHE.manifest));
   app.get('/status', file(sitePaths.statusPage, CACHE.none, 'text/html; charset=utf-8'));
   app.get('/status.json', file(sitePaths.status, CACHE.none));
@@ -115,19 +130,34 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
       return c.json({ metas: hits.slice(skip, skip + GENRE_PAGE).map(asPreview) }, 200, headers);
     }
     if (search) {
-      const index = (await readJson<SearchRow[]>(sitePaths.search, true)) ?? [];
+      const index = await searchIndex();
       const q = normalizeForSearch(search);
       const hits: SearchRow[] = [];
+      const later: SearchRow[] = [];
       if (q) {
-        for (const row of index) {
-          // Whole words from their start: "kan" finds "Kan 11", not the middle of another word.
-          if (row[2] === id && ` ${row[4]}`.includes(` ${q}`) && (!genre || row[6]?.includes(genre))) {
-            hits.push(row);
-            if (hits.length >= MAX_SEARCH) break;
-          }
+        for (const [row, key] of index) {
+          if (row[2] !== id || (genre && !row[6]?.includes(genre))) continue;
+          // Whole words from their start; matches only through a Hebrew prefix letter come last (hebrew.ts).
+          const how = searchMatches(key, q);
+          if (how === 1) hits.push(row);
+          else if (how === 2) later.push(row);
+          if (hits.length >= MAX_SEARCH) break;
         }
       }
+      hits.push(...later.slice(0, MAX_SEARCH - hits.length));
       return c.json({ metas: hits.map(asPreview) }, 200, headers);
+    }
+    // Pages are stored every CATALOG_PAGE_SIZE items; any other offset is cut from the two pages around it.
+    const offset = skip % CATALOG_PAGE_SIZE;
+    if (offset > 0) {
+      const base = skip - offset;
+      const read = async (at: number) =>
+        ((await readJson<{ metas: unknown[] }>(sitePaths.catalog(type, id, at)))?.metas ?? []) as unknown[];
+      const metas = [...(await read(base)), ...(await read(base + CATALOG_PAGE_SIZE))].slice(
+        offset,
+        offset + CATALOG_PAGE_SIZE,
+      );
+      return c.json({ metas }, 200, headers);
     }
     const page = await reader.read(sitePaths.catalog(type, id, skip));
     // A row that has not been updated for too long says so first (works without the home machine).
@@ -174,9 +204,23 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
 
   app.get('/stream/:type/:file', async (c) => {
     const id = decodeURIComponent(c.req.param('file')).replace(/\.json$/, '');
+    // Only the types the manifest declares: live channels are `tv`, everything else `series`.
+    const type = c.req.param('type');
+    const live = id.startsWith('iltv_live_');
+    if (type !== (live ? 'tv' : 'series'))
+      return c.json({ streams: [] }, 200, { 'cache-control': CACHE.list });
     const streams = await streamsFor(id);
     return c.json({ streams }, 200, { 'cache-control': CACHE.stream });
   });
+
+  /** The search index with each row's key expanded for Hebrew prefixes, built once per index read. */
+  let expanded: { from: SearchRow[]; rows: [SearchRow, string][] } | undefined;
+  async function searchIndex(): Promise<[SearchRow, string][]> {
+    const index = (await readJson<SearchRow[]>(sitePaths.search, true)) ?? [];
+    if (expanded?.from !== index)
+      expanded = { from: index, rows: index.map((r) => [r, expandSearchKey(r[4])]) };
+    return expanded.rows;
+  }
 
   async function seasonStreams(series: string, season: number, episode: number): Promise<Stream[]> {
     const file = await readJson<SeasonStreams>(sitePaths.seasonStreams(series, season));

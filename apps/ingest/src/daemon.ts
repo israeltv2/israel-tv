@@ -42,6 +42,7 @@ import {
   runOne,
 } from './runner.ts';
 import { createAdapters } from './sources.ts';
+import { probeStreams } from './stream-probe.ts';
 import { matchShows } from './tmdb.ts';
 import { buildDashboard, latestCanary, queryEvents, renderUsagePage } from './usage-page.ts';
 
@@ -180,6 +181,7 @@ export class Daemon {
       const adapters = createAdapters(this.config);
       for (const make of Object.values(adapters)) await runFull(this.store, make(), this.runOpts);
       if (this.config.sources.live) await checkLive(this.store);
+      await this.probeStreams(1500);
       const key = tmdbApiKey(this.config);
       if (key) await matchShows(this.store, key, { log: this.log });
       this.store.prune();
@@ -223,8 +225,18 @@ export class Daemon {
       for (const make of Object.values(adapters)) {
         await runAiring(this.store, make(), this.config.schedule.airingWindowDays, this.runOpts);
       }
+      await this.probeStreams(300);
       this.requestPublish();
     });
+  }
+
+  /** Measure what is due (stream-probe.ts); a failure here never fails the run it follows. */
+  private async probeStreams(budget: number): Promise<void> {
+    try {
+      await probeStreams(this.store, this.config, { budget, log: this.log });
+    } catch (err) {
+      this.log(`stream probes failed: ${(err as Error).stack ?? err}`);
+    }
   }
 
   /** Re-read one show (all seasons) and publish. */

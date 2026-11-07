@@ -15,6 +15,7 @@ export const CATALOGS: readonly CatalogDef[] = [
   { id: 'iltv_reshet13', source: 'reshet', type: 'series', name: 'רשת 13' },
   { id: 'iltv_kan11', source: 'kan', type: 'series', name: 'כאן 11' },
   { id: 'iltv_kankids', source: 'kan', type: 'series', name: 'כאן חינוכית: ילדים ונוער' },
+  { id: 'iltv_kanarchive', source: 'kan', type: 'series', name: 'כאן ארכיון' },
   { id: 'iltv_live', source: 'live', type: 'tv', name: 'שידור חי' },
 ];
 

@@ -8,14 +8,35 @@ const ENTITIES: Record<string, string> = {
   apos: "'",
   lt: '<',
   gt: '>',
-  '#39': "'",
+  ndash: '–',
+  mdash: '—',
+  hellip: '…',
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+  laquo: '«',
+  raquo: '»',
+  shy: '',
+  zwj: '',
+  zwnj: '',
+  lrm: '',
+  rlm: '',
 };
 
-/** Decode entities (twice, for double-encoded text) and collapse spaces, including non-breaking ones. */
+function entity(whole: string, name: string): string {
+  if (name[0] === '#') {
+    const code =
+      name[1] === 'x' || name[1] === 'X' ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1));
+    return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+  }
+  return ENTITIES[name.toLowerCase()] ?? whole;
+}
+
+/** Decode entities — named and numeric (`&#x27;`, `&#39;`) — twice, for double-encoded text, and collapse spaces. */
 export function tidyText(s: string): string {
   let t = s;
-  for (let i = 0; i < 2; i++)
-    t = t.replace(/&(amp|nbsp|quot|apos|lt|gt|#39);/g, (_, e: string) => ENTITIES[e] ?? _);
+  for (let i = 0; i < 2; i++) t = t.replace(/&(#x[0-9a-f]{1,6}|#\d{1,7}|[a-z]{2,8});/gi, entity);
   return t.replace(/[\s ​]+/g, ' ').trim();
 }
 
@@ -56,6 +77,8 @@ export function cleanDescription(raw: string | undefined | null): string | undef
   let t = tidyText(raw).replace(/%%[a-z_]+%%/gi, ' ');
   t = tidyText(t)
     .replace(/^(?:חדשות 13|רשת 13|ערוץ 13|קשת 12|N12)\s*\|\s*/, '')
+    // A closing pointer to another page of the site ("… בעמוד כאן תסריטים >>"): the link is not here.
+    .replace(/(?:^|(?<=[.!?:]))\s*[^.!?:]*(?:>>|»)\s*$/, '')
     .replace(/\s*\|[^|]*לצפייה ישירה[^|]*$/, '')
     .replace(/\s*[-–,]?\s*(?:פרקים מלאים\s*)?לצפייה ישירה\s*$/, '')
     .trim();
@@ -84,4 +107,12 @@ export function rtl(s: string | undefined): string | undefined {
   const firstLetter = /\p{L}/u.exec(t)?.[0];
   if (!firstLetter || !/[\u0590-\u05FF]/.test(firstLetter)) return t;
   return /[A-Za-z0-9]/.test(t) ? `${RLE}${t}${PDF}` : t;
+}
+
+const TRAILER =
+  /(?:^|[|\-–:·]\s*)(?:ה)?(?:טריילר|פרומו|טיזר)(?:\s+(?:ה?רשמי|ה?רשמית|ל?עונה\s*\d+))?\s*$|^(?:ה)?(?:טריילר|פרומו|טיזר)\s*[-–:|]/;
+
+/** A trailer, teaser or promo ("טריילר", "… | טריילר", "טריילר - עונה 2"): not an episode. */
+export function isTrailer(title: string): boolean {
+  return TRAILER.test(tidyText(title));
 }

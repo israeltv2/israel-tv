@@ -7,6 +7,7 @@
 // This file answers the manifest and stream requests, asking each module for its streams.
 import { randomBytes } from 'node:crypto';
 import {
+  CONTACT_EMAIL,
   clientHash,
   GEO_LIMITED,
   LIVE_CHANNELS,
@@ -15,6 +16,7 @@ import {
   parseSeriesId,
   parseVideoId,
   probePrefix,
+  RESOLVER_ADDON_ID,
   rtl,
   type ScrapedEpisode,
   type Stream,
@@ -115,7 +117,7 @@ export function createResolverApp(deps: ResolverDeps) {
   app.get('/', (c) => c.redirect('/manifest.json'));
   app.get('/manifest.json', (c) =>
     c.json({
-      id: deps.manifest?.id ?? 'community.israel-tv.resolver',
+      id: deps.manifest?.id ?? RESOLVER_ADDON_ID,
       version: RELEASE_VERSION,
       name: deps.manifest?.name ?? 'Israel TV · home helper',
       description:
@@ -137,6 +139,7 @@ export function createResolverApp(deps: ResolverDeps) {
       ],
       types: ['series', 'tv'],
       catalogs: [],
+      contactEmail: CONTACT_EMAIL,
       ...(deps.branding?.logo ? { logo: `${base(c)}/logo.png` } : {}),
       ...(deps.branding?.background ? { background: `${base(c)}/background.jpg` } : {}),
     }),

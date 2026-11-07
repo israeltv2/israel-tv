@@ -14,21 +14,20 @@ export const SOURCE_LABELS: Record<string, string> = {
 export const ISRAEL_ONLY = 'זמין לצפייה רק בישראל';
 
 /**
- * The best quality of a stream, when its source's renditions are known (measured 2026-11-06): Kan names its
- * ladder in the address (`…_1080_KAN/…`); Reshet's Kaltura masters top out at 720p (every sampled episode).
+ * The best quality of a stream when its address says it: Kan names its ladder there (`…_1080_KAN/…`). Others are
+ * measured from the playlist (apps/ingest stream-probe.ts: Reshet episodes top out at 540p or 720p) and passed in.
  */
 export function streamQuality(source: string, url: string): string | undefined {
   if (source === 'kan') {
     const m = /_(\d{3,4})_KAN\//i.exec(url);
     return m ? `${m[1]}p` : undefined;
   }
-  if (source === 'reshet' && /kaltura\.com\//.test(url)) return '720p';
   return undefined;
 }
 
-/** "רשת 13 · 720p", or the source alone when its quality is not known. */
-export function streamName(source: string, url = ''): string {
+/** "רשת 13 · 720p", or the source alone when its quality is not known. `measured` wins over the address. */
+export function streamName(source: string, url = '', measured?: string): string {
   const label = SOURCE_LABELS[source] ?? 'Israel TV';
-  const q = streamQuality(source, url);
+  const q = measured ?? streamQuality(source, url);
   return rtl(q ? `${label} · ${q}` : label);
 }

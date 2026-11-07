@@ -1,7 +1,9 @@
 // Render the whole addon site (Stremio JSON files) from the home database contents. Pure: data in, files out.
 import {
+  ADDON_ID,
   CATALOG_PAGE_SIZE,
   CATALOGS,
+  CONTACT_EMAIL,
   CONTRACT,
   cleanDescription,
   cleanGenres,
@@ -11,6 +13,7 @@ import {
   type Freshness,
   GEO_LIMITED,
   ISRAEL_ONLY,
+  isTrailer,
   LIVE_ALIASES,
   type Manifest,
   type Meta,
@@ -34,6 +37,7 @@ import {
   type Video,
   videoId,
 } from '@israel-tv/core';
+import { renderLandingHtml } from './landing-html.ts';
 import { renderStatusHtml } from './status-html.ts';
 
 export interface RenderShow {
@@ -71,6 +75,8 @@ export interface RenderInput {
   freshness?: Freshness;
   /** catalog id → warning shown as the first item of that row (failures are visible, not hidden). */
   catalogWarnings: Record<string, string>;
+  /** catalog id → "still filling" text, shown as a ⏳ item first in that row (after a warning, if any). */
+  catalogFilling?: Record<string, string>;
   name?: string;
   /** Enabled sources, for the description (default: all). */
   sources?: string[];
@@ -78,6 +84,13 @@ export interface RenderInput {
   assets?: Map<string, Uint8Array>;
   /** When "ended" is judged (default now). */
   now?: number;
+  /**
+   * What playing the streams showed (apps/ingest stream-probe.ts): per series, whether it plays only in Israel
+   * (overrides what the source says); per episode key, its measured best quality ("540p").
+   */
+  probes?: { israelOnly?: Record<string, boolean>; quality?: Record<string, string> };
+  /** stremio-addons.net's signature for the listed addon (config `addon.stremioAddonsConfig`). */
+  stremioAddonsConfig?: { issuer: string; signature: string };
 }
 
 /** Genres offered as a filter on a row: those of its shows, most common first. */
@@ -113,25 +126,24 @@ export function hasEnded(s: RenderShow, now: number): boolean | undefined {
 }
 
 /**
- * The year line, in the usual form (Cinemeta, IMDb, Wikipedia: en dash, no spaces): "2024–present" while a show
- * runs, "2021–2024" or "2024" once it has ended. Apps show it as it is (a bare year for a running show makes Nuvio
- * add its own open dash, "2026 -", which reads as if something were missing).
+ * The year line, in the usual form (Cinemeta, IMDb, Wikipedia: en dash, no spaces): the years of the first and the
+ * latest episode, "2024–2026", or one year when they are the same. Whether the show still runs is said by
+ * `status` ("Returning Series"/"Ended"), which apps show next to it.
  */
-export function releaseInfo(s: RenderShow, now: number): string | undefined {
+export function releaseInfo(s: RenderShow): string | undefined {
   const dates = airDates(s);
   const first = dates[0]?.slice(0, 4);
   const last = dates.at(-1)?.slice(0, 4);
   if (!first || !last) return undefined;
-  if (!hasEnded(s, now)) return `${first}–present`;
   return first === last ? first : `${first}–${last}`;
 }
 
-function preview(s: RenderShow, now: number): MetaPreview {
+function preview(s: RenderShow): MetaPreview {
   const p: MetaPreview = { id: s.seriesId, type: 'series', name: rtl(tidyText(s.title)), posterShape: SHAPE };
   if (s.show.poster) p.poster = s.show.poster;
   const description = cleanDescription(s.show.description);
   if (description) p.description = rtl(description);
-  const year = releaseInfo(s, now);
+  const year = releaseInfo(s);
   if (year) p.releaseInfo = year;
   const genres = cleanGenres(s.show.genres);
   if (genres.length) p.genres = genres;
@@ -139,11 +151,27 @@ function preview(s: RenderShow, now: number): MetaPreview {
   return p;
 }
 
-/** Named seasons ("VIP 5", numbered from 101) say which they are in episode titles; numbered and year ones not. */
+/** Season names that only say "the episodes" (a site's archive bucket): nothing worth repeating on every episode. */
+const GENERIC_SEASON = /^(?:עונות קודמות|פרקים קודמים|פרקים מלאים|כל הפרקים|פרקים|ארכיון)$/;
+
+/** Named seasons ("VIP 5") say which they are in episode titles; numbered and year ones not. */
 function seasonLabel(a: SeasonAssignment | undefined, title: string): string | undefined {
   // An untitled season has nothing to say ("101 ·" means nothing to a viewer).
-  if (a?.kind !== 'named' || !title.trim()) return undefined;
-  return tidyText(title);
+  const t = tidyText(title);
+  if (a?.kind !== 'named' || !t || GENERIC_SEASON.test(t)) return undefined;
+  return t;
+}
+
+/** A show without trailers and promos (read before they were left out at the source boundary; model.ts). */
+function withoutTrailers(s: RenderShow): RenderShow {
+  if (!s.show.seasons.some((x) => x.episodes.some((e) => isTrailer(e.title)))) return s;
+  return {
+    ...s,
+    show: {
+      ...s.show,
+      seasons: s.show.seasons.map((x) => ({ ...x, episodes: x.episodes.filter((e) => !isTrailer(e.title)) })),
+    },
+  };
 }
 
 function videosFor(s: RenderShow): Video[] {
@@ -172,8 +200,19 @@ function videosFor(s: RenderShow): Video[] {
   return videos.sort((x, y) => (x.season ?? 0) - (y.season ?? 0) || (x.episode ?? 0) - (y.episode ?? 0));
 }
 
+/**
+ * Said on every Keshet 12 show page: its episodes play only through the viewer's own home helper, so without one
+ * the app's stream list is empty. (Not a placeholder "stream": Nuvio would try to play a guide link as video.)
+ */
+export const MAKO_HELPER_NOTE =
+  'כדי לצפות בפרקים של קשת 12 צריך את העוזר הביתי של Israel TV. איך מתקינים: github.com/israeltv2/israel-tv';
+
 function metaFor(s: RenderShow, now: number): Meta {
-  const m: Meta = { ...preview(s, now), videos: videosFor(s) };
+  const m: Meta = { ...preview(s), videos: videosFor(s) };
+  if (s.show.source === 'mako')
+    m.description = rtl(
+      [cleanDescription(s.show.description), MAKO_HELPER_NOTE].filter(Boolean).join('\n\n'),
+    );
   // Shown by apps (Nuvio: a "Status" row), and used by them for the year line when it is a bare year.
   const last = airDates(s).at(-1);
   if (last) {
@@ -186,7 +225,13 @@ function metaFor(s: RenderShow, now: number): Meta {
 }
 
 /** Per season, what a resolver needs per episode (so it does not need the home database). */
-function seasonPlayFiles(s: RenderShow): Map<number, SeasonPlay> {
+type Probes = RenderInput['probes'];
+
+/** Plays only from Israel: as measured from abroad for the series when it was, else as the source says. */
+const israelOnly = (s: RenderShow, ep: ScrapedShow['seasons'][number]['episodes'][number], probes: Probes) =>
+  probes?.israelOnly?.[s.seriesId] ?? ep.availableAbroad === false;
+
+function seasonPlayFiles(s: RenderShow, probes: Probes): Map<number, SeasonPlay> {
   const epByKey = new Map(s.episodes.map((a) => [a.key, a]));
   const out = new Map<number, SeasonPlay>();
   for (const season of s.show.seasons) {
@@ -205,7 +250,7 @@ function seasonPlayFiles(s: RenderShow): Map<number, SeasonPlay> {
             }
           : {}),
         ...(direct ? { direct } : {}),
-        ...(ep.availableAbroad === false ? { israelOnly: true } : {}),
+        ...(israelOnly(s, ep, probes) ? { israelOnly: true } : {}),
       };
       if (!play.mako && !play.direct) continue;
       const file = out.get(a.season) ?? {};
@@ -216,7 +261,7 @@ function seasonPlayFiles(s: RenderShow): Map<number, SeasonPlay> {
   return out;
 }
 
-function seasonStreamFiles(s: RenderShow): Map<number, SeasonStreams> {
+function seasonStreamFiles(s: RenderShow, probes: Probes): Map<number, SeasonStreams> {
   const epByKey = new Map(s.episodes.map((a) => [a.key, a]));
   const out = new Map<number, SeasonStreams>();
   for (const season of s.show.seasons) {
@@ -227,12 +272,12 @@ function seasonStreamFiles(s: RenderShow): Map<number, SeasonStreams> {
       const file = out.get(a.season) ?? {};
       file[String(a.episode)] = direct.map((x) => ({
         url: x.url,
-        name: streamName(s.show.source, x.url),
+        name: streamName(s.show.source, x.url, probes?.quality?.[ep.key]),
         title: rtl(
           [
             (ep.title && tidyEpisodeTitle(ep.title, s.title)) || `פרק ${a.episode}`,
             x.label,
-            ep.availableAbroad === false ? ISRAEL_ONLY : undefined,
+            israelOnly(s, ep, probes) ? ISRAEL_ONLY : undefined,
           ]
             .filter(Boolean)
             .join(' · '),
@@ -281,10 +326,12 @@ export function buildManifest(input: RenderInput, catalogIds: Set<string>, exter
   // Claim IMDb/TMDB ids only when some show is matched: otherwise apps would ask us about every title.
   const streamPrefixes = externalIds ? ['iltv_', 'tt', 'tmdb:'] : ['iltv_'];
   return {
-    id: 'community.israel-tv',
+    id: ADDON_ID,
     version: input.version,
     name: input.name ?? 'Israel TV',
     description: describe(input.sources ?? [...SOURCES]),
+    contactEmail: CONTACT_EMAIL,
+    ...(input.stremioAddonsConfig ? { stremioAddonsConfig: input.stremioAddonsConfig } : {}),
     resources: [
       'catalog',
       { name: 'meta', types: ['series', 'tv'], idPrefixes: ['iltv_'] },
@@ -319,11 +366,12 @@ export function renderSite(input: RenderInput): SiteFiles {
   const rows = new Map<string, MetaPreview[]>();
 
   const now = input.now ?? Date.now();
+  input = { ...input, shows: input.shows.map(withoutTrailers) };
   const listed = input.shows.filter((s) => s.state === 'listed' && s.episodes.length > 0);
   listed.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
   for (const s of listed) {
     const row = rows.get(s.catalog) ?? [];
-    row.push(preview(s, now));
+    row.push(preview(s));
     rows.set(s.catalog, row);
     const genres = cleanGenres(s.show.genres);
     search.push([
@@ -348,10 +396,10 @@ export function renderSite(input: RenderInput): SiteFiles {
   for (const s of input.shows) {
     if (s.episodes.length === 0) continue;
     files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s, now) }));
-    for (const [season, streams] of seasonStreamFiles(s)) {
+    for (const [season, streams] of seasonStreamFiles(s, input.probes)) {
       files.set(sitePaths.seasonStreams(s.seriesId, season), json(streams));
     }
-    for (const [season, play] of seasonPlayFiles(s)) {
+    for (const [season, play] of seasonPlayFiles(s, input.probes)) {
       files.set(sitePaths.seasonPlay(s.seriesId, season), json(play));
     }
     // Year seasons are numbered 1, 2, … by position, as TMDB numbers them; named ones (101+) never match.
@@ -404,6 +452,16 @@ export function renderSite(input: RenderInput): SiteFiles {
     rows.set('iltv_live', row);
   }
 
+  // A row still filling says so first (Kan's first fill takes days).
+  for (const [catalog, text] of Object.entries(input.catalogFilling ?? {})) {
+    const def = CATALOGS.find((c) => c.id === catalog);
+    if (!def || !rows.get(catalog)?.length) continue;
+    const id = `${STATUS_ID_PREFIX}${catalog}_filling`;
+    const item: MetaPreview = { id, type: def.type, name: rtl(`⏳ ${text}`), description: rtl(text) };
+    rows.set(catalog, [item, ...(rows.get(catalog) ?? [])]);
+    files.set(sitePaths.meta(def.type, id), json({ meta: { ...item, videos: [] } }));
+  }
+
   // Visible failures: a labelled first item in the affected row.
   for (const [catalog, text] of Object.entries(input.catalogWarnings)) {
     const def = CATALOGS.find((c) => c.id === catalog);
@@ -447,10 +505,9 @@ export function renderSite(input: RenderInput): SiteFiles {
     }
   }
 
-  files.set(
-    sitePaths.manifest,
-    json(buildManifest(input, new Set(rows.keys()), Object.keys(extIds).length > 0)),
-  );
+  const manifest = buildManifest(input, new Set(rows.keys()), Object.keys(extIds).length > 0);
+  files.set(sitePaths.manifest, json(manifest));
+  files.set(sitePaths.landing, renderLandingHtml(manifest.name, manifest.description));
   files.set(sitePaths.search, json(search));
   files.set(sitePaths.extIds, json(extIds));
   files.set(sitePaths.status, json(input.status));

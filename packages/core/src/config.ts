@@ -231,6 +231,16 @@ export const ConfigSchema = z.strictObject({
     .prefault({}),
   /** Optional: match shows to TMDB/IMDb so they also play when opened from other catalogs. */
   tmdb: z.strictObject({ apiKeyEnv: envName.default('TMDB_API_KEY') }).optional(),
+  /** Optional: what addon directories need in the published manifest. */
+  addon: z
+    .strictObject({
+      /**
+       * The signature stremio-addons.net gives a listed addon (its "stremioAddonsConfig"), pasted as it is. Not a
+       * secret: it is published in the manifest.
+       */
+      stremioAddonsConfig: z.strictObject({ issuer: z.url(), signature: z.string().min(1) }).optional(),
+    })
+    .prefault({}),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

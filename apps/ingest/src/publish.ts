@@ -26,11 +26,12 @@ import { brandImage, channelLogo } from '@israel-tv/resolver';
 import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { auditSite } from './catalog-audit.ts';
-import { kanArtwork, kanArtworkDir } from './kan.ts';
+import { KAN_LATER, kanArtwork, kanArtworkDir, kanRowProgress, stillFilling } from './kan.ts';
 import { liveRender } from './live.ts';
 import { checkNumbering } from './numbering-guard.ts';
 import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster } from './posters.ts';
 import { BLOCK_RETRIES, type BlockedRetry, emptyShowsKey, episodeCount, retryKey } from './runner.ts';
+import { probeResults } from './stream-probe.ts';
 import { ALIASES_KEY } from './tmdb.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -125,6 +126,18 @@ export function buildStatus(
     } else if (shows.length === 0 && last) {
       health = 'error';
       notes.push('no shows');
+    }
+    // Kan fills over days: until every listed show is in, the source is not "ok" (its rows say so too).
+    if (source === 'kan') {
+      for (const [catalog, p] of Object.entries(kanRowProgress(store))) {
+        if (!stillFilling(p)) continue;
+        const name = CATALOGS.find((c) => c.id === catalog)?.name ?? catalog;
+        // The archive is a long back catalogue read last: noted, not a warning.
+        if (!KAN_LATER.has(catalog) && health === 'ok') health = 'warn';
+        notes.push(
+          `first fill of ${catalog} (${name}) in progress: ${p.inCatalog} of ${p.known} shows in the catalog, ${p.backlog} episode pages to read`,
+        );
+      }
     }
     // Listed by the site with nothing to watch: a count here, the titles in `emptyShows` (an expandable list).
     const empty = store.getState<string[]>(emptyShowsKey(source)) ?? [];
@@ -228,6 +241,20 @@ export function catalogWarnings(status: StatusFile): Record<string, string> {
   return out;
 }
 
+/** Rows still filling (Kan's first fill): a ⏳ item first in the row, in the viewer's words. */
+export function catalogFilling(
+  store: Store,
+  config: Pick<Config, 'sources' | 'browser'>,
+): Record<string, string> {
+  if (!config.sources.kan || config.browser.type === 'none') return {};
+  const out: Record<string, string> = {};
+  for (const [catalog, p] of Object.entries(kanRowProgress(store)))
+    if (stillFilling(p))
+      out[catalog] =
+        `עדיין בטעינה: ${p.inCatalog} מתוך ${p.known} התוכניות כבר כאן, השאר יופיעו בימים הקרובים`;
+  return out;
+}
+
 export function renderFromStore(store: Store, config: Config): SiteFiles {
   const hiddenShows = new Set(config.hide.shows);
   const hiddenSources = new Set<string>(config.hide.sources);
@@ -326,6 +353,8 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   const files = renderSite({
     version: RELEASE_VERSION,
     assets,
+    ...(config.addon.stremioAddonsConfig ? { stremioAddonsConfig: config.addon.stremioAddonsConfig } : {}),
+    probes: probeResults(store),
     sources: activeSources(config).filter((src) => !hiddenSources.has(src)),
     shows,
     live,
@@ -346,6 +375,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
       catalogs: Object.fromEntries(CATALOGS.map((c) => [c.id, c.source])),
     },
     catalogWarnings: catalogWarnings(status),
+    catalogFilling: catalogFilling(store, config),
   });
   // The publisher's own audit of these files, published on /status with them.
   const audit = auditSite(files, store);

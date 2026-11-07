@@ -6,6 +6,8 @@ export const CATALOG_PAGE_SIZE = 100;
 
 export const sitePaths = {
   manifest: 'manifest.json',
+  /** A short page for people who open the addon's address in a browser. */
+  landing: 'index.html',
   catalog: (type: string, id: string, skip = 0) =>
     // Later pages are stored as skip-N (not skip=N: some static hosts redirect '=' to '%3D'); the addon
     // app maps Stremio's `/skip=N.json` URL onto them.
