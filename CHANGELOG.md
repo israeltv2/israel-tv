@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.7.5](https://github.com/israeltv2/israel-tv/compare/v0.7.4...v0.7.5) (2026-11-07)
+
+
+### Bug Fixes
+
+* **ingest:** round 10 lane A — printed episode numbers, Kan retries converge, graceful restarts, Mako bot check, clean titles ([#148](https://github.com/israeltv2/israel-tv/issues/148)) ([f031e3a](https://github.com/israeltv2/israel-tv/commit/f031e3adc5ebc5e1a602cb12c833257b23599933))
+
 ## [0.7.4](https://github.com/israeltv2/israel-tv/compare/v0.7.3...v0.7.4) (2026-11-07)
 
 
