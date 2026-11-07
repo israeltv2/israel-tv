@@ -12,7 +12,19 @@ import {
   sitePaths,
 } from '@israel-tv/core';
 import { CATALOG_LOGO } from './names.ts';
-import { absolute, esc, footer, head, ICONS, num, PROJECT_URL, siteNav, sized, topBar } from './page.ts';
+import {
+  absolute,
+  BRAND,
+  esc,
+  footer,
+  head,
+  ICONS,
+  num,
+  PROJECT_URL,
+  siteNav,
+  sized,
+  topBar,
+} from './page.ts';
 
 export interface LibraryShow {
   meta: Meta;
@@ -148,10 +160,12 @@ const LIBRARY_CSS = `
 .page-head{padding-block:40px 8px}
 .page-head h1{font-size:clamp(3rem,9vw,5.6rem);margin:0}
 .page-head .lead{color:var(--muted);max-width:44rem;font-size:1.05rem;margin:.4em 0 0}
-.crumbs{display:flex;flex-wrap:wrap;gap:6px;font-size:.9rem;color:var(--muted);margin-bottom:10px}
+.crumbs{display:flex;flex-wrap:wrap;gap:6px;font-size:.9rem;color:var(--muted);margin:0 0 10px;padding:0}
 .crumbs a{color:var(--muted)}
 .crumbs li{list-style:none}.crumbs ol{display:contents}
-.crumbs li+li::before{content:"‹";margin-inline-end:6px;color:var(--muted)}
+.crumbs li{display:inline-flex;align-items:center}
+.crumbs li+li::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);margin-inline:4px 10px;opacity:.75}
+[dir=rtl] .crumbs li+li::before{transform:rotate(135deg)}
 .searchbox{display:flex;gap:8px;margin-top:22px;max-width:34rem}
 .searchbox input{flex:1;min-width:0;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:12px 18px;min-height:48px}
 .searchbox input:focus{outline:2px solid var(--accent);outline-offset:1px}
@@ -160,7 +174,7 @@ const LIBRARY_CSS = `
 .shelf-head h2{margin:0;font-size:clamp(2rem,4.4vw,2.7rem)}
 .shelf-head .count{color:var(--muted);font-size:.9rem}
 .shelf-head a.all{margin-inline-start:auto;font-weight:600;white-space:nowrap}
-.strip{display:grid;grid-auto-flow:column;grid-auto-columns:clamp(118px,15vw,168px);gap:14px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:4px 2px 14px;scrollbar-width:thin}
+.strip{display:grid;grid-auto-flow:column;grid-auto-columns:clamp(118px,15vw,168px);gap:14px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:12px 8px 16px;margin:-8px -8px 0;scroll-padding-inline:8px;scrollbar-width:thin}
 .strip>*{scroll-snap-align:start}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(42vw,150px),1fr));gap:22px 14px}
 @media (min-width:720px){.tiles{grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}}
@@ -174,13 +188,13 @@ const LIBRARY_CSS = `
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 26px}
 .chip{font:inherit;font-size:.9rem;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--fg);cursor:pointer;text-decoration:none;transition:background-color .15s var(--ease-out),border-color .15s var(--ease-out)}
 .chip:hover{border-color:var(--accent)}
-.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.chip[aria-current=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
 .note{border-inline-start:3px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:10px 14px;margin:14px 0;max-width:46rem}
 .channels-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr))}
-.chan{display:grid;grid-template-columns:56px 1fr;gap:4px 14px;align-items:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.chan{display:grid;grid-template-columns:56px 1fr;grid-template-rows:auto 1fr auto;gap:4px 14px;align-items:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
 .chan>img,.chan>.logo-blank{grid-row:span 2;width:56px;height:56px;border-radius:12px;background:var(--surface-2);object-fit:contain}
 .chan h2,.chan h3{margin:0;font:600 1.1rem/1.3 var(--body)}
-.chan .acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chan .acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-self:end}
 .chan .acts .btn{min-height:40px;padding:6px 14px;font-size:.9rem}
 .tag{display:inline-block;font-size:.72rem;font-weight:600;color:var(--warn);border:1px solid currentColor;border-radius:6px;padding:0 6px;margin-inline-start:6px;vertical-align:2px}
 .guide{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px;font-size:.92rem}
@@ -198,12 +212,15 @@ const LIBRARY_CSS = `
 .show-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,var(--bg) 2%,rgb(13 12 18/80%) 40%,rgb(13 12 18/45%)),linear-gradient(to left,rgb(13 12 18/85%),transparent 75%)}
 .show-hero .wrap{display:grid;gap:22px;padding-block:96px 36px;align-items:end}
 @media (min-width:760px){.show-hero .wrap{grid-template-columns:260px 1fr;padding-block:120px 48px;gap:36px}}
-.show-hero .poster{max-width:220px;box-shadow:0 20px 50px rgb(0 0 0/55%)}
-@media (min-width:760px){.show-hero .poster{max-width:none}}
+.show-hero .poster{max-width:200px;justify-self:center;box-shadow:0 20px 50px rgb(0 0 0/55%)}
+@media (max-width:759px){.show-hero .acts .btn{flex:1 1 100%}}
+@media (min-width:760px){.show-hero .poster{max-width:none;justify-self:stretch}}
 .show-hero h1{font-size:clamp(3rem,9vw,6rem);margin:0}
 .show-hero .crumbs,.show-hero .crumbs a{color:var(--hero-muted)}
 .facts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0;list-style:none}
 .facts li{font-size:.85rem;padding:3px 12px;border-radius:999px;background:rgb(255 255 255/9%);border:1px solid rgb(255 255 255/16%);color:var(--hero-fg)}
+.facts li:has(a){padding:0}.facts a{display:block;padding:3px 12px;color:${BRAND.stone};text-decoration:none;border-radius:inherit}
+.facts a:hover{background:rgb(255 255 255/16%)}.facts li:has(a:hover){border-color:var(--accent)}
 .show-hero .desc{max-width:44rem;color:var(--hero-muted);font-size:1.05rem;margin:16px 0 0;white-space:pre-line}
 .show-hero .acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .show-hero .small{color:var(--hero-muted);margin:14px 0 0;max-width:44rem}
@@ -216,7 +233,9 @@ const LIBRARY_CSS = `
 .eps{list-style:none;margin:0;padding:0 12px 12px;display:grid;gap:4px}
 .ep{display:grid;grid-template-columns:minmax(0,128px) 1fr;gap:4px 14px;padding:10px 6px;border-radius:12px;align-items:start}
 @media (min-width:720px){.ep{grid-template-columns:200px 1fr}}
-.ep:hover{background:var(--surface-2)}
+.ep{position:relative}.ep:hover{background:var(--surface-2)}
+.ep h3 a::after{content:"";position:absolute;inset:0;border-radius:inherit}
+.ep h3 a:focus-visible{outline:none}.ep:has(h3 a:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 .ep .still{grid-row:span 3;aspect-ratio:16/9;width:100%;height:auto;object-fit:cover;border-radius:8px;background:var(--surface-2)}
 .ep .still.blank{display:grid;place-items:center;font:700 2rem/1 var(--display);color:var(--muted)}
 .ep h3{margin:0;font-size:1rem}
@@ -338,9 +357,10 @@ function libraryHome(input: LibraryInput): string {
 
 /** The genre filter's script: show only the tiles of the chosen genre (all of them without the script). */
 const FILTER_SCRIPT = `(function(){var bs=document.querySelectorAll('.filters .chip'),ts=document.querySelectorAll('.tiles .tile');
-bs.forEach(function(b){b.addEventListener('click',function(){var g=b.dataset.g;bs.forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});
-ts.forEach(function(t){t.hidden=!!g&&('|'+(t.dataset.g||'')+'|').indexOf('|'+g+'|')<0})})});
-document.querySelector('.filters')&&document.querySelector('.filters').removeAttribute('hidden')})();`;
+function pick(g){bs.forEach(function(x){if(x.dataset.g===g)x.setAttribute('aria-current','true');else x.removeAttribute('aria-current')});
+ts.forEach(function(t){t.hidden=!!g&&('|'+(t.dataset.g||'')+'|').indexOf('|'+g+'|')<0})}
+bs.forEach(function(b){b.addEventListener('click',function(e){if(e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();pick(b.dataset.g);history.replaceState(null,'',b.getAttribute('href'))})});
+var f=document.querySelector('.filters');if(f){f.removeAttribute('hidden');var g=new URLSearchParams(location.search).get('g')||'';if([].some.call(bs,function(b){return b.dataset.g===g}))pick(g)}})();`;
 
 function rowPage(r: LibraryRow): string {
   const name = rowName(r.id);
@@ -385,12 +405,12 @@ ${
 }
 ${
   genres.length
-    ? `<div class="filters" role="group" aria-label="סינון לפי סוגה" hidden><button class="chip" type="button" data-g="" aria-pressed="true">הכול</button>${genres
+    ? `<nav class="filters" aria-label="סינון לפי סוגה" hidden><a class="chip" href="${rowHref(r.id)}" data-g="" aria-current="true">הכול</a>${genres
         .map(
           (g) =>
-            `<button class="chip" type="button" data-g="${esc(g)}" aria-pressed="false">${esc(g)}</button>`,
+            `<a class="chip" href="${rowHref(r.id)}?g=${encodeURIComponent(g)}" data-g="${esc(g)}">${esc(g)}</a>`,
         )
-        .join('')}</div>`
+        .join('')}</nav>`
     : ''
 }
 <div class="tiles">${r.shows.map((s, i) => tile(s.meta, { morph: true, eager: i < 6, first: i === 0 })).join('')}</div>
@@ -442,14 +462,17 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
   const broadcaster = BROADCASTER[s.source];
   const site = m.links?.find((l) => l.category === 'Website' && /^https?:\/\//.test(l.url))?.url;
   const years = m.releaseInfo;
-  const facts = [
-    rowName(row.id),
-    years,
-    m.status === 'Ended' ? 'הסתיימה' : m.status ? 'עדיין משודרת' : undefined,
-    bySeason.size > 1 ? `${num(bySeason.size, 'he')} עונות` : undefined,
-    countEpisodes(total),
-    ...(m.genres ?? []).map(plain),
-  ].filter((x): x is string => !!x);
+  // The channel and the genres are links (the row, and the row filtered by that genre); the rest is plain text.
+  const facts: { text: string; href?: string }[] = [
+    { text: rowName(row.id), href: rowHref(row.id) },
+    { text: years ?? '' },
+    { text: m.status === 'Ended' ? 'הסתיימה' : m.status ? 'עדיין משודרת' : '' },
+    { text: bySeason.size > 1 ? `${num(bySeason.size, 'he')} עונות` : '' },
+    { text: countEpisodes(total) },
+    ...(m.genres ?? [])
+      .map(plain)
+      .map((g) => ({ text: g, href: `${rowHref(row.id)}?g=${encodeURIComponent(g)}` })),
+  ].filter((f) => !!f.text);
   const list = seasons
     .slice(0, SEASONS_IN_FULL)
     .map(([n, vs], i) => {
@@ -531,7 +554,7 @@ ${poster ? `<img class="poster" src="${esc(poster)}" alt="" width="260" height="
 <div>
 <nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li><a href="${rowHref(row.id)}">${esc(rowName(row.id))}</a></li></ol></nav>
 <h1 dir="auto">${esc(name)}</h1>
-<ul class="facts">${facts.map((f) => `<li dir="auto">${esc(f)}</li>`).join('')}</ul>
+<ul class="facts">${facts.map((f) => `<li dir="auto">${f.href ? `<a href="${esc(f.href)}">${esc(f.text)}</a>` : esc(f.text)}</li>`).join('')}</ul>
 ${description ? `<p class="desc" dir="auto">${esc(description)}</p>` : ''}
 <div class="acts"><a class="btn btn-primary" href="${esc(stremioDetail('series', m.id))}">${ICONS.play}צפייה ב-Stremio</a>${
       site
