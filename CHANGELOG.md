@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.7.8](https://github.com/israeltv2/israel-tv/compare/v0.7.7...v0.7.8) (2026-11-07)
+
+
+### Performance Improvements
+
+* **site:** the library page's first posters load at once (they were lazy and on screen) ([#154](https://github.com/israeltv2/israel-tv/issues/154)) ([f65a8e5](https://github.com/israeltv2/israel-tv/commit/f65a8e5cded0b0bbee6ba448cbad14768732316f))
+
 ## [0.7.7](https://github.com/israeltv2/israel-tv/compare/v0.7.6...v0.7.7) (2026-11-07)
 
 
