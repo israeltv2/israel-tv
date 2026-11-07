@@ -56,6 +56,7 @@ export interface LandingInput {
 
 const HELPER_DOC = `${PROJECT_URL}/blob/main/docs/setup/home-helper.md`;
 const ABROAD_DOC = `${HELPER_DOC}#watching-from-abroad`;
+const TUNNEL_DOC = `${PROJECT_URL}/blob/main/docs/setup/tunnel.md`;
 const AGENTS_DOC = `${PROJECT_URL}/blob/main/docs/setup/for-agents.md`;
 const SELF_HOST_DOC = `${PROJECT_URL}/blob/main/docs/setup/README.md`;
 const BROKEN_URL = `${PROJECT_URL}/issues/new?template=broken-source.yml`;
@@ -373,8 +374,8 @@ ${
 </div><div class="card">
 <p>${t(
         lang,
-        'Setting it up takes 15 minutes to an hour the first time, and that computer has to stay on. It then plays at home; on a phone outside the house it needs some extra setup.',
-        'ההתקנה הראשונה לוקחת בין רבע שעה לשעה, והמחשב צריך להישאר דלוק. מאותו רגע קשת 12 מתנגנת בבית; כדי לצפות בטלפון מחוץ לבית צריך עוד כמה הגדרות.',
+        `Setting it up takes 15 minutes to an hour the first time, and that computer has to stay on. It then plays at home. All your devices share one account, so they get the same helper link: with a <a href="${TUNNEL_DOC}">Cloudflare Tunnel</a> that one link plays at home and away.`,
+        `ההתקנה הראשונה לוקחת בין רבע שעה לשעה, והמחשב צריך להישאר דלוק. מאותו רגע קשת 12 מתנגנת בבית. כל המכשירים שלכם מחוברים לאותו חשבון ומקבלים אותו קישור של העוזר: עם <a href="${TUNNEL_DOC}">Cloudflare Tunnel</a> הקישור האחד הזה עובד גם בבית וגם מחוץ לבית.`,
       )}</p>
 <div class="oss"><a class="btn btn-plain" href="${HELPER_DOC}">${t(lang, 'Set up the home helper', 'התקנת העוזר הביתי')}</a><a class="btn btn-plain" href="${AGENTS_DOC}">${t(lang, 'Let an AI assistant do it', 'להיעזר בעוזר AI')}</a></div>
 </div></div>

@@ -864,9 +864,13 @@ export async function startDaemon(
       'publisher.port',
     );
   }
+  // Both helper doors sign relay URLs with one secret: the tunnel door hands out, at home, relayed streams that the
+  // home-network door plays.
+  const relaySecret = randomBytes(32);
   if (config.resolver.enabled) {
     await listen(
       resolverApp(config, {
+        secret: relaySecret,
         log: (component) => logger.for(component),
         onRelay: (r) => d.noteRelay(r),
         onEvent: (e) => d.record(e),
@@ -880,6 +884,7 @@ export async function startDaemon(
   }
   if (config.resolver.remote.enabled) {
     const remote = remoteResolverApp(config, {
+      secret: relaySecret,
       log: (component) => logger.for(`remote-${component}`),
       onEvent: (e) => d.record(e),
       sessions: d.sessions,
@@ -896,7 +901,7 @@ export async function startDaemon(
         'resolver.remote.port',
       );
       log(
-        `remote resolver (Mako away from home) on ${config.resolver.remote.host}:${config.resolver.remote.port}, served at ${config.resolver.remote.publicUrl} — \`israel-tv remote-url\` prints the link to install`,
+        `helper tunnel door on ${config.resolver.remote.host}:${config.resolver.remote.port}, served at ${config.resolver.remote.publicUrl} — \`israel-tv remote-url\` prints the one helper link to install (it works at home and away)`,
       );
     }
   }
@@ -910,7 +915,9 @@ export async function startDaemon(
   }
   if (config.resolver.enabled) {
     log(
-      `resolver — install this too, at home: ${urls(config.resolver.host, config.resolver.port, '/manifest.json')}`,
+      config.resolver.remote.enabled
+        ? `helper on this network: ${urls(config.resolver.host, config.resolver.port, '/manifest.json')} (with the tunnel set up, install the tunnel link instead: \`israel-tv remote-url\`)`
+        : `helper — install this too, at home: ${urls(config.resolver.host, config.resolver.port, '/manifest.json')}`,
     );
   }
   d.geo.proxies = proxyEndpoints(config.geo).map((p) => p.server);

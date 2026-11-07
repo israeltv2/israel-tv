@@ -13,6 +13,9 @@ Most people need nothing from this page: [install the public link](../../README.
 3. **Do you want your own catalog reachable from anywhere, to share with family and friends?** →
    [Your own copy on Cloudflare](host.md) (a free Cloudflare account).
 
+One account for all your devices (the usual case)? Then they all get the same helper link: with a domain on
+Cloudflare, [a tunnel](tunnel.md) makes that one link work at home and away.
+
 Outside Israel? Options 2 and 3 also need a proxy or VPN service with an Israeli exit; it is described in each guide.
 You do not need one inside Israel.
 

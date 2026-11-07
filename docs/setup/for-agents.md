@@ -89,9 +89,9 @@ The whole procedure, with what each step shows: [home helper](home-helper.md#the
    after a system restart someone must sign in. Windows: the home network must be _Private_ and Docker allowed on
    private networks. Mac: if asked whether Docker may accept incoming connections, allow it.
 7. **Tell them:** the helper's sources (Keshet 12, and abroad the "דרך החיבור הישראלי שלך" ones) play on the home network only;
-   away from home the public link's other episodes and live channels still work. Opening the helper to the outside
-   needs a domain and the install without Docker ([away from home](resolver-only.md#away-from-home)) — do not
-   attempt it unless they ask.
+   away from home the public link's other episodes and live channels still work. A tunnel turns the helper into one
+   link that works at home and away (installed instead of the home-network link, since one account syncs its addons
+   to every device); it needs a domain on Cloudflare ([tunnel guide](tunnel.md)) — do not attempt it unless they ask.
 
 No Docker and they are comfortable with a terminal: [without Docker](resolver-only.md).
 

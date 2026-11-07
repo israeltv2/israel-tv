@@ -1,6 +1,7 @@
 // The resolver on its own (role "resolver-only"): the home resolver, and the remote one when enabled, playing
 // from a published Israel TV catalog. No reading of sites, no publishing, no catalog database — this module and
 // its entry point (cli.ts) need only the resolver's own packages, so a resolver-only install stays small.
+import { randomBytes } from 'node:crypto';
 import type { Config, UsageEvent } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { createLogger, lanAddresses, listen, stopSignal } from '@israel-tv/runtime';
@@ -24,6 +25,9 @@ export async function runResolverOnly(config: Config): Promise<number> {
     },
     sessions,
     salt: events.clientSalt(),
+    // Both doors sign relay URLs with one secret: the tunnel door hands out, at home, relayed streams that the
+    // home-network door plays.
+    secret: randomBytes(32),
   };
   await listen(
     resolverApp(config, shared).fetch as never,
@@ -47,7 +51,7 @@ export async function runResolverOnly(config: Config): Promise<number> {
         'resolver.remote.port',
       );
       log(
-        `remote resolver (Mako away from home) served at ${config.resolver.remote.publicUrl} — \`pnpm resolver remote-url\` prints the link`,
+        `helper tunnel door served at ${config.resolver.remote.publicUrl} — \`pnpm resolver remote-url\` prints the one helper link to install (it works at home and away)`,
       );
     }
   }

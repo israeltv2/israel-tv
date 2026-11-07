@@ -112,10 +112,11 @@ abroad) and one called **דרך החיבור הישראלי שלך** (via your I
 ### Keshet 12 away from home
 
 The helper answers only on your home network: on a phone outside the house, Keshet 12 and the "דרך החיבור הישראלי שלך" sources will
-not play (the public link's other episodes and the live channels still do). Opening it to the
-outside safely needs a domain name of your own and some technical setup, and is not part of the easy way: see
-[Away from home](resolver-only.md#away-from-home) if you or someone helping you is comfortable with that (it is written for
-the install without Docker).
+not play (the public link's other episodes and the live channels still do). Your apps share one account, so they all
+get the same links. A **Cloudflare Tunnel** gives the helper one `https://` link instead, which works at home (with
+everything) and away (Keshet 12): you install that link in place of this one. It needs a domain name of your own and
+some technical setup, and is not part of the easy way: see [The helper through a Cloudflare Tunnel](tunnel.md) if you
+or someone helping you is comfortable with that.
 
 ### If something goes wrong
 

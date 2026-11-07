@@ -365,7 +365,7 @@ test('the remote resolver: Mako only, behind its token, nothing else, limited pe
     expect(await r.text(), p).toBe('');
   }
   const m = await (await get(`/${token}/manifest.json`)).json();
-  expect(m.name).toBe('Israel TV · Mako (away from home)');
+  expect(m.name).toBe('Israel TV · home helper');
   expect(m.resources[0].idPrefixes).not.toContain('iltv_reshet_');
   // Stream URLs point back through the public address with the token, and never at a relay.
   const s = await (await get(`/${token}/stream/series/iltv_mako_1:2:3.json`)).json();

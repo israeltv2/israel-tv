@@ -55,6 +55,8 @@ export function instanceUrls(config: Config): string[] {
       `Dashboard (this network only): ${at(config.admin.host, config.admin.port, '/dash/').join('  ')}  (\`admin-url\` adds your token)`,
     );
   if (config.resolver.remote.enabled)
-    lines.push('Away from home (Mako): `remote-url` prints the link with its token');
+    lines.push(
+      'Helper through your tunnel: `remote-url` prints the link with its token. Install that one instead of the home-network link: it works at home and away',
+    );
   return lines;
 }

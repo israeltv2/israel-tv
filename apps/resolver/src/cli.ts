@@ -4,18 +4,18 @@
 import { parseArgs } from 'node:util';
 import { ConfigError, roleOf, secretOwners } from '@israel-tv/core';
 import { instancePaths, instanceUrls, loadConfig, registerSecretNames } from '@israel-tv/runtime';
-import { checkProxy, printEvents, remoteUrl } from './commands.ts';
+import { checkProxy, printEvents, remoteUrl, remoteUrlHint } from './commands.ts';
 import { checkCatalog } from './server.ts';
 import { runResolverOnly } from './standalone.ts';
 
 const HELP = `israel-tv-resolver <command>
 
-  start            Run the home resolver (and the remote one, when enabled) from resolver.catalogUrl
+  start            Run the helper (and its tunnel door, when enabled) from resolver.catalogUrl
   check-catalog    Check that resolver.catalogUrl is an Israel TV catalog this resolver understands
   check-proxy      Check that the geo proxy (outside Israel) exits in Israel
   paths            Where the config, the secrets file and the data are on this computer
   urls             The link to install in your app (as other devices on this network see it)
-  remote-url       Print the away-from-home install link (resolver.remote)
+  remote-url       The helper's tunnel link (resolver.remote): with a tunnel, the one helper link to install
   events           Recent plays and failures: --errors, --play <id>, --kind <k>, --since 2h, --show <id>, --limit <n>
   help             This text
 
@@ -55,6 +55,7 @@ async function main(argv: string[]): Promise<number> {
   if (cmd === 'events') return printEvents(config, values);
   if (cmd === 'remote-url') {
     console.log(remoteUrl(config));
+    console.error(remoteUrlHint(config));
     return 0;
   }
   if (cmd === 'check-catalog') {

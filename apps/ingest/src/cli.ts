@@ -14,7 +14,14 @@ import {
 } from '@israel-tv/core';
 import { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
-import { checkProxy, printEvents, remoteUrl, resolverApp, runResolverOnly } from '@israel-tv/resolver';
+import {
+  checkProxy,
+  printEvents,
+  remoteUrl,
+  remoteUrlHint,
+  resolverApp,
+  runResolverOnly,
+} from '@israel-tv/resolver';
 import {
   createLogger,
   instancePaths,
@@ -78,7 +85,7 @@ const HELP = `israel-tv <command>
   usage                              The usage dashboard's figures as JSON (pnpm usage)
   admin-url                          The admin page's address with its token (open it once in a browser)
   restore <registry.json file or URL> Rebuild ids and numbering into an empty database (see docs/operations.md)
-  remote-url                         The away-from-home (Mako) resolver's manifest URL, with its token
+  remote-url                         The helper's tunnel link, with its token: with a tunnel, the one helper link to install
   help                               This text
 
 Config: israel-tv.config.json and .env in the config folder (\`paths\` shows it; ISRAEL_TV_HOME picks another).`;
@@ -158,6 +165,7 @@ async function main(argv: string[]): Promise<number> {
     if (cmd === 'events') return printEvents(config, values);
     if (cmd === 'remote-url') {
       console.log(remoteUrl(config));
+      console.error(remoteUrlHint(config));
       return 0;
     }
     if (cmd !== 'start' && cmd !== 'resolver')
@@ -443,6 +451,8 @@ async function main(argv: string[]): Promise<number> {
       }
       case 'remote-url':
         console.log(remoteUrl(config));
+        console.error(remoteUrlHint(config));
+        console.error(remoteUrlHint(config));
         return 0;
       case 'admin-url': {
         const token = adminToken(config, store);

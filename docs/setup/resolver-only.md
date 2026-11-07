@@ -83,36 +83,9 @@ and offers the relay only where it is refused. Mako and most live channels never
 
 ## Away from home
 
-The helper answers only on your network. To watch Keshet 12 elsewhere, open a narrow second door to it through a
-**Cloudflare Tunnel** (needs a domain of your own on Cloudflare; a `workers.dev` name cannot be used for tunnels):
-
-1. Make a token of 32 or more letters and digits — macOS/Linux: `openssl rand -hex 32`; Windows PowerShell:
-   `-join ((48..57)+(97..122) | Get-Random -Count 40 | % {[char]$_})` — and put it in `.env` as
-   `ISRAEL_TV_REMOTE_TOKEN=…`.
-2. In `israel-tv.config.json`:
-   `"resolver": { "remote": { "enabled": true, "publicUrl": "https://tv-remote.example.net" } }` — the tunnel's
-   address, without the token.
-3. Route that hostname to `http://127.0.0.1:7703` in the tunnel, and nothing else. A new tunnel, in this order:
-   `cloudflared tunnel login`; `cloudflared tunnel create israel-tv` (it prints an id and writes a credentials file
-   in your `.cloudflared` folder); write `.cloudflared/config.yml`:
-
-   ```yaml
-   tunnel: <id>
-   credentials-file: <full path to the .cloudflared folder>/<id>.json
-   ingress:
-     - hostname: tv-remote.example.net
-       service: http://127.0.0.1:7703
-     - service: http_status:404
-   ```
-
-   then `cloudflared tunnel route dns israel-tv tv-remote.example.net`, and `cloudflared service install` so it
-   survives restarts (on Windows, from an administrator PowerShell; the Windows service reads its settings from
-   `C:\Windows\System32\config\systemprofile\.cloudflared\`, so copy `config.yml` and the credentials file there).
-4. Restart the helper and install the link `pnpm resolver remote-url` prints (it contains the token: keep it
-   private; change the token to revoke every install).
-
-Only Mako's routes are there; video goes from Mako to the player, never through your home. Any other path, and any
-request without the token, gets an empty 404, and each client is rate-limited.
+The helper answers only on your network. With a domain of your own on Cloudflare you can give it a tunnel, and then
+install **one helper link** that works at home and away (at home with everything, away with Keshet 12): see
+[The helper through a Cloudflare Tunnel](tunnel.md).
 
 ## Troubleshoot
 
@@ -120,5 +93,5 @@ request without the token, gets an empty 404, and each client is rate-limited.
   version of the [contract](../contract.md)).
 - `pnpm resolver events --errors` lists recent failures; the log is in the config folder's `data/logs/current.log` (Windows: the newest `israel-tv.*.log` there).
 - Updating: `git pull`, `pnpm install --prod --filter "@israel-tv/resolver..."`, restart.
-- Ports: 7701 (the helper), 7703 (away from home, for the tunnel on this computer only). Do not expose 7701 to the
+- Ports: 7701 (the helper), 7703 (the tunnel door, for the tunnel on this computer only). Do not expose 7701 to the
   internet: it has no login and would relay through your proxy.

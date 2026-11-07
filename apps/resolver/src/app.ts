@@ -33,6 +33,9 @@ import { makoAuth } from './mako-auth.ts';
 import { type PlayInfo, PlaySessions } from './sessions.ts';
 
 export { absolutize } from './context.ts';
+
+/** The helper's one name, whichever door (home network or tunnel) it is installed from. */
+export const HELPER_NAME = 'Israel TV · home helper';
 export { RELAY_HOSTS } from './geo-relay.ts';
 
 /** Our series for an IMDb/TMDB id, with the seasons that share TMDB's numbering. */
@@ -70,6 +73,14 @@ export interface ResolverDeps {
   branding?: { logo?: { body: Uint8Array; type: string }; background?: { body: Uint8Array; type: string } };
   /** The address this app is reached at, for the URLs it hands out (default: the request's origin). */
   publicBase?: (c: Context) => string;
+  /**
+   * Where this request's relayed streams point (default: the same address as everything else), or undefined to
+   * offer no relay for it. The tunnel door uses it: relayed streams only for requests from home, at the helper's
+   * home-network address.
+   */
+  relayBase?: (c: Context) => string | undefined | Promise<string | undefined>;
+  /** Serve the relay route itself (default true). The tunnel door never does: no video passes through it. */
+  serveRelay?: boolean;
   /** Manifest overrides (the remote, Mako-only resolver names itself differently). */
   manifest?: { id: string; name: string; description: string; idPrefixes: string[] };
   /** The client's address for a request (default: the connecting socket's). */
@@ -120,7 +131,7 @@ export function createResolverApp(deps: ResolverDeps) {
     c.json({
       id: deps.manifest?.id ?? RESOLVER_ADDON_ID,
       version: RELEASE_VERSION,
-      name: deps.manifest?.name ?? 'Israel TV · home helper',
+      name: deps.manifest?.name ?? HELPER_NAME,
       description:
         deps.manifest?.description ??
         'Plays Keshet 12 and live channels from your own computer, and Reshet and Kan where they are refused.',
@@ -163,6 +174,7 @@ export function createResolverApp(deps: ResolverDeps) {
   app.get('/stream/:type/:file', async (c) => {
     const id = decodeURIComponent(c.req.param('file')).replace(/\.json$/, '');
     const origin = base(c);
+    const relayOrigin = relay ? (deps.relayBase ? await deps.relayBase(c) : origin) : undefined;
     const t0 = Date.now();
     // The canary and other internal checks mark their requests: their plays are not usage (rollups, failures and
     // "playing now" skip them).
@@ -193,12 +205,12 @@ export function createResolverApp(deps: ResolverDeps) {
         streams.push(...mako.streams(origin, play(), { video }));
       // Reshet and Kan video is geo-blocked outside Israel; the relay is offered only when it is refused here.
       const geoSource = source !== undefined && GEO_LIMITED.has(source);
-      if (ep && relay && (geoSource || ep.availableAbroad === false)) {
+      if (ep && relay && relayOrigin && (geoSource || ep.availableAbroad === false)) {
         needed = true;
         const direct = ep.streams.find((s) => s.kind === 'direct' || s.kind === 'resolver');
         if (direct) {
           const r = await relay.streamFor(
-            origin,
+            relayOrigin,
             play(),
             v.series,
             direct.url,
@@ -217,12 +229,12 @@ export function createResolverApp(deps: ResolverDeps) {
         // Neither a Mako ticket nor a geo limit (Channel 13, Channel 14): its direct streams from the public addon
         // play anywhere, so nothing is needed here.
         directPlays ||= !ch.mako?.length && !ch.geo;
-        needed = !!ch.mako?.length || (!!ch.geo && !!relay);
+        needed = !!ch.mako?.length || (!!ch.geo && !!relayOrigin);
         if (mako) streams.push(...mako.streams(origin, play(), { channel: ch }));
-        if (ch.geo && relay) {
+        if (ch.geo && relay && relayOrigin) {
           for (const l of ch.direct) {
             const r = await relay.streamFor(
-              origin,
+              relayOrigin,
               play(),
               `${ch.id}|${l.url}`,
               l.url,
@@ -263,7 +275,7 @@ export function createResolverApp(deps: ResolverDeps) {
   });
 
   mako?.mount(app);
-  relay?.mount(app);
+  if (deps.serveRelay !== false) relay?.mount(app);
 
   app.notFound((c) => c.json({ error: 'not found' }, 404));
   return app;

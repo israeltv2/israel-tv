@@ -143,13 +143,22 @@ Publishing is batched: airing checks and Kan slices gather their changes into on
 | `makoAuth.enabled` | `true`            | Mako playback (a fresh ticket and the ~1 KB playlist per play; video comes from Mako's CDN).                                 |
 | `geoRelay.enabled` | `true`            | Geo-blocked Reshet/Kan video through the `geo` proxy, only when refused from this network. The only part that carries video. |
 | `catalogUrl`       | —                 | The public catalog to play from (role `resolver-only`).                                                                      |
-| `remote.*`         | off               | Mako away from home through your own tunnel (see below).                                                                     |
+| `remote.*`         | off               | The helper through your own tunnel: one link for home and away (see below).                                                  |
 
 `remote`: `enabled` (default `false`), `host`/`port` (default `127.0.0.1`, `7703`: for a tunnel connector on the
 same machine), `publicUrl` (the tunnel's address), `tokenEnv` (default `ISRAEL_TV_REMOTE_TOKEN`: the secret
 path token, 32 characters or more, in `.env`), `playsPerMinute` (30) and `requestsPerMinute` (240) per client.
-Serves only Mako's routes under `/<token>/…` (no relay, nothing of the admin page); everything else answers an
-empty 404. `pnpm israel-tv remote-url` (resolver-only: `pnpm resolver remote-url`) prints the manifest link.
+Serves only the manifest, stream answers and Mako's play playlists under `/<token>/…` (no relay route, nothing of the
+admin page); everything else answers an empty 404. `pnpm israel-tv remote-url` (resolver-only: `pnpm resolver
+remote-url`) prints the link: with a tunnel, install that one instead of the home-network link. Guide:
+[setup/tunnel.md](setup/tunnel.md).
+
+`remote.home`: `lanUrl` (the helper's address on the home network, e.g. `http://<this computer's address>:7701`;
+unset = off), `addressUrls` (where the home's public address is looked up; default Cloudflare's `/cdn-cgi/trace` on
+1.1.1.1 and its IPv6 twin), `refreshMinutes` (10). A request through the tunnel from the home's own public address
+(IPv6: the same /64) also gets the relayed Reshet/Kan streams, pointing at `lanUrl`, so their video stays on the home
+network; from anywhere else it gets Mako and live channels only. Needs `resolver.enabled`, `geoRelay` and a `geo`
+proxy. The address is compared in memory only; logs show a salted hash.
 
 ## `admin`
 
