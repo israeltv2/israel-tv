@@ -61,6 +61,7 @@ test('two Workers: the public one runs only its router for dynamic paths; the AP
     '/catalog/*',
     '/stream/*',
     '/status*',
+    '/meta/tv/*',
     '/manifest.json',
     '/meta/*',
   ]);
@@ -197,7 +198,7 @@ test('with the public address known, image URLs are absolute and only dynamic pa
   const { Store } = await import('@israel-tv/store');
   const dir = fileURLToPath(new URL('../../catalog', import.meta.url));
   const known = workerConfig(cf().publisher as never, dir, true) as { assets: Record<string, unknown> };
-  expect(known.assets.run_worker_first).toEqual(['/catalog/*', '/stream/*', '/status*']);
+  expect(known.assets.run_worker_first).toEqual(['/catalog/*', '/stream/*', '/status*', '/meta/tv/*']);
   const config = ConfigSchema.parse({
     publisher: {
       type: 'cloudflare',

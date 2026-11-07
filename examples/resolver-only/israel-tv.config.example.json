@@ -1,9 +1,9 @@
 {
   "role": "resolver-only",
   "resolver": {
-    "catalogUrl": "https://israel-tv.example.workers.dev/manifest.json"
+    "catalogUrl": "https://israel-tv.israeltv2.workers.dev/manifest.json"
   },
   "log": {
-    "file": "./data/logs/israel-tv-resolver.log"
+    "file": "./data/logs/israel-tv.log"
   }
 }

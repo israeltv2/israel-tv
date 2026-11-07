@@ -6,7 +6,7 @@ needed.
 
 ## Requirements
 
-- A computer that stays on (Windows, macOS, Linux, NAS, Raspberry Pi), with [Node.js](https://nodejs.org) 24.11+
+- A computer that stays on (Windows, macOS, Linux, NAS, Raspberry Pi with a 64-bit system), with [Node.js](https://nodejs.org) 24.11+
   and git — or Docker (see [background](background.md#docker)).
 - For **Kan episodes**: Google Chrome, Microsoft Edge or Chromium on that computer (a desktop session; see
   [Kan](#kan-episodes)). Without one, everything except Kan episodes works.

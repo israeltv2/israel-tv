@@ -231,6 +231,7 @@ describe('pages with no episode list, only a featured video (recorded 2026-11-07
         key: 'ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD',
         title: 'המהדורה המרכזית כ.סמויות 05.11.26',
         airDate: '2026-11-05',
+        description: 'ליברמן מסיר את הווטו לממשלה עם החרדים',
         play: {
           vcmid: 'ee23b3fcbeaa1a10VgnVCM100000700a10acRCRD',
           channelId: '34a47f20b4271a10VgnVCM100000700a10acRCRD',

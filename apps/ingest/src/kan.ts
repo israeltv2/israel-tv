@@ -15,10 +15,13 @@ import {
   cleanShow,
   DAY_MS,
   HOUR_MS,
+  isTrailer,
+  nextDay,
   parseEpisodeHint,
   type ScrapedEpisode,
   type ScrapedSeason,
   type ScrapedShow,
+  zonedDay,
 } from '@israel-tv/core';
 import {
   cleanKanTitle,
@@ -33,6 +36,7 @@ import {
 } from '@israel-tv/kan';
 import type { ProxyEndpoint } from '@israel-tv/net';
 import type { Store } from '@israel-tv/store';
+import { KAN_GUIDE_CHANNELS, parseKanGuide, storeGuide } from './epg.ts';
 import { latestAirDate } from './runner.ts';
 
 export interface KanLobby {
@@ -61,7 +65,24 @@ export const KAN_LOBBIES: KanLobby[] = [
     channelPath: 'kids/ktantanim-main',
     catalog: 'iltv_kankids',
   },
+  // The preschool lobby lists more of the little ones' shows than kids-teens does (2026-11-07: 29 vs a few).
+  {
+    url: 'https://www.kankids.org.il/lobby-kids/tiny/',
+    origin: 'https://www.kankids.org.il',
+    channelPath: 'kids/ktantanim-main',
+    catalog: 'iltv_kankids',
+  },
+  // Kan's archive: classic series of Israeli TV (183 shows, 2026-11-07). Read after everything else (KAN_LATER).
+  {
+    url: 'https://www.kan.org.il/lobby/series/',
+    origin: 'https://www.kan.org.il',
+    channelPath: 'archive1/vod',
+    catalog: 'iltv_kanarchive',
+  },
 ];
+
+/** Rows whose episodes are read only when no other Kan show has pages waiting (a large back catalogue). */
+export const KAN_LATER = new Set(['iltv_kanarchive']);
 
 interface ShowState {
   origin: string;
@@ -74,6 +95,8 @@ interface ShowState {
   pending: string[];
   /** Episode pages given up on after several tries; kept so they never re-enter the queue. */
   failed: string[];
+  /** Episode pages that are trailers, not episodes; kept so they never re-enter the queue. */
+  skipped?: string[];
   /** Last time a re-read of the show page found new episode links (not set by the first read). */
   lastNewAt?: string;
   /** Episode pages found as new on a re-read (newly published), as opposed to the first fill's backlog. */
@@ -110,7 +133,12 @@ interface CrawlState {
   goodEpisode?: Record<string, string>;
   /** Episode pages whose player offered subtitles, and one sample of what it gave (to learn their shape). */
   subtitles?: { n: number; url: string; sample: string };
+  /** Guide pages read (live programme guide): `<channel id>|<yyyy-mm-dd>` → when. */
+  guideAt?: Record<string, string>;
 }
+
+/** A guide page (one channel, one day) is read again after this long. */
+const GUIDE_EVERY_MS = 12 * HOUR_MS;
 
 const STATE_KEY = 'kan:crawl';
 /** Browser errors that mean the connection is down (proxy, network, browser), not that one page is broken. */
@@ -157,6 +185,8 @@ export interface KanCrawlOptions {
   log?: (line: string) => void;
   /** Where to keep our copies of show images (none: images are not copied). */
   artworkDir?: string;
+  /** Read Kan's live programme guide pages too (default true). */
+  guide?: boolean;
 }
 
 /**
@@ -442,6 +472,34 @@ export async function crawlKan(
       log(`kan: ${Object.keys(state.shows).length} shows known`);
     }
 
+    // 1b. One live-guide page per slice when one is due: today's and tomorrow's schedule of each Kan channel.
+    if (opts.guide !== false && pages < opts.pagesPerRun) {
+      const today = zonedDay(now, 'Asia/Jerusalem');
+      const days = [today, nextDay(today)];
+      const at = state.guideAt ?? {};
+      for (const k of Object.keys(at)) if (!days.includes(k.split('|')[1] ?? '')) delete at[k];
+      const due = Object.entries(KAN_GUIDE_CHANNELS)
+        .flatMap(([id, ch]) => days.map((day) => ({ id, ch, day })))
+        .find(
+          (x) => !at[`${x.id}|${x.day}`] || now - Date.parse(at[`${x.id}|${x.day}`] ?? '') > GUIDE_EVERY_MS,
+        );
+      if (due) {
+        const [y, m, d] = due.day.split('-');
+        const url = `https://www.kan.org.il/tv-guide/?channelId=${due.ch}&day=${d}-${m}-${y}`;
+        // Recorded first: a guide page that fails waits its turn like one that loads, and never stops the crawl
+        // (the guide is an extra; shows and episodes go on, and a real outage shows on the next page anyway).
+        at[`${due.id}|${due.day}`] = new Date(now).toISOString();
+        state.guideAt = at;
+        try {
+          const rows = parseKanGuide(await load(url, 'listing'));
+          if (rows.length > 0) storeGuide(store, due.id, rows, now);
+          else warn(null, `Kan guide ${url}: no programmes on the page (layout changed?)`);
+        } catch (err) {
+          warn(null, `Kan guide ${url}: ${(err as Error).message}`);
+        }
+      }
+    }
+
     // 2. Show pages that are due (never read, airing, or a week old). While episode pages are waiting,
     //    at most half the slice goes to show pages, so both make progress.
     const waiting = Object.values(state.shows).some((s) => s.pending.length > 0);
@@ -449,11 +507,16 @@ export async function crawlKan(
     // Refresh requests first, made due now; then everything else in order.
     const prio = new Set((opts.priority ?? []).filter((k) => state.shows[k]));
     const order = [...prio, ...Object.keys(state.shows).filter((k) => !prio.has(k))];
+    // The archive's show pages wait, like its episodes, until the other rows have nothing left to read.
+    const othersWaiting = Object.values(state.shows).some(
+      (x) => !KAN_LATER.has(x.catalog) && x.pending.length > 0,
+    );
     for (const key of order) {
       const s = state.shows[key];
       if (!s) continue;
       if (pages >= showBudget && !prio.has(key)) break;
       if (!prio.has(key) && !showDue(s, now, opts.airingWindowDays)) continue;
+      if (!prio.has(key) && othersWaiting && KAN_LATER.has(s.catalog)) continue;
       const id = store.findSeriesId('kan', key);
       const firstRead = !s.checkedAt;
       const path = new URL(key).pathname;
@@ -499,7 +562,7 @@ export async function crawlKan(
       const known = new Set(
         id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
       );
-      const seenBefore = new Set([...s.pending, ...s.failed]);
+      const seenBefore = new Set([...s.pending, ...s.failed, ...(s.skipped ?? [])]);
       const dated = new Set(
         id
           ? (store
@@ -514,7 +577,7 @@ export async function crawlKan(
       if (s.undated.length === 0) delete s.undated;
       // Pages given up on (after several tries) stay given up: they never re-enter the ordered queue, where
       // they would hold back newer episodes and, if they ever loaded, be numbered after them.
-      const gaveUp = new Set(s.failed);
+      const gaveUp = new Set([...s.failed, ...(s.skipped ?? [])]);
       s.pending = page.episodes
         .map((e) => `${s.origin}${e.path}`)
         .filter((u) => !known.has(kanEpisodeKey({ id: String(/(\d+)\/$/.exec(u)?.[1]) })) && !gaveUp.has(u));
@@ -542,9 +605,7 @@ export async function crawlKan(
       const r = s.pending[0] ? s.retry?.[s.pending[0]] : undefined;
       return r ? Date.parse(r.at) + RETRY_GAP_MS : 0;
     };
-    const queue = Object.entries(state.shows)
-      .filter(([, s]) => s.pending.length > 0 && retryAfter(s) <= Date.now())
-      .sort(([, a], [, b]) => (b.checkedAt ?? '').localeCompare(a.checkedAt ?? ''));
+    const queue = episodeQueue(store, state.shows, Date.now(), retryAfter);
     for (const [key, s] of queue) {
       const seriesId = store.findSeriesId('kan', key);
       const batch: BatchItem[] = [];
@@ -586,6 +647,14 @@ export async function crawlKan(
             continue;
           }
           if (e.subtitles !== undefined) noteSubtitles(url, e.subtitles);
+          // A trailer is not an episode: remembered, so its page never re-enters the queue as "new".
+          if (isTrailer(e.title)) {
+            delete s.retry?.[url];
+            s.skipped = [...new Set([...(s.skipped ?? []), url])];
+            if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
+            s.pending.shift();
+            continue;
+          }
           batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
           state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
           delete s.retry?.[url];
@@ -678,6 +747,77 @@ export async function crawlKan(
   };
 }
 
+export interface KanRowProgress {
+  /** Shows the lobbies list for this row. */
+  known: number;
+  /** Of them, shows with at least one episode stored (in the catalog). */
+  inCatalog: number;
+  /** Episode pages of the first fill still to read (not counting newly published ones). */
+  backlog: number;
+}
+
+/**
+ * How far the first fill of each Kan row has come: the crawl reads lobby by lobby, show by show, over days. A row
+ * whose shows are not all in yet says so (/status, and a ⏳ item first in the row).
+ */
+export function kanRowProgress(
+  store: Pick<Store, 'getState' | 'findSeriesId' | 'getShow'>,
+): Record<string, KanRowProgress> {
+  const state = store.getState<CrawlState>(STATE_KEY);
+  const out: Record<string, KanRowProgress> = {};
+  for (const [key, s] of Object.entries(state?.shows ?? {})) {
+    const row = out[s.catalog] ?? { known: 0, inCatalog: 0, backlog: 0 };
+    out[s.catalog] = row;
+    row.known++;
+    const id = store.findSeriesId('kan', key);
+    const eps = id ? (store.getShow(id)?.show.seasons.reduce((n, x) => n + x.episodes.length, 0) ?? 0) : 0;
+    // A show whose page lists no episodes at all (or was given up on) is not waited for.
+    if (eps > 0 || (s.pending.length === 0 && s.checkedAt)) row.inCatalog++;
+    const fresh = new Set(s.fresh ?? []);
+    row.backlog += s.pending.filter((u) => !fresh.has(u)).length;
+  }
+  return out;
+}
+
+/** A row still filling: some of its shows have nothing in the catalog yet. */
+export function stillFilling(p: KanRowProgress | undefined): boolean {
+  return !!p && p.inCatalog < p.known;
+}
+
+/**
+ * The order shows get their episode pages read in: newly published episodes first (an airing show stays current);
+ * then shows with the fewest episodes so far, so the first fill makes every show watchable before it completes any
+ * long back catalogue (Tehran waited behind shows with 100 pages); the archive row last. Ties keep the lobby order.
+ */
+export function episodeQueue(
+  store: Pick<Store, 'findSeriesId' | 'getShow'>,
+  shows: Record<string, ShowState>,
+  now: number,
+  retryAfter: (s: ShowState) => number,
+): [string, ShowState][] {
+  const have = (key: string) => {
+    const id = store.findSeriesId('kan', key);
+    return id ? (store.getShow(id)?.show.seasons.reduce((n, x) => n + x.episodes.length, 0) ?? 0) : 0;
+  };
+  const ready = Object.entries(shows).filter(([, s]) => s.pending.length > 0 && retryAfter(s) <= now);
+  const rank = new Map(
+    ready.map(([key, s], i) => [
+      key,
+      [KAN_LATER.has(s.catalog) ? 1 : 0, s.fresh?.length ? 0 : 1, have(key), i] as const,
+    ]),
+  );
+  const cmp = (a: string, b: string) => {
+    const x = rank.get(a) ?? [0, 0, 0, 0];
+    const y = rank.get(b) ?? [0, 0, 0, 0];
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return (x[i] ?? 0) - (y[i] ?? 0);
+    return 0;
+  };
+  const later = ready.filter(([, s]) => KAN_LATER.has(s.catalog));
+  const first = ready.filter(([, s]) => !KAN_LATER.has(s.catalog));
+  // The archive waits until nothing else has pages to read.
+  return (first.length > 0 ? first : later).sort(([a], [b]) => cmp(a, b));
+}
+
 function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[], runId: number): number {
   const seriesId = store.seriesIdFor('kan', key);
   const prev = store.getShow(seriesId)?.show;
@@ -757,6 +897,8 @@ export function kanCrawlOptions(
     pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
     airingWindowDays: config.schedule.airingWindowDays,
     artworkDir: kanArtworkDir(config),
+    // Kan's live channels' guide comes through this browser too (epg.ts).
+    guide: config.sources.live,
     log,
   };
 }

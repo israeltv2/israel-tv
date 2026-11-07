@@ -24,7 +24,7 @@ You do not need one inside Israel.
 
 ## For all of them
 
-- **Requirements:** a computer that stays on — Windows, macOS, Linux, a NAS or a Raspberry Pi. The own-copy setups
+- **Requirements:** a computer that stays on — Windows, macOS, Linux, a NAS or a Raspberry Pi (64-bit system). The own-copy setups
   need [Node.js](https://nodejs.org) 24.11 or newer, or Docker.
 - **Where things are:** your settings (`israel-tv.config.json`), your secrets (`.env`) and the data live in one
   folder; `pnpm israel-tv paths` shows where (`pnpm resolver paths` for the helper alone). Set `ISRAEL_TV_HOME` to

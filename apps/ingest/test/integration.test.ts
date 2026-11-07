@@ -135,42 +135,44 @@ test('integration: which addon answers what, at home and abroad', async () => {
 
     // Mako: only the resolver (one stream), at home and abroad.
     const mako = await by('series', ep('mako'));
-    expect(Object.keys(mako)).toEqual(['community.israel-tv.resolver']);
-    expect(mako['community.israel-tv.resolver']).toHaveLength(1);
+    expect(Object.keys(mako)).toEqual(['io.github.israeltv2.israel-tv.resolver']);
+    expect(mako['io.github.israeltv2.israel-tv.resolver']).toHaveLength(1);
 
     for (const source of ['reshet', 'kan']) {
       const got = await by('series', ep(source));
       if (where === 'home') {
         // Plays directly at home: only the catalog's stream, no duplicate from the resolver.
-        expect(Object.keys(got), source).toEqual(['community.israel-tv']);
-        expect(got['community.israel-tv']).toHaveLength(1);
+        expect(Object.keys(got), source).toEqual(['io.github.israeltv2.israel-tv']);
+        expect(got['io.github.israeltv2.israel-tv']).toHaveLength(1);
       } else {
         // Abroad: the deliberate pair — the catalog's direct stream (labelled Israel-only) and one relay of it.
         expect(Object.keys(got).sort(), source).toEqual([
-          'community.israel-tv',
-          'community.israel-tv.resolver',
+          'io.github.israeltv2.israel-tv',
+          'io.github.israeltv2.israel-tv.resolver',
         ]);
-        expect(got['community.israel-tv']).toHaveLength(1);
+        expect(got['io.github.israeltv2.israel-tv']).toHaveLength(1);
         // Labels: source (and quality, when known) as the name; plainly Israel-only on the public one.
-        expect(got['community.israel-tv']?.[0]?.name).toMatch(
+        expect(got['io.github.israeltv2.israel-tv']?.[0]?.name).toMatch(
           source === 'reshet' ? /^[\u200F\u202B]?רשת 13/ : /^[\u200F\u202B]?כאן/,
         );
-        expect(got['community.israel-tv']?.[0]?.title).toMatch(/זמין לצפייה רק בישראל/);
-        expect(got['community.israel-tv.resolver']).toHaveLength(1);
-        expect(got['community.israel-tv.resolver']?.[0]?.name).toMatch(
+        expect(got['io.github.israeltv2.israel-tv']?.[0]?.title).toMatch(/זמין לצפייה רק בישראל/);
+        expect(got['io.github.israeltv2.israel-tv.resolver']).toHaveLength(1);
+        expect(got['io.github.israeltv2.israel-tv.resolver']?.[0]?.name).toMatch(
           source === 'reshet' ? /^[\u200F\u202B]?רשת 13/ : /^[\u200F\u202B]?כאן/,
         );
-        expect(got['community.israel-tv.resolver']?.[0]?.title).toMatch(/דרך החיבור הישראלי שלך/);
+        expect(got['io.github.israeltv2.israel-tv.resolver']?.[0]?.title).toMatch(/דרך החיבור הישראלי שלך/);
       }
     }
 
     // Live: Keshet 12 only through the resolver; Kan 11 from the catalog, relayed by the resolver only abroad,
     // one relay per direct stream.
     const k12 = await by('tv', 'iltv_live_keshet12');
-    expect(Object.keys(k12)).toEqual(['community.israel-tv.resolver']);
+    expect(Object.keys(k12)).toEqual(['io.github.israeltv2.israel-tv.resolver']);
     const kan11 = await by('tv', 'iltv_live_kan11');
-    const direct = kan11['community.israel-tv'] ?? [];
+    const direct = kan11['io.github.israeltv2.israel-tv'] ?? [];
     expect(direct.length).toBeGreaterThan(0);
-    expect(kan11['community.israel-tv.resolver']?.length ?? 0).toBe(where === 'home' ? 0 : direct.length);
+    expect(kan11['io.github.israeltv2.israel-tv.resolver']?.length ?? 0).toBe(
+      where === 'home' ? 0 : direct.length,
+    );
   }
 });

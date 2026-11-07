@@ -4,7 +4,13 @@ import type { Fetcher } from '@israel-tv/net';
 import { expect, test } from 'vitest';
 import { fetchShow } from '../src/client.ts';
 import { blockedEntries } from '../src/kaltura.ts';
-import { parseAllShows, parseSeasonPage, parseShowPage, playManifestUrl } from '../src/parse.ts';
+import {
+  episodeThumb,
+  parseAllShows,
+  parseSeasonPage,
+  parseShowPage,
+  playManifestUrl,
+} from '../src/parse.ts';
 
 const html = (name: string) => readFileSync(new URL(`./fixtures/${name}.html`, import.meta.url), 'utf8');
 
@@ -199,7 +205,7 @@ test('the Israel-only access profile is labelled even when the check passes (ing
 });
 
 test('genres come from the episodes’ Kaltura tags (older template)', () => {
-  expect(parseShowPage(html('show-kitchen-nightmares')).genres).toEqual(['אוכל']);
+  expect(parseShowPage(html('show-kitchen-nightmares')).genres).toEqual(['בישול']); // "אוכל" on Reshet, one name with Keshet's
   expect(parseShowPage(html('show-the-voice')).genres).toBeUndefined();
 });
 
@@ -310,4 +316,19 @@ test('a show split by year before stays split when one read sees a single untitl
     ['/d|s1|2025', 1],
     ['/d|s1|2026', 2],
   ]);
+});
+
+test('Kaltura episode stills are asked for at 640×360 (the service sends 120×90 otherwise)', () => {
+  const bare = 'https://images.frp1.ott.kaltura.com/Service.svc/GetImage/p/5031/entry_id/c66b6e24/version/10';
+  expect(episodeThumb(bare)).toBe(`${bare}/width/640/height/360`);
+  expect(episodeThumb(`${bare}/width/300/height/200`)).toBe(`${bare}/width/300/height/200`);
+  const cloudinary = 'https://media3.reshet.tv/image/upload/t_new_grid_item/v1/uploads/2025/9.jpg';
+  expect(episodeThumb(cloudinary)).toBe(cloudinary);
+  expect(episodeThumb(undefined)).toBeUndefined();
+});
+
+test('a show with an empty page description takes its Kaltura blurb, and its 16x9 picture as the background', () => {
+  const p = parseShowPage(html('show-friday'));
+  expect(p.description).toBe('תוכנית חדשות ואקטואליה המשודרת בימי שישי בערוץ 13');
+  expect(p.background).toMatch(/\/Service\.svc\/GetImage\/.*\/width\/1280\/height\/720$/);
 });

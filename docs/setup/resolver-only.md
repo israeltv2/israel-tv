@@ -78,7 +78,7 @@ GEO_PROXY_PASSWORD=your-proxy-password
 Use the scheme your provider gives (`http://`, `https://` for a proxy that speaks TLS, or `socks5://` with
 `"type": "socks5"`). Several URLs can be listed; the next is tried when one fails. Then
 `pnpm resolver check-proxy` should say `exits in IL ✓`. Episodes refused from your network then get a second stream,
-**"דרך ישראל · via Israel"**, that goes through the proxy; the helper checks each show's direct stream every 6 hours
+**"דרך החיבור הישראלי שלך"** (via your Israeli connection), that goes through the proxy; the helper checks each show's direct stream every 6 hours
 and offers the relay only where it is refused. Mako and most live channels never go through the proxy.
 
 ## Away from home

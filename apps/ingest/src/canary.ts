@@ -123,6 +123,9 @@ export async function playCheck(
     if (!m.ok) return { statuses, step: 'master', detail: `master HTTP ${m.status}` };
     let base = m.url || url;
     const text = await m.text();
+    // A DASH manifest (Kan's backup live streams) is a full description, not a list of URLs: answering it is the
+    // check (its segments are addressed by templates).
+    if (/<MPD[\s>]/.test(text.slice(0, 4096))) return { statuses };
     let next = firstUri(text, base);
     if (!next) return { statuses, step: 'master', detail: 'master lists nothing' };
     // Variant playlists (a master may point at another master), then the first segment. What a URL is comes

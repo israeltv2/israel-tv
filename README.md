@@ -23,11 +23,12 @@ https://israel-tv.israeltv2.workers.dev/manifest.json
 Tip for TVs: install it on your phone or computer, signed in to the same Stremio account — it then appears on the TV
 too.
 
-You will see new rows: **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער** and **שידור חי** (live).
+You will see new rows: **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער**, **כאן ארכיון** and **שידור חי**
+(live).
 
 - **In Israel**, the link alone plays everything except Keshet 12.
-- **Abroad**, the link alone gives you all the shows and live channels such as 13, 14 and i24; episodes need the home
-  helper with an Israeli connection.
+- **Abroad**, the link alone plays most of Reshet 13, the Kan titles the broadcaster allows abroad and most live
+  channels. Anything that plays only from Israel says so: **זמין לצפייה רק בישראל**.
 - **Keshet 12** shows have no play option until you add the [home helper](#want-keshet-12-mako).
 
 ## What you get
@@ -35,14 +36,17 @@ You will see new rows: **קשת 12**, **רשת 13**, **כאן 11**, **כאן ח�
 Shows in Hebrew, newest episode first, with search and show pages. Your watch progress stays put: episodes keep
 their numbers for good.
 
-| Channel                                                    | What     | In Israel                | Outside Israel                                                   |
-| ---------------------------------------------------------- | -------- | ------------------------ | ---------------------------------------------------------------- |
-| Reshet 13                                                  | Episodes | ✅ plays                 | 🏠 needs the home helper with an Israeli connection              |
-| Kan 11, Kan Kids & Teens                                   | Episodes | ✅ plays                 | 🏠 needs the home helper with an Israeli connection              |
-| Keshet 12 (Mako)                                           | Episodes | 🏠 needs the home helper | 🏠 needs the home helper                                         |
-| Live: 13, 14, i24 (4 languages), Knesset, ynet, Calcala 10 | Live     | ✅ plays                 | ✅ plays                                                         |
-| Live: Kan 11, Kan Educational, Makan 33                    | Live     | ✅ plays                 | often only from Israel; 🏠 the helper with an Israeli connection |
-| Live: Keshet 12, 24, Eretz Nehederet, Savri Maranan        | Live     | 🏠 needs the home helper | 🏠 needs the home helper                                         |
+| Channel                                                                                                                                              | What     | In Israel                | Outside Israel                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------ | -------------------------------------------------------- |
+| Reshet 13                                                                                                                                            | Episodes | ✅ plays                 | ✅ most play; a few say "only in Israel"                 |
+| Kan 11, Kan Kids & Teens, Kan Archive                                                                                                                | Episodes | ✅ plays                 | some titles play, the others say "only in Israel"        |
+| Keshet 12 (Mako)                                                                                                                                     | Episodes | 🏠 needs the home helper | 🏠 needs the home helper                                 |
+| Live: Kan 11, Kan Educational, Makan 33, 13, 14, Knesset, i24 (4 languages), ynet, Calcala 10, Channel 9, 13's comedy, vacation and reality channels | Live     | ✅ plays                 | ✅ plays (a stream refused abroad says "only in Israel") |
+| Live: Keshet 12, 24, Eretz Nehederet, Savri Maranan, Keshet's comedy, drama, music and food channels                                                 | Live     | 🏠 needs the home helper | 🏠 needs the home helper                                 |
+
+Live channels show what is on now and next. Apps with a TV guide (Stremio's guide view) also get the full programme
+guide of Keshet 12, Reshet 13, Kan 11, Kan Educational, Makan 33, Channel 14 and the Knesset. Keshet 12, Kan 11 and the
+Knesset also have a captioned stream ("כתוביות").
 
 Some titles **only play from Israel** — that is the broadcaster's choice, not the app's.
 
@@ -57,11 +61,12 @@ Setting it up takes about 15 minutes:
 
 ## Watching from abroad?
 
-Everything in the catalog shows up anywhere, and live channels like 13, 14 and i24 play anywhere. Keshet 12 plays with
-the home helper on your home network, wherever in the world your home is. Episodes from Reshet and Kan only play from an Israeli internet connection: the home
-helper can fetch them for you through a VPN or proxy service with an Israeli location (a paid service you may already
-have). Those episodes then show a source called **דרך ישראל · via Israel** next to the one marked **ישראל בלבד**
-(Israel only) — pick "via Israel". See
+Everything in the catalog shows up anywhere, most live channels and most of Reshet 13 play anywhere, and so do the Kan
+titles the broadcaster allows abroad. Keshet 12 plays with the home helper on your home network, wherever in the world
+your home is. A stream that plays only from an Israeli internet connection says so in the app: **זמין לצפייה רק
+בישראל** (only in Israel). The home helper can fetch those for you through a VPN or proxy service with an Israeli
+location (a paid service you may already have); they then show a second source called **דרך החיבור הישראלי שלך** (via your Israeli connection) —
+pick that one. See
 [Watching from abroad](docs/setup/home-helper.md#watching-from-abroad). You only need this if you live outside
 Israel.
 

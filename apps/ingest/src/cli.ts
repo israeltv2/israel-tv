@@ -41,6 +41,7 @@ import {
 import { renumberKanReshet, renumberNamedSeasons, repairReshetSplit } from './renumber.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
+import { probesAbroad } from './stream-probe.ts';
 import { matchShows } from './tmdb.ts';
 import { buildDashboard, latestCanary } from './usage-page.ts';
 
@@ -207,7 +208,7 @@ async function main(argv: string[]): Promise<number> {
         let ok = true;
         for (const a of pick(values.source)) ok = (await runFull(store, a, opts)).status !== 'failed' && ok;
         if (config.sources.live && (!values.source || values.source === 'live')) {
-          const r = await checkLive(store);
+          const r = await checkLive(store, { abroad: probesAbroad(config) });
           log(
             `live: ${r.ok} channels answering${r.failed.length ? `, not answering: ${r.failed.join(', ')}` : ''}`,
           );

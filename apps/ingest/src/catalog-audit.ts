@@ -49,7 +49,8 @@ export function auditSite(
   let metas = 0;
   for (const [path, body] of files) {
     const m = /^meta\/series\/([^/]+)\.json$/.exec(path);
-    if (!m || typeof body !== 'string') continue;
+    // The rows' own notices (⏳ still loading, ⚠ failed) are not shows.
+    if (!m || typeof body !== 'string' || /^iltv_(status|stale)_/.test(m[1] ?? '')) continue;
     metas++;
     const meta = (JSON.parse(body) as { meta: Meta }).meta;
     const id = meta.id;

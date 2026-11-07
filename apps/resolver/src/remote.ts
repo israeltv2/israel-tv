@@ -8,6 +8,7 @@
 //
 // It listens on its own port, on 127.0.0.1 by default, for the tunnel connector on the same machine.
 import { timingSafeEqual } from 'node:crypto';
+import { REMOTE_RESOLVER_ADDON_ID } from '@israel-tv/core';
 import { Hono } from 'hono';
 import { createResolverApp, type ResolverDeps } from './app.ts';
 
@@ -69,7 +70,7 @@ export function createRemoteResolverApp(
     publicBase: () => base,
     clientAddress: (c) => clientOf(c.req.raw.headers),
     manifest: {
-      id: 'community.israel-tv.resolver.remote',
+      id: REMOTE_RESOLVER_ADDON_ID,
       name: 'Israel TV · Mako (away from home)',
       description: 'Plays Mako (Keshet 12) episodes and live channels from anywhere, through your home.',
       idPrefixes: ['iltv_mako_', 'iltv_live_', 'tt', 'tmdb:'],

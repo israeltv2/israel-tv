@@ -44,7 +44,7 @@ catalog on your network; `resolver-only` = the resolver alone, pointed at any Is
 - **Which addon answers what:** an integration test installs both addons in a simulated app and checks, for every
   kind of title at home and abroad, that no title gets competing streams
   ([apps/ingest/test/integration.test.ts](../apps/ingest/test/integration.test.ts)). The only deliberate pair is abroad:
-  the catalog's direct stream (marked "ישראל בלבד", Israel only) next to the resolver's relay of it.
+  the catalog's direct stream (marked "זמין לצפייה רק בישראל", only in Israel) next to the resolver's relay of it.
 
 ## Principles
 

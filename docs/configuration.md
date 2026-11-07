@@ -69,7 +69,12 @@ Only needed **outside Israel**.
 | `urls`                       | required | One or more proxy URLs, tried in order.                                                    |
 | `usernameEnv`, `passwordEnv` | optional | Names of the `.env` variables with the proxy login. Leave out for a proxy without a login. |
 
-What goes through it: the resolver's "דרך ישראל" streams, offered only when the direct stream is refused from your network (checked about every 6 hours per show). `pnpm israel-tv check-proxy` (resolver-only: `pnpm resolver check-proxy`) tests it.
+What goes through it: the resolver's "דרך החיבור הישראלי שלך" (via your Israeli connection) streams, offered only when the direct stream is refused from your network (checked about every 6 hours per show). `pnpm israel-tv check-proxy` (resolver-only: `pnpm resolver check-proxy`) tests it.
+
+A host with a proxy is taken to be **outside Israel**: it then asks Kan directly (without the proxy) whether each title
+plays abroad, and labels a title or live stream "זמין לצפייה רק בישראל" only when it is refused (see
+[operations](operations.md#stream-probes-and-the-live-check)). Without a proxy (inside Israel) that cannot be told,
+and every Kan title, and the Kan live channels, keep the label.
 
 ## `browser` — for Kan pages
 
@@ -186,6 +191,12 @@ On start, if there was no full run in the last 24 hours, one starts immediately.
 
 `{ "apiKeyEnv": "TMDB_API_KEY" }` turns on matching shows to TMDB/IMDb after each full run, so a show opened
 from another catalog (e.g. Cinemeta) also gets streams.
+
+## `addon` (optional)
+
+What addon directories need in the published manifest. `stremioAddonsConfig`: the signature stremio-addons.net gives a
+listed addon, pasted as it is (`{ "issuer": "https://stremio-addons.net", "signature": "…" }`). It is not a secret
+(it is published in the manifest); the next publish carries it.
 
 ## `log`
 

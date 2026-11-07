@@ -1,6 +1,16 @@
 // The subset of the Stremio addon protocol this project serves.
 // https://github.com/Stremio/stremio-addon-sdk/tree/master/docs/api
 
+/**
+ * The addons' ids. Apps and addon directories key installs on them, so they are unique to this project (reverse
+ * domain of its GitHub account) and never change again (renamed from `community.israel-tv` on 2026-11-07).
+ */
+export const ADDON_ID = 'io.github.israeltv2.israel-tv';
+export const RESOLVER_ADDON_ID = `${ADDON_ID}.resolver`;
+export const REMOTE_RESOLVER_ADDON_ID = `${ADDON_ID}.resolver.remote`;
+/** The project's contact address, shown by addon directories. */
+export const CONTACT_EMAIL = 'israeltv2@proton.me';
+
 export interface ManifestCatalog {
   type: string;
   id: string;
@@ -18,7 +28,11 @@ export interface Manifest {
   types: string[];
   idPrefixes?: string[];
   catalogs: ManifestCatalog[];
-  behaviorHints?: { configurable?: boolean; configurationRequired?: boolean };
+  /** `epgProvider`: the live row answers guide pages (`date` extra; core epg.ts). */
+  behaviorHints?: { configurable?: boolean; configurationRequired?: boolean; epgProvider?: boolean };
+  contactEmail?: string;
+  /** stremio-addons.net's proof that this manifest belongs to the listed addon (issued after approval). */
+  stremioAddonsConfig?: { issuer: string; signature: string };
 }
 
 export interface MetaPreview {
@@ -32,6 +46,8 @@ export interface MetaPreview {
   genres?: string[];
   /** The show's IMDb id, when matched: lets Trakt and other addons recognise it. */
   imdb_id?: string;
+  /** `isLive`: a live channel (players drop the seek bar); `hasScheduledVideos`: its videos are a guide. */
+  behaviorHints?: { isLive?: boolean; hasScheduledVideos?: boolean; defaultVideoId?: string };
 }
 
 export interface Video {
@@ -53,7 +69,6 @@ export interface Meta extends MetaPreview {
   logo?: string;
   videos?: Video[];
   links?: { name: string; category: string; url: string }[];
-  behaviorHints?: { defaultVideoId?: string };
 }
 
 export interface Stream {

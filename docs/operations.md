@@ -201,6 +201,37 @@ when a CDN refuses one, since a refusal can be the exit's fault. Each result is 
 carry `x-israel-tv-probe: canary`, so its plays never count as usage or failures. Run it now with
 `curl -X POST -H "Authorization: Bearer $T" http://<host>:7702/run/canary`.
 
+### Stream probes and the live check
+
+- **Live check** (with each full run): every stream of every live channel is played (playlist → variant → first
+  segment): the public addon's own streams directly, and the Mako channels through this instance's home helper. A
+  channel is red when none of its streams plays; a single dead stream (a backup) makes the live source amber and is
+  named on `/status`. From abroad (an instance with a geo proxy) a refusal (403/451) is the "זמין לצפייה רק בישראל"
+  label on that stream, not a fault. Results: kv `live:check`; the dashboard's Sources page lists every stream.
+- **Stream probes** (after each full run, up to 1,500 reads, and each airing check, up to 300): Kan titles are asked
+  from abroad, directly (newest episode, playlist → variant → segment), once a week per title; a title refused there
+  is labelled "only in Israel", one that plays is not, and one that could not be told keeps the label. Reshet
+  episodes get their real best quality from their master playlist (once each). Results: kv `probe:kan-abroad` and
+  `probe:quality`; the next publish uses them. Inside Israel (no proxy) Kan is not probed.
+
+### Programme guide
+
+`epg.json` (published) holds each channel's programmes from 6 hours ago to 3 days ahead, from the broadcasters' own
+schedule pages: Keshet 12 (mako.co.il) and Reshet 13 (13tv.co.il) through the scrapers, Channel 14 (c14.co.il
+wp-json) and the Knesset (knesset.tv) directly, every 6 hours (Knesset 12) after an airing check; Kan 11, Kan
+Educational and Makan 33 through the Kan browser, one guide page per crawl slice (each channel, today and tomorrow,
+twice a day). A failed read keeps the last good guide and says why on the dashboard (kv `epg:guide`). The addon puts
+"עכשיו … · אחר כך …" first in every live tile's description at request time and answers Stremio's guide pages
+(`/catalog/tv/iltv_live/date=YYYY-MM-DD.json` → `metasDetailed`). Not covered: i24 (an undated weekly template its own
+site no longer shows), Channel 10 (bot checkpoint), Channel 24, ynet and the 24/7 loop channels (no schedule).
+
+### Kan's first fill
+
+Kan is read a few pages per slice, so a new install fills over days. Until every show its lobbies list has at least
+one episode, `/status` says how far each row is (`first fill of iltv_kan11 … in progress: N of M shows`) and the row
+starts with a "⏳ עדיין בטעינה" item; the source is amber meanwhile (the archive row is read last and only noted).
+Episode pages are read breadth-first: newly published episodes, then the shows with the fewest episodes.
+
 ### Shows the site refused (bot protection)
 
 Mako and Reshet sometimes answer a show page with a bot-protection page in the nightly full read. Those shows are

@@ -69,7 +69,7 @@ test('catalog is newest first and paged by 100', () => {
   const page2 = read(files, 'catalog/series/iltv_keshet12/skip-100.json').metas;
   expect(page1.length).toBe(100);
   expect(page2.length).toBe(50);
-  expect(page1[0].releaseInfo).toBe('2026–present');
+  expect(page1[0].releaseInfo).toBe('2026');
   expect(page1[0].id).not.toBe(page2[0].id);
   expect(read(files, 'manifest.json').catalogs.map((c: { id: string }) => c.id)).toEqual(['iltv_keshet12']);
 });
@@ -138,6 +138,7 @@ test('a running source whose row has no shows yet is listed, saying it is loadin
     'iltv_keshet12',
     'iltv_kan11',
     'iltv_kankids',
+    'iltv_kanarchive',
   ]);
   const row = read(files, 'catalog/series/iltv_kankids.json');
   expect(row.metas[0].name).toMatch(/^⏳/);
@@ -232,13 +233,13 @@ test('year seasons: numbers 1, 2 in ids, no year in episode titles, mapped for o
   expect(read(files, 'ext-ids.json').tt5).toEqual({ id: 'iltv_mako_54', seasons: [1, 2] });
 });
 
-test('year line: "2024–present" while running, "2021–2024" or one year once ended (the usual form)', () => {
+test('year line: first and latest episode years ("2024–2026"), one year when they are the same', () => {
   const now = Date.parse('2026-11-07T00:00:00Z');
   const info = (dates: string[]) =>
     read(renderSite({ ...base, now, shows: [yearShow(dates)] }), 'catalog/series/iltv_keshet12.json').metas[0]
       .releaseInfo;
-  expect(info(['2024-03-01', '2026-10-20'])).toBe('2024–present');
-  expect(info(['2026-09-01'])).toBe('2026–present');
+  expect(info(['2024-03-01', '2026-10-20'])).toBe('2024–2026');
+  expect(info(['2026-09-01'])).toBe('2026');
   expect(info(['2021-03-01', '2024-06-01'])).toBe('2021–2024');
   expect(info(['2023-03-01', '2023-05-01'])).toBe('2023');
 });
@@ -246,9 +247,9 @@ test('year line: "2024–present" while running, "2021–2024" or one year once 
 test('genres and the IMDb id are published; each row offers its genres as a filter', () => {
   const files = renderSite({ ...base, shows: [yearShow(['2024-03-01'], { imdbId: 'tt5' })] });
   const preview = read(files, 'catalog/series/iltv_keshet12.json').metas[0];
-  expect(preview).toMatchObject({ genres: ['תעודה'], imdb_id: 'tt5', posterShape: 'poster' });
+  expect(preview).toMatchObject({ genres: ['דוקומנטרי'], imdb_id: 'tt5', posterShape: 'poster' });
   expect(read(files, 'meta/series/iltv_mako_54.json').meta).toMatchObject({
-    genres: ['תעודה'],
+    genres: ['דוקומנטרי'],
     imdb_id: 'tt5',
   });
   // One show of a genre makes no filter; two do.
@@ -259,8 +260,8 @@ test('genres and the IMDb id are published; each row offers its genres as a filt
     shows: [yearShow(['2024-03-01']), { ...yearShow(['2025-03-01']), seriesId: 'iltv_mako_55' }],
   });
   const row2 = read(two, 'manifest.json').catalogs.find((c: { id: string }) => c.id === 'iltv_keshet12');
-  expect(row2.extra).toContainEqual({ name: 'genre', options: ['תעודה'] });
-  expect(read(files, 'search.json')[0][6]).toEqual(['תעודה']);
+  expect(row2.extra).toContainEqual({ name: 'genre', options: ['דוקומנטרי'] });
+  expect(read(files, 'search.json')[0][6]).toEqual(['דוקומנטרי']);
 });
 
 test('the manifest carries the version it is given and a short description in plain words', () => {
@@ -332,7 +333,7 @@ test('an untitled named season adds nothing to episode titles; titles and texts 
   });
   const meta = read(files, 'meta/series/iltv_reshet_183.json').meta;
   expect(meta.videos[0].title).toBe('06.11.26');
-  expect(meta.description).toBe('תכנית אקטואליה שבועית');
+  expect(meta.description).toMatch(/^\u202B?תכנית אקטואליה שבועית(\n|$)/);
 });
 
 test('status and lastAirDate let apps write the year line: ended after a year without episodes', () => {
@@ -347,6 +348,44 @@ test('status and lastAirDate let apps write the year line: ended after a year wi
   expect(meta(['2026-01-01', '2026-07-26'])).toMatchObject({
     status: 'Returning Series',
     lastAirDate: '2026-07-26',
-    releaseInfo: '2026–present',
+    releaseInfo: '2026',
   });
+});
+
+test('a Keshet 12 show page says its episodes need the home helper (the catalog alone offers no stream)', () => {
+  const files = renderSite({ ...base, shows: [yearShow(['2024-03-01'])] });
+  const meta = read(files, 'meta/series/iltv_mako_54.json').meta;
+  expect(meta.description).toContain('צריך את העוזר הביתי');
+  // The row's tile keeps the show's own text only.
+  expect(read(files, 'catalog/series/iltv_keshet12.json').metas[0].description ?? '').not.toContain('העוזר');
+});
+
+test('a row still filling shows a ⏳ item first', () => {
+  const files = renderSite({
+    ...base,
+    shows: [yearShow(['2024-03-01'])],
+    catalogFilling: { iltv_keshet12: 'עדיין בטעינה: 1 מתוך 3 התוכניות כבר כאן' },
+  });
+  const metas = read(files, 'catalog/series/iltv_keshet12.json').metas;
+  expect(metas[0].name).toMatch(/^\u202B?⏳ עדיין בטעינה/);
+  expect(metas[0].id).toBe('iltv_status_iltv_keshet12_filling');
+  expect(read(files, 'meta/series/iltv_status_iltv_keshet12_filling.json').meta.videos).toEqual([]);
+  expect(metas[1].id).toBe('iltv_mako_54');
+});
+
+test('a show whose only stored episode is a trailer is not listed (and has no page)', () => {
+  const s = yearShow(['2026-10-01']);
+  const trailerOnly: RenderShow = {
+    ...s,
+    show: {
+      ...s.show,
+      seasons: s.show.seasons.map((x) => ({
+        ...x,
+        episodes: x.episodes.map((e) => ({ ...e, title: 'טריילר' })),
+      })),
+    },
+  };
+  const files = renderSite({ ...base, shows: [trailerOnly] });
+  expect(files.has('meta/series/iltv_mako_54.json')).toBe(false);
+  expect(read(files, 'search.json')).toEqual([]);
 });

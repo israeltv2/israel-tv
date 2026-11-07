@@ -93,10 +93,14 @@ export function featuredEpisode(
   const title = cleanVodTitle(vp?.seo?.title) || showTitle;
   const airDate = parseDottedDate(title);
   const v = vp?.vod ?? vod;
+  // Episodes in a season list carry no blurb (one more page per episode would double a full read); a featured
+  // video's own page, read anyway, has one.
+  const about = vp?.hero?.description?.trim();
   return {
     key: vod.itemVcmId,
     title,
     ...(airDate ? { airDate } : {}),
+    ...(about && about.length >= 10 ? { description: about } : {}),
     ...(v.aINT !== undefined ? { availableAbroad: v.aINT } : {}),
     streams: [],
     play: {

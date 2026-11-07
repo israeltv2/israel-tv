@@ -5,7 +5,7 @@ with an Israeli proxy ([see below](#watching-from-abroad)) — the episodes that
 second link, next to the [Israel TV link](../../README.md#install).
 
 **Which computer?** Any computer that stays switched on and connected at home: a desktop PC or Mac, a storage box
-(NAS) or a small always-on computer like a Raspberry Pi. A laptop works only while it is open, awake and at home —
+(NAS) or a small always-on computer like a Raspberry Pi (a Pi 3, 4 or 5 with the 64-bit system). A laptop works only while it is open, awake and at home —
 Keshet 12 stops when it sleeps or leaves the house.
 
 It takes about 15 minutes. Pick one way:
@@ -73,8 +73,10 @@ help).
 
 ### Watching from abroad
 
-Outside Israel, Reshet and Kan episodes (and at times the Kan live channels) only play through an Israeli internet
-connection. Keshet 12 does not need one: the helper alone plays it on your home network, wherever in the world your home is.
+Outside Israel, most Reshet 13 episodes, the Kan titles the broadcaster allows abroad and most live channels play
+without anything extra. What plays only from Israel says so in the app: **זמין לצפייה רק בישראל**. Those play
+through an Israeli internet connection. Keshet 12 does not need one: the helper alone plays it on your home network,
+wherever in the world your home is.
 
 You need a **proxy with an Israeli location**. Many VPN services include one: in your VPN account or its help pages,
 look for "proxy" or "SOCKS5". Note the address of a server **in Israel**, its port (a number such as 1080 or 3128), and
@@ -104,12 +106,12 @@ credentials").
    user name and password in the file; "not an Israeli exit" → use the address of a server in Israel; "host not found"
    → re-check the address. Fix the file, then repeat steps 2–4.
 
-Episodes that only play from Israel then show two sources: one marked **ישראל בלבד** (Israel only — it will not play
-abroad) and one called **דרך ישראל · via Israel** — pick that one.
+Episodes that only play from Israel then show two sources: one marked **זמין לצפייה רק בישראל** (only in Israel — it will not play
+abroad) and one called **דרך החיבור הישראלי שלך** (via your Israeli connection) — pick that one.
 
 ### Keshet 12 away from home
 
-The helper answers only on your home network: on a phone outside the house, Keshet 12 and the "via Israel" sources will
+The helper answers only on your home network: on a phone outside the house, Keshet 12 and the "דרך החיבור הישראלי שלך" sources will
 not play (the public link's other episodes and the live channels still do). Opening it to the
 outside safely needs a domain name of your own and some technical setup, and is not part of the easy way: see
 [Away from home](resolver-only.md#away-from-home) if you or someone helping you is comfortable with that (it is written for

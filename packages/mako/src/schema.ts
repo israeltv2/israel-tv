@@ -78,6 +78,8 @@ export type ShowPage = z.infer<typeof ShowPage>;
 /** A single video's own page (`…/VOD-….htm`): its title (with the air date on dated items) and ids. */
 export const VodPage = z.looseObject({
   seo: z.looseObject({ title: z.string().optional() }).nullish(),
+  /** The video's own blurb (what the episode is about). */
+  hero: z.looseObject({ description: z.string().nullish() }).nullish(),
   vod: FeaturedVod.extend({ channelName: z.string().optional() }),
 });
 export type VodPage = z.infer<typeof VodPage>;

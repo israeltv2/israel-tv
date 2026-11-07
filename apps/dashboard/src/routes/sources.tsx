@@ -332,8 +332,77 @@ export function Sources() {
               </CardBody>
             </Card>
           </div>
+          {data.live ? <LiveChannels live={data.live} /> : null}
         </>
       )}
     </section>
+  );
+}
+
+const STREAM_STATE: Record<string, 'ok' | 'warn' | 'error'> = { ok: 'ok', refused: 'warn', failed: 'error' };
+
+/** Every live channel: each stream's last daily check, and how far its programme guide reaches. */
+function LiveChannels({ live }: { live: NonNullable<SourcesData['live']> }) {
+  return (
+    <Card>
+      <CardHeader
+        title="Live channels"
+        description={
+          live.checkedAt ? (
+            <>
+              Every stream played (playlist → variant → segment) <Ago iso={live.checkedAt} />. A refusal from
+              abroad is the "Israel only" label, not a fault.
+            </>
+          ) : (
+            'Not checked yet: the check runs with the nightly full run.'
+          )
+        }
+      />
+      <CardBody>
+        <ul className="divide-y divide-border">
+          {live.channels.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
+              <div className="min-w-0">
+                <div className="font-medium">
+                  <bdi>{c.name}</bdi>
+                </div>
+                <div className="text-muted text-xs">
+                  {c.guide ? (
+                    c.guide.error ? (
+                      <span className="text-[var(--error)]">Guide: last read failed ({c.guide.error})</span>
+                    ) : (
+                      <>
+                        Guide: {num(c.guide.programmes)} programmes ahead
+                        {c.guide.until ? (
+                          <>
+                            , until <When iso={c.guide.until} />
+                          </>
+                        ) : null}
+                      </>
+                    )
+                  ) : (
+                    'No guide (the broadcaster publishes none we read)'
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-end gap-1">
+                {c.streams.length ? (
+                  c.streams.map((x) => (
+                    <span key={`${x.via}:${x.title}`} title={x.detail ?? x.statuses ?? ''}>
+                      <HealthPill
+                        state={STREAM_STATE[x.outcome] ?? 'unknown'}
+                        label={x.via === 'helper' ? `helper: ${x.title}` : x.title}
+                      />
+                    </span>
+                  ))
+                ) : (
+                  <Badge>not checked</Badge>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardBody>
+    </Card>
   );
 }

@@ -82,13 +82,13 @@ The whole procedure, with what each step shows: [home helper](home-helper.md#the
 5. **In the app:** add `http://<that address>:7701/manifest.json` (easiest from a phone or computer on the same
    account; if it does not appear on another device, such as the TV or Nuvio elsewhere, add the link there too).
    **Verify (person):** an addon "Israel TV · home helper" appears; a Keshet 12 episode plays; abroad,
-   Israel-only episodes show a source "דרך ישראל · via Israel". Stremio in a web browser cannot use this `http://`
+   Israel-only episodes show a source "דרך החיבור הישראלי שלך" (via your Israeli connection). Stremio in a web browser cannot use this `http://`
    link; the apps can.
 6. **Keep it running:** Docker Desktop → Settings → _Start Docker Desktop when you sign in_; the computer never sleeps
    when plugged in (Windows _Settings → System → Power_; Mac _System Settings → Energy → Prevent automatic sleeping_);
    after a system restart someone must sign in. Windows: the home network must be _Private_ and Docker allowed on
    private networks. Mac: if asked whether Docker may accept incoming connections, allow it.
-7. **Tell them:** the helper's sources (Keshet 12, and abroad the "via Israel" ones) play on the home network only;
+7. **Tell them:** the helper's sources (Keshet 12, and abroad the "דרך החיבור הישראלי שלך" ones) play on the home network only;
    away from home the public link's other episodes and live channels still work. Opening the helper to the outside
    needs a domain and the install without Docker ([away from home](resolver-only.md#away-from-home)) — do not
    attempt it unless they ask.
@@ -101,7 +101,7 @@ No Docker and they are comfortable with a terminal: [without Docker](resolver-on
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | App cannot reach the helper                  | Computer asleep/off, Docker not running, wrong address, Windows network not Private, firewall prompt refused. |
 | Keshet 12 has no play option                 | The helper's link is not added in the app.                                                                    |
-| Abroad, Reshet/Kan do not play               | Proxy missing or not Israeli: run check-proxy; pick the "דרך ישראל · via Israel" source.                      |
+| Abroad, Reshet/Kan do not play               | Proxy missing or not Israeli: run check-proxy; pick the "דרך החיבור הישראלי שלך" source.                      |
 | `docker: command not found` / not recognized | Docker Desktop not installed or not running.                                                                  |
 | `denied` / `not found` pulling the image     | Image name mistyped; copy the command again.                                                                  |
 | Port 7701 already in use                     | Another copy is running: `docker rm -f israel-tv-helper`, then run again.                                     |

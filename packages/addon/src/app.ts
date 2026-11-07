@@ -1,14 +1,21 @@
 // The public addon as a Hono app over the rendered site files. Used by both publishers:
 // Cloudflare (static assets answer plain file paths first; this app handles the rest) and local (Node).
 import {
+  CATALOG_PAGE_SIZE,
   type ExtIds,
+  expandSearchKey,
   type Freshness,
+  type GuideFile,
+  guideLine,
+  guideVideos,
+  liveChannelOf,
   normalizeForSearch,
   parseVideoId,
   type SearchRow,
   type SeasonStreams,
   STALE_ID_PREFIX,
   type Stream,
+  searchMatches,
   sitePaths,
   staleItem,
   staleSince,
@@ -35,6 +42,14 @@ const CACHE = {
 
 /** Shows per page of a genre filter. */
 const GENRE_PAGE = 100;
+
+/** A catalog item or meta as read from a rendered file. */
+interface MetaLike {
+  id: string;
+  description?: string;
+  behaviorHints?: Record<string, unknown>;
+  [k: string]: unknown;
+}
 const MAX_SEARCH = 100;
 
 export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
@@ -66,6 +81,12 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     c.header('Access-Control-Allow-Headers', '*');
   });
 
+  // The addon is read-only.
+  app.use('*', async (c, next) => {
+    if (c.req.method === 'GET' || c.req.method === 'HEAD') return next();
+    return c.text('Israel TV is read-only: use GET or HEAD.\n', 405, { allow: 'GET, HEAD' });
+  });
+
   const file =
     (path: string, cacheControl: string, type = 'application/json; charset=utf-8') =>
     async (c: import('hono').Context) => {
@@ -74,7 +95,13 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
       return c.body(text, 200, { 'content-type': type, 'cache-control': cacheControl });
     };
 
-  app.get('/', (c) => c.redirect('/manifest.json'));
+  // A short page for people who open the address in a browser (rendered with the site); the manifest otherwise.
+  app.get('/', async (c) => {
+    const page = await reader.read(sitePaths.landing);
+    return page === undefined
+      ? c.redirect('/manifest.json')
+      : c.body(page, 200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': CACHE.list });
+  });
   app.get('/manifest.json', file(sitePaths.manifest, CACHE.manifest));
   app.get('/status', file(sitePaths.statusPage, CACHE.none, 'text/html; charset=utf-8'));
   app.get('/status.json', file(sitePaths.status, CACHE.none));
@@ -98,7 +125,7 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     const extra = new URLSearchParams(extraRaw);
     const search = extra.get('search')?.trim();
     const genre = extra.get('genre')?.trim();
-    const skip = Math.max(0, Number(extra.get('skip') ?? 0) || 0);
+    let skip = Math.max(0, Number(extra.get('skip') ?? 0) || 0);
     const headers = { 'cache-control': CACHE.list };
     const asPreview = ([hid, htype, , name, , poster, genres]: SearchRow) => ({
       id: hid,
@@ -115,19 +142,69 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
       return c.json({ metas: hits.slice(skip, skip + GENRE_PAGE).map(asPreview) }, 200, headers);
     }
     if (search) {
-      const index = (await readJson<SearchRow[]>(sitePaths.search, true)) ?? [];
+      const index = await searchIndex();
       const q = normalizeForSearch(search);
       const hits: SearchRow[] = [];
+      const later: SearchRow[] = [];
       if (q) {
-        for (const row of index) {
-          // Whole words from their start: "kan" finds "Kan 11", not the middle of another word.
-          if (row[2] === id && ` ${row[4]}`.includes(` ${q}`) && (!genre || row[6]?.includes(genre))) {
-            hits.push(row);
-            if (hits.length >= MAX_SEARCH) break;
-          }
+        for (const [row, key] of index) {
+          if (row[2] !== id || (genre && !row[6]?.includes(genre))) continue;
+          // Whole words from their start; matches only through a Hebrew prefix letter come last (hebrew.ts).
+          const how = searchMatches(key, q);
+          if (how === 1) hits.push(row);
+          else if (how === 2) later.push(row);
+          if (hits.length >= MAX_SEARCH) break;
         }
       }
+      hits.push(...later.slice(0, MAX_SEARCH - hits.length));
       return c.json({ metas: hits.map(asPreview) }, 200, headers);
+    }
+    // A stale row's first page carries one extra item (the notice), so apps that page by what they received ask
+    // one further: step back one so no show is skipped.
+    if (skip > 0 && !extra.has('date')) {
+      const fresh = await readJson<Freshness>(sitePaths.freshness, true);
+      if (fresh && staleSince(fresh, id)) skip -= 1;
+    }
+    // Pages are stored every CATALOG_PAGE_SIZE items; any other offset is cut from the two pages around it.
+    const offset = skip % CATALOG_PAGE_SIZE;
+    if (offset > 0 && !extra.has('date')) {
+      const base = skip - offset;
+      const read = async (at: number) =>
+        ((await readJson<{ metas: unknown[] }>(sitePaths.catalog(type, id, at)))?.metas ?? []) as unknown[];
+      const metas = [...(await read(base)), ...(await read(base + CATALOG_PAGE_SIZE))].slice(
+        offset,
+        offset + CATALOG_PAGE_SIZE,
+      );
+      return c.json({ metas }, 200, headers);
+    }
+    // The live row: a day of the programme guide (apps with a guide grid), or the channels with what is on now.
+    if (type === 'tv') {
+      const date = extra.get('date')?.trim();
+      if (date !== undefined) {
+        if (skip > 0 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return c.json({ metasDetailed: [] }, 200, headers);
+        const from = Date.parse(`${date}T00:00:00Z`);
+        const guide = (await readJson<GuideFile>(sitePaths.epg, true)) ?? {};
+        const channels = (
+          (await readJson<{ metas: MetaLike[] }>(sitePaths.catalog(type, id, 0)))?.metas ?? []
+        ).filter((m) => m.id.startsWith('iltv_live_'));
+        const metasDetailed = channels.map((m) => ({
+          ...m,
+          behaviorHints: { ...(m.behaviorHints ?? {}), isLive: true, hasScheduledVideos: true },
+          videos: guideVideos(m.id, guide[m.id] ?? [], from, from + 86_400_000),
+        }));
+        return c.json({ metasDetailed }, 200, { 'cache-control': CACHE.stream });
+      }
+      if (skip === 0) {
+        const list = await readJson<{ metas: MetaLike[] }>(sitePaths.catalog(type, id, 0));
+        if (list) {
+          const fresh = await readJson<Freshness>(sitePaths.freshness, true);
+          const since = fresh ? staleSince(fresh, id) : undefined;
+          const metas = await withGuideLines(list.metas);
+          return c.json({ metas: since ? [staleItem(id, type, since), ...metas] : metas }, 200, {
+            'cache-control': CACHE.stream,
+          });
+        }
+      }
     }
     const page = await reader.read(sitePaths.catalog(type, id, skip));
     // A row that has not been updated for too long says so first (works without the home machine).
@@ -166,6 +243,12 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     }
     const text = await reader.read(sitePaths.meta(c.req.param('type'), id));
     if (text === undefined) return c.json({ meta: null }, 404);
+    // A live channel's page says what is on now and next.
+    if (id.startsWith('iltv_live_')) {
+      const { meta } = JSON.parse(text) as { meta: MetaLike };
+      const [withLine] = await withGuideLines([meta]);
+      return c.json({ meta: withLine }, 200, { 'cache-control': CACHE.stream });
+    }
     return c.body(text, 200, {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': CACHE.list,
@@ -174,20 +257,47 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
 
   app.get('/stream/:type/:file', async (c) => {
     const id = decodeURIComponent(c.req.param('file')).replace(/\.json$/, '');
+    // Only the types the manifest declares: live channels are `tv`, everything else `series`.
+    const type = c.req.param('type');
+    const live = !!liveChannelOf(id);
+    if (type !== (live ? 'tv' : 'series'))
+      return c.json({ streams: [] }, 200, { 'cache-control': CACHE.list });
     const streams = await streamsFor(id);
     return c.json({ streams }, 200, { 'cache-control': CACHE.stream });
   });
+
+  /** The search index with each row's key expanded for Hebrew prefixes, built once per index read. */
+  let expanded: { from: SearchRow[]; rows: [SearchRow, string][] } | undefined;
+  async function searchIndex(): Promise<[SearchRow, string][]> {
+    const index = (await readJson<SearchRow[]>(sitePaths.search, true)) ?? [];
+    if (expanded?.from !== index)
+      expanded = { from: index, rows: index.map((r) => [r, expandSearchKey(r[4])]) };
+    return expanded.rows;
+  }
 
   async function seasonStreams(series: string, season: number, episode: number): Promise<Stream[]> {
     const file = await readJson<SeasonStreams>(sitePaths.seasonStreams(series, season));
     return file?.[String(episode)] ?? [];
   }
 
+  /** Live tiles with "now / next" from the guide put first in their description (core epg.ts). */
+  async function withGuideLines(metas: MetaLike[]): Promise<MetaLike[]> {
+    const guide = await readJson<GuideFile>(sitePaths.epg, true);
+    if (!guide) return metas;
+    const now = Date.now();
+    return metas.map((m) => {
+      const line = guideLine(guide[m.id], now);
+      return line ? { ...m, description: m.description ? `${line}\n${m.description}` : line } : m;
+    });
+  }
+
   async function streamsFor(id: string): Promise<Stream[]> {
     const ours = parseVideoId(id);
     if (ours) return seasonStreams(ours.series, ours.season, ours.episode);
-    if (id.startsWith('iltv_live_')) {
-      return (await readJson<{ streams: Stream[] }>(sitePaths.liveStreams(id)))?.streams ?? [];
+    // A channel, also when asked for by one of its guide entries.
+    const channel = liveChannelOf(id);
+    if (channel) {
+      return (await readJson<{ streams: Stream[] }>(sitePaths.liveStreams(channel)))?.streams ?? [];
     }
     // Shows opened from other catalogs: tt123:2:5 or tmdb:123:2:5, numbered seasons only.
     const m = /^(tt\d+|tmdb:\d+):(\d+):(\d+)$/.exec(id);
