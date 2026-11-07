@@ -78,7 +78,7 @@ export function cleanVodTitle(seoTitle: string | undefined): string {
     .replace(/\s*\|\s*12\+.*$/, '')
     .replace(/\s*לצפייה ישירה\s*$/, '')
     .replace(/\s*-?\s*(הסרט המלא|המופע המלא|פרקים מלאים|עמוד הסרט)\s*$/, '')
-    .replace(/\s*-\s*$/, '')
+    .replace(/[\s|\-–·]+$/, '')
     .trim();
 }
 
