@@ -80,7 +80,7 @@ const LANDING_CSS = `
 .hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to left,#0b0a10 0%,rgb(11 10 16/92%) 38%,rgb(11 10 16/35%) 72%,rgb(11 10 16/15%) 100%),linear-gradient(to top,#0b0a10 0%,transparent 30%)}
 [dir=ltr] .hero::before{background:linear-gradient(to right,#0b0a10 0%,rgb(11 10 16/92%) 38%,rgb(11 10 16/35%) 72%,rgb(11 10 16/15%) 100%),linear-gradient(to top,#0b0a10 0%,transparent 30%)}
 @media (max-width:719px){.hero::before,[dir=ltr] .hero::before{background:linear-gradient(to top,#0b0a10 0%,rgb(11 10 16/90%) 55%,rgb(11 10 16/55%) 100%)}}
-.wall{position:absolute;inset:-14% -12%;z-index:-2;display:grid;gap:16px;align-content:center;transform:rotate(-7deg);direction:ltr;opacity:.8;animation:wall-in 1.4s var(--ease-out) both}
+.wall{position:absolute;top:-90px;inset-inline:-12%;z-index:-2;display:grid;gap:16px;align-content:start;contain:layout;transform:rotate(-7deg);direction:ltr;opacity:.8;animation:wall-in 1.4s var(--ease-out) both}
 .lane{display:flex}
 .drift{display:flex;gap:16px;flex:none;padding-inline-end:16px;animation:drift 140s linear infinite}
 .lane:nth-child(2) .drift{animation-duration:170s;animation-direction:reverse}

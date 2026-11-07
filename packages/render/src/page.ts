@@ -66,6 +66,13 @@ const LATIN_RANGE =
   'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
 const face = (family: string, file: string, weight: number, range: string) =>
   `@font-face{font-family:"${family}";src:url(/fonts/${file}.woff2) format("woff2");font-weight:${weight};font-style:normal;font-display:swap;unicode-range:${range}}`;
+/**
+ * Stand-ins drawn from Arial (on almost every computer and phone browser that has it), scaled to the width of our
+ * faces (measured per script: Karantina is far narrower than Arial in Hebrew): until a face arrives the text takes
+ * the same room, so swapping it in does not rewrap lines and move the page.
+ */
+const standIn = (family: string, weight: number, range: string, scale: number) =>
+  `@font-face{font-family:"${family} fb";src:${weight >= 600 ? 'local("Arial Bold"),local("Arial-BoldMT")' : 'local("Arial"),local("ArialMT")'};font-weight:${weight};size-adjust:${scale}%;unicode-range:${range}}`;
 const FONTS = [
   face('Plex', 'plex-he-400', 400, HE_RANGE),
   face('Plex', 'plex-latin-400', 400, LATIN_RANGE),
@@ -73,6 +80,12 @@ const FONTS = [
   face('Plex', 'plex-latin-600', 600, LATIN_RANGE),
   face('Karantina', 'karantina-he-700', 700, HE_RANGE),
   face('Karantina', 'karantina-latin-700', 700, LATIN_RANGE),
+  standIn('Plex', 400, HE_RANGE, 104.4),
+  standIn('Plex', 400, LATIN_RANGE, 100.3),
+  standIn('Plex', 600, HE_RANGE, 90.6),
+  standIn('Plex', 600, LATIN_RANGE, 89.5),
+  standIn('Karantina', 700, HE_RANGE, 70.6),
+  standIn('Karantina', 700, LATIN_RANGE, 89.5),
 ].join('');
 
 const DARK = `--bg:${BRAND.night};--bg-2:#121119;--surface:#17151e;--surface-2:#221f2b;--border:#302c3a;--fg:#f3ede3;--muted:#ada497;
@@ -86,7 +99,7 @@ const LIGHT = `--bg:#f5f0e7;--bg-2:#efe8dc;--surface:#fffbf4;--surface-2:#eee6d8
 
 const CSS = `${FONTS}
 :root{${DARK};--hero-fg:#f8f3ea;--hero-muted:#d3cabd;--radius:16px;--ease-out:cubic-bezier(.23,1,.32,1);--ease-io:cubic-bezier(.77,0,.175,1);
---display:"Karantina","Plex",system-ui,sans-serif;--body:"Plex",system-ui,-apple-system,"Segoe UI","Noto Sans Hebrew","Arial Hebrew",Arial,sans-serif}
+--display:"Karantina","Karantina fb","Plex",system-ui,sans-serif;--body:"Plex","Plex fb",system-ui,-apple-system,"Segoe UI","Noto Sans Hebrew","Arial Hebrew",Arial,sans-serif}
 :root[data-theme=light]{${LIGHT}}
 @view-transition{navigation:auto}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.24s;animation-timing-function:var(--ease-out)}
@@ -245,7 +258,8 @@ const preloadFonts = (files: string[]) =>
     .join('');
 const FONT_PRELOAD: Record<Lang, string> = {
   en: preloadFonts(['plex-latin-400', 'karantina-latin-700']),
-  he: preloadFonts(['plex-he-400', 'karantina-he-700']),
+  // Hebrew text carries digits and app names (Latin letters): the Latin reading face too, or lines rewrap on load.
+  he: preloadFonts(['plex-he-400', 'plex-latin-400', 'karantina-he-700']),
 };
 
 /** The document head: title, description, canonical address, icons, share cards, theme colour, styles. */

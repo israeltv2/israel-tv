@@ -1786,7 +1786,12 @@ and waits 45 minutes (unchanged), and for the next 24 hours slices run at half t
 - **Type with Hebrew, self-hosted:** IBM Plex Sans Hebrew (400/600) for reading, Karantina (700, condensed, a
   broadcast-title voice) for headlines and numbers. Six WOFF2 files, Hebrew and Latin subsets, 49 KB in all
   (`assets/site/fonts`, SIL OFL licences beside them); the page's language preloads its two. No request to a font
-  service (privacy) and no layout shift measured.
+  service (privacy). Swapping a face in must not move the page: every page preloads its language's faces (Hebrew
+  pages also the Latin reading face, for digits and app names), and until a face arrives the text uses Arial scaled
+  to its width per script (`size-adjust`, measured in the browser: Karantina is 70.6% of Arial Bold's width in
+  Hebrew, 89.5% in Latin). Measured on the live `/he/`: layout shift 0.184 before, ≤0.04 after.
+- The poster wall is anchored to the header's top, not sized from its height: sized from it, every rewrap of the
+  text above moved the wall's lanes, which counted as a layout shift (0.34 measured).
 - **One bold element, motion with a job:** the home page's header is a wall of real show posters drifting in three
   lanes behind the headline, and under it a "lower third" ticker of what every live channel is airing now. The
   headline lines rise in once on load (60 ms stagger). Everything else answers the reader: poster lift on hover
