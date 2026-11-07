@@ -10,7 +10,8 @@ and its output can be checked in tests without a server.
 - The manifest (`buildManifest`) and every site file under the paths in `sitePaths` (`@israel-tv/core`).
 - Catalog rows newest first, paged; a failing source shown as a warning item at the top of its row, not hidden.
 - The catalog ↔ resolver contract files: `resolver-contract.json`, `play/<series>/<season>.json`, `ext-ids.json`.
-- `status.json` and its self-contained HTML page (no scripts); `freshness.json`; `registry.json`.
+- `status.json` (scrubbed of anything private: `publicStatus`) and the public status page; the landing page in
+  English and Hebrew; `robots.txt`, `sitemap.xml`, `site.webmanifest`; `freshness.json`; `registry.json`.
 
 ## Must not
 
@@ -24,7 +25,9 @@ and its output can be checked in tests without a server.
 
 - `renderSite(input: RenderInput)` → `SiteFiles` — every file of the site (path → text or bytes).
 - `buildManifest(input, catalogIds, externalIds?)` → `Manifest` — the addon manifest alone.
-- `renderStatusHtml(status: StatusFile)` — the status page.
+- `renderStatusHtml(status: StatusFile)` — the status page; `overall(status)` — its one-line headline.
+- `renderLandingHtml(input: LandingInput, lang)` — the landing page (`'en'` or `'he'`).
+- `publicText(text)`, `publicStatus(status)` — private addresses, host names and paths replaced by placeholders.
 - `RenderInput`, `RenderShow`, `LiveChannelRender`, `SiteFiles` — types; `STATUS_ID_PREFIX`.
 
 ## Run and test it alone

@@ -4,15 +4,20 @@ import { join, normalize, sep } from 'node:path';
 import { createAddonApp } from '@israel-tv/addon';
 import { Hono } from 'hono';
 
-const IMAGE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg' };
+const IMAGE_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  ico: 'image/x-icon',
+  svg: 'image/svg+xml',
+};
 
 export function localAddonApp(dir: string) {
   const root = normalize(dir);
   const inside = (p: string) => p.startsWith(root.endsWith(sep) ? root : root + sep);
   const images = new Hono();
-  // Images (the addon's logo and background, channel logos) are served as they are.
+  // Images (the addon's logo and background, channel logos, the pages' icons) are served as they are.
   images.get(
-    '/:path{(logos/[a-z0-9_]+\\.png|art/[a-z0-9_]+(-poster)?\\.jpg|art/placeholder-poster\\.jpg|logo\\.png|background\\.jpg)}',
+    '/:path{(logos/[a-z0-9_]+\\.png|art/[a-z0-9_]+(-poster)?\\.jpg|art/placeholder-poster\\.jpg|logo\\.png|background\\.jpg|favicon\\.ico|icon\\.svg|apple-touch-icon\\.png|icon-[a-z0-9-]+\\.png|og\\.jpg|hero\\.jpg)}',
     async (c) => {
       const p = normalize(join(root, c.req.param('path')));
       if (!inside(p)) return c.notFound();

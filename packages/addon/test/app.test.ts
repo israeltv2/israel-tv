@@ -34,6 +34,33 @@ const app = createAddonApp({
     return f === undefined ? undefined : typeof f === 'string' ? f : JSON.stringify(f);
   },
 });
+test('the pages: Hebrew landing, robots, sitemap; their own address filled in; JSON kept out of search results', async () => {
+  const pages = createAddonApp({
+    read: async (p) =>
+      (
+        ({
+          'he/index.html': '<html lang="he"><link rel="canonical" href="{{israel-tv-origin}}/he/">',
+          'robots.txt': 'Sitemap: {{israel-tv-origin}}/sitemap.xml',
+          'sitemap.xml': '<loc>{{israel-tv-origin}}/</loc>',
+          'manifest.json': '{}',
+        }) as Record<string, string>
+      )[p],
+  });
+  const he = await pages.request('http://addon.example/he/');
+  expect(await he.text()).toContain('href="http://addon.example/he/"');
+  expect(he.headers.get('x-robots-tag')).toBeNull();
+  expect((await pages.request('http://addon.example/he')).headers.get('location')).toBe('/he/');
+  expect(await (await pages.request('http://addon.example/robots.txt')).text()).toBe(
+    'Sitemap: http://addon.example/sitemap.xml',
+  );
+  expect(await (await pages.request('http://addon.example/sitemap.xml')).text()).toContain(
+    'http://addon.example/',
+  );
+  expect((await pages.request('http://addon.example/manifest.json')).headers.get('x-robots-tag')).toBe(
+    'noindex',
+  );
+});
+
 const get = async (path: string) => {
   const r = await app.request(path);
   return {

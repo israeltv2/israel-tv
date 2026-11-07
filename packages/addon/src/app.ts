@@ -72,11 +72,14 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
 
   app.use('*', async (c, next) => {
     await next();
-    // Image URLs in rendered files are relative to wherever this addon is served from.
-    if (/json/.test(c.res.headers.get('content-type') ?? '')) {
+    // Image URLs in rendered files (and the pages' own addresses) are relative to wherever this addon is served from.
+    const type = c.res.headers.get('content-type') ?? '';
+    if (/json|html|xml|text\/plain/.test(type)) {
       const body = await c.res.text();
       c.res = new Response(withOrigin(body, new URL(c.req.url).origin), c.res);
     }
+    // The addon's data is not a page: kept out of search results.
+    if (/json/.test(type)) c.header('X-Robots-Tag', 'noindex');
     c.header('Access-Control-Allow-Origin', '*');
     c.header('Access-Control-Allow-Headers', '*');
   });
@@ -102,6 +105,11 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
       ? c.redirect('/manifest.json')
       : c.body(page, 200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': CACHE.list });
   });
+  app.get('/he', (c) => c.redirect('/he/', 301));
+  app.get('/he/', file(sitePaths.landingHe, CACHE.list, 'text/html; charset=utf-8'));
+  app.get(`/${sitePaths.robots}`, file(sitePaths.robots, CACHE.list, 'text/plain; charset=utf-8'));
+  app.get(`/${sitePaths.sitemap}`, file(sitePaths.sitemap, CACHE.list, 'application/xml; charset=utf-8'));
+  app.get(`/${sitePaths.webManifest}`, file(sitePaths.webManifest, CACHE.list, 'application/manifest+json'));
   app.get('/manifest.json', file(sitePaths.manifest, CACHE.manifest));
   app.get('/status', file(sitePaths.statusPage, CACHE.none, 'text/html; charset=utf-8'));
   app.get('/status.json', file(sitePaths.status, CACHE.none));

@@ -8,6 +8,20 @@ export const sitePaths = {
   manifest: 'manifest.json',
   /** A short page for people who open the addon's address in a browser. */
   landing: 'index.html',
+  /** The same page in Hebrew (served at /he/). */
+  landingHe: 'he/index.html',
+  robots: 'robots.txt',
+  sitemap: 'sitemap.xml',
+  webManifest: 'site.webmanifest',
+  /** The public pages' icons and share image (made by `pnpm images:site` into assets/site). */
+  favicon: 'favicon.ico',
+  faviconSvg: 'icon.svg',
+  appleTouchIcon: 'apple-touch-icon.png',
+  icon192: 'icon-192.png',
+  icon512: 'icon-512.png',
+  iconMaskable: 'icon-maskable-512.png',
+  shareImage: 'og.jpg',
+  heroImage: 'hero.jpg',
   catalog: (type: string, id: string, skip = 0) =>
     // Later pages are stored as skip-N (not skip=N: some static hosts redirect '=' to '%3D'); the addon
     // app maps Stremio's `/skip=N.json` URL onto them.
@@ -92,4 +106,44 @@ export interface StatusFile {
   warnings: { at: string; id?: string; code: string; message: string }[];
   /** The publisher's own check of what it just published (apps/ingest catalog-audit.ts). */
   audit?: { at: string; metas: number; problems: { check: string; count: number; examples: string[] }[] };
+  /** The catalog's rows as published, in the apps' order (shows with something to watch). */
+  catalogs?: StatusCatalog[];
+  /** One health per day for each source, oldest day first (days in `schedule.timezone`). */
+  history?: { days: string[]; sources: Record<string, (Health | null)[]> };
+  /** The last check that played every live channel (no stream addresses). */
+  live?: { at: string; abroad: boolean; channels: StatusLiveChannel[] };
+  /** When things are refreshed, in the instance's time zone. */
+  schedule?: StatusSchedule;
+}
+
+export interface StatusCatalog {
+  id: string;
+  /** The row's name as apps show it (Hebrew). */
+  name: string;
+  source: string;
+  shows: number;
+  episodes: number;
+  /** A row still in its first fill (Kan): shows in the catalog of those the site lists. */
+  filling?: { inCatalog: number; known: number };
+}
+
+export interface StatusLiveChannel {
+  id: string;
+  name: string;
+  /** `unchecked`: the last check could not try it (a Keshet channel without a home helper to play it through). */
+  state: 'up' | 'down' | 'unchecked';
+  /** Plays only through the viewer's own home helper (Keshet's channels). */
+  helper: boolean;
+  /** Refused outside Israel when checked from abroad. */
+  israelOnly?: boolean;
+}
+
+export interface StatusSchedule {
+  timezone: string;
+  /** The nightly full read, as "HH:MM" when it runs once a day at a fixed time. */
+  fullRunTime?: string;
+  nextFullRun?: string;
+  /** Checks for new episodes of shows on the air, per day. */
+  airingChecksPerDay?: number;
+  nextAiringCheck?: string;
 }

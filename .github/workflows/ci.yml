@@ -44,11 +44,19 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
       - run: pnpm shots:dashboard
         if: matrix.os == 'ubuntu-latest'
+      - run: pnpm shots:site
+        if: matrix.os == 'ubuntu-latest'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always() && matrix.os == 'ubuntu-latest'
         with:
           name: dashboard-screens
           path: dashboard-screens/
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && matrix.os == 'ubuntu-latest'
+        with:
+          name: site-screens
+          path: site-screens/
           if-no-files-found: ignore
   windows-task:
     # The Windows background task, for real: install it for the helper, fetch the manifest it serves, stop it (no

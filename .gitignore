@@ -13,3 +13,4 @@ data/
 .revision
 !.env.example
 dashboard-screens
+site-screens

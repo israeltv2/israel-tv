@@ -160,7 +160,7 @@ test('every series row is shaped "poster", every poster is portrait and reachabl
   // The publisher's own audit agrees, and says so on /status.
   const audit = JSON.parse(String(files.get('status.json'))).audit;
   expect(audit).toMatchObject({ metas: 5, problems: [] });
-  expect(String(files.get('status.html'))).toContain('Catalog audit');
+  expect(String(files.get('status.html'))).toContain('Catalog check');
   // The no-copy Kan show shows the placeholder; the landscape ones got their own portrait poster.
   const id = (key: string) =>
     store.findSeriesId(shows.find((s) => s.key === key)?.source ?? 'kan', key) ?? '';

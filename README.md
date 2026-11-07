@@ -3,9 +3,17 @@
 **Keshet 12, Reshet 13, Kan and live Israeli channels in Stremio and Nuvio.** Free, no account, nothing to sign up
 for. (Keshet 12, and some titles when you are abroad, need a little extra setup at home: see below.)
 
+**[Install it from the website](https://israel-tv.israeltv2.workers.dev/)** ([בעברית](https://israel-tv.israeltv2.workers.dev/he/)) ·
+**[Is everything working?](https://israel-tv.israeltv2.workers.dev/status)**
+
 ![status: beta](https://img.shields.io/badge/status-beta-orange) ![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)
 
 ![Keshet 12 shows in Stremio](docs/images/stremio-keshet12.jpg)
+
+<p>
+<a href="https://israel-tv.israeltv2.workers.dev/"><img src="docs/images/site-landing-desktop.jpg" alt="The Israel TV website: install in one click, what you can watch" width="49%"></a>
+<a href="https://israel-tv.israeltv2.workers.dev/status"><img src="docs/images/site-status-desktop.jpg" alt="The status page: everything working, each channel's refreshes and the last 30 days" width="49%"></a>
+</p>
 
 ## Install
 
@@ -81,7 +89,8 @@ Israel.
 - **A row starts with ⚠.** That channel's site has not been read for a while; what you see is the last good list.
 - **A row starts with ⏳.** That row is still filling (Kan's shows arrive over a few days); the item says how many
   are in so far.
-- **Something does not play.** Check the [status page](https://israel-tv.israeltv2.workers.dev/status), then
+- **Something does not play.** Check the [status page](https://israel-tv.israeltv2.workers.dev/status) (it says in plain words
+  what works and what does not), then
   [report it](https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml) with the show and episode.
 - **Search finds nothing.** Search in Hebrew, as the channel writes the title. Many well-known shows can also be
   found by their English name.

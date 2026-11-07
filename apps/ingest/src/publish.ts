@@ -21,7 +21,13 @@ import {
   type StatusFile,
   sitePaths,
 } from '@israel-tv/core';
-import { type RenderShow, renderSite, renderStatusHtml, type SiteFiles } from '@israel-tv/render';
+import {
+  publicStatus,
+  type RenderShow,
+  renderSite,
+  renderStatusHtml,
+  type SiteFiles,
+} from '@israel-tv/render';
 import { brandImage, channelLogo } from '@israel-tv/resolver';
 import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
@@ -47,7 +53,9 @@ import {
   reachableAbroad,
   remotePoster,
 } from './posters.ts';
+import { publicStatusExtras } from './public-status.ts';
 import { BLOCK_RETRIES, type BlockedRetry, emptyShowsKey, episodeCount, retryKey } from './runner.ts';
+import { siteImages } from './site-images.ts';
 import { probeResults } from './stream-probe.ts';
 import { ALIASES_KEY } from './tmdb.ts';
 
@@ -298,7 +306,12 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   const rows = store
     .listShows()
     .filter((r) => !hiddenShows.has(r.seriesId) && !hiddenSources.has(r.show.source));
-  const status = buildStatus(store, activeSources(config), Date.now(), rows);
+  const shown = activeSources(config).filter((src) => !hiddenSources.has(src));
+  // What the public status page adds: rows, a day-by-day history, the live channels, the schedule (public-status.ts).
+  const status = {
+    ...buildStatus(store, activeSources(config), Date.now(), rows),
+    ...publicStatusExtras(store, config, shown, rows),
+  };
   const registry = store.registry();
   const seasonsBy = groupBy(registry.seasons, (x) => x.seriesId);
   const episodesBy = groupBy(registry.episodes, (x) => x.seriesId);
@@ -385,6 +398,8 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     const img = brandImage(config.branding.dir, name);
     if (img) assets.set(path, img.body);
   }
+  // The public pages' icons and share image.
+  for (const [path, body] of siteImages(config.branding.dir)) assets.set(path, body);
   // Live channel logos are served from here (their sources are not ours to hotlink).
   const logos = new Set<string>();
   if (config.sources.live && !hiddenSources.has('live')) {
@@ -427,11 +442,13 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     },
     catalogWarnings: catalogWarnings(status),
     catalogFilling: catalogFilling(store, config),
+    ...(publicBase(config, store) ? { publicUrl: publicBase(config, store) as string } : {}),
   });
   // The publisher's own audit of these files, published on /status with them.
   const audit = auditSite(files, store);
   store.setState('catalog:audit', audit);
-  const audited = { ...status, audit };
+  const published = JSON.parse(String(files.get(sitePaths.status))) as StatusFile;
+  const audited = publicStatus({ ...published, audit });
   files.set(sitePaths.status, JSON.stringify(audited));
   files.set(sitePaths.statusPage, renderStatusHtml(audited));
   // With the public address known, write it into every file now: no file then needs the Worker for it.
@@ -456,6 +473,14 @@ function groupBy<T>(list: T[], key: (x: T) => string): Map<string, T[]> {
   return m;
 }
 
+/** The addon's data, not pages: kept out of search results (robots.txt asks the same). */
+const NOINDEX = [
+  ...['status', 'search', 'epg', 'ext-ids', 'registry', 'freshness', 'resolver-contract'].map(
+    (f) => `/${f}.json`,
+  ),
+  ...['meta', 'play', 'catalog'].map((d) => `/${d}/*`),
+];
+
 /**
  * Cloudflare's static-asset headers. Every matching rule applies, values added up, so a rule that sets its own
  * Cache-Control first detaches the one from `/*` (`! Cache-Control`): one value per response.
@@ -466,12 +491,15 @@ export const HEADERS_FILE = `/*
 /manifest.json
   ! Cache-Control
   Cache-Control: public, max-age=300
+  X-Robots-Tag: noindex
 /streams/*
   ! Cache-Control
   Cache-Control: public, max-age=300
+  X-Robots-Tag: noindex
 /status*
   ! Cache-Control
   Cache-Control: no-store
+${NOINDEX.map((p) => `${p}\n  X-Robots-Tag: noindex`).join('\n')}
 `;
 
 function* walk(dir: string): Generator<string> {
@@ -490,8 +518,9 @@ function* walk(dir: string): Generator<string> {
 
 const MARKER = '.israel-tv-site';
 
-/** Status files carry a timestamp; compare them without it so a quiet run changes nothing. */
-const comparable = (content: string) => content.replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z/g, '');
+/** Status files carry timestamps (the page as `<time>` elements); compare them without, so a quiet run changes nothing. */
+export const comparable = (content: string) =>
+  content.replace(/<time [^>]*>[^<]*<\/time>/g, '').replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z/g, '');
 
 /**
  * Write the site to `dir`, touching only files whose content changed, and delete files no longer

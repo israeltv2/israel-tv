@@ -27,6 +27,8 @@
     "budget:workers": "node tools/worker-budget.mjs",
     "shots:dashboard": "node tools/dashboard-shots.mjs",
     "audit:images": "node tools/image-audit.mjs",
+    "shots:site": "node tools/site-shots.mjs",
+    "images:site": "node tools/site-images.mjs",
     "build": "pnpm --filter @israel-tv/dashboard build"
   },
   "devDependencies": {

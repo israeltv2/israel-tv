@@ -30,6 +30,7 @@ import {
   type SeasonStreams,
   SOURCES,
   type Source,
+  type StatusCatalog,
   type StatusFile,
   type Stream,
   sitePaths,
@@ -40,7 +41,9 @@ import {
   videoId,
 } from '@israel-tv/core';
 import { renderLandingHtml } from './landing-html.ts';
-import { renderStatusHtml } from './status-html.ts';
+import { publicStatus } from './public-text.ts';
+import { robotsTxt, sitemapXml, webManifest } from './site-meta.ts';
+import { overall, renderStatusHtml } from './status-html.ts';
 
 export interface RenderShow {
   seriesId: string;
@@ -95,6 +98,8 @@ export interface RenderInput {
   guide?: GuideFile;
   /** stremio-addons.net's signature for the listed addon (config `addon.stremioAddonsConfig`). */
   stremioAddonsConfig?: { issuer: string; signature: string };
+  /** The addon's public address, when known: written into the landing page's install links. */
+  publicUrl?: string;
 }
 
 /** Genres offered as a filter on a row: those of its shows, most common first. */
@@ -540,14 +545,55 @@ export function renderSite(input: RenderInput): SiteFiles {
 
   const manifest = buildManifest(input, new Set(rows.keys()), Object.keys(extIds).length > 0);
   files.set(sitePaths.manifest, json(manifest));
-  files.set(sitePaths.landing, renderLandingHtml(manifest.name, manifest.description));
+  // The status and the pages carry the rows as published: these counts are what the apps show.
+  const status = publicStatus({ ...input.status, catalogs: publishedCatalogs(input, listed) });
+  const landing = {
+    name: manifest.name,
+    description: manifest.description,
+    catalogs: status.catalogs ?? [],
+    live: input.live.map((ch) => ({
+      id: ch.id,
+      name: ch.name,
+      logo: !!ch.logo,
+      helper: ch.streams.length === 0,
+    })),
+    status: overall(status),
+    ...(input.publicUrl ? { publicUrl: input.publicUrl } : {}),
+  };
+  files.set(sitePaths.landing, renderLandingHtml(landing, 'en'));
+  files.set(sitePaths.landingHe, renderLandingHtml(landing, 'he'));
+  files.set(sitePaths.robots, robotsTxt());
+  files.set(sitePaths.sitemap, sitemapXml());
+  files.set(sitePaths.webManifest, webManifest());
   files.set(sitePaths.search, json(search));
   files.set(sitePaths.extIds, json(extIds));
-  files.set(sitePaths.status, json(input.status));
-  files.set(sitePaths.statusPage, renderStatusHtml(input.status));
+  files.set(sitePaths.status, json(status));
+  files.set(sitePaths.statusPage, renderStatusHtml(status));
   files.set(sitePaths.registry, json(input.registry));
   files.set(sitePaths.contract, json(CONTRACT));
   if (input.freshness) files.set(sitePaths.freshness, json(input.freshness));
   if (input.live.length > 0) files.set(sitePaths.epg, json(input.guide ?? {}));
   return files;
+}
+
+/**
+ * The rows of the running sources with what was published in them (shows with something to watch, their episodes;
+ * the live row's channels), keeping what the status already says about them (a Kan row's first-fill progress).
+ */
+function publishedCatalogs(input: RenderInput, listed: RenderShow[]): StatusCatalog[] {
+  const running = new Set<string>(input.sources ?? SOURCES);
+  const known = new Map((input.status.catalogs ?? []).map((c) => [c.id, c]));
+  return CATALOGS.filter((c) => running.has(c.source) && (c.source !== 'live' || input.live.length > 0)).map(
+    (c) => {
+      const shows = listed.filter((s) => s.catalog === c.id);
+      return {
+        ...known.get(c.id),
+        id: c.id,
+        name: c.name,
+        source: c.source,
+        shows: c.source === 'live' ? input.live.length : shows.length,
+        episodes: shows.reduce((n, s) => n + videosFor(s).length, 0),
+      };
+    },
+  );
 }
