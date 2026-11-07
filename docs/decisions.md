@@ -1530,7 +1530,9 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
 - **Genres:** one name per genre across sources ("לייף סטייל" → "לייפסטייל", "שעשועון" → "שעשועונים", "תעודה" and "דוקו
   ותחקירים" → "דוקומנטרי", "תחקיר" → "תחקירים", "אוכל" → "בישול").
 - **Newcomers:** `/` is a short page (what this is, the install link with a Stremio button, the project, the status);
-  any method but GET/HEAD answers 405 with `Allow: GET, HEAD` and a sentence; the resolver-only example points at the
+  any method but GET/HEAD answers 405 with `Allow: GET, HEAD` and a sentence on every path the Worker answers (rows,
+  search, streams, status, live pages; static files such as `manifest.json` get Cloudflare's own bare 405, which the
+  Worker never sees — routing every request through it to add a header would cost a Worker request per file); the resolver-only example points at the
   real public catalog and logs where the docs say; the docs say Raspberry Pi needs its 64-bit system (the images are
   amd64 and arm64; no armv7 image is built).
 - **Streams only for the declared types:** `series` for shows, `tv` for live channels; `/stream/movie/…` is empty.

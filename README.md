@@ -1,7 +1,7 @@
 # Israel TV
 
 **Keshet 12, Reshet 13, Kan and live Israeli channels in Stremio and Nuvio.** Free, no account, nothing to sign up
-for.
+for. (Keshet 12, and some titles when you are abroad, need a little extra setup at home: see below.)
 
 ![status: beta](https://img.shields.io/badge/status-beta-orange) ![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)
 
@@ -22,6 +22,9 @@ https://israel-tv.israeltv2.workers.dev/manifest.json
 
 Tip for TVs: install it on your phone or computer, signed in to the same Stremio account — it then appears on the TV
 too.
+
+**Added it before 7 November 2026?** Remove Israel TV from your addons and add the link again (and the home helper's
+link, if you use one). This is needed once; what you have watched and where you stopped stay as they are.
 
 You will see new rows: **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער**, **כאן ארכיון** and **שידור חי**
 (live).
@@ -44,9 +47,10 @@ their numbers for good.
 | Live: Kan 11, Kan Educational, Makan 33, 13, 14, Knesset, i24 (4 languages), ynet, Calcala 10, Channel 9, 13's comedy, vacation and reality channels | Live     | ✅ plays                 | ✅ plays (a stream refused abroad says "only in Israel") |
 | Live: Keshet 12, 24, Eretz Nehederet, Savri Maranan, Keshet's comedy, drama, music and food channels                                                 | Live     | 🏠 needs the home helper | 🏠 needs the home helper                                 |
 
-Live channels show what is on now and next. Apps with a TV guide (Stremio's guide view) also get the full programme
+Live channels show what is on now and next. Apps that have a TV-guide screen (some Stremio versions; Nuvio has none yet) also get the full programme
 guide of Keshet 12, Reshet 13, Kan 11, Kan Educational, Makan 33, Channel 14 and the Knesset. Keshet 12, Kan 11 and the
-Knesset also have a captioned stream ("כתוביות").
+Knesset also have a captioned stream ("כתוביות"). Some channels have a spare stream marked "גיבוי" (backup): try it
+when the first one does not play.
 
 Some titles **only play from Israel** — that is the broadcaster's choice, not the app's.
 
@@ -55,7 +59,7 @@ Some titles **only play from Israel** — that is the broadcaster's choice, not 
 Keshet 12 only lets a video play when your own home internet asks for it. So Keshet 12 needs a small **home helper**:
 a little program on a computer that stays on at home (a desktop PC or Mac, a storage box or a Raspberry Pi), which you
 add to your app as a second link. It then plays at home; on a phone outside the house it needs extra technical setup.
-Setting it up takes about 15 minutes:
+Setting it up takes 15 minutes to an hour the first time, and that computer has to stay on:
 **[Set up the home helper](docs/setup/home-helper.md)**. You can also ask an AI assistant to do it for you:
 [a guide written for assistants](docs/setup/for-agents.md).
 
@@ -65,7 +69,7 @@ Everything in the catalog shows up anywhere, most live channels and most of Resh
 titles the broadcaster allows abroad. Keshet 12 plays with the home helper on your home network, wherever in the world
 your home is. A stream that plays only from an Israeli internet connection says so in the app: **זמין לצפייה רק
 בישראל** (only in Israel). The home helper can fetch those for you through a VPN or proxy service with an Israeli
-location (a paid service you may already have); they then show a second source called **דרך החיבור הישראלי שלך** (via your Israeli connection) —
+location (a paid service you may already have); those titles then show a second source called **דרך החיבור הישראלי שלך** (via your Israeli connection) —
 pick that one. See
 [Watching from abroad](docs/setup/home-helper.md#watching-from-abroad). You only need this if you live outside
 Israel.
@@ -75,6 +79,8 @@ Israel.
 - **A new episode is not there yet.** New episodes usually appear within an hour or two of going online. Apps keep
   the rows for a while — pull down to refresh, or restart the app.
 - **A row starts with ⚠.** That channel's site has not been read for a while; what you see is the last good list.
+- **A row starts with ⏳.** That row is still filling (Kan's shows arrive over a few days); the item says how many
+  are in so far.
 - **Something does not play.** Check the [status page](https://israel-tv.israeltv2.workers.dev/status), then
   [report it](https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml) with the show and episode.
 - **Search finds nothing.** Search in Hebrew, as the channel writes the title. Many well-known shows can also be
@@ -93,7 +99,7 @@ Israel.
 ```
  the broadcasters' sites ──▶  reader  ──▶  catalog (the link you installed)  ◀──  your app
                                                                                      │
-                                         home helper (Keshet 12, from abroad)  ◀─────┘
+                                    home helper (Keshet 12; Israel-only titles)  ◀───┘
 ```
 
 - **The reader** visits the broadcasters' public sites slowly and keeps every show and episode under a permanent
