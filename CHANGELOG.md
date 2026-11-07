@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.7.7](https://github.com/israeltv2/israel-tv/compare/v0.7.6...v0.7.7) (2026-11-07)
+
+
+### Bug Fixes
+
+* **ingest:** review of round 10 lane A — migrations only in the service, Reshet migration on fresh seasons after a complete read, state kept ([#152](https://github.com/israeltv2/israel-tv/issues/152)) ([9c77af5](https://github.com/israeltv2/israel-tv/commit/9c77af5fb775cd94c5860d95a13cf79adff1cc34))
+
 ## [0.7.6](https://github.com/israeltv2/israel-tv/compare/v0.7.5...v0.7.6) (2026-11-07)
 
 
