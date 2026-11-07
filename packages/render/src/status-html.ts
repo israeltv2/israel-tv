@@ -68,6 +68,13 @@ export function rowState(
   // A Kan row whose source is amber only because another Kan row is still filling is fine.
   const fillingElsewhere =
     s.source === 'kan' && (status.catalogs ?? []).some((x) => x.source === 'kan' && x.filling);
+  // A read that failed outright but is retried soon (Kan's slices: a bot check, the browser not starting).
+  if (s.health === 'warn' && s.lastFullRun?.status === 'failed')
+    return {
+      level: 'warn',
+      label: 'Paused',
+      line: `Reading ${s.source === 'kan' ? 'Kan’s' : 'the channel’s'} site is paused for now and is tried again shortly. Everything here still plays.`,
+    };
   if (s.health === 'warn' && !fillingElsewhere)
     return {
       level: 'warn',
@@ -170,6 +177,9 @@ function historyBar(days: string[], values: (Health | null)[] | undefined): stri
     )}</div><div class="hist-legend small muted"><span>${values.length} days ago</span><span>${count('ok')} of ${values.length - count(null)} days fine</span><span>Today</span></div></div>`;
 }
 
+/** Source notes shown on a row's card as well as in the details. */
+const VIEWER_NOTE = /bot check|no longer offered/i;
+
 function card(c: StatusCatalog, status: StatusFile, logos: boolean): string {
   const s = status.sources.find((x) => x.source === c.source);
   const st = rowState(c, s, status);
@@ -198,6 +208,8 @@ function card(c: StatusCatalog, status: StatusFile, logos: boolean): string {
       );
     if (s?.lastAiringRun) facts.push(`<li><span>New episodes checked</span>${when(s.lastAiringRun.at)}</li>`);
   }
+  // Notes a viewer can use as they are (plain words, no ids): Kan's bot check, episodes Kan no longer offers.
+  const said = (s?.notes ?? []).filter((n) => VIEWER_NOTE.test(n) && !/iltv_/.test(n));
   let next = '';
   if (c.source === 'kan') next = 'A few pages at a time, all day long.';
   else if (sched?.nextFullRun)
@@ -213,6 +225,7 @@ function card(c: StatusCatalog, status: StatusFile, logos: boolean): string {
 <p class="row-line">${esc(st.line)}</p>
 <ul class="facts">${facts.join('')}</ul>
 ${next ? `<p class="small muted next">${next}</p>` : ''}
+${said.length ? `<ul class="small muted said">${said.map((n) => `<li>${esc(n.replace(/^./, (x) => x.toUpperCase()))}.</li>`).join('')}</ul>` : ''}
 ${historyBar(status.history?.days ?? [], status.history?.sources[c.source])}
 </article>`;
 }
@@ -385,6 +398,7 @@ const STATUS_CSS = `
 .facts li span{font-size:.75rem;color:var(--muted)}
 .facts strong{font-size:1.1rem;font-variant-numeric:tabular-nums}
 .next{margin:0}
+.said{margin:0;padding-inline-start:18px}
 .hist-wrap{margin-top:auto;padding-top:4px}
 .hist{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;height:26px}
 .hist .d{border-radius:3px;background:var(--none)}

@@ -43,6 +43,8 @@ export const SITE_STATUS: StatusFile = {
       notes: [
         'first fill of iltv_kan11 (כאן 11) in progress: 91 of 118 shows in the catalog, 608 episode pages to read',
         'first fill of iltv_kankids (כאן חינוכית: ילדים ונוער) in progress: 21 of 61 shows in the catalog, 1546 episode pages to read',
+        '14 Kan episodes are no longer offered by Kan (their broadcast rights ended), so they are not in the catalog',
+        "Kan's bot check stopped 3 of 412 page loads today; the crawl waits and tries again",
       ],
     },
     {

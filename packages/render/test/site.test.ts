@@ -230,6 +230,31 @@ describe('nothing private is published', () => {
   });
 });
 
+test("Kan's bot check and a browser that did not start read plainly", () => {
+  const kan = (error: string): StatusFile => ({
+    ...SITE_STATUS,
+    catalogs: (SITE_STATUS.catalogs ?? []).map(({ filling: _f, ...c }) => c),
+    sources: SITE_STATUS.sources.map((s) =>
+      s.source === 'kan'
+        ? { ...s, health: 'warn', lastFullRun: { at: s.lastFullRun?.at ?? '', status: 'failed', error } }
+        : s,
+    ),
+  });
+  for (const error of [
+    "blocked by Kan's bot check (Cloudflare)",
+    'browser did not start: Executable not found at /Users/someone/Library/Caches/ms-playwright/chrome',
+  ]) {
+    const page = renderStatusHtml(kan(error));
+    const main = page.slice(0, page.indexOf('id="details-h"'));
+    expect(main).toContain('>Paused<');
+    expect(main).toContain('Reading Kan’s site is paused for now');
+    expect(main).toContain('Kan&#39;s bot check stopped 3 of 412 page loads today');
+    expect(main).toContain('14 Kan episodes are no longer offered by Kan');
+    expect(text(main)).not.toContain('iltv_');
+    expect(page).not.toContain('someone');
+  }
+});
+
 test('the landing page without a known address: the script fills in the install links', () => {
   const html = renderLandingHtml(LANDING, 'en');
   expect(html).toContain(`<code id="manifest-url" data-origin>${ORIGIN_TOKEN}/manifest.json</code>`);

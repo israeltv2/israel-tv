@@ -1615,7 +1615,6 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
 - **Expected numbering notes.** "source-renumbered … kept SxEy" stays for an episode whose printed number another
   episode already holds (it was numbered on, once, with "episode-number-taken"): published numbers never move. A
   warning is stored once per distinct text, so an unchanged note does not repeat.
-  
 
 ## Public pages: landing and status (2026-11-07)
 
