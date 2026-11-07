@@ -128,6 +128,7 @@ export async function createChromeLoader(
 ): Promise<PageLoader> {
   let context: BrowserContext | undefined;
   let lastError: unknown;
+  let locked = false;
   const profile = opts.profileDir ?? (await mkdtemp(join(tmpdir(), 'israel-tv-kan-')));
   mkdirSync(profile, { recursive: true });
   for (const candidate of browserCandidates(cfg.executablePath)) {
@@ -136,9 +137,13 @@ export async function createChromeLoader(
       break;
     } catch (err) {
       lastError = err;
+      if (/ProcessSingleton|SingletonLock|profile is already in use/i.test(String(err))) locked = true;
     }
   }
   if (!context) {
+    // Chrome locks a profile: another crawl (the daemon's slice, or `israel-tv kan` by hand) is using it.
+    if (locked)
+      throw new Error(`the Kan browser profile ${profile} is in use by another run; try again when it ends`);
     throw new Error(
       `could not start a browser for Kan (${((lastError as Error)?.message ?? '').split('\n')[0]}). ` +
         'Install Google Chrome (or Microsoft Edge, or Chromium on Linux), or set browser.executablePath in the config, or set browser.type to "none" to turn Kan off.',
