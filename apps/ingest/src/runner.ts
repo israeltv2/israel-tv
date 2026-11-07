@@ -150,8 +150,14 @@ export async function ingestShow(
   }
   const raw = dedupeEpisodes(mergePartial(prev?.show, scraped, fetched));
   const show = cleanShow(raw);
-  // Only a trailer so far (cleanShow leaves trailers out): nothing to watch yet, not a failed read.
-  if (episodeCount(show) === 0 && episodeCount(raw) > 0) {
+  // A new show with only a trailer so far (cleanShow leaves trailers out): nothing to watch yet, not a failed read.
+  // A show we have whose re-read finds only a trailer is a failed read (thinReason below), kept and flagged; so is
+  // one stored before trailers were left out, until a real episode comes.
+  if (
+    episodeCount(show) === 0 &&
+    episodeCount(raw) > 0 &&
+    (!prev || episodeCount(cleanShow(prev.show)) === 0)
+  ) {
     store.addWarnings(runId, knownId ?? null, [
       {
         code: 'source-note',

@@ -398,3 +398,38 @@ test('routine publishes are gathered: at most one per interval; urgent ones go a
     vi.useRealTimers();
   }
 });
+
+test('trailers: a new show with only a trailer is "nothing yet"; a show we have re-read as only a trailer is a failed read', async () => {
+  const { ingestShow } = await import('../src/runner.ts');
+  const { Store } = await import('@israel-tv/store');
+  const store = Store.open(':memory:');
+  const ep = (key: string, title: string) => ({
+    key,
+    title,
+    airDate: '2026-10-01',
+    streams: [{ url: `https://cdn.test/${key}.m3u8`, kind: 'direct' as const }],
+  });
+  let episodes = [ep('t', 'טריילר')];
+  const adapter = {
+    source: 'reshet' as const,
+    requests: 0,
+    listShows: async () => [],
+    fetchShow: async () => ({
+      source: 'reshet' as const,
+      key: '/new',
+      title: 'חדשה',
+      catalog: 'iltv_reshet13',
+      seasons: [{ key: 's1', title: 'עונה 1', episodes }],
+    }),
+  };
+  const run = store.startRun('full', 'reshet');
+  expect(await ingestShow(store, adapter, { key: '/new', title: 'חדשה' }, false, run)).toEqual({
+    kind: 'empty',
+  });
+  episodes = [ep('e1', 'פרק 1'), ep('e2', 'פרק 2')];
+  expect((await ingestShow(store, adapter, { key: '/new', title: 'חדשה' }, false, run)).kind).toBe('saved');
+  episodes = [ep('t', 'טריילר')];
+  await expect(ingestShow(store, adapter, { key: '/new', title: 'חדשה' }, false, run)).rejects.toThrow();
+  const id = store.findSeriesId('reshet', '/new') ?? '';
+  expect(store.getShow(id)?.lastError).toMatch(/kept last good data/);
+});

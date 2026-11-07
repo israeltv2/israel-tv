@@ -649,6 +649,7 @@ export async function crawlKan(
           if (e.subtitles !== undefined) noteSubtitles(url, e.subtitles);
           // A trailer is not an episode: remembered, so its page never re-enters the queue as "new".
           if (isTrailer(e.title)) {
+            delete s.retry?.[url];
             s.skipped = [...new Set([...(s.skipped ?? []), url])];
             if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
             s.pending.shift();

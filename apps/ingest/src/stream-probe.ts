@@ -69,20 +69,36 @@ export function publicHttps(u: string): boolean {
   } catch {
     return false;
   }
-  const h = url.hostname.replace(/^\[|\]$/g, '');
-  if (url.protocol !== 'https:' || h === 'localhost' || h.endsWith('.local')) return false;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return false;
+  const h = url.hostname
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '')
+    .toLowerCase();
+  if (url.protocol !== 'https:' || h === 'localhost' || /\.(local|localhost)$/.test(h)) return false;
+  if (
+    /^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(
+      h,
+    )
+  )
+    return false;
   return !/^(::1?|f[cd][0-9a-f]{2}:|fe80:)/i.test(h);
 }
 
 async function textUpTo(r: Response, max = MAX_PLAYLIST_BYTES): Promise<string> {
-  const len = Number(r.headers.get('content-length') ?? 0);
-  if (len > max) {
-    await r.body?.cancel();
-    return '';
+  if (!r.body) return '';
+  const reader = r.body.getReader();
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel();
+      return '';
+    }
+    parts.push(value);
   }
-  const text = await r.text();
-  return text.length > max ? '' : text;
+  return new TextDecoder().decode(Buffer.concat(parts));
 }
 
 /** Master → first variant → first segment (2 KB of it), following redirects. `segment: false` stops at the master. */

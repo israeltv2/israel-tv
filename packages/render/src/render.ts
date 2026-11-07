@@ -108,6 +108,10 @@ const json = (v: unknown) => JSON.stringify(v);
 
 export const STATUS_ID_PREFIX = 'iltv_status_';
 
+/** Something to watch: numbered episodes that are still in the show (a show with only a trailer has none). */
+const hasVideos = (s: RenderShow) =>
+  s.episodes.length > 0 && s.show.seasons.some((x) => x.episodes.length > 0);
+
 function sortKey(s: RenderShow): string {
   return `${s.latestAirDate ?? '0000-00-00'}|${s.latestEpisodeSeenAt ?? ''}`;
 }
@@ -164,10 +168,6 @@ function seasonLabel(a: SeasonAssignment | undefined, title: string): string | u
   if (a?.kind !== 'named' || !t || GENERIC_SEASON.test(t)) return undefined;
   return t;
 }
-
-/** Something to watch: numbered episodes that are still in the show (a show with only a trailer has none). */
-const hasVideos = (s: RenderShow) =>
-  s.episodes.length > 0 && s.show.seasons.some((x) => x.episodes.length > 0);
 
 /** A show without trailers and promos (read before they were left out at the source boundary; model.ts). */
 function withoutTrailers(s: RenderShow): RenderShow {
@@ -319,7 +319,7 @@ export function describe(sources: string[]): string {
 function genreOptions(input: RenderInput, catalog: string): string[] {
   const n = new Map<string, number>();
   for (const s of input.shows)
-    if (s.catalog === catalog && s.state === 'listed' && s.episodes.length > 0)
+    if (s.catalog === catalog && s.state === 'listed' && hasVideos(s))
       for (const g of cleanGenres(s.show.genres)) n.set(g, (n.get(g) ?? 0) + 1);
   // A filter that finds one show is noise.
   return [...n]
