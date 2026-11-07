@@ -120,10 +120,10 @@ describe('the library pages', () => {
     const html = page(sitePaths.showPage('iltv_mako_1'));
     // A mirrored character ("‹") would draw the other way in Hebrew; the separator is drawn and rotated per direction.
     expect(html).not.toContain('content:"‹"');
-    expect(html).toContain('[dir=rtl] .crumbs li+li::before{transform:rotate(135deg)}');
+    expect(html).toMatch(/\[dir="?rtl"?\] \.crumbs li ?\+ ?li::before\{transform:rotate\(135deg\)\}/);
     // The disclosure arrow uses physical borders, so the RTL rotation is not applied on top of a flipped shape.
     expect(html).toMatch(/details>summary::before\{content:"";width:8px;height:8px;border-right:2px/);
-    expect(html).toContain('[dir=rtl] .flip{transform:scaleX(-1)}');
+    expect(html).toMatch(/\[dir="?rtl"?\] \.flip\{transform:scaleX\(-1\)\}/);
   });
 
   test('pages are Hebrew, right to left, with the show’s own title, description and canonical address', () => {

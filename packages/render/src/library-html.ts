@@ -3,6 +3,7 @@
 // search (/search/). Pre-rendered with the site from the same data the apps get, so search engines and link
 // previews see everything; the pages link to the apps ("Watch in Stremio") and to the broadcaster's own player.
 // No video plays here (docs/decisions.md, "No playback on the website").
+
 import {
   CATALOGS,
   type GuideFile,
@@ -11,11 +12,11 @@ import {
   type MetaPreview,
   sitePaths,
 } from '@israel-tv/core';
+import { script, style } from './assets.ts';
+import { type Child, type Html, html, raw } from './html.ts';
 import { CATALOG_MARK } from './names.ts';
 import {
   absolute,
-  BRAND,
-  esc,
   externalLinks,
   footer,
   head,
@@ -83,13 +84,13 @@ const LIVE_PAGES: Record<string, string> = {
 };
 
 /** A row's first fill, as a short line with a progress bar. */
-export function fillChip(f: { inCatalog: number; known: number }, lang: 'he' | 'en'): string {
+export function fillChip(f: { inCatalog: number; known: number }, lang: 'he' | 'en'): Html {
   const pct = f.known ? Math.min(100, Math.round((f.inCatalog / f.known) * 100)) : 0;
   const text =
     lang === 'he'
       ? `נטען לראשונה: ${num(f.inCatalog, 'he')} מתוך ${num(f.known, 'he')}`
       : `First load: ${num(f.inCatalog)} of ${num(f.known)}`;
-  return `<span class="chip-fill"><span>${text}</span><span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${f.known}" aria-valuenow="${f.inCatalog}" aria-label="${text}"><i style="width:${pct}%"></i></span></span>`;
+  return html`<span class="chip-fill"><span>${text}</span><span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${f.known}" aria-valuenow="${f.inCatalog}" aria-label="${text}"><i style="width:${pct}%"></i></span></span>`;
 }
 
 /** Where each source plays, in a sentence. */
@@ -117,15 +118,18 @@ const vtName = (id: string) => `p-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 export function tile(
   m: MetaPreview,
   opts: { morph?: boolean; eager?: boolean; first?: boolean; width?: number } = {},
-): string {
+): Html {
   const name = plain(m.name);
   const w = opts.width ?? 342;
+  const loading = opts.first ? raw(' fetchpriority="high"') : opts.eager ? '' : raw(' loading="lazy"');
   const img = m.poster
-    ? `<img class="poster" src="${esc(sized(m.poster, w))}" alt="" width="${w}" height="${Math.round(w * 1.5)}"${opts.first ? ' fetchpriority="high"' : opts.eager ? '' : ' loading="lazy"'} decoding="async"${opts.morph ? ` style="view-transition-name:${vtName(m.id)}"` : ''}>`
-    : `<span class="poster blank" aria-hidden="true">${esc(name.slice(0, 1))}</span>`;
+    ? html`<img class="poster" src="${sized(m.poster, w)}" alt="" width="${w}" height="${Math.round(w * 1.5)}"${loading} decoding="async"${
+        opts.morph ? html` style="view-transition-name:${vtName(m.id)}"` : ''
+      }>`
+    : html`<span class="poster blank" aria-hidden="true">${name.slice(0, 1)}</span>`;
   const genres = (m.genres ?? []).map(plain).join('|');
-  return `<a class="tile" href="${showHref(m.id)}"${genres ? ` data-g="${esc(genres)}"` : ''}>${img}<span class="t" dir="auto">${esc(name)}</span>${
-    m.releaseInfo ? `<span class="y">${esc(m.releaseInfo)}</span>` : ''
+  return html`<a class="tile" href="${showHref(m.id)}"${genres ? html` data-g="${genres}"` : ''}>${img}<span class="t" dir="auto">${name}</span>${
+    m.releaseInfo ? html`<span class="y">${m.releaseInfo}</span>` : ''
   }</a>`;
 }
 
@@ -158,109 +162,15 @@ const clock = (ms: number) => clockFmt.format(ms);
  * A channel's guide as a list the page's script keeps current: every programme carries its start and end; the
  * script hides the ones that ended, marks the one on the air (with a progress bar) and shows `shown` at a time.
  */
-export function guideList(rows: GuideRow[], shown = 2): string {
+export function guideList(rows: GuideRow[], shown = 2): Child {
   if (rows.length === 0) return '';
-  return `<ol class="guide" data-guide="${shown}">${rows
-    .map(
-      (r, i) =>
-        `<li data-s="${r[0]}" data-e="${r[1]}"${i >= shown ? ' hidden' : ''}><span class="at">${clock(r[0])}</span><span class="pg" dir="auto">${esc(plain(r[2]))}</span></li>`,
-    )
-    .join('')}</ol>`;
+  return html`<ol class="guide" data-guide="${shown}">${rows.map(
+    (r, i) =>
+      html`<li data-s="${r[0]}" data-e="${r[1]}"${i >= shown ? raw(' hidden') : ''}><span class="at">${clock(r[0])}</span><span class="pg" dir="auto">${plain(r[2])}</span></li>`,
+  )}</ol>`;
 }
 
-const LIBRARY_CSS = `
-.page-head{padding-block:40px 8px}
-.page-head h1{font-size:clamp(3rem,9vw,5.6rem);margin:0}
-.page-head .lead{color:var(--muted);max-width:44rem;font-size:1.05rem;margin:.4em 0 0}
-.crumbs{display:flex;flex-wrap:wrap;gap:6px;font-size:.9rem;color:var(--muted);margin:0 0 10px;padding:0}
-.crumbs a{color:var(--muted)}
-.crumbs li{list-style:none}.crumbs ol{display:contents}
-.crumbs li{display:inline-flex;align-items:center}
-.crumbs li+li::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);margin-inline:4px 10px;opacity:.75}
-[dir=rtl] .crumbs li+li::before{transform:rotate(135deg)}
-.searchbox{display:flex;gap:8px;margin-top:22px;max-width:34rem}
-.searchbox input{flex:1;min-width:0;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:12px 18px;min-height:48px}
-.searchbox input:focus{outline:2px solid var(--accent);outline-offset:1px}
-.shelf{padding-block:26px 6px}
-.shelf-head{display:flex;align-items:baseline;gap:14px;margin-bottom:12px}
-.shelf-head h2{margin:0;font-size:clamp(2rem,4.4vw,2.7rem)}
-.shelf-head .count{color:var(--muted);font-size:.9rem}
-.shelf-head a.all{margin-inline-start:auto;font-weight:600;white-space:nowrap}
-.strip{display:grid;grid-auto-flow:column;grid-auto-columns:clamp(118px,15vw,168px);gap:14px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:12px 8px 16px;margin:-8px -8px 0;scroll-padding-inline:8px;scrollbar-width:thin}
-.strip>*{scroll-snap-align:start}
-.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(42vw,150px),1fr));gap:22px 14px}
-@media (min-width:720px){.tiles{grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}}
-.tile{display:flex;flex-direction:column;gap:6px;color:var(--fg);text-decoration:none;min-width:0}
-.tile .poster{transition:transform .25s var(--ease-out),box-shadow .25s var(--ease-out);box-shadow:0 0 0 1px var(--border)}
-.tile .blank{display:grid;place-items:center;font:700 3rem/1 var(--display);color:var(--muted)}
-.tile .t{font-weight:600;font-size:.95rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.tile .y{font-size:.8rem;color:var(--muted)}
-@media (hover:hover){.tile:hover .poster{transform:translateY(-4px);box-shadow:0 0 0 2px var(--accent),var(--shadow)}}
-.tile:focus-visible{outline:none}.tile:focus-visible .poster{box-shadow:0 0 0 3px var(--accent)}
-.filters{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 26px}
-.chip{font:inherit;font-size:.9rem;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--fg);cursor:pointer;text-decoration:none;transition:background-color .15s var(--ease-out),border-color .15s var(--ease-out)}
-.chip:hover{border-color:var(--accent)}
-.chip[aria-current=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
-.note{border-inline-start:3px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:10px 14px;margin:14px 0;max-width:46rem}
-.channels-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr))}
-.chan{display:grid;grid-template-columns:56px 1fr;grid-template-rows:auto 1fr auto;gap:4px 14px;align-items:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
-.chan>.logo-tile{grid-row:span 2}
-.row-title{display:flex;align-items:center;gap:16px}
-.chan h2,.chan h3{margin:0;font:600 1.1rem/1.3 var(--body)}
-.chan .acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-self:end}
-.chan .acts .btn{min-height:40px;padding:6px 14px;font-size:.9rem}
-.tag{display:inline-block;font-size:.72rem;font-weight:600;color:var(--warn);border:1px solid currentColor;border-radius:6px;padding:0 6px;margin-inline-start:6px;vertical-align:2px}
-.guide{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px;font-size:.92rem}
-.guide li{display:grid;grid-template-columns:3.2em 1fr;gap:8px;color:var(--muted)}
-.guide li.now{color:var(--fg)}
-.guide li.now .pg{font-weight:600}
-.guide li.now::after{content:"";grid-column:1/-1;height:3px;border-radius:3px;background:linear-gradient(to left,var(--on-air) calc(var(--p,0)*100%),var(--surface-2) 0)}
-[dir=ltr] .guide li.now::after{background:linear-gradient(to right,var(--on-air) calc(var(--p,0)*100%),var(--surface-2) 0)}
-.guide .at{font-variant-numeric:tabular-nums}
-.guide.empty{display:none}
-.strip.live{grid-auto-columns:clamp(220px,26vw,280px)}
-.strip.live .chan{height:100%}
-.show-hero{position:relative;isolation:isolate;overflow:hidden;color:var(--hero-fg);background:#0b0a10}
-.show-hero .bg{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;opacity:.5}
-.show-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,var(--bg) 2%,rgb(13 12 18/80%) 40%,rgb(13 12 18/45%)),linear-gradient(to left,rgb(13 12 18/85%),transparent 75%)}
-.show-hero .wrap{display:grid;gap:22px;padding-block:96px 36px;align-items:end}
-@media (min-width:760px){.show-hero .wrap{grid-template-columns:260px 1fr;padding-block:120px 48px;gap:36px}}
-.show-hero .poster{max-width:200px;justify-self:center;box-shadow:0 20px 50px rgb(0 0 0/55%)}
-@media (max-width:759px){.show-hero .acts .btn{flex:1 1 100%}}
-@media (min-width:760px){.show-hero .poster{max-width:none;justify-self:stretch}}
-.show-hero h1{font-size:clamp(3rem,9vw,6rem);margin:0}
-.show-hero .crumbs,.show-hero .crumbs a{color:var(--hero-muted)}
-.facts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0;list-style:none}
-.facts li{font-size:.85rem;padding:3px 12px;border-radius:999px;background:rgb(255 255 255/9%);border:1px solid rgb(255 255 255/16%);color:var(--hero-fg)}
-.facts li:has(a){padding:0}.facts a{display:block;padding:3px 12px;color:${BRAND.stone};text-decoration:none;border-radius:inherit}
-.facts a:hover{background:rgb(255 255 255/16%)}.facts li:has(a:hover){border-color:var(--accent)}
-.show-hero .desc{max-width:44rem;color:var(--hero-muted);font-size:1.05rem;margin:16px 0 0;white-space:pre-line}
-.show-hero .acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-.show-hero .small{color:var(--hero-muted);margin:14px 0 0;max-width:44rem}
-.show-hero .small a{color:var(--hero-fg)}
-:root[data-theme=light] .show-hero::after{background:linear-gradient(to top,#0d0c12 2%,rgb(13 12 18/80%) 40%,rgb(13 12 18/45%)),linear-gradient(to left,rgb(13 12 18/85%),transparent 75%)}
-.seasons{padding-block:32px 8px}
-.seasons>.wrap>h2{margin-bottom:14px}
-.season>summary{font-size:1.05rem}
-.season>summary .count{margin-inline-start:auto;color:var(--muted);font-weight:400;font-size:.9rem}
-.eps{list-style:none;margin:0;padding:0 12px 12px;display:grid;gap:4px}
-.ep{display:grid;grid-template-columns:minmax(0,128px) 1fr;gap:4px 14px;padding:10px 6px;border-radius:12px;align-items:start}
-@media (min-width:720px){.ep{grid-template-columns:200px 1fr}}
-.ep{position:relative}.ep:hover{background:var(--surface-2)}
-.ep h3 a::after{content:"";position:absolute;inset:0;border-radius:inherit}
-.ep h3 a:focus-visible{outline:none}.ep:has(h3 a:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
-.ep .still{grid-row:span 3;aspect-ratio:16/9;width:100%;height:auto;object-fit:cover;border-radius:8px;background:var(--surface-2)}
-.ep .still.blank{display:grid;place-items:center;font:700 2rem/1 var(--display);color:var(--muted)}
-.ep h3{margin:0;font-size:1rem}
-.ep h3 a{color:var(--fg);text-decoration:none}
-.ep h3 a:hover{color:var(--accent)}
-.ep .meta{font-size:.82rem;color:var(--muted)}
-.ep p{margin:0;font-size:.9rem;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.more{padding:4px 18px 16px;color:var(--muted);font-size:.9rem;margin:0}
-.older{columns:2 12rem;margin:8px 0 0;padding-inline-start:20px;color:var(--muted)}
-.how{padding-block:28px 8px}
-.results-info{color:var(--muted);min-height:1.6em;margin:18px 0}
-`;
+const LIBRARY_CSS = style('library.css');
 
 interface PageOpts {
   title: string;
@@ -276,28 +186,27 @@ interface PageOpts {
 }
 
 /** A library page: Hebrew, right to left, the site's header and footer. */
-function page(o: PageOpts, body: string): string {
-  return externalLinks(page0(o, body), 'he');
-}
-
-function page0(o: PageOpts, body: string): string {
-  return `${head(
-    {
-      lang: 'he',
-      title: o.title,
-      description: o.description,
-      path: o.path,
-      ...(o.jsonLd ? { jsonLd: o.jsonLd } : {}),
-      ...(o.image ? { image: o.image } : {}),
-      ...(o.ogType ? { ogType: o.ogType } : {}),
-    },
-    LIBRARY_CSS + (o.css ?? ''),
-  )}<body>
+function page(o: PageOpts, body: Html): string {
+  return externalLinks(
+    html`${head(
+      {
+        lang: 'he',
+        title: o.title,
+        description: o.description,
+        path: o.path,
+        ...(o.jsonLd ? { jsonLd: o.jsonLd } : {}),
+        ...(o.image ? { image: o.image } : {}),
+        ...(o.ogType ? { ogType: o.ogType } : {}),
+      },
+      LIBRARY_CSS + (o.css ?? ''),
+    )}<body>
 ${topBar('he', siteNav('he', o.section), { over: o.over ?? false })}
 <main id="main">${body}</main>
-${footer('he')}${o.script ? `<script>${o.script}</script>` : ''}
+${footer('he')}${o.script ? html`<script>${raw(o.script)}</script>` : ''}
 </body></html>
-`;
+`,
+    'he',
+  );
 }
 
 const rowName = (id: string) => CATALOGS.find((c) => c.id === id)?.name ?? id;
@@ -307,16 +216,17 @@ const episodesOf = (m: Meta) => (m.videos ?? []).length;
 
 const channelLogo = (c: LibraryChannel, size = 56) => logoTile(c.logo ? { logo: c.id } : undefined, size);
 
-function channelCard(c: LibraryChannel, input: LibraryInput, heading: 'h2' | 'h3', full: boolean): string {
+function channelCard(c: LibraryChannel, input: LibraryInput, heading: 'h2' | 'h3', full: boolean): Html {
   const rows = channelGuide(input.guide, c.id);
   const site = LIVE_PAGES[c.id];
-  return `<article class="chan" id="${esc(c.id)}">${channelLogo(c)}
-<${heading} dir="auto">${esc(plain(c.name))}${c.helper ? '<span class="tag">עוזר ביתי</span>' : ''}</${heading}>
-<div>${rows.length ? `<span class="on-air small">בשידור</span>${guideList(rows)}` : '<span class="small muted">אין לוח שידורים לערוץ הזה</span>'}</div>
+  const h = raw(heading);
+  return html`<article class="chan" id="${c.id}">${channelLogo(c)}
+<${h} dir="auto">${plain(c.name)}${c.helper ? raw('<span class="tag">עוזר ביתי</span>') : ''}</${h}>
+<div>${rows.length ? html`<span class="on-air small">בשידור</span>${guideList(rows)}` : raw('<span class="small muted">אין לוח שידורים לערוץ הזה</span>')}</div>
 ${
   full
-    ? `<div class="acts"><a class="btn btn-primary" href="${esc(stremioDetail('tv', c.id))}">${ICONS.play}צפייה ב-Stremio</a>${
-        site ? `<a class="btn btn-plain" href="${esc(site)}" rel="noopener">${ICONS.out}באתר הערוץ</a>` : ''
+    ? html`<div class="acts"><a class="btn btn-primary" href="${stremioDetail('tv', c.id)}">${ICONS.play}צפייה ב-Stremio</a>${
+        site ? html`<a class="btn btn-plain" href="${site}" rel="noopener">${ICONS.out}באתר הערוץ</a>` : ''
       }</div>`
     : ''
 }</article>`;
@@ -328,19 +238,15 @@ function libraryHome(input: LibraryInput): string {
   const shelves = input.rows
     .filter((r) => r.shows.length > 0)
     .map(
-      (r) => `<section class="shelf" aria-labelledby="h-${rowSlug(r.id)}"><div class="wrap">
-<div class="shelf-head"><h2 id="h-${rowSlug(r.id)}">${esc(rowName(r.id))}</h2><span class="count">${countShows(r.shows.length)}</span><a class="all" href="${rowHref(r.id)}">לכל התוכניות</a></div>
-<div class="strip">${r.shows
-        .slice(0, STRIP)
-        .map((s) => tile(s.meta, { width: 220 }))
-        .join('')}</div>
+      (r) => html`<section class="shelf" aria-labelledby="h-${rowSlug(r.id)}"><div class="wrap">
+<div class="shelf-head"><h2 id="h-${rowSlug(r.id)}">${rowName(r.id)}</h2><span class="count">${countShows(r.shows.length)}</span><a class="all" href="${rowHref(r.id)}">לכל התוכניות</a></div>
+<div class="strip">${r.shows.slice(0, STRIP).map((s) => tile(s.meta, { width: 220 }))}</div>
 </div></section>`,
-    )
-    .join('');
+    );
   const live = input.live.length
-    ? `<section class="shelf" aria-labelledby="h-live"><div class="wrap">
+    ? html`<section class="shelf" aria-labelledby="h-live"><div class="wrap">
 <div class="shelf-head"><h2 id="h-live">שידור חי</h2><span class="count">${num(input.live.length, 'he')} ערוצים</span><a class="all" href="/live/">לוח השידורים</a></div>
-<div class="strip live">${input.live.map((c) => channelCard(c, input, 'h3', false)).join('')}</div>
+<div class="strip live">${input.live.map((c) => channelCard(c, input, 'h3', false))}</div>
 </div></section>`
     : '';
   return page(
@@ -362,7 +268,7 @@ function libraryHome(input: LibraryInput): string {
         })),
       },
     },
-    `<div class="wrap page-head"><h1>הספרייה</h1>
+    html`<div class="wrap page-head"><h1>הספרייה</h1>
 <p class="lead">${countShows(total)} ו-${countEpisodes(episodes)} מקשת 12, רשת 13 וכאן. בחרו תוכנית ופתחו אותה באפליקציה.</p>
 <form class="searchbox" action="/search/" method="get" role="search"><input type="search" name="q" placeholder="חיפוש תוכנית" aria-label="חיפוש תוכנית"><button class="btn btn-primary" type="submit">${ICONS.search}חיפוש</button></form>
 </div>${live}${shelves}`,
@@ -370,11 +276,7 @@ function libraryHome(input: LibraryInput): string {
 }
 
 /** The genre filter's script: show only the tiles of the chosen genre (all of them without the script). */
-const FILTER_SCRIPT = `(function(){var bs=document.querySelectorAll('.filters .chip'),ts=document.querySelectorAll('.tiles .tile');
-function pick(g){bs.forEach(function(x){if(x.dataset.g===g)x.setAttribute('aria-current','true');else x.removeAttribute('aria-current')});
-ts.forEach(function(t){t.hidden=!!g&&('|'+(t.dataset.g||'')+'|').indexOf('|'+g+'|')<0})}
-bs.forEach(function(b){b.addEventListener('click',function(e){if(e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();pick(b.dataset.g);history.replaceState(null,'',b.getAttribute('href'))})});
-var f=document.querySelector('.filters');if(f){f.removeAttribute('hidden');var g=new URLSearchParams(location.search).get('g')||'';if([].some.call(bs,function(b){return b.dataset.g===g}))pick(g)}})();`;
+const FILTER_SCRIPT = script('genre-filter.js');
 
 function rowPage(r: LibraryRow): string {
   const name = rowName(r.id);
@@ -408,22 +310,20 @@ function rowPage(r: LibraryRow): string {
         })),
       },
     },
-    `<div class="wrap page-head">
-<nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li>${esc(name)}</li></ol></nav>
-<h1 class="row-title">${mark ? logoTile(mark, 64) : ''}<span>${esc(name)}</span></h1>
-<p class="lead">${countShows(r.shows.length)} ו-${countEpisodes(episodes)}. ${esc(WHERE[r.source] ?? '')}</p>
-${r.filling ? `<p>${fillChip(r.filling, 'he')}</p>` : ''}
+    html`<div class="wrap page-head">
+<nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li>${name}</li></ol></nav>
+<h1 class="row-title">${mark ? logoTile(mark, 64) : ''}<span>${name}</span></h1>
+<p class="lead">${countShows(r.shows.length)} ו-${countEpisodes(episodes)}. ${WHERE[r.source] ?? ''}</p>
+${r.filling ? html`<p>${fillChip(r.filling, 'he')}</p>` : ''}
 ${
   genres.length
-    ? `<nav class="filters" aria-label="סינון לפי סוגה" hidden><a class="chip" href="${rowHref(r.id)}" data-g="" aria-current="true">הכול</a>${genres
-        .map(
-          (g) =>
-            `<a class="chip" href="${rowHref(r.id)}?g=${encodeURIComponent(g)}" data-g="${esc(g)}">${esc(g)}</a>`,
-        )
-        .join('')}</nav>`
+    ? html`<nav class="filters" aria-label="סינון לפי סוגה" hidden><a class="chip" href="${rowHref(r.id)}" data-g="" aria-current="true">הכול</a>${genres.map(
+        (g) =>
+          html`<a class="chip" href="${rowHref(r.id)}?g=${encodeURIComponent(g)}" data-g="${g}">${g}</a>`,
+      )}</nav>`
     : ''
 }
-<div class="tiles">${r.shows.map((s, i) => tile(s.meta, { morph: true, eager: i < 6, first: i === 0 })).join('')}</div>
+<div class="tiles">${r.shows.map((s, i) => tile(s.meta, { morph: true, eager: i < 6, first: i === 0 }))}</div>
 </div>`,
   );
 }
@@ -442,16 +342,16 @@ const dateFmt = new Intl.DateTimeFormat('he-IL', {
   timeZone: 'UTC',
 });
 
-function episodeItem(m: Meta, v: NonNullable<Meta['videos']>[number], named: boolean): string {
+function episodeItem(m: Meta, v: NonNullable<Meta['videos']>[number], named: boolean): Html {
   const title = plain(v.title);
   const shown = named ? title.split(' · ').slice(1).join(' · ') || title : title;
   const still = v.thumbnail
-    ? `<img class="still" src="${esc(sized(v.thumbnail, 400))}" alt="" width="200" height="113" loading="lazy" decoding="async">`
-    : `<span class="still blank" aria-hidden="true">${v.episode ?? ''}</span>`;
+    ? html`<img class="still" src="${sized(v.thumbnail, 400)}" alt="" width="200" height="113" loading="lazy" decoding="async">`
+    : html`<span class="still blank" aria-hidden="true">${v.episode ?? ''}</span>`;
   const date = v.released ? dateFmt.format(Date.parse(v.released)) : '';
-  return `<li class="ep">${still}<h3><a href="${esc(stremioDetail('series', m.id, v.id))}" dir="auto">${esc(shown)}</a></h3>
-<span class="meta">פרק ${num(v.episode ?? 0, 'he')}${date ? ` · <time datetime="${esc(v.released ?? '')}" data-abs>${esc(date)}</time>` : ''}</span>${
-    v.overview ? `<p dir="auto">${esc(plain(v.overview))}</p>` : ''
+  return html`<li class="ep">${still}<h3><a href="${stremioDetail('series', m.id, v.id)}" dir="auto">${shown}</a></h3>
+<span class="meta">פרק ${num(v.episode ?? 0, 'he')}${date ? html` · <time datetime="${v.released ?? ''}" data-abs>${date}</time>` : ''}</span>${
+    v.overview ? html`<p dir="auto">${plain(v.overview)}</p>` : ''
   }</li>`;
 }
 
@@ -483,21 +383,18 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
       .map(plain)
       .map((g) => ({ text: g, href: `${rowHref(row.id)}?g=${encodeURIComponent(g)}` })),
   ].filter((f) => !!f.text);
-  const list = seasons
-    .slice(0, SEASONS_IN_FULL)
-    .map(([n, vs], i) => {
-      const named = n > 100;
-      const long = vs.length > 40;
-      const sorted = [...vs].sort((a, b) => (long ? -1 : 1) * ((a.episode ?? 0) - (b.episode ?? 0)));
-      const shown = sorted.slice(0, EPISODES_PER_SEASON);
-      return `<details class="season"${i === 0 ? ' open' : ''}><summary><span dir="auto">${esc(seasonName(n, vs))}</span><span class="count">${countEpisodes(vs.length)}</span></summary>
-<ol class="eps">${shown.map((v) => episodeItem(m, v, named)).join('')}</ol>${
-        vs.length > shown.length
-          ? `<p class="more">ועוד ${countEpisodes(vs.length - shown.length)} באפליקציה.</p>`
-          : ''
-      }</details>`;
-    })
-    .join('');
+  const list = seasons.slice(0, SEASONS_IN_FULL).map(([n, vs], i) => {
+    const named = n > 100;
+    const long = vs.length > 40;
+    const sorted = [...vs].sort((a, b) => (long ? -1 : 1) * ((a.episode ?? 0) - (b.episode ?? 0)));
+    const shown = sorted.slice(0, EPISODES_PER_SEASON);
+    return html`<details class="season"${i === 0 ? raw(' open') : ''}><summary><span dir="auto">${seasonName(n, vs)}</span><span class="count">${countEpisodes(vs.length)}</span></summary>
+<ol class="eps">${shown.map((v) => episodeItem(m, v, named))}</ol>${
+      vs.length > shown.length
+        ? html`<p class="more">ועוד ${countEpisodes(vs.length - shown.length)} באפליקציה.</p>`
+        : ''
+    }</details>`;
+  });
   const older = seasons.slice(SEASONS_IN_FULL);
   const poster = m.poster ? sized(m.poster, 520) : undefined;
   // Our own artwork is served from this site: share cards and structured data need its full address.
@@ -559,29 +456,31 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
       jsonLd,
       ...(posterUrl ? { image: posterUrl } : {}),
     },
-    `<header class="show-hero">${m.background ? `<img class="bg" src="${esc(sized(m.background, 1280))}" alt="" fetchpriority="low" decoding="async">` : ''}<div class="wrap">
-${poster ? `<img class="poster" src="${esc(poster)}" alt="" width="260" height="390" style="view-transition-name:${vtName(m.id)}">` : '<span></span>'}
+    html`<header class="show-hero">${m.background ? html`<img class="bg" src="${sized(m.background, 1280)}" alt="" fetchpriority="low" decoding="async">` : ''}<div class="wrap">
+${poster ? html`<img class="poster" src="${poster}" alt="" width="260" height="390" style="view-transition-name:${vtName(m.id)}">` : raw('<span></span>')}
 <div>
-<nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li><a href="${rowHref(row.id)}">${esc(rowName(row.id))}</a></li></ol></nav>
-<h1 dir="auto">${esc(name)}</h1>
-<ul class="facts">${facts.map((f) => `<li dir="auto">${f.href ? `<a href="${esc(f.href)}">${esc(f.text)}</a>` : esc(f.text)}</li>`).join('')}</ul>
-${description ? `<p class="desc" dir="auto">${esc(description)}</p>` : ''}
-<div class="acts"><a class="btn btn-primary" href="${esc(stremioDetail('series', m.id))}">${ICONS.play}צפייה ב-Stremio</a>${
+<nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li><a href="${rowHref(row.id)}">${rowName(row.id)}</a></li></ol></nav>
+<h1 dir="auto">${name}</h1>
+<ul class="facts">${facts.map((f) => html`<li dir="auto">${f.href ? html`<a href="${f.href}">${f.text}</a>` : f.text}</li>`)}</ul>
+${description ? html`<p class="desc" dir="auto">${description}</p>` : ''}
+<div class="acts"><a class="btn btn-primary" href="${stremioDetail('series', m.id)}">${ICONS.play}צפייה ב-Stremio</a>${
       site
-        ? `<a class="btn btn-ghost" href="${esc(site)}" rel="noopener">${ICONS.out}לצפייה באתר של ${esc(broadcaster ?? 'הערוץ')}</a>`
+        ? html`<a class="btn btn-ghost" href="${site}" rel="noopener">${ICONS.out}לצפייה באתר של ${broadcaster ?? 'הערוץ'}</a>`
         : ''
     }</div>
 <p class="small">${
-      s.source === 'mako' ? `הפרקים של קשת 12 מתנגנים דרך <a href="${HELPER_DOC}">העוזר הביתי</a> שלכם. ` : ''
-    }הכפתור פותח את התוכנית ב-Stremio, אם Israel TV מותקן שם (<a href="/he/#install">איך מתקינים</a>). ב-Nuvio, אחרי ההתקנה, חפשו "<bdi>${esc(name)}</bdi>".</p>
+      s.source === 'mako'
+        ? html`הפרקים של קשת 12 מתנגנים דרך <a href="${HELPER_DOC}">העוזר הביתי</a> שלכם. `
+        : ''
+    }הכפתור פותח את התוכנית ב-Stremio, אם Israel TV מותקן שם (<a href="/he/#install">איך מתקינים</a>). ב-Nuvio, אחרי ההתקנה, חפשו "<bdi>${name}</bdi>".</p>
 </div></div></header>
 <section class="seasons" aria-labelledby="eps-h"><div class="wrap">
 <h2 id="eps-h">פרקים</h2>
 ${list}${
   older.length
-    ? `<p class="muted">עונות קודמות, באפליקציה:</p><ul class="older">${older
-        .map(([n, vs]) => `<li dir="auto">${esc(seasonName(n, vs))}: ${countEpisodes(vs.length)}</li>`)
-        .join('')}</ul>`
+    ? html`<p class="muted">עונות קודמות, באפליקציה:</p><ul class="older">${older.map(
+        ([n, vs]) => html`<li dir="auto">${seasonName(n, vs)}: ${countEpisodes(vs.length)}</li>`,
+      )}</ul>`
     : ''
 }
 </div></section>`,
@@ -614,33 +513,15 @@ function livePage(input: LibraryInput): string {
         })),
       },
     },
-    `<div class="wrap page-head"><h1>שידור חי</h1>
+    html`<div class="wrap page-head"><h1>שידור חי</h1>
 <p class="lead">${num(input.live.length, 'he')} ערוצים ומה משודר בהם עכשיו, לפי שעון ישראל. ערוצים שמסומנים "עוזר ביתי" מתנגנים רק דרך <a href="${HELPER_DOC}">העוזר הביתי</a>.</p>
 </div>
-<section style="padding-top:24px"><div class="wrap"><div class="channels-grid">${input.live.map((c) => channelCard(c, input, 'h2', true)).join('')}</div></div></section>`,
+<section style="padding-top:24px"><div class="wrap"><div class="channels-grid">${input.live.map((c) => channelCard(c, input, 'h2', true))}</div></div></section>`,
   );
 }
 
 /** Search over search.json, in the browser (the same matching rules as the apps' search, simplified). */
-const SEARCH_SCRIPT = `(function(){var F={'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ'},P='הובלמשכ';
-function norm(s){return s.normalize('NFKD').replace(/[\\u0591-\\u05C7]/g,'').replace(/[ךםןףץ]/g,function(c){return F[c]}).toLowerCase().replace(/[׳״'"\`]/g,'').replace(/[^\\p{L}\\p{N}]+/gu,' ').trim()}
-function strip(w){var n=w[0]==='ו'&&w.length>3&&P.indexOf(w[1])>=0?2:1;return w.length-n>=2&&P.indexOf(w[0])>=0?w.slice(n):''}
-function score(key,q){var ws=key.split(' '),ex=ws.map(strip).filter(Boolean),best=1;
-for(var i=0;i<q.length;i++){var w=q[i],hit=ws.some(function(k){return k.indexOf(w)===0});if(hit)continue;
-var w2=strip(w);if(ex.some(function(k){return k.indexOf(w)===0})||(w2&&ws.some(function(k){return k.indexOf(w2)===0}))){best=2;continue}return 0}return best}
-var d=document,f=d.getElementById('q'),out=d.getElementById('results'),info=d.getElementById('info'),rows=null,
-esc=function(s){return s.replace(/[&<>"']/g,function(c){return '&#'+c.charCodeAt(0)+';'})},
-clean=function(s){return s.replace(/[\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]/g,'')};
-function sized(u){return /^https:\\/\\/media\\d*\\.reshet\\.tv\\/image\\/upload\\//.test(u)&&!/\\/upload\\/[a-z]_/.test(u)?u.replace('/image/upload/','/image/upload/w_220,c_limit,f_auto,q_auto/'):u}
-function run(){var q=norm(f.value);history.replaceState(null,'',q?'?q='+encodeURIComponent(f.value):location.pathname);
-if(!q){out.innerHTML='';info.textContent='';return}if(!rows){info.textContent='טוען…';return}
-var ws=q.split(' '),hits=[];rows.forEach(function(r){var s=score(r[4],ws);if(s)hits.push([s,r])});hits.sort(function(a,b){return a[0]-b[0]});
-info.textContent=hits.length?(hits.length===1?'נמצאה תוכנית אחת':'נמצאו '+hits.length+' תוצאות'):'לא נמצא כלום. נסו בעברית, כמו שהערוץ כותב את השם.';
-out.innerHTML=hits.slice(0,120).map(function(h){var r=h[1],live=r[1]==='tv',href=live?'/live/#'+r[0]:'/show/'+r[0]+'/',img=r[5]?sized(r[5].replace('{{israel-tv-origin}}','')):'';
-return '<a class="tile" href="'+href+'">'+(img?'<img class="poster" src="'+esc(img)+'" alt="" loading="lazy" width="220" height="330"'+(live?' style="object-fit:contain;padding:18%"':'')+'>':'<span class="poster blank" aria-hidden="true"></span>')+'<span class="t" dir="auto">'+esc(clean(r[3]))+'</span></a>'}).join('')}
-f.addEventListener('input',run);f.value=new URLSearchParams(location.search).get('q')||'';
-fetch('/search.json').then(function(r){return r.json()}).then(function(j){rows=j;run()},function(){info.textContent='החיפוש לא נטען. נסו לרענן את הדף.'});
-f.focus();run()})();`;
+const SEARCH_SCRIPT = script('search.js');
 
 function searchPage(): string {
   return page(
@@ -651,7 +532,7 @@ function searchPage(): string {
       section: 'search',
       script: SEARCH_SCRIPT,
     },
-    `<div class="wrap page-head"><h1>חיפוש</h1>
+    html`<div class="wrap page-head"><h1>חיפוש</h1>
 <form class="searchbox" action="/search/" method="get" role="search" onsubmit="return false"><input id="q" type="search" name="q" placeholder="שם התוכנית או הערוץ" aria-label="שם התוכנית או הערוץ" autocomplete="off"></form>
 <p class="results-info" id="info" role="status" aria-live="polite"></p>
 <noscript><p class="note">החיפוש עובד רק עם JavaScript. אפשר לדפדף ב<a href="/library/">ספרייה</a>.</p></noscript>
