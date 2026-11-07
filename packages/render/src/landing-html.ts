@@ -172,33 +172,36 @@ ${
     ? [
         [
           'פרק חדש עוד לא מופיע.',
-          'פרקים חדשים מופיעים בדרך כלל תוך שעה-שעתיים מרגע שעלו לאתר הערוץ. האפליקציות שומרות את השורות לזמן מה: משכו למטה לרענון, או הפעילו את האפליקציה מחדש.',
+          'פרק חדש מופיע בדרך כלל תוך שעה או שעתיים מרגע שעלה לאתר הערוץ. האפליקציה שומרת את הרשימות לזמן מה: משכו למטה כדי לרענן, או פתחו את האפליקציה מחדש.',
         ],
         [
-          'שורה מתחילה ב-⚠.',
+          'בתחילת שורה מופיע ⚠.',
           'האתר של הערוץ לא נקרא כבר זמן מה. מה שרואים הוא הרשימה הטובה האחרונה, והיא ממשיכה להתנגן. <a href="/status">דף המצב</a> מראה מה קורה.',
         ],
         [
-          'שורה מתחילה ב-⏳.',
-          'השורה עדיין מתמלאת (התוכניות של כאן מגיעות במשך כמה ימים). הפריט הראשון אומר כמה כבר נכנסו.',
+          'בתחילת שורה מופיע ⏳.',
+          'השורה עדיין נטענת: התוכניות של כאן מתווספות במשך כמה ימים. הפריט הראשון בשורה מראה כמה כבר נוספו.',
         ],
         [
           'משהו לא מתנגן.',
-          `בדקו את <a href="/status">דף המצב</a>, ואז <a href="${BROKEN_URL}">ספרו לנו</a> איזו תוכנית ואיזה פרק. אם כתוב "${ISRAEL_ONLY_LABEL}" ואתם בחו״ל, זו החלטה של הגוף המשדר.`,
+          `בדקו את <a href="/status">דף המצב</a>, ואם הבעיה לא מופיעה שם, <a href="${BROKEN_URL}">ספרו לנו</a> באיזו תוכנית ובאיזה פרק. אם כתוב "${ISRAEL_ONLY_LABEL}" ואתם בחו״ל, זו החלטה של הערוץ.`,
         ],
         [
-          'החיפוש לא מוצא כלום.',
-          'חפשו בעברית, כמו שהערוץ כותב את השם. תוכניות מוכרות רבות נמצאות גם לפי השם באנגלית.',
+          'החיפוש לא מוצא את התוכנית.',
+          'חפשו בעברית, כמו שהשם כתוב באתר הערוץ. הרבה תוכניות מוכרות נמצאות גם לפי השם באנגלית.',
         ],
         [
           'זה עובד עם התוספים האחרים שלי?',
-          'כן. כשפותחים תוכנית ישראלית משורות של תוסף אחר, Israel TV מוסיף את הפרקים שלו גם שם, אם הוא מכיר את התוכנית והעונות ממוספרות אותו דבר. סרטים הוא לא נוגע בהם.',
+          'כן. כשפותחים תוכנית ישראלית מהשורות של תוסף אחר, Israel TV מוסיף לה את הפרקים שלו, אם הוא מכיר את התוכנית ומספור העונות זהה. בסרטים הוא לא נוגע.',
         ],
         [
           'כמה זה עולה? צריך חשבון?',
-          'שום דבר, ולא. אין חשבונות ואין מעקב. הווידאו מגיע ישירות מהשירותים החינמיים של הגופים המשדרים; Israel TV לא מאחסן וידאו.',
+          'זה בחינם, ולא צריך חשבון. אין גם מעקב. הווידאו מגיע ישירות מהשירותים החינמיים של הערוצים; Israel TV לא מאחסן וידאו.',
         ],
-        ['יש לי זכויות במשהו שמופיע כאן ואני רוצה שיוסר.', `ראו <a href="${TAKEDOWN_DOC}">בקשות הסרה</a>.`],
+        [
+          'יש לכם זכויות בתוכן שמופיע כאן ואתם רוצים שיוסר?',
+          `כל הפרטים בדף <a href="${TAKEDOWN_DOC}">בקשות הסרה</a>.`,
+        ],
       ]
     : [
         [
@@ -318,7 +321,7 @@ ${
 <p class="section-lead">${t(
         lang,
         `With what is on now and next. Apps with a TV-guide screen also get the full programme guide.${helperChannels.length ? ' Channels marked “home helper” play only through your own home helper.' : ''}`,
-        `עם מה שמשודר עכשיו ומה הבא. באפליקציות עם לוח שידורים מופיע גם הלוח המלא.${helperChannels.length ? ' ערוצים שמסומנים "עוזר ביתי" מתנגנים רק דרך העוזר הביתי.' : ''}`,
+        `לכל ערוץ רואים מה משודר עכשיו ומה הבא, ובאפליקציות עם לוח שידורים גם את הלוח המלא.${helperChannels.length ? ' ערוצים שמסומנים "עוזר ביתי" מתנגנים רק דרך העוזר הביתי.' : ''}`,
       )}</p>
 <ul class="channels">${channels}</ul>`
     : ''
@@ -334,7 +337,7 @@ ${
 <li><span>${t(
       lang,
       `Press <a href="${stremio}" data-stremio>Install in Stremio</a> on this page, on a computer or phone that has Stremio. No Stremio app here? Use <a href="${stremioWeb}" data-stremio-web>Stremio’s website</a>.`,
-      `לחצו על <a href="${stremio}" data-stremio>התקנה ב-Stremio</a> בדף הזה, במחשב או בטלפון שמותקן בהם Stremio. אין כאן את האפליקציה? השתמשו ב<a href="${stremioWeb}" data-stremio-web>אתר של Stremio</a>.`,
+      `לחצו על <a href="${stremio}" data-stremio>התקנה ב-Stremio</a> בדף הזה, במחשב או בטלפון שמותקנת בהם האפליקציה. אין אותה כאן? אפשר להתקין דרך <a href="${stremioWeb}" data-stremio-web>האתר של Stremio</a>.`,
     )}</span></li>
 <li><span>${t(lang, 'Or: open <strong>Addons</strong> in Stremio, paste the link into the search box and choose <strong>Install</strong>.', 'או: פתחו ב-Stremio את <strong>Addons</strong>, הדביקו את הקישור בתיבת החיפוש ובחרו <strong>Install</strong>.')}</span></li>
 <li><span>${t(lang, 'Signed in to Stremio? It then appears in all your Stremio apps, the TV too.', 'מחוברים לחשבון Stremio? התוסף יופיע בכל האפליקציות שלכם, גם בטלוויזיה.')}</span></li>
@@ -360,7 +363,7 @@ ${
 <p>${t(
         lang,
         'Keshet 12 lets a video play only when your own home internet asks for it. So Keshet 12 needs a small <strong>home helper</strong>: a little program on a computer that stays on at home (a desktop PC or Mac, a storage box or a Raspberry Pi), which you add to your app as a second link.',
-        'קשת 12 מאפשרת לנגן וידאו רק כשהבקשה מגיעה מהאינטרנט הביתי שלכם. לכן לקשת 12 צריך <strong>עוזר ביתי</strong> קטן: תוכנה קטנה על מחשב שנשאר דלוק בבית (מחשב שולחני, מק, כונן רשת או Raspberry Pi), שמוסיפים לאפליקציה כקישור שני.',
+        'קשת 12 מנגנת וידאו רק כשהבקשה מגיעה מחיבור האינטרנט הביתי שלכם. לכן צריך בשבילה <strong>עוזר ביתי</strong>: תוכנה קטנה שרצה על מחשב שנשאר דלוק בבית (מחשב שולחני, מק, כונן רשת או Raspberry Pi) ומתווספת לאפליקציה כקישור שני.',
       )}</p>
 <p>${t(
         lang,
@@ -371,9 +374,9 @@ ${
 <p>${t(
         lang,
         'Setting it up takes 15 minutes to an hour the first time, and that computer has to stay on. It then plays at home; on a phone outside the house it needs some extra setup.',
-        'ההתקנה לוקחת בפעם הראשונה בין רבע שעה לשעה, והמחשב צריך להישאר דלוק. אחרי זה הוא מנגן בבית; בטלפון מחוץ לבית צריך עוד קצת הגדרות.',
+        'ההתקנה הראשונה לוקחת בין רבע שעה לשעה, והמחשב צריך להישאר דלוק. מאותו רגע קשת 12 מתנגנת בבית; כדי לצפות בטלפון מחוץ לבית צריך עוד כמה הגדרות.',
       )}</p>
-<div class="oss"><a class="btn btn-plain" href="${HELPER_DOC}">${t(lang, 'Set up the home helper', 'התקנת העוזר הביתי')}</a><a class="btn btn-plain" href="${AGENTS_DOC}">${t(lang, 'Let an AI assistant do it', 'לתת לעוזר AI לעשות את זה')}</a></div>
+<div class="oss"><a class="btn btn-plain" href="${HELPER_DOC}">${t(lang, 'Set up the home helper', 'התקנת העוזר הביתי')}</a><a class="btn btn-plain" href="${AGENTS_DOC}">${t(lang, 'Let an AI assistant do it', 'להיעזר בעוזר AI')}</a></div>
 </div></div>
 </div></section>`
     : ''
@@ -385,12 +388,12 @@ ${
 <p>${t(
       lang,
       'Everything in the catalog shows up anywhere in the world. Most live channels and most of Reshet 13 play anywhere, and so do the Kan titles the broadcaster allows abroad.',
-      'כל מה שבקטלוג מופיע בכל מקום בעולם. רוב הערוצים החיים ורוב התוכן של רשת 13 מתנגנים בכל מקום, וכך גם תוכניות כאן שהגוף המשדר מתיר לצפייה בחו״ל.',
+      'הקטלוג כולו מופיע בכל מקום בעולם. רוב ערוצי השידור החי ורוב התוכן של רשת 13 מתנגנים בכל מקום, וכך גם התוכניות של כאן שמותרות לצפייה בחו״ל.',
     )}</p>
 <p>${t(
       lang,
       `A stream that plays only from an Israeli internet connection says so in the app: <span class="he-label" lang="he" dir="rtl">${ISRAEL_ONLY_LABEL}</span> (only in Israel). That is the broadcaster’s choice, not the app’s.`,
-      `וידאו שמתנגן רק מחיבור אינטרנט ישראלי מסומן באפליקציה: <span class="he-label">${ISRAEL_ONLY_LABEL}</span>. זו החלטה של הגוף המשדר, לא של האפליקציה.`,
+      `תוכן שמתנגן רק מחיבור אינטרנט ישראלי מסומן באפליקציה: <span class="he-label">${ISRAEL_ONLY_LABEL}</span>. זו החלטה של הערוץ, לא של האפליקציה.`,
     )}</p>
 </div><div class="card">
 <p>${t(
@@ -411,8 +414,8 @@ ${faq.map(([q, a]) => html`<details><summary>${q}</summary><div class="body"><p>
 <h2 id="oss-h">${t(lang, 'Open source, run by volunteers', 'קוד פתוח, בהתנדבות')}</h2>
 <p class="section-lead">${t(
       lang,
-      `Israel TV reads the broadcasters’ public sites slowly, keeps every show and episode under a permanent number, and points your app at the broadcasters’ own video. Anyone can read the code, report a problem, help fix a channel whose site changed, or <a href="${SELF_HOST_DOC}">run their own copy</a>. Licensed <a href="${LICENSE_URL}">AGPL-3.0</a>.`,
-      `Israel TV קורא את האתרים הציבוריים של הגופים המשדרים לאט, שומר כל תוכנית וכל פרק תחת מספר קבוע, ומפנה את האפליקציה לווידאו של הגופים המשדרים עצמם. כל אחד יכול לקרוא את הקוד, לדווח על בעיה, לעזור לתקן ערוץ שהאתר שלו השתנה, או <a href="${SELF_HOST_DOC}">להריץ עותק משלו</a>. רישיון <a href="${LICENSE_URL}">AGPL-3.0</a>.`,
+      `Israel TV reads the channels’ public sites at a polite pace, gives every show and episode a permanent number, and points your app straight at the channel’s own video. The code is open: you can read it, report a problem, help fix a channel whose site changed, or <a href="${SELF_HOST_DOC}">run your own copy</a>. Licensed <a href="${LICENSE_URL}">AGPL-3.0</a>.`,
+      `Israel TV קורא את האתרים הציבוריים של ערוצי השידור בקצב מתון, שומר לכל תוכנית ולכל פרק מספר קבוע, ומפנה את האפליקציה ישירות לווידאו של הערוץ. הקוד פתוח: אפשר לקרוא אותו, לדווח על בעיה, לעזור לתקן ערוץ שהאתר שלו השתנה, או <a href="${SELF_HOST_DOC}">להריץ עותק משלכם</a>. רישיון <a href="${LICENSE_URL}">AGPL-3.0</a>.`,
     )}</p>
 <div class="oss">
 <a class="btn btn-plain" href="${PROJECT_URL}">${ICONS.github}${t(lang, 'Source code', 'קוד המקור')}</a>

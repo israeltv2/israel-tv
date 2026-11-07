@@ -1886,6 +1886,24 @@ below.
   `packages/render/test/__snapshots__/pages/`) before the change; after it the markup of every page is byte-identical,
   the styles equal after normalising notation, and the scripts were rewritten (tested in the browser design check).
 
+**Polish pass (round 9, sections 6, 8, 9).** Every page type and state (home in both languages, library, rows, show
+pages with a long title, one and many seasons, no description, no picture, no stills, a 400-episode season; live,
+search with results, none and a Hebrew prefix; status; not found) was captured at 1440 and 390 px, dark and light,
+with automatic checks (sideways scrolling, broken images, text pushed out of its box, small tap targets, script
+errors) and read by eye. Found and fixed: the external-link arrow could wrap onto a line of its own (now joined to the
+last word); live cards in the library strip were too narrow on phones; empty search offered no way on; the local
+server answered missing pages with a bare "Not Found" (now the site's 404 page, also on Cloudflare); the Hebrew
+footer's "AGPL-3.0. Israel TV" scrambled its full stop; the archive tile's small word failed contrast. Hebrew copy was
+read as a native reader would (the owner's "המשדרים לאט" example: modifiers on the wrong word, repetition, a switch of
+person) and rewritten throughout; "the broadcaster" is "הערוץ" everywhere.
+
+- **/status contributor details** are worded from the status fields, never from the publisher's run text: rows still
+  loading as progress bars (`filling.pagesToRead` added), runs that did not finish cleanly, pages skipped
+  (`skipped`), Kan's bot check (`botCheck`); the cards' notes come from the same fields. Show names listed with
+  nothing to watch are a compact grid, each name in its own direction. Warnings stay as logged (for contributors), with
+  each Hebrew run isolated so quotes and colons keep their places, ids linked to the show's page, ten per kind.
+- Focus: a quieter ring (70% accent, 2 px) and, on accordion headers, inside the box with a light tint.
+
 ## Round 10, live and publishing: only real problems are errors (2026-11-07)
 
 Measured on the home instance (runs, warnings, events.sqlite, logs; last 3 days) before changing anything.

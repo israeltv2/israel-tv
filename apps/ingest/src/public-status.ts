@@ -147,7 +147,9 @@ export function catalogSummary(
       source: c.source,
       shows: c.source === 'live' ? LIVE_CHANNELS.length : listed.length,
       episodes: listed.reduce((n, r) => n + episodeCount(r.show), 0),
-      ...(p && stillFilling(p) ? { filling: { inCatalog: p.inCatalog, known: p.known } } : {}),
+      ...(p && stillFilling(p)
+        ? { filling: { inCatalog: p.inCatalog, known: p.known, pagesToRead: p.backlog } }
+        : {}),
     };
   });
 }

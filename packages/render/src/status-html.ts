@@ -188,8 +188,21 @@ function historyBar(days: string[], values: (Health | null)[] | undefined): Chil
   )}</div><div class="hist-legend small muted"><span>${values.length} days ago</span><span>${count('ok')} of ${values.length - count(null)} days fine</span><span>Today</span></div></div>`;
 }
 
-/** Source notes shown on a row's card as well as in the details. */
-const VIEWER_NOTE = /bot check|no longer offered/i;
+/** What a viewer may want to know about a source, worded here from the status fields (never the run's own text). */
+function viewerNotes(s: Source | undefined): string[] {
+  const out: string[] = [];
+  const gone = s?.skipped?.noLongerOffered ?? 0;
+  if (gone)
+    out.push(
+      `${num(gone)} Kan ${gone === 1 ? 'episode is' : 'episodes are'} no longer offered (the broadcast rights ended), so ${gone === 1 ? 'it is' : 'they are'} not in the catalog.`,
+    );
+  const bot = s?.botCheck;
+  if (bot?.challenged)
+    out.push(
+      `Kan’s bot check stopped ${num(bot.challenged)} of ${num(bot.pages)} page loads today; reading carries on.`,
+    );
+  return out;
+}
 
 function card(c: StatusCatalog, status: StatusFile, logos: boolean): Html {
   const s = status.sources.find((x) => x.source === c.source);
@@ -224,7 +237,7 @@ function card(c: StatusCatalog, status: StatusFile, logos: boolean): Html {
       facts.push(html`<li><span>New episodes checked</span>${when(s.lastAiringRun.at)}</li>`);
   }
   // Notes a viewer can use as they are (plain words, no ids): Kan's bot check, episodes Kan no longer offers.
-  const said = (s?.notes ?? []).filter((n) => VIEWER_NOTE.test(n) && !/iltv_/.test(n));
+  const said = viewerNotes(s);
   let next: Child = '';
   if (c.source === 'kan') next = 'A few pages at a time, all day long.';
   else if (sched?.nextFullRun)
@@ -240,7 +253,7 @@ function card(c: StatusCatalog, status: StatusFile, logos: boolean): Html {
 <p class="row-line">${st.line}</p>
 <ul class="facts">${facts}</ul>
 ${next ? html`<p class="small muted next">${next}</p>` : ''}
-${said.length ? html`<ul class="small muted said">${said.map((n) => html`<li>${n.replace(/^./, (x) => x.toUpperCase())}.</li>`)}</ul>` : ''}
+${said.length ? html`<ul class="small muted said">${said.map((n) => html`<li>${n}</li>`)}</ul>` : ''}
 ${historyBar(status.history?.days ?? [], status.history?.sources[c.source])}
 </article>`;
 }
@@ -275,15 +288,54 @@ function detailsBlock(summary: Child, body: Child, open = false): Html {
   return html`<details${open ? raw(' open') : ''}><summary>${summary}</summary><div class="body">${body}</div></details>`;
 }
 
+/**
+ * An English line that quotes Hebrew (a show's or an episode's title): each Hebrew run is isolated, so its words and
+ * the punctuation around it keep their places ("\"פרק 4\" collides", not "\"4 פרק\" collides").
+ */
+function mixed(text: string): Html {
+  const parts = text.split(
+    /([\u0590-\u05FF][\u0590-\u05FF0-9 ׳״'\-–.,!?]*[\u0590-\u05FF0-9]|[\u0590-\u05FF])/,
+  );
+  return html`${parts.map((part, i) => (i % 2 ? html`<bdi dir="rtl">${part}</bdi>` : part))}`;
+}
+
+/** Warnings listed per kind on the page; status.json has them all. */
+const WARNINGS_SHOWN = 10;
+
+/** A series id in a warning, linked to its page (contributors can see the show it is about). */
+const showLink = (id: string) =>
+  /^iltv_[a-z]+_\d+$/.test(id)
+    ? html`<a href="/show/${id}/"><code>${id}</code></a>`
+    : html`<code>${id}</code>`;
+
+/** The details contributors need, each folded away, all worded from the status fields. */
 function contributorDetails(status: StatusFile): Html[] {
   const parts: Html[] = [];
   const name = (src: string) => sourceName(src);
+  const rowLabel = (c: StatusCatalog) =>
+    html`${catalogName(c.id, 'en')} <bdi lang="he" dir="rtl" class="muted">${catalogAppName(c.id)}</bdi>`;
   if (status.publish || status.tmdb)
     parts.push(
       detailsBlock(
         'Publishing and matching',
         html`<ul>${status.publish ? html`<li>${status.publish}</li>` : ''}${status.tmdb ? html`<li>${status.tmdb}</li>` : ''}</ul>`,
         true,
+      ),
+    );
+  const filling = (status.catalogs ?? []).filter((c) => c.filling);
+  if (filling.length)
+    parts.push(
+      detailsBlock(
+        html`Rows still loading <span class="count">${filling.length}</span>`,
+        html`<p class="small muted">A new row is read a few pages at a time; its shows play as soon as they are in.</p><ul class="progress">${filling.map(
+          (c) => {
+            const f = c.filling as NonNullable<StatusCatalog['filling']>;
+            const pct = f.known ? Math.min(100, Math.round((f.inCatalog / f.known) * 100)) : 0;
+            return html`<li><span class="p-name">${rowLabel(c)}</span><span class="p-text">${num(f.inCatalog)} of ${num(f.known)} shows${
+              f.pagesToRead ? html`, ${num(f.pagesToRead)} episode pages to go` : ''
+            }</span><span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${f.known}" aria-valuenow="${f.inCatalog}" aria-label="${catalogName(c.id, 'en')}: ${f.inCatalog} of ${f.known} shows"><i style="width:${pct}%"></i></span></li>`;
+          },
+        )}</ul>`,
       ),
     );
   parts.push(
@@ -296,20 +348,22 @@ function contributorDetails(status: StatusFile): Html[] {
         : raw('<p class="muted">None: every show was read in its last refresh.</p>'),
     ),
   );
-  const notes = status.sources.filter((s) => s.notes.length || s.lastFullRun?.error);
-  if (notes.length)
-    parts.push(
-      detailsBlock(
-        'Notes from the last runs',
-        notes.map(
-          (s) =>
-            html`<h3>${name(s.source)}</h3><ul>${[
-              ...(s.lastFullRun?.error ? [`Last run: ${s.lastFullRun.error}`] : []),
-              ...s.notes,
-            ].map((n) => html`<li><bdi dir="auto">${n}</bdi></li>`)}</ul>`,
-        ),
-      ),
-    );
+  // Runs that did not finish cleanly, and pages a site lists that are not played.
+  const runs = status.sources.flatMap((s) => {
+    const lines: Html[] = [];
+    const r = s.lastFullRun;
+    if (r && r.status !== 'ok' && r.status !== 'running')
+      lines.push(
+        html`<li><strong>${name(s.source)}:</strong> the last full read ${r.status === 'partial' ? 'finished with some shows missing' : 'failed'}${r.error ? html` (<span class="muted">${r.error}</span>)` : ''}.</li>`,
+      );
+    if (s.skipped?.notVideo)
+      lines.push(
+        html`<li><strong>${name(s.source)}:</strong> ${num(s.skipped.notVideo)} pages listed among the episodes are articles or promos without video, and are skipped.</li>`,
+      );
+    for (const n of viewerNotes(s)) lines.push(html`<li><strong>${name(s.source)}:</strong> ${n}</li>`);
+    return lines;
+  });
+  if (runs.length) parts.push(detailsBlock('From the last runs', html`<ul class="runs">${runs}</ul>`));
   const blocked = status.sources.filter(
     (s) => s.blocked && (s.blocked.pending.length || s.blocked.recovered.length),
   );
@@ -330,9 +384,9 @@ function contributorDetails(status: StatusFile): Html[] {
     parts.push(
       detailsBlock(
         html`Listed by a channel with nothing to watch <span class="count">${empty.reduce((n, s) => n + (s.emptyShows?.length ?? 0), 0)}</span>`,
-        html`<p class="small muted">The channel’s site lists these, but has no episodes to play; they are left out of the catalog until it does.</p>${empty.map(
+        html`<p class="small muted">The channel’s site lists these, but has no episodes to play; they stay out of the catalog until it does.</p>${empty.map(
           (s) =>
-            html`<h3>${name(s.source)}</h3><ul class="names" lang="he" dir="rtl">${(s.emptyShows ?? []).map((t) => html`<li>${t}</li>`)}</ul>`,
+            html`<h3>${name(s.source)} <span class="count">${s.emptyShows?.length ?? 0}</span></h3><ul class="name-chips">${(s.emptyShows ?? []).map((t) => html`<li dir="auto">${t}</li>`)}</ul>`,
         )}`,
       ),
     );
@@ -361,13 +415,21 @@ function contributorDetails(status: StatusFile): Html[] {
     detailsBlock(
       html`Recent warnings <span class="count">${status.warnings.length}</span>`,
       status.warnings.length
-        ? [...groups].map(
+        ? html`<p class="small muted">As the publisher logged them, newest first, grouped by kind.</p>${[
+            ...groups,
+          ].map(
             ([code, ws]) =>
-              html`<details class="inner"><summary>${warningWord(code)} <span class="count">${ws.length}</span></summary><div class="body"><ul class="warn-list">${ws.map(
-                (w) =>
-                  html`<li><span class="small muted">${when(w.at)}${w.id ? html` · <code>${w.id}</code>` : ''}</span><br><bdi dir="auto">${w.message}</bdi></li>`,
-              )}</ul></div></details>`,
-          )
+              html`<details class="inner"><summary>${warningWord(code)} <span class="count">${ws.length}</span></summary><div class="body"><ul class="warn-list">${ws
+                .slice(0, WARNINGS_SHOWN)
+                .map(
+                  (w) =>
+                    html`<li><span class="small muted">${when(w.at)}${w.id ? html` · ${showLink(w.id)}` : ''}</span><br><span dir="ltr">${mixed(w.message)}</span></li>`,
+                )}</ul>${
+                ws.length > WARNINGS_SHOWN
+                  ? html`<p class="small muted">And ${num(ws.length - WARNINGS_SHOWN)} more of this kind, in <a href="/${sitePaths.status}">status.json</a>.</p>`
+                  : ''
+              }</div></details>`,
+          )}`
         : raw('<p class="muted">None.</p>'),
     ),
   );

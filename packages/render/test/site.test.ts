@@ -258,9 +258,11 @@ test("Kan's bot check and a browser that did not start read plainly", () => {
     const main = page.slice(0, page.indexOf('id="details-h"'));
     expect(main).toContain('>Paused<');
     expect(main).toContain('Reading Kan’s site is paused for now');
-    expect(main).toContain('Kan&#39;s bot check stopped 3 of 412 page loads today');
-    expect(main).toContain('14 Kan episodes are no longer offered by Kan');
+    expect(main).toContain('Kan’s bot check stopped 3 of 412 page loads today');
+    expect(main).toContain('14 Kan episodes are no longer offered (the broadcast rights ended)');
     expect(text(main)).not.toContain('iltv_');
+    // The details are worded from the fields too: no run text with ids.
+    expect(text(page)).not.toContain('first fill of iltv_');
     expect(page).not.toContain('someone');
   }
 });

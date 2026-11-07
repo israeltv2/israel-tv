@@ -194,9 +194,12 @@ a {
 a:hover {
   text-decoration-thickness: 2px;
 }
+:focus {
+  outline: none;
+}
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 2px;
   border-radius: 6px;
 }
 [dir="rtl"] .flip {
@@ -524,6 +527,15 @@ details > summary {
   gap: 12px;
   align-items: center;
 }
+/* An accordion header's focus ring sits inside its box, quietly: visible, not a frame around the whole card. */
+details > summary {
+  border-radius: 14px;
+}
+details > summary:focus-visible {
+  outline-offset: -2px;
+  outline-width: 1.5px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
 details > summary::-webkit-details-marker {
   display: none;
 }
@@ -630,7 +642,7 @@ th {
 }
 .logo-tile .lt-over {
   font: 600 calc(var(--s) * 0.2) / 1 var(--body);
-  color: #5b5346;
+  color: #3a2e14;
 }
 .logo-tile .lt-text {
   font: 700 calc(var(--s) * 0.34) / 1 var(--display);

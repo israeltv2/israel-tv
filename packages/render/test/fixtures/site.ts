@@ -47,6 +47,8 @@ export const SITE_STATUS: StatusFile = {
         '14 Kan episodes are no longer offered by Kan (their broadcast rights ended), so they are not in the catalog',
         "Kan's bot check stopped 3 of 412 page loads today; the crawl waits and tries again",
       ],
+      skipped: { noLongerOffered: 14, notVideo: 2 },
+      botCheck: { challenged: 3, pages: 412 },
     },
     {
       source: 'live',
@@ -110,7 +112,7 @@ export const SITE_STATUS: StatusFile = {
       source: 'kan',
       shows: 91,
       episodes: 254,
-      filling: { inCatalog: 91, known: 118 },
+      filling: { inCatalog: 91, known: 118, pagesToRead: 608 },
     },
     {
       id: 'iltv_kankids',
@@ -118,7 +120,7 @@ export const SITE_STATUS: StatusFile = {
       source: 'kan',
       shows: 21,
       episodes: 48,
-      filling: { inCatalog: 21, known: 61 },
+      filling: { inCatalog: 21, known: 61, pagesToRead: 1546 },
     },
     {
       id: 'iltv_kanarchive',

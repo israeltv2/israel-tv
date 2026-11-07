@@ -46,5 +46,7 @@ export function localAddonApp(dir: string) {
     { cacheMs: 5_000 },
   );
   images.route('/', addon);
+  // Addresses neither app knows get the addon's answer (the site's not-found page for a person, JSON for an app).
+  images.notFound((c) => addon.fetch(c.req.raw));
   return images;
 }

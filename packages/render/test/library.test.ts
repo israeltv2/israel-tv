@@ -204,7 +204,9 @@ describe('the library pages', () => {
 
 test('renderLibrary alone: no guide, no live page section errors', () => {
   const files = renderLibrary({ rows: [], live: [] });
-  expect([...files.keys()].sort()).toEqual([sitePaths.library, sitePaths.searchPage].sort());
+  expect([...files.keys()].sort()).toEqual(
+    [sitePaths.library, sitePaths.searchPage, sitePaths.notFound].sort(),
+  );
 });
 
 test('channelGuide cuts by the guide’s own start, not by the clock', () => {
