@@ -33,5 +33,14 @@ export const CATALOG_LOGO: Record<string, string> = {
   iltv_reshet13: 'iltv_live_reshet13',
   iltv_kan11: 'iltv_live_kan11',
   iltv_kankids: 'iltv_live_kanedu',
-  iltv_kanarchive: 'iltv_live_kan11',
+};
+
+/**
+ * A row's mark: its channel's logo, or, for a row with no channel of its own (Kan's archive), a lettered tile: never
+ * another channel's logo.
+ */
+export type Mark = { logo: string } | { text: string; over: string };
+export const CATALOG_MARK: Record<string, Mark> = {
+  ...Object.fromEntries(Object.entries(CATALOG_LOGO).map(([k, v]) => [k, { logo: v }])),
+  iltv_kanarchive: { over: 'כאן', text: 'ארכיון' },
 };

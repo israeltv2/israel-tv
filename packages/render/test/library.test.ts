@@ -129,7 +129,8 @@ describe('the library pages', () => {
   test('pages are Hebrew, right to left, with the show’s own title, description and canonical address', () => {
     const html = page(sitePaths.showPage('iltv_mako_1'));
     expect(html).toContain('<html lang="he" dir="rtl">');
-    expect(html).toContain('<title>תוכנית iltv_mako_1: לצפייה בכל הפרקים | Israel TV</title>');
+    // Set right to left, with the Latin name isolated so it stays in one piece in the browser's tab.
+    expect(html).toMatch(/<title>\u200fתוכנית .*: לצפייה בכל הפרקים \| \u2066Israel TV\u2069<\/title>/);
     expect(html).toContain('<link rel="canonical" href="{{israel-tv-origin}}/show/iltv_mako_1/">');
     expect(html).toContain('תוכנית על &#60;משהו&#62;');
     expect(html).not.toContain('<משהו>');
@@ -278,4 +279,49 @@ test('our own artwork is a same-site path in pages, and a full address in share 
     '<meta property="og:image" content="{{israel-tv-origin}}/art/iltv_kan_1-poster.jpg">',
   );
   expect(html).not.toContain('javascript:');
+});
+
+test('links that leave the site open in a new tab and say so; app and own links stay as they are', () => {
+  const files = renderSite(input(Date.parse('2026-11-07T09:00:00Z')));
+  for (const [path, body] of files) {
+    if (!path.endsWith('.html')) continue;
+    for (const m of String(body).matchAll(/<a\b[^>]*>/g)) {
+      const tag = m[0];
+      const href = /href="([^"]*)"/.exec(tag)?.[1] ?? '';
+      const external = /^https?:\/\//.test(href) && !href.startsWith('{{israel-tv-origin}}');
+      expect(tag.includes('target="_blank"'), `${path}: ${tag}`).toBe(external);
+      if (external) expect(tag).toContain('rel="noopener noreferrer"');
+    }
+  }
+  const show = String(files.get(sitePaths.showPage('iltv_mako_1')));
+  expect(show).toContain('(נפתח בכרטיסייה חדשה)');
+  expect(show).toContain('href="stremio:///detail/series/iltv_mako_1"');
+});
+
+test('a row without a channel of its own gets a lettered tile, never another channel’s logo', () => {
+  const files = renderSite({
+    ...input(Date.parse('2026-11-07T09:00:00Z')),
+    shows: [show('iltv_kan_9', 'iltv_kanarchive', 'kan', 2)],
+    sources: ['kan'],
+    status: {
+      ...status,
+      catalogs: [
+        {
+          id: 'iltv_kanarchive',
+          name: 'כאן ארכיון',
+          source: 'kan',
+          shows: 0,
+          episodes: 0,
+          filling: { inCatalog: 1, known: 171 },
+        },
+      ],
+    },
+  });
+  const landing = String(files.get(sitePaths.landing));
+  const card =
+    landing.split('<article class="card row">').find((c) => c.includes('/library/kanarchive/')) ?? '';
+  expect(card).toContain('<span class="lt-text">ארכיון</span>');
+  expect(card.slice(0, card.indexOf('</article>'))).not.toContain('logos/iltv_live_kan11.png');
+  // Its first fill, not zeros.
+  expect(card).toContain('First load: 1 of 171');
 });

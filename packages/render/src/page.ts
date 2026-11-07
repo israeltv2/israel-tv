@@ -182,6 +182,17 @@ th{color:var(--muted);font-weight:600;font-size:.8rem}
 .on-air{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--on-air)}
 .on-air::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;animation:pulse 1.8s var(--ease-out) infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 60%,transparent)}100%{box-shadow:0 0 0 9px transparent}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.ext{width:.8em;height:.8em;margin-inline-start:.2em;vertical-align:-.05em}
+[dir=rtl] .ico-dir{transform:scaleX(-1)}
+.logo-tile{--s:48px;flex:none;width:var(--s);height:var(--s);display:inline-grid;place-items:center;border-radius:calc(var(--s)*.24);background:#fff;padding:calc(var(--s)*.1);box-shadow:inset 0 0 0 1px rgb(0 0 0/8%);overflow:hidden;line-height:1}
+.logo-tile img{width:100%;height:100%;object-fit:contain;display:block}
+.logo-tile .lt-over{font:600 calc(var(--s)*.2)/1 var(--body);color:#5b5346}
+.logo-tile .lt-text{font:700 calc(var(--s)*.34)/1 var(--display);color:#1c1406}
+.logo-tile:has(.lt-text){grid-template-rows:auto auto;align-content:center;gap:2px;background:${BRAND.stone}}
+.chip-fill{display:inline-flex;flex-direction:column;gap:5px;font-size:.82rem;font-weight:600;color:var(--accent);min-width:min(100%,14rem)}
+.chip-fill .bar{height:4px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.chip-fill .bar i{display:block;height:100%;background:var(--accent);border-radius:inherit}
 .poster{display:block;aspect-ratio:2/3;width:100%;height:auto;object-fit:cover;border-radius:12px;background:var(--poster-bg)}
 footer{border-top:1px solid var(--border);padding-block:32px;margin-top:32px;font-size:.92rem;background:var(--bg-2)}
 footer .wrap{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center}
@@ -263,6 +274,15 @@ const FONT_PRELOAD: Record<Lang, string> = {
   he: preloadFonts(['plex-he-400', 'plex-latin-400', 'karantina-he-700']),
 };
 
+/**
+ * The browser tab's title. A Hebrew title is set right to left whatever the browser's own direction, and the Latin
+ * name in it is isolated, so "Israel TV" stays in one piece ("שישי | Israel TV", not "TV | שישי … Israel").
+ */
+const tabTitle = (h: PageHead) =>
+  h.lang === 'he'
+    ? `\u200f${h.title.replace(/[A-Za-z][A-Za-z0-9 .-]*[A-Za-z0-9]/g, (m) => `\u2066${m}\u2069`)}`
+    : h.title;
+
 /** The document head: title, description, canonical address, icons, share cards, theme colour, styles. */
 export function head(h: PageHead, extraCss = ''): string {
   const url = absolute(h.path);
@@ -279,7 +299,7 @@ export function head(h: PageHead, extraCss = ''): string {
   const image = h.image ?? absolute(sitePaths.shareImage);
   return `<!doctype html><html lang="${h.lang}" dir="${h.lang === 'he' ? 'rtl' : 'ltr'}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(h.title)}</title>
+<title>${esc(tabTitle(h))}</title>
 <meta name="description" content="${esc(h.description)}">
 <link rel="canonical" href="${esc(url)}">${alt}${xDefault}
 <meta name="robots" content="index,follow">
@@ -370,6 +390,40 @@ export function footer(lang: Lang, extra = ''): string {
   }</p>
 </div></footer>
 <script>${SCRIPT}</script>`;
+}
+
+/**
+ * A logo in the site's one logo tile: the same box, padding and corner for every channel and row, the logo contained
+ * in it. A lettered mark (a row without a channel of its own) gets the same box.
+ */
+export function logoTile(
+  mark: { logo: string } | { text: string; over: string } | undefined,
+  size: number,
+): string {
+  const box = `class="logo-tile" style="--s:${size}px"`;
+  if (!mark) return `<span ${box} aria-hidden="true"></span>`;
+  if ('text' in mark)
+    return `<span ${box} aria-hidden="true"><span class="lt-over">${esc(mark.over)}</span><span class="lt-text">${esc(mark.text)}</span></span>`;
+  return `<span ${box}><img src="/${esc(sitePaths.channelLogo(mark.logo))}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async"></span>`;
+}
+
+/** The small "opens another site" arrow after a text link (mirrored in right-to-left text). */
+const EXT_ICON =
+  '<svg class="ext ico-dir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 16 16 8M9 8h7v7"/></svg>';
+
+/**
+ * Every link that leaves the site opens in a new tab, says so to screen readers, and (a text link) shows the arrow;
+ * links within the site and app links (stremio://) stay as they are. Applied to each finished page.
+ */
+export function externalLinks(html: string, lang: Lang): string {
+  const note = lang === 'he' ? ' (נפתח בכרטיסייה חדשה)' : ' (opens in a new tab)';
+  return html.replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/g, (all, attrs: string, body: string) => {
+    const href = /\shref="([^"]*)"/.exec(attrs)?.[1] ?? '';
+    if (!/^https?:\/\//.test(href) || href.startsWith(ORIGIN_TOKEN)) return all;
+    const rest = attrs.replace(/\s(target|rel)="[^"]*"/g, '');
+    const button = /\sclass="[^"]*\bbtn\b/.test(attrs);
+    return `<a${rest} target="_blank" rel="noopener noreferrer">${body}${button ? '' : EXT_ICON}<span class="sr">${note}</span></a>`;
+  });
 }
 
 /**
