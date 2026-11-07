@@ -39,6 +39,11 @@ enabled): no reading of sites, no publishing, no catalog database; usage events 
 `logo.png` (the addon's logo, square, about 256 px), `resolver-logo.png` (the resolver's) and `background.jpg`
 or `background.png` (1920×1080). Missing ones fall back to the bundled images in `assets/branding/`.
 
+The public pages' icons, share image and header picture (`favicon.ico`, `icon.svg`, `apple-touch-icon.png`,
+`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `og.jpg` 1200×630, `hero.jpg`) come from `assets/site/`;
+a file of the same name in `<dir>/site/` replaces one. `pnpm images:site` makes them from `assets/branding/` (run it
+after changing the logo or background, and commit the results).
+
 ## `sources`
 
 `mako`, `reshet`, `kan`, `live`: each `true` (default) or `false`.

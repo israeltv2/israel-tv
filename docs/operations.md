@@ -58,6 +58,40 @@ only there (`pnpm resolver events --errors`). At start it logs `catalog check: �
 `failingShows` lists shows whose last read failed (still served from last good data); `warnings` lists
 numbering conflicts, renumberings at the source, thin results and dead season links.
 
+### The public status page
+
+`/status` is for viewers first: one line on top says whether everything is working and what that means for
+watching; then a card per row (shows, episodes, last and next refresh, a 30-day bar), the live channels as last
+checked, and, folded away, the details for contributors (shows that failed, notes, the catalog check, recent
+warnings). It is rendered at publish time from the same data as `/status.json`; a few lines of script only turn
+times into "3 hours ago" in the reader's time zone (without it they read "7 Nov, 03:30 Israel time"). Its times are
+`<time>` elements, which the publisher leaves out when it compares status files, so a quiet run uploads nothing.
+
+Nothing private is published: every string in the status goes through `publicText` (packages/render). Kept: web
+addresses on the broadcasters' hosts and a few well-known public ones (`PUBLIC_HOSTS`: not workers.dev or
+cloudflare.com), as origin and path only (no user, password, query or fragment), and the public addon's own origin
+(`publisher.publicUrl` or the deployed address). Replaced with `[private address]` / `[path]`: every other web
+address, host names without a scheme (`proxy.example.net:3128`, as Node's connection errors print them), LAN names
+with a port (`mac-mini:7703`), `localhost`, IP addresses and file paths (`/Users/…`, `/Library/…`, `~/…`, `C:\…`,
+`C:/…`). The live check's stream addresses and the home helper's address are never copied into it.
+
+`/status.json` keeps every field above and adds (all optional, for older readers):
+
+| Field        | What it holds                                                                                                                                                                                                                                                                                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `catalogs[]` | The rows as published: `id`, `name` (Hebrew, as apps show it), `source`, `shows`, `episodes`; `filling: {inCatalog, known}` while a Kan row has its first fill.                                                                                                                                                                                                  |
+| `history`    | `days` (YYYY-MM-DD in `schedule.timezone`, oldest first, 30 of them) and `sources.<source>`: one `ok` / `warn` / `error` / `null` (no run) per day, from the runs table (full, airing and show runs; Kan's crawl slices; the live check). A day is `error` when nothing succeeded (Kan: `warn`), `warn` when something failed (Kan: more failed than succeeded). |
+| `live`       | The last live check: `at`, `abroad`, `channels[]` with `id`, `name`, `state` (`up`, `down`, or `unchecked` when a Keshet channel had no home helper to play it through), `helper` (plays only through the home helper), `israelOnly`.                                                                                                                            |
+| `schedule`   | `timezone`, `fullRunTime` ("03:30" for a plain daily `schedule.fullRun`), `nextFullRun`, `airingChecksPerDay`, `nextAiringCheck`.                                                                                                                                                                                                                                |
+
+The landing page (`/`, and `/he/` in Hebrew) is rendered at the same time, with the rows, counts and live channels
+written in. Both pages have their canonical address, share cards (`og.jpg`) and icons; `robots.txt` and
+`sitemap.xml` list the three pages, and the addon's JSON is kept out of search results (`X-Robots-Tag: noindex`
+and `Disallow` in robots.txt). Absolute addresses use `publisher.publicUrl`, else the address the last Cloudflare
+deploy reported; otherwise (the local publisher, or the very first deploy) the server fills in the address the page
+was asked on. To look at the pages without a database: `pnpm shots:site` (screenshots at phone and desktop width,
+light and dark, into `site-screens/`) or `pnpm shots:site --serve` (http://127.0.0.1:7790/).
+
 ## Usage dashboard and events
 
 The dashboard `http://<this computer's address>:7702/dash/` is for the owner only: it answers on the local network

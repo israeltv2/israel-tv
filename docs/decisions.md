@@ -1615,64 +1615,36 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
 - **Expected numbering notes.** "source-renumbered … kept SxEy" stays for an episode whose printed number another
   episode already holds (it was numbered on, once, with "episode-number-taken"): published numbers never move. A
   warning is stored once per distinct text, so an unchanged note does not repeat.
-  ||||||| 9044d02
 
-## Kan's bot check (2026-11-07)
+## Public pages: landing and status (2026-11-07)
 
-Kan's pages and images sit behind Cloudflare. Measured from outside Israel through the Israeli proxy exits:
-
-| Setup                                                                                                                  | Pages challenged                      | Images challenged             |
-| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------- |
-| Stock Playwright, fresh browser context per page (what ran until now; 2 days of logs)                                  | 0 of ~555                             | 129 of 273 on one lobby (47%) |
-| Stock Playwright, one persistent profile, pages in a row                                                               | 4 of 5 on kan.org.il (kankids passed) | –                             |
-| **patchright, one persistent profile** (Google Chrome and Chrome for Testing, two exits, a reused and a fresh profile) | **0 of 34**                           | **0 of ~3,000**               |
-
-- The per-page fresh session got pages through (Cloudflare lets the first navigation of a session in), but it never
-  earned a clearance, so nearly half of every page's own images were answered with `cf-mitigated: challenge`: that
-  is why 156 of 350 Kan shows had no copied poster ("could not copy its image (HTTP 403)") and the dashboard showed
-  a placeholder. It also cost a new proxy session per page, which is why pages were spaced 75 s apart.
-- **Chosen: [patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright) (`patchright-core`, Apache-2.0), a
-  drop-in Playwright build that removes the automation giveaways** (`navigator.webdriver`, `--enable-automation`,
-  the `Runtime.enable` leak), with **one persistent profile per proxy exit** (`kan-browser-<exit>/` next to the database) reused across
-  slices, the sandbox on (no `--no-sandbox` bar), no custom user agent or viewport, Israeli locale and time zone,
-  and **one sticky proxy exit** (the first configured one; Cloudflare's `cf_clearance` cookie is tied to the exit's
-  address). The managed check then clears on its own on the first page, as for a person's browser; we never click
-  or solve anything, and no paid solving service is involved.
-- Pacing follows: one browser per slice, pages 20 s apart, 12 pages per 10-minute slice (about 1,700 pages a day at
-  most, less than one page a minute on average), concurrency 1. The first fill of every Kan row (about 2,200
-  episode pages plus the archive) takes days less than before.
-- **Considered and not taken:** FlareSolverr/Byparr (an extra service to run, and they solve the same way a stealth
-  browser does); rebrowser-playwright-core (the same fix, kept as the fallback); camoufox/nodriver/undetected-chromedriver
-  (Python, or a different browser engine; patchright keeps the Playwright API this code already uses); `cf_clearance`
-  replay into plain HTTP (needs the same TLS fingerprint as the browser).
-- **Next step, measured but not built this round: Kan's app API** (`mobapi.kan.org.il/api/mobile/program?id=<show
-  page id>`, `…/subClass?id=<category>`; behaviour learned from the Idan Plus Kodi addon, no code taken). From
-  abroad it answers `403 cf-mitigated: challenge`; inside the cleared patchright session it answers 200 with every
-  episode of a show in one JSON: the same page ids as our episode keys, season, episode number, air date, duration,
-  and a Kaltura `playManifest` URL whose entry id is the one in the Redge URL we store (an entry with an empty id is
-  not a video). One request per show instead of one page per episode would make the first fill a matter of hours.
-  Not switched yet because it changes where every Kan stream URL comes from (Kaltura instead of Redge, to be
-  play-checked from Israel and abroad), and numbering is frozen: it needs its own round with fixtures and a
-  side-by-side comparison against what the pages gave.
-- **Reported, not hidden:** a page that still meets the check is "blocked by Kan's bot check (Cloudflare)"; the
-  slice stops and waits 45 minutes, and no page is charged. The crawl keeps a per-day tally (`kan:crawl` →
-  `botCheck`: pages, challenged, images, images challenged; two weeks), and `/status` says how many page loads the
-  check stopped today when it stopped any.
-- **Tuning:** `scraping.browserPagesPerRun` and `scraping.browserPageIntervalSec` (docs/configuration.md). If the
-  tally shows challenges: delete `kan-browser-<exit>/` (a fresh profile clears again), check that the first `geo.urls`
-  entry still answers, then slow the pace. Only one process may use the profile at a time (Chrome locks it): run
-  `israel-tv kan` by hand only while the daemon is stopped.
-
-**Episode pages that are not episodes.** The four pages reported as "no video player config on the page (layout
-changed?)" were none of them a layout change. Two were episodes Kan took down when their rights ended (a
-`rights-expired` overlay where the player was: "בשל הסכמי זכויות שידור, … כבר לא זמין לצפייה"); one was an interview
-article linked among the episodes (a VideoObject with an empty `contentUrl`); one show's episodes were all taken down.
-Episode pages are now classified: a video; the bot check (also when it answers 200); removed; not a video; or
-unknown. Removed and not-a-video pages are skipped at once, never retried, and counted on `/status`; only an
-unknown page is retried (three times, a day apart) and then given up visibly. A page with a Redge `contentUrl` but
-no player config is read from its VideoObject.
-
-**The archive row was empty** ("0 of 171 shows in the catalog, 0 episode pages to read") because its show pages, like
-its episodes, waited until every other Kan row had nothing left to read, which at the old pace was a week away. The
-archive's show pages are now read after the other rows' due ones in each slice, and episode pages of all rows share
-one queue: newly published first, then the show with the fewest episodes (the archive only loses ties).
+- **Pre-rendered, no framework.** Both pages are written at publish time by `packages/render` (`landing-html.ts`,
+  `status-html.ts`, shared `page.ts`), CSS and a few lines of script inline: one request each, no build step, nothing
+  for the Workers to run (the landing page is a static asset; `/status` is read from the assets by the API Worker as
+  before). Lighthouse is 99–100 in every category on both. The script only makes times relative, remembers the
+  theme and fills the install links when the address was not known at render time; the pages read complete without it.
+- **Numbers come from what was published.** `renderSite` counts the rows it just wrote and puts them into
+  `status.json` (`catalogs`) and the landing page, so the page, the status and the apps agree.
+- **History is cheap:** one query of the runs table for 30 days (`Store.finishedRunsSince`, four columns), folded into
+  one health per day per source at publish time. Runs are pruned after 60 days, so 30 always fit.
+- **Times as `<time>`.** The fallback text is Israel time; the publisher's comparison drops `<time>` elements, so the
+  hourly airing checks alone do not upload a new status page. The "next refresh" time rolls forward a day in the
+  browser when the page is older than it.
+- **Scrubbed by allowlist.** Error texts can carry the home helper's address, a tunnel, a LAN IP or a file path.
+  Rather than trying to name what is private, `publicText` keeps only web addresses on the broadcasters' and
+  well-known public hosts (origin and path: queries carry tickets and tokens) and the public addon's exact origin, and
+  replaces every other address — with or without a scheme, single-word LAN names with a port — and every path.
+  workers.dev and cloudflare.com are not allowed: the private API Worker lives there too. Applied to everything in the
+  status file, both in `status.json` and on the page.
+- **Two languages for the landing page, one for status.** The landing page is the viewer's way in, so it exists in
+  English (`/`) and Hebrew (`/he/`, `dir="rtl"`) with `hreflang` links; the status page is English with the Hebrew row
+  and channel names in `<bdi>`. A Hebrew status page can follow if viewers ask.
+- **Absolute addresses:** canonical, Open Graph, sitemap and JSON-LD use the origin token, which publish replaces
+  with `publisher.publicUrl` or the last deployed address; the addon app now also fills it in HTML, XML and text
+  responses, so the local publisher and a first deploy serve correct addresses for whoever asks.
+- **Icons and share image are committed files** (`assets/site/`, made by `pnpm images:site` from the branding with
+  the installed Chrome): publishing only copies them, so a publish needs no browser. `favicon.ico` comes from a
+  hand-drawn `icon.svg` of the logo (crisper at 16 px than a scaled bitmap).
+- **Not indexed:** the addon's JSON (`X-Robots-Tag: noindex` from the app and in `_headers`; `Disallow` in
+  robots.txt). The pages say `index,follow`.
+- **No analytics, no donation links, no web fonts** (system fonts with Hebrew fallbacks).

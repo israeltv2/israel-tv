@@ -13,7 +13,7 @@ import {
   ScrapedShow as ScrapedShowSchema,
   type Source,
 } from '@israel-tv/core';
-import { and, desc, eq, inArray, like, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, ne, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
 import * as t from './schema.ts';
@@ -591,6 +591,19 @@ export class Store {
       )
       .orderBy(desc(t.runs.id))
       .limit(limit)
+      .all();
+  }
+
+  /** Finished runs of these kinds started since `since` (ISO), oldest first: just what a day-by-day history needs. */
+  finishedRunsSince(
+    since: string,
+    kinds: RunKind[],
+  ): { kind: RunKind; scope: string; startedAt: string; status: RunStatus }[] {
+    return this.db
+      .select({ kind: t.runs.kind, scope: t.runs.scope, startedAt: t.runs.startedAt, status: t.runs.status })
+      .from(t.runs)
+      .where(and(gte(t.runs.startedAt, since), inArray(t.runs.kind, kinds), ne(t.runs.status, 'running')))
+      .orderBy(t.runs.id)
       .all();
   }
 
