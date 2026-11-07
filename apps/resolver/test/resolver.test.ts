@@ -659,6 +659,33 @@ test('internal traffic is marked: probe-/canary- play ids; a request for somethi
   expect(events.at(-1)?.playId).toMatch(/^probe-/);
 });
 
+test('a live channel with neither a Mako ticket nor a geo limit needs nothing here: "none needed", not an error', async () => {
+  // The daily canary asks for Channel 13; it plays from its direct streams (2026-11-07: 14 such "errors" in 3 days).
+  const events: { outcome: string; detail?: unknown }[] = [];
+  const direct = (id: string, geo?: boolean) => ({
+    id,
+    name: id,
+    description: '',
+    direct: [{ title: id, url: `https://cdn.example/${id}.m3u8` }],
+    ...(geo ? { geo } : {}),
+  });
+  const app = createResolverApp({
+    episode: () => undefined,
+    onEvent: (e) => events.push(e),
+    fetch: async () => new Response('', { status: 404 }),
+    channels: [direct('iltv_live_reshet13'), direct('iltv_live_kan11', true)],
+  });
+  const s = await (await app.request('/stream/tv/iltv_live_reshet13.json')).json();
+  expect(s.streams).toEqual([]);
+  expect(events.at(-1)).toMatchObject({ outcome: 'ok', detail: { offered: 'none needed' } });
+  // A geo-limited channel with no relay configured here still says it has nothing to offer.
+  await app.request('/stream/tv/iltv_live_kan11.json');
+  expect(events.at(-1)).toMatchObject({
+    outcome: 'error',
+    detail: { offered: 'no stream for this id here' },
+  });
+});
+
 test('a relay refused through one exit is tried once through the next', async () => {
   const exits: string[] = [];
   let current = 'a';

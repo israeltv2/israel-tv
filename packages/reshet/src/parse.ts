@@ -113,6 +113,8 @@ const OldEpisode = z.looseObject({
 const Program = z.looseObject({
   seriesId: z.coerce.string(),
   seriesName: z.string().nullish(),
+  /** The show's own page on the site ("/vod/hostages/"), which lists its videos as posts. */
+  seriesHp: z.string().nullish(),
   season: z.looseObject({ position: z.number(), name: z.string().nullish() }).nullish(),
   seasonsList: z.array(z.looseObject({ position: z.number(), name: z.string().nullish() })).nullish(),
   episodes: z.array(OldEpisode).nullish(),
@@ -132,7 +134,11 @@ const ShowPageData = z.looseObject({
     pageProps: z.looseObject({
       page: z
         .looseObject({
-          Content: z.looseObject({ PageGrid: z.array(z.looseObject({ grid_type: z.string().nullish() })) }),
+          Content: z.looseObject({
+            PageGrid: z.array(
+              z.looseObject({ grid_type: z.string().nullish(), post_count: z.number().nullish() }),
+            ),
+          }),
         })
         .optional(),
       program: Program.optional(),
@@ -163,6 +169,11 @@ export interface ParsedShowPage {
   description?: string;
   /** A wide picture of the show (its Kaltura record's 16x9 image, 1280×720). */
   background?: string;
+  /**
+   * Older template whose Kaltura record has no seasons left: the show's own site page ("/vod/hostages/"), where its
+   * episodes are still listed as posts (see parseShowSitePage).
+   */
+  sitePage?: string;
 }
 
 const img = (o: z.infer<typeof ImageObj>) => o?.d ?? o?.m ?? undefined;
@@ -217,15 +228,25 @@ const epochDay = (sec: number | null | undefined) =>
   sec ? new Date(sec * 1000).toISOString().slice(0, 10) : undefined;
 
 /**
- * Older-template episodes, with one repair: some shows give every episode the show's own start date as
- * `startDate`. When all episodes without a date in their title share one startDate, their upload date
- * (`createDate`) is the better air date.
+ * Older-template episodes, with two repairs:
+ * - some shows give every episode the show's own start date as `startDate`. When all episodes without a date in
+ *   their title share one startDate, their upload date (`createDate`) is the better air date;
+ * - some seasons give many episodes the same `EpisodeNumber` (a placeholder, mostly 1: 135 of the 138 episodes in
+ *   one season of "המקור", 2026-11-07). A number shared within a season is not an episode number: those episodes
+ *   take the number printed in their title, if any.
  */
 function oldSeason(list: z.infer<typeof OldEpisode>[]): ScrapedEpisode[] {
   const untitled = list.filter((e) => !parseDottedDate(e.name) && e.startDate);
   const shared = untitled.length >= 2 && new Set(untitled.map((e) => e.startDate)).size === 1;
+  const uses = new Map<number, number>();
+  for (const e of list) {
+    const n = e.metas?.EpisodeNumber;
+    if (n) uses.set(n, (uses.get(n) ?? 0) + 1);
+  }
+  const placeholder = (e: z.infer<typeof OldEpisode>) => (uses.get(e.metas?.EpisodeNumber ?? 0) ?? 0) > 1;
   return list
     .map((e) => (shared && !parseDottedDate(e.name) && e.createDate ? { ...e, startDate: e.createDate } : e))
+    .map((e) => (placeholder(e) ? { ...e, metas: { ...e.metas, EpisodeNumber: null } } : e))
     .map(fromOld)
     .filter((e): e is ScrapedEpisode => !!e);
 }
@@ -286,10 +307,15 @@ export function parseShowPage(html: string): ParsedShowPage {
     // Daily news shows leave the page's description empty; their Kaltura record still has a blurb.
     const own = tidyText(p.programData?.description ?? '');
     const wide = p.programData?.images?.find((i) => i.imageTypeName === '16x9')?.url;
+    // A record with no seasons and no episodes (29 shows, 2026-11-07; their season pages answer HTTP 500): the
+    // show's own site page still lists its videos.
+    const empty = seasons.length === 0 && !p.episodes?.length;
+    const home = p.seriesHp?.trim();
     return {
       template: 'program',
       seriesId: p.seriesId,
       seasons,
+      ...(empty && home?.startsWith('/') ? { sitePage: home } : {}),
       ...(genres.length ? { genres } : {}),
       ...(description ? blurb : own.length >= 10 ? { description: own } : {}),
       ...(wide && /^https:\/\//.test(wide) ? { background: kalturaImage(wide, 1280, 720) } : {}),
@@ -300,10 +326,12 @@ export function parseShowPage(html: string): ParsedShowPage {
   const grids = pp.page?.Content.PageGrid ?? [];
   if (grids.length > 0) {
     const kinds = [...new Set(grids.map((g) => g.grid_type ?? '?'))].join(', ');
+    // A video list page whose list is empty (post_count 0): the show is listed with nothing on it.
+    const count = grids.find((g) => g.grid_type === 'PaginationArray')?.post_count;
     return {
       template: 'no-vod',
       seasons: [],
-      note: `no episode list on the show page (only ${kinds})`,
+      note: count === 0 ? 'its page lists no videos' : `no episode list on the show page (only ${kinds})`,
       ...blurb,
     };
   }
@@ -314,6 +342,199 @@ export function parseShowPage(html: string): ParsedShowPage {
 export function parseSeasonPage(html: string): ScrapedEpisode[] {
   const d = ShowPageData.parse(nextData(html));
   return oldSeason(d.props.pageProps.program?.episodes ?? []);
+}
+
+// ---- the show's own site page --------------------------------------------------------------------------
+//
+// Shows whose Kaltura record is empty (and some shows listed straight to such a page) are still on the site as a
+// page of posts: a "Base" list with further pages ("/vod/hostages/page/2/"), or grids ("פרקים מלאים", clips,
+// articles) that link to full lists ("/entertainment/the-x-factor-israel/season-04/episodes/"). A post is a full
+// episode when it has a Kaltura video and links either to Reshet's VOD item for it
+// ("/allshows/series/464/season/1/2147762/") or to an item under the show's own "episodes" section
+// ("/item/kan-kids/shakshuka/season-01/episodes/…"). Clips, recipes and articles link elsewhere and are left out.
+
+const SitePost = z.looseObject({
+  link: z.string().nullish(),
+  title: z.string().nullish(),
+  secondaryTitle: z.string().nullish(),
+  isBlank: z.boolean().nullish(),
+  imageObj: ImageObj.catch(undefined),
+  publishDate: z.string().nullish(),
+  video: z
+    .looseObject({
+      kalturaId: z.string().nullish(),
+      duration: z.number().nullish(),
+      name: z.string().nullish(),
+    })
+    .nullish()
+    .catch(undefined),
+});
+type SitePost = z.infer<typeof SitePost>;
+const SiteGrid = z.looseObject({
+  grid_type: z.string().nullish(),
+  grid_title: z
+    .looseObject({ text: z.string().nullish(), link: z.string().nullish() })
+    .nullish()
+    .catch(undefined),
+  posts: z.array(z.unknown()).nullish().catch(undefined),
+  matrix_elements: z
+    .array(z.looseObject({ posts: z.array(z.unknown()).nullish() }).catch({ posts: [] }))
+    .nullish()
+    .catch(undefined),
+  current_page: z.number().nullish(),
+  max_page: z.number().nullish(),
+  base: z.string().nullish(),
+});
+const SitePageData = z.looseObject({
+  props: z.looseObject({
+    pageProps: z.looseObject({
+      page: z
+        .looseObject({
+          PageMeta: z.looseObject({ pageType: z.string().nullish() }).nullish().catch(undefined),
+          Content: z.looseObject({ PageGrid: z.array(z.unknown()) }),
+        })
+        .nullish(),
+    }),
+  }),
+});
+
+export interface SiteEpisode {
+  season: number;
+  /** The post's publish time, to order a season oldest first. */
+  at: string;
+  episode: ScrapedEpisode;
+}
+
+export interface ShowSitePage {
+  /** The site's front page (a show the list links there has no page of its own). */
+  front: boolean;
+  episodes: SiteEpisode[];
+  /** Full-episode lists the page's grids link to. */
+  lists: string[];
+  /** This list's further pages, in order. */
+  morePages: string[];
+  /** The Reshet VOD series the episodes belong to (from their links), once known. */
+  seriesId?: string;
+  /** VOD links to several series and no way to tell the show's own: those were left out. */
+  mixed?: boolean;
+}
+
+const VOD_ITEM = /^\/allshows\/series\/(\d+)\/season\/(\d+)\/\d+\/?$/;
+const seasonIn = (s: string | null | undefined) => /עונה\s*(\d{1,3})(?!\d)/.exec(s ?? '')?.[1] ?? undefined;
+const seasonPath = (s: string | null | undefined) =>
+  /season-0*(\d{1,3})(?!\d)/.exec(s ?? '')?.[1] ?? undefined;
+const dayOf = (s: string | null | undefined) => (/^\d{4}-\d{2}-\d{2}/.exec(s ?? '') ?? [])[0];
+
+/**
+ * Full episodes on one of a show's site pages. `show` is the show's own page ("/kan-kids/shakshuka/"), which its
+ * episode items sit under; `seriesId` its VOD series when known (otherwise the one series the page's VOD links share);
+ * `page` the address of this page, whose "season-04" names the season of a list that does not say it otherwise.
+ */
+export function parseShowSitePage(
+  html: string,
+  where: { show: string; page: string; seriesId?: string | undefined },
+): ShowSitePage {
+  const page = SitePageData.parse(nextData(html)).props.pageProps.page;
+  const grids = (page?.Content.PageGrid ?? []).flatMap((g) => {
+    const r = SiteGrid.safeParse(g);
+    return r.success ? [r.data] : [];
+  });
+  const showPath = where.show.endsWith('/') ? where.show : `${where.show}/`;
+  const candidates: { series?: string; season: number; at: string; episode: ScrapedEpisode }[] = [];
+  const lists: string[] = [];
+  const morePages: string[] = [];
+  for (const g of grids) {
+    const posts = [...(g.posts ?? []), ...(g.matrix_elements ?? []).flatMap((m) => m.posts ?? [])].flatMap(
+      (p) => {
+        const r = SitePost.safeParse(p);
+        return r.success ? [r.data] : [];
+      },
+    );
+    for (const p of posts) {
+      const c = sitePost(p, showPath, g.grid_title, where.page);
+      if (c) candidates.push(c);
+    }
+    const link = g.grid_title?.link?.trim();
+    if (link?.startsWith(showPath) && /\/episodes\/?$/.test(link) && !lists.includes(link)) lists.push(link);
+    if (g.grid_type === 'PaginationArray' && g.base?.includes('%#%') && g.max_page) {
+      for (let n = (g.current_page ?? 1) + 1; n <= g.max_page; n++)
+        morePages.push(`${g.base.replace('%#%', String(n)).replace(/\/?$/, '/')}`);
+    }
+  }
+  const series = [...new Set(candidates.flatMap((c) => (c.series ? [c.series] : [])))];
+  const seriesId = where.seriesId ?? (series.length === 1 ? series[0] : undefined);
+  const mixed = !where.seriesId && series.length > 1;
+  const seen = new Set<string>();
+  const episodes = candidates.filter((c) => {
+    if (c.series && c.series !== seriesId) return false;
+    if (seen.has(c.episode.key)) return false;
+    seen.add(c.episode.key);
+    return true;
+  });
+  return {
+    front: page?.PageMeta?.pageType === 'hp',
+    episodes: episodes.map(({ season, at, episode }) => ({ season, at, episode })),
+    lists,
+    morePages,
+    ...(seriesId ? { seriesId } : {}),
+    ...(mixed ? { mixed } : {}),
+  };
+}
+
+/** One post as a full episode of the show, or undefined (a clip, an article, another show's video). */
+function sitePost(
+  p: SitePost,
+  showPath: string,
+  grid: { text?: string | null | undefined; link?: string | null | undefined } | null | undefined,
+  pagePath: string,
+): { series?: string; season: number; at: string; episode: ScrapedEpisode } | undefined {
+  const entryId = p.video?.kalturaId?.trim();
+  const link = p.link?.trim() ?? '';
+  if (!entryId || p.isBlank) return undefined;
+  const vod = VOD_ITEM.exec(link);
+  const own = link.startsWith(`/item${showPath}`) && /\/episodes\//.test(link);
+  if (!vod && !own) return undefined;
+  const title = p.title ?? '';
+  // The season as the site names it: in the title, the item's address, the grid, the list's address, the video's
+  // name; then the VOD item's season position; else 1.
+  const season = Number(
+    seasonIn(title) ??
+      seasonPath(own ? link : undefined) ??
+      seasonIn(grid?.text) ??
+      seasonPath(grid?.link) ??
+      seasonPath(pagePath) ??
+      seasonPath(p.video?.name) ??
+      vod?.[2] ??
+      '1',
+  );
+  return {
+    ...(vod?.[1] ? { series: vod[1] } : {}),
+    season: season > 0 ? season : 1,
+    at: p.publishDate ?? '',
+    episode: episode(entryId, title, {
+      numberHint: parseEpisodeHint(title),
+      airDate: parseDottedDate(title) ?? dayOf(p.publishDate),
+      description: p.secondaryTitle,
+      thumb: img(p.imageObj),
+      dur: p.video?.duration,
+    }),
+  };
+}
+
+/** Site-page episodes as seasons ("עונה 2"), lowest first, each oldest first. */
+export function siteSeasons(list: readonly SiteEpisode[]): (ParsedSeason & { episodes: ScrapedEpisode[] })[] {
+  const by = new Map<number, SiteEpisode[]>();
+  for (const e of list) by.set(e.season, [...(by.get(e.season) ?? []), e]);
+  return [...by.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([n, eps]) => ({
+      id: String(n),
+      title: `עונה ${n}`,
+      episodes: eps
+        .map((e, i) => ({ e, i }))
+        .sort((a, b) => a.e.at.localeCompare(b.e.at) || b.i - a.i)
+        .map(({ e }) => e.episode),
+    }));
 }
 
 /** Season keys a stored show already split by year (`<key>|2024`), so a later read splits them again. */

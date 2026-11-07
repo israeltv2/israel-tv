@@ -55,9 +55,12 @@ export function parseSeasonTitle(title: string): { kind: SeasonKind; number?: nu
   return { kind: 'named' };
 }
 
-/** Read an episode number from text like "פרק 5", "פרק 5@05.11.26" or "פרק 12 - הגמר". */
+/**
+ * Read an episode number from text like "פרק 5", "פרק 5@05.11.26" or "פרק 12 - הגמר". "מתוך פרק 1" ("from
+ * episode 1", a song or clip taken from it) names another episode, not this one's number.
+ */
 export function parseEpisodeHint(text: string | undefined | null): number | undefined {
-  const m = /פרק\s*(\d{1,4})(?!\d)/.exec(text ?? '');
+  const m = /(?<!מתוך\s*)פרק\s*(\d{1,4})(?!\d)/.exec(text ?? '');
   const n = m ? Number(m[1]) : Number.NaN;
   return Number.isInteger(n) && n > 0 ? n : undefined;
 }
