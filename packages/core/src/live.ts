@@ -1,7 +1,10 @@
 // Live channels. Streams marked `direct` play as-is anywhere they are not geo-blocked; `mako` channels
 // need a fresh Mako ticket per play (private resolver); `geo` channels may be blocked outside Israel and
 // get an extra relayed stream from the resolver when a geo proxy is configured.
-// Checked 2026-11-06: every direct URL below answered master/variant/segment = 200/200/206 from outside Israel.
+// Checked 2026-11-06 and again 2026-11-07 (every direct URL below answered master/variant/segment = 200/200/206
+// from outside Israel; every Mako path played with a fresh ticket). The daily live check (apps/ingest live.ts)
+// plays every one of them again and labels a stream "Israel only" only when it is refused abroad.
+// Order within a channel: the broadcaster's main feed first, then captioned, then backups.
 
 export interface LiveLink {
   title: string;
@@ -23,6 +26,10 @@ export interface LiveChannel {
 
 const redge = (path: string) =>
   `https://r.il.cdn-redge.media/livehls/oil/${path}/live.livx/playlist.m3u8?dvr=21600000`;
+/** Kan's DASH edition of the same channel (same CDN: a backup for a packager fault, not for a CDN outage). */
+const redgeDash = (path: string) =>
+  `https://r.il.cdn-redge.media/livedash/oil/${path}/live.livx?dvr=14400000`;
+const FREE_KESHET = '/evrideo/hls/live/20001278';
 
 export const LIVE_CHANNELS: readonly LiveChannel[] = [
   {
@@ -32,6 +39,7 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     direct: [
       { title: 'כאן 11', url: redge('kancdn-live/live/kan11') },
       { title: 'כאן 11 · כתוביות', url: redge('kancdn-live/live/kan11_subs') },
+      { title: 'כאן 11 · גיבוי (DASH)', url: redgeDash('kancdn-live/live/kan11') },
     ],
     geo: true,
   },
@@ -42,6 +50,12 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     direct: [],
     mako: [
       { title: 'קשת 12', path: '/stream/hls/live/2033791/k12/index.m3u8' },
+      {
+        title: 'קשת 12 · כתוביות לכבדי שמיעה',
+        path: '/k12cc/index.m3u8?b-in-range=0-1800',
+        host: 'https://d2249b6f08tjt0.cloudfront.net',
+        cdn: 'AWS',
+      },
       { title: 'קשת 12 · גיבוי', path: '/stream/hls/live/2033791/k12dvr/index.m3u8' },
     ],
   },
@@ -58,6 +72,10 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
         title: 'רשת 13 · גיבוי',
         url: 'https://dsk76kvc9kie6.cloudfront.net/media/87f59c77-03f6-4bad-a648-897e095e7360/mainManifest.m3u8',
       },
+      {
+        title: 'רשת 13 · גיבוי 2 (720p)',
+        url: 'https://d2xg1g9o5vns8m.cloudfront.net/out/v1/0855d703f7d5436fae6a9c7ce8ca5075/index.m3u8',
+      },
     ],
   },
   {
@@ -67,11 +85,13 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     direct: [
       {
         title: 'עכשיו 14',
+        // The bitrate pin selects the 1080p rendition (without it the playlist offers only 960×540).
         url: 'https://r.il.cdn-redge.media/livehls/oil/ch14/live/ch14/live.livx/playlist.m3u8?dvr=21600000&bitrate=5692000&audioId=1&videoId=0',
       },
+      // The broadcaster's own second feed (its API's answer, 2026-11-07); the older address refuses https.
       {
-        title: 'עכשיו 14 · גיבוי',
-        url: 'https://ch14channel14.encoders.immergo.tv/app/2/streamPlaylist.m3u8',
+        title: 'עכשיו 14 · גיבוי (720p)',
+        url: 'https://ch14channel14-cdn.encoders.immergo.tv/2/streamPlaylist.m3u8',
       },
     ],
   },
@@ -89,14 +109,20 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     id: 'iltv_live_kanedu',
     name: 'כאן חינוכית',
     description: 'שידור חי של כאן חינוכית',
-    direct: [{ title: 'כאן חינוכית', url: redge('kancdn-live/live/kan_edu') }],
+    direct: [
+      { title: 'כאן חינוכית', url: redge('kancdn-live/live/kan_edu') },
+      { title: 'כאן חינוכית · גיבוי (DASH)', url: redgeDash('kancdn-live/live/kan_edu') },
+    ],
     geo: true,
   },
   {
     id: 'iltv_live_makan33',
     name: 'מכאן 33',
     description: 'שידור חי של מכאן 33',
-    direct: [{ title: 'מכאן 33', url: redge('kancdn-live/live/makan') }],
+    direct: [
+      { title: 'מכאן 33', url: redge('kancdn-live/live/makan') },
+      { title: 'מכאן 33 · גיבוי (DASH)', url: redgeDash('kancdn-live/live/makan') },
+    ],
     geo: true,
   },
   {
@@ -105,8 +131,9 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     description: 'שידור חי של ערוץ הכנסת',
     direct: [
       { title: 'ערוץ הכנסת', url: 'https://kneset.gostreaming.tv/p2-kneset/_definst_/myStream/index.m3u8' },
+      // The channel with Hebrew captions burned in (knesset.tv calls it "שידור עם כתוביות").
       {
-        title: 'ערוץ הכנסת · נגיש',
+        title: 'ערוץ הכנסת · כתוביות',
         url: 'https://kneset.gostreaming.tv/p2-Accessibility/_definst_/myStream/index.m3u8',
       },
     ],
@@ -121,7 +148,10 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     id: 'iltv_live_ynet',
     name: 'ynet',
     description: 'שידור חי של ynet',
-    direct: [{ title: 'ynet', url: 'https://ynet-live-01.ynet-pic1.yit.co.il/ynet/live_720.m3u8' }],
+    direct: [
+      { title: 'ynet', url: 'https://ynet-live-01.ynet-pic1.yit.co.il/ynet/live.m3u8' },
+      { title: 'ynet · 720p', url: 'https://ynet-live-01.ynet-pic1.yit.co.il/ynet/live_720.m3u8' },
+    ],
   },
   {
     id: 'iltv_live_i24he',
@@ -161,6 +191,73 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     direct: [],
     mako: [{ title: 'סברי מרנן', path: '/evrideo/hls/live/20001278/savri/index.m3u8' }],
   },
+  {
+    id: 'iltv_live_ch9',
+    name: 'ערוץ 9',
+    description: 'ערוץ 9 · שידור חי בשפה הרוסית',
+    direct: [{ title: 'ערוץ 9', url: 'https://contact.gostreaming.tv/Con-11/index.m3u8' }],
+  },
+  {
+    id: 'iltv_live_r13comedy',
+    name: 'ערוץ הקומדיות של 13',
+    description: 'ערוץ קומדיות 24/7 של רשת 13',
+    direct: [
+      {
+        title: 'ערוץ הקומדיות',
+        url: 'https://d15ds134q59udk.cloudfront.net/out/v1/fbba879221d045598540ee783b140fe2/index.m3u8',
+      },
+    ],
+  },
+  {
+    id: 'iltv_live_r13nofesh',
+    name: 'ערוץ הנופש של 13',
+    description: 'ערוץ נופש וטיולים 24/7 של רשת 13',
+    direct: [
+      {
+        title: 'ערוץ הנופש',
+        url: 'https://d1yd8hohnldm33.cloudfront.net/out/v1/19dee23c2cc24f689bd4e1288661ee0c/index.m3u8',
+      },
+    ],
+  },
+  {
+    id: 'iltv_live_r13reality',
+    name: 'ערוץ הריאליטי של 13',
+    description: 'ערוץ ריאליטי 24/7 של רשת 13',
+    direct: [
+      {
+        title: 'ערוץ הריאליטי',
+        url: 'https://d2dffl3588mvfk.cloudfront.net/out/v1/d8e15050ca4148aab0ee387a5e2eb46b/index.m3u8',
+      },
+    ],
+  },
+  {
+    id: 'iltv_live_k12comedy',
+    name: 'ערוץ הקומדיה של קשת',
+    description: 'ערוץ קומדיה 24/7 של קשת · צריך את העוזר הביתי',
+    direct: [],
+    mako: [{ title: 'ערוץ הקומדיה', path: `${FREE_KESHET}/free_comedy/index.m3u8` }],
+  },
+  {
+    id: 'iltv_live_k12drama',
+    name: 'ערוץ הדרמה של קשת',
+    description: 'ערוץ דרמה 24/7 של קשת · צריך את העוזר הביתי',
+    direct: [],
+    mako: [{ title: 'ערוץ הדרמה', path: `${FREE_KESHET}/free_drama/index.m3u8` }],
+  },
+  {
+    id: 'iltv_live_k12music',
+    name: 'ערוץ המוזיקה של קשת',
+    description: 'ערוץ מוזיקה 24/7 של קשת · צריך את העוזר הביתי',
+    direct: [],
+    mako: [{ title: 'ערוץ המוזיקה', path: `${FREE_KESHET}/free_music/index.m3u8` }],
+  },
+  {
+    id: 'iltv_live_k12food',
+    name: 'ערוץ האוכל של קשת',
+    description: 'ערוץ אוכל 24/7 של קשת · צריך את העוזר הביתי',
+    direct: [],
+    mako: [{ title: 'ערוץ האוכל', path: `${FREE_KESHET}/free_food/index.m3u8` }],
+  },
 ];
 
 /** Other names of the live channels (English, as people type them): found by search, never shown. */
@@ -181,4 +278,12 @@ export const LIVE_ALIASES: Record<string, string[]> = {
   iltv_live_i24ar: ['i24 News Arabic', 'i24'],
   iltv_live_erets: ['Eretz Nehederet', 'A Wonderful Country'],
   iltv_live_savri: ['Savri Maranan'],
+  iltv_live_ch9: ['Channel 9', 'Kanal 9', 'Девятый канал'],
+  iltv_live_r13comedy: ['Reshet 13 Comedy', 'Channel 13 Comedy'],
+  iltv_live_r13nofesh: ['Reshet 13 Vacation', 'Channel 13 Travel'],
+  iltv_live_r13reality: ['Reshet 13 Reality', 'Channel 13 Reality'],
+  iltv_live_k12comedy: ['Keshet Comedy', 'Keshet 12 Comedy'],
+  iltv_live_k12drama: ['Keshet Drama', 'Keshet 12 Drama'],
+  iltv_live_k12music: ['Keshet Music', 'Keshet 12 Music'],
+  iltv_live_k12food: ['Keshet Food', 'Keshet 12 Food'],
 };

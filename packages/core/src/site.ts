@@ -20,6 +20,8 @@ export const sitePaths = {
   contract: 'resolver-contract.json',
   liveStreams: (id: string) => `streams/${id}.json`,
   search: 'search.json',
+  /** The live programme guide (core epg.ts). */
+  epg: 'epg.json',
   extIds: 'ext-ids.json',
   status: 'status.json',
   statusPage: 'status.html',

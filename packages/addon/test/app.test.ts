@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { createAddonApp } from '../src/app.ts';
 
 const files: Record<string, unknown> = {
@@ -191,4 +191,64 @@ test('the address itself shows a short page', async () => {
   const r = await app.request('/');
   expect(r.status).toBe(200);
   expect(r.headers.get('content-type')).toMatch(/text\/html/);
+});
+
+describe('live guide', () => {
+  const now = Date.now();
+  const h = 3_600_000;
+  const guideFiles: Record<string, unknown> = {
+    'catalog/tv/iltv_live.json': {
+      metas: [
+        {
+          id: 'iltv_live_keshet12',
+          type: 'tv',
+          name: 'קשת 12',
+          description: 'שידור חי',
+          behaviorHints: { isLive: true },
+        },
+        { id: 'iltv_live_ynet', type: 'tv', name: 'ynet' },
+      ],
+    },
+    'meta/tv/iltv_live_keshet12.json': { meta: { id: 'iltv_live_keshet12', type: 'tv', name: 'קשת 12' } },
+    'streams/iltv_live_keshet12.json': { streams: [{ url: 'https://live/k12.m3u8' }] },
+    'epg.json': {
+      iltv_live_keshet12: [
+        [now - h, now + h, 'חדשות'],
+        [now + h, now + 2 * h, 'הישרדות'],
+      ],
+    },
+  };
+  const live = createAddonApp({
+    read: async (p) => (p in guideFiles ? JSON.stringify(guideFiles[p]) : undefined),
+  });
+  const body = async (path: string) => (await (await live.request(path)).json()) as never;
+
+  test('the row and the channel page say what is on now and next', async () => {
+    const row = (await body('/catalog/tv/iltv_live.json')) as { metas: { description?: string }[] };
+    expect(row.metas[0]?.description).toMatch(
+      /^עכשיו: חדשות \(עד \d\d:\d\d\) · אחר כך \d\d:\d\d: הישרדות\nשידור חי$/,
+    );
+    expect(row.metas[1]?.description).toBeUndefined();
+    const meta = (await body('/meta/tv/iltv_live_keshet12.json')) as {
+      meta: { description: string; videos?: unknown };
+    };
+    expect(meta.meta.description).toMatch(/^עכשיו: חדשות/);
+    // Never videos on the channel page: Nuvio would show a series.
+    expect(meta.meta.videos).toBeUndefined();
+  });
+
+  test('a guide day for apps with a guide grid; a guide entry plays its channel', async () => {
+    const day = new Date(now).toISOString().slice(0, 10);
+    const g = (await body(`/catalog/tv/iltv_live/date=${day}.json`)) as {
+      metasDetailed: { id: string; behaviorHints: object; videos: { title: string }[] }[];
+    };
+    expect(g.metasDetailed.map((m) => m.id)).toEqual(['iltv_live_keshet12', 'iltv_live_ynet']);
+    expect(g.metasDetailed[0]?.behaviorHints).toEqual({ isLive: true, hasScheduledVideos: true });
+    expect(g.metasDetailed[0]?.videos.map((v) => v.title)).toContain('חדשות');
+    expect(g.metasDetailed[1]?.videos).toEqual([]);
+    expect(await body(`/catalog/tv/iltv_live/date=${day}&skip=2.json`)).toEqual({ metasDetailed: [] });
+    expect(await body(`/stream/tv/iltv_live_keshet12:epg:${new Date(now).toISOString()}.json`)).toEqual({
+      streams: [{ url: 'https://live/k12.m3u8' }],
+    });
+  });
 });

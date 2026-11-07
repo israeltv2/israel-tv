@@ -272,7 +272,7 @@ export const FIXTURES: Responses = {
         lastGoodAt: ago(40),
         cadenceHours: 24,
         lastFullRun: ago(40),
-        notes: ['12 channels answering (Mako channels are checked at play time)'],
+        notes: ['24 channels answering (every stream played daily; Mako channels through the home helper)'],
         emptyShows: [],
         canary: { outcome: 'ok', at: ago(210), detail: '200/206/206 · iltv_live_kan_edu' },
         canaryHistory: canaryHistory([]),
@@ -295,6 +295,30 @@ export const FIXTURES: Responses = {
       ],
     },
     kan: { pending: 64, shows: 91, showsDone: 74 },
+    live: {
+      checkedAt: ago(20 * 60),
+      channels: [
+        {
+          id: 'iltv_live_kan11',
+          name: 'כאן 11',
+          streams: [
+            { title: 'כאן 11', via: 'direct', outcome: 'ok', statuses: '200/200/206' },
+            { title: 'כאן 11 · כתוביות', via: 'direct', outcome: 'ok', statuses: '200/200/206' },
+          ],
+          guide: { at: ago(60), programmes: 41, until: ago(-36 * 60) },
+        },
+        {
+          id: 'iltv_live_keshet12',
+          name: 'קשת 12',
+          streams: [
+            { title: 'קשת 12', via: 'helper', outcome: 'ok', statuses: '200/200/206' },
+            { title: 'קשת 12 · גיבוי', via: 'helper', outcome: 'failed', detail: 'master HTTP 404' },
+          ],
+          guide: { at: ago(7 * 60), programmes: 0, error: 'HTTP 503' },
+        },
+        { id: 'iltv_live_ynet', name: 'ynet', streams: [{ title: 'ynet', via: 'direct', outcome: 'ok' }] },
+      ],
+    },
   },
   plays: {
     bySourcePerDay: month.flatMap((day, i) => [

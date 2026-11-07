@@ -67,3 +67,13 @@ export function zonedDayStart(day: string, timeZone = 'UTC'): number {
 export function nextDay(day: string, by = 1): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + by * DAY_MS).toISOString().slice(0, 10);
 }
+
+/** The moment (epoch ms) a wall-clock time (`HH:mm`) on a calendar day happens in a time zone. */
+export function zonedTime(day: string, hhmm: string, timeZone = 'UTC'): number {
+  const [h = 0, m = 0] = hhmm.split(':').map(Number);
+  const wall = Date.parse(`${day}T00:00:00Z`) + (h * 60 + m) * 60_000;
+  // Guess with the offset at that wall time read as UTC, then correct once (a change of clocks that day).
+  let t = wall - offsetMinutes(wall, timeZone) * 60_000;
+  t = wall - offsetMinutes(t, timeZone) * 60_000;
+  return t;
+}

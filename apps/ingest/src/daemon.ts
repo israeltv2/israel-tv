@@ -27,8 +27,9 @@ import { csrfFor, sameSecret } from './admin-auth.ts';
 import { backupCatalog, checkBackup } from './backup.ts';
 import { type CanaryResult, canaryEvent, runCanary } from './canary.ts';
 import { QUOTA_KEY, type Quota, readQuota } from './cloudflare-quota.ts';
+import { refreshGuides } from './epg.ts';
 import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
-import { checkLive } from './live.ts';
+import { checkLive, type LiveCheckOptions } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { pullPublicUsage } from './public-usage.ts';
 import { activeSources, analyticsOff, buildStatus, cleanSecrets, publishSite } from './publish.ts';
@@ -42,7 +43,7 @@ import {
   runOne,
 } from './runner.ts';
 import { createAdapters } from './sources.ts';
-import { probeStreams } from './stream-probe.ts';
+import { probeStreams, probesAbroad } from './stream-probe.ts';
 import { matchShows } from './tmdb.ts';
 import { buildDashboard, latestCanary, queryEvents, renderUsagePage } from './usage-page.ts';
 
@@ -180,8 +181,9 @@ export class Daemon {
     this.enqueue('full', async () => {
       const adapters = createAdapters(this.config);
       for (const make of Object.values(adapters)) await runFull(this.store, make(), this.runOpts);
-      if (this.config.sources.live) await checkLive(this.store);
+      if (this.config.sources.live) await checkLive(this.store, this.liveCheckOptions());
       await this.probeStreams(1500);
+      await this.refreshGuides();
       const key = tmdbApiKey(this.config);
       if (key) await matchShows(this.store, key, { log: this.log });
       this.store.prune();
@@ -226,8 +228,18 @@ export class Daemon {
         await runAiring(this.store, make(), this.config.schedule.airingWindowDays, this.runOpts);
       }
       await this.probeStreams(300);
+      await this.refreshGuides();
       this.requestPublish();
     });
+  }
+
+  /** Read the live guides that are due (epg.ts); a failure keeps the last good guide and never fails the run. */
+  private async refreshGuides(): Promise<void> {
+    try {
+      await refreshGuides(this.store, this.config, { log: this.log });
+    } catch (err) {
+      this.log(`guide refresh failed: ${(err as Error).stack ?? err}`);
+    }
   }
 
   /** Measure what is due (stream-probe.ts); a failure here never fails the run it follows. */
@@ -411,6 +423,16 @@ export class Daemon {
         );
       }
     });
+  }
+
+  /** The daily live check plays Mako channels through this instance's home helper, when it runs one. */
+  liveCheckOptions(): LiveCheckOptions {
+    return {
+      resolverBase: this.config.resolver.enabled
+        ? `http://127.0.0.1:${this.config.resolver.port}`
+        : undefined,
+      abroad: probesAbroad(this.config),
+    };
   }
 
   /** Play one recent title per source end to end and record the results. */
@@ -763,7 +785,7 @@ export async function startDaemon(
   // Relay sessions end after a quiet minute or two.
   setInterval(() => d.sessions.flush(), 30_000).unref();
   // Live channels are checked right away (as a job, not holding startup), so /status reflects them.
-  if (config.sources.live) d.enqueue('live', async () => void (await checkLive(store)));
+  if (config.sources.live) d.enqueue('live', async () => void (await checkLive(store, d.liveCheckOptions())));
   // First start (or after a long stop): fill the catalog now instead of waiting for the night.
   // Sources read by full runs (Mako, Reshet), in order.
   // Stale when any source read by full runs has had no good run in a day (e.g. the first run was stopped).

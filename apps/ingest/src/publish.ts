@@ -26,8 +26,9 @@ import { brandImage, channelLogo } from '@israel-tv/resolver';
 import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { auditSite } from './catalog-audit.ts';
+import { guideFile } from './epg.ts';
 import { KAN_LATER, kanArtwork, kanArtworkDir, kanRowProgress, stillFilling } from './kan.ts';
-import { liveRender } from './live.ts';
+import { LIVE_CHECK_KEY, type LiveCheck, liveRender } from './live.ts';
 import { checkNumbering } from './numbering-guard.ts';
 import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster } from './posters.ts';
 import { BLOCK_RETRIES, type BlockedRetry, emptyShowsKey, episodeCount, retryKey } from './runner.ts';
@@ -122,7 +123,10 @@ export function buildStatus(
       );
     }
     if (source === 'live') {
-      if (last) notes.push(`${last.showsOk} channels answering (Mako channels are checked at play time)`);
+      if (last)
+        notes.push(
+          `${last.showsOk} channels answering (every stream played daily; Mako channels through the home helper)`,
+        );
     } else if (shows.length === 0 && last) {
       health = 'error';
       notes.push('no shows');
@@ -349,12 +353,16 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
       }
     }
   }
-  const live = config.sources.live && !hiddenSources.has('live') ? liveRender(logos) : [];
+  const live =
+    config.sources.live && !hiddenSources.has('live')
+      ? liveRender(logos, store.getState<LiveCheck>(LIVE_CHECK_KEY))
+      : [];
   const files = renderSite({
     version: RELEASE_VERSION,
     assets,
     ...(config.addon.stremioAddonsConfig ? { stremioAddonsConfig: config.addon.stremioAddonsConfig } : {}),
     probes: probeResults(store),
+    guide: guideFile(store),
     sources: activeSources(config).filter((src) => !hiddenSources.has(src)),
     shows,
     live,
@@ -572,7 +580,8 @@ function readJsonc(path: string): Record<string, unknown> {
 }
 
 /** Paths the data Worker's router runs for; everything else is served as static assets, without any code. */
-export const ROUTER_PATHS = ['/catalog/*', '/stream/*', '/status*'];
+/** Paths the router script runs for (the rest are plain files). Live meta pages carry "now / next" (epg). */
+export const ROUTER_PATHS = ['/catalog/*', '/stream/*', '/status*', '/meta/tv/*'];
 
 /**
  * The public data Worker's wrangler config: the catalog as static assets, the router for the dynamic paths, and

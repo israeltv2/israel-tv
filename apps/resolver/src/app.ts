@@ -12,6 +12,7 @@ import {
   GEO_LIMITED,
   LIVE_CHANNELS,
   type LiveChannel,
+  liveChannelOf,
   newPlayId,
   parseSeriesId,
   parseVideoId,
@@ -205,7 +206,7 @@ export function createResolverApp(deps: ResolverDeps) {
         }
       }
     } else {
-      const ch = channels.find((x) => x.id === id);
+      const ch = channels.find((x) => x.id === liveChannelOf(id));
       if (ch) {
         info = { showId: ch.id, source: 'live' };
         if (mako) streams.push(...mako.streams(origin, play(), { channel: ch }));

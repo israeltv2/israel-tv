@@ -38,6 +38,7 @@ const opts = (l: PageLoader, pagesPerRun: number): KanCrawlOptions => ({
   pageIntervalMs: 0,
   airingWindowDays: 14,
   loader: l,
+  guide: false,
 });
 
 /** Every stored Kan episode, in show and season order. */
@@ -658,4 +659,33 @@ test('a row still filling is counted: shows in the catalog of those its lobbies 
   expect(p.iltv_kan11?.inCatalog).toBe(0);
   expect(p.iltv_kanarchive?.known).toBeGreaterThan(100);
   expect(stillFilling(p.iltv_kan11)).toBe(true);
+});
+
+test('the live guide: one Kan guide page per slice, each channel today and tomorrow, twice a day', async () => {
+  const { GUIDE_KEY } = await import('../src/epg.ts');
+  const store = Store.open(':memory:');
+  const guide = readFileSync(new URL('./fixtures/epg/kanedu.html', import.meta.url), 'utf8');
+  const base = loader(routes);
+  const l = {
+    ...base,
+    async load(url: string) {
+      if (url.includes('/tv-guide/')) {
+        base.urls.push(url);
+        return { status: 200, html: guide, challenged: false };
+      }
+      return base.load(url);
+    },
+  };
+  for (let i = 0; i < 6; i++) await crawlKan(store, { ...opts(l, 6), guide: true });
+  const guides = base.urls.filter((u) => u.includes('/tv-guide/'));
+  expect(guides).toHaveLength(6); // 3 channels × today and tomorrow, one per slice
+  expect(new Set(guides).size).toBe(6);
+  await crawlKan(store, { ...opts(l, 6), guide: true });
+  expect(base.urls.filter((u) => u.includes('/tv-guide/'))).toHaveLength(6); // none due again yet
+  const state = store.getState<Record<string, { rows: unknown[] }>>(GUIDE_KEY);
+  expect(Object.keys(state ?? {}).sort()).toEqual([
+    'iltv_live_kan11',
+    'iltv_live_kanedu',
+    'iltv_live_makan33',
+  ]);
 });

@@ -37,7 +37,8 @@ export function HealthPill({
       style={{ color, background: `color-mix(in oklab, ${color} 13%, transparent)` }}
     >
       <Icon className="size-3.5" aria-hidden />
-      {label ?? word}
+      {/* Hebrew names keep their own direction inside the left-to-right page. */}
+      <bdi>{label ?? word}</bdi>
     </span>
   );
 }

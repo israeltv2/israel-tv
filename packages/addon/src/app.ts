@@ -5,6 +5,10 @@ import {
   type ExtIds,
   expandSearchKey,
   type Freshness,
+  type GuideFile,
+  guideLine,
+  guideVideos,
+  liveChannelOf,
   normalizeForSearch,
   parseVideoId,
   type SearchRow,
@@ -38,6 +42,14 @@ const CACHE = {
 
 /** Shows per page of a genre filter. */
 const GENRE_PAGE = 100;
+
+/** A catalog item or meta as read from a rendered file. */
+interface MetaLike {
+  id: string;
+  description?: string;
+  behaviorHints?: Record<string, unknown>;
+  [k: string]: unknown;
+}
 const MAX_SEARCH = 100;
 
 export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
@@ -149,7 +161,7 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     }
     // Pages are stored every CATALOG_PAGE_SIZE items; any other offset is cut from the two pages around it.
     const offset = skip % CATALOG_PAGE_SIZE;
-    if (offset > 0) {
+    if (offset > 0 && !extra.has('date')) {
       const base = skip - offset;
       const read = async (at: number) =>
         ((await readJson<{ metas: unknown[] }>(sitePaths.catalog(type, id, at)))?.metas ?? []) as unknown[];
@@ -158,6 +170,35 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
         offset + CATALOG_PAGE_SIZE,
       );
       return c.json({ metas }, 200, headers);
+    }
+    // The live row: a day of the programme guide (apps with a guide grid), or the channels with what is on now.
+    if (type === 'tv') {
+      const date = extra.get('date')?.trim();
+      if (date !== undefined) {
+        if (skip > 0 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return c.json({ metasDetailed: [] }, 200, headers);
+        const from = Date.parse(`${date}T00:00:00Z`);
+        const guide = (await readJson<GuideFile>(sitePaths.epg, true)) ?? {};
+        const channels = (
+          (await readJson<{ metas: MetaLike[] }>(sitePaths.catalog(type, id, 0)))?.metas ?? []
+        ).filter((m) => m.id.startsWith('iltv_live_'));
+        const metasDetailed = channels.map((m) => ({
+          ...m,
+          behaviorHints: { ...(m.behaviorHints ?? {}), isLive: true, hasScheduledVideos: true },
+          videos: guideVideos(m.id, guide[m.id] ?? [], from, from + 86_400_000),
+        }));
+        return c.json({ metasDetailed }, 200, { 'cache-control': CACHE.stream });
+      }
+      if (skip === 0) {
+        const list = await readJson<{ metas: MetaLike[] }>(sitePaths.catalog(type, id, 0));
+        if (list) {
+          const fresh = await readJson<Freshness>(sitePaths.freshness, true);
+          const since = fresh ? staleSince(fresh, id) : undefined;
+          const metas = await withGuideLines(list.metas);
+          return c.json({ metas: since ? [staleItem(id, type, since), ...metas] : metas }, 200, {
+            'cache-control': CACHE.stream,
+          });
+        }
+      }
     }
     const page = await reader.read(sitePaths.catalog(type, id, skip));
     // A row that has not been updated for too long says so first (works without the home machine).
@@ -196,6 +237,12 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     }
     const text = await reader.read(sitePaths.meta(c.req.param('type'), id));
     if (text === undefined) return c.json({ meta: null }, 404);
+    // A live channel's page says what is on now and next.
+    if (id.startsWith('iltv_live_')) {
+      const { meta } = JSON.parse(text) as { meta: MetaLike };
+      const [withLine] = await withGuideLines([meta]);
+      return c.json({ meta: withLine }, 200, { 'cache-control': CACHE.stream });
+    }
     return c.body(text, 200, {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': CACHE.list,
@@ -206,7 +253,7 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     const id = decodeURIComponent(c.req.param('file')).replace(/\.json$/, '');
     // Only the types the manifest declares: live channels are `tv`, everything else `series`.
     const type = c.req.param('type');
-    const live = id.startsWith('iltv_live_');
+    const live = !!liveChannelOf(id);
     if (type !== (live ? 'tv' : 'series'))
       return c.json({ streams: [] }, 200, { 'cache-control': CACHE.list });
     const streams = await streamsFor(id);
@@ -227,11 +274,24 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     return file?.[String(episode)] ?? [];
   }
 
+  /** Live tiles with "now / next" from the guide put first in their description (core epg.ts). */
+  async function withGuideLines(metas: MetaLike[]): Promise<MetaLike[]> {
+    const guide = await readJson<GuideFile>(sitePaths.epg, true);
+    if (!guide) return metas;
+    const now = Date.now();
+    return metas.map((m) => {
+      const line = guideLine(guide[m.id], now);
+      return line ? { ...m, description: m.description ? `${line}\n${m.description}` : line } : m;
+    });
+  }
+
   async function streamsFor(id: string): Promise<Stream[]> {
     const ours = parseVideoId(id);
     if (ours) return seasonStreams(ours.series, ours.season, ours.episode);
-    if (id.startsWith('iltv_live_')) {
-      return (await readJson<{ streams: Stream[] }>(sitePaths.liveStreams(id)))?.streams ?? [];
+    // A channel, also when asked for by one of its guide entries.
+    const channel = liveChannelOf(id);
+    if (channel) {
+      return (await readJson<{ streams: Stream[] }>(sitePaths.liveStreams(channel)))?.streams ?? [];
     }
     // Shows opened from other catalogs: tt123:2:5 or tmdb:123:2:5, numbered seasons only.
     const m = /^(tt\d+|tmdb:\d+):(\d+):(\d+)$/.exec(id);

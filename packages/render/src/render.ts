@@ -12,6 +12,7 @@ import {
   type ExtIds,
   type Freshness,
   GEO_LIMITED,
+  type GuideFile,
   ISRAEL_ONLY,
   isTrailer,
   LIVE_ALIASES,
@@ -89,6 +90,8 @@ export interface RenderInput {
    * (overrides what the source says); per episode key, its measured best quality ("540p").
    */
   probes?: { israelOnly?: Record<string, boolean>; quality?: Record<string, string> };
+  /** The live programme guide (apps/ingest epg.ts), published as `epg.json`. */
+  guide?: GuideFile;
   /** stremio-addons.net's signature for the listed addon (config `addon.stremioAddonsConfig`). */
   stremioAddonsConfig?: { issuer: string; signature: string };
 }
@@ -322,6 +325,8 @@ function genreOptions(input: RenderInput, catalog: string): string[] {
     .map(([g]) => g);
 }
 
+const hasGuide = (input: RenderInput) => Object.values(input.guide ?? {}).some((rows) => rows.length > 0);
+
 export function buildManifest(input: RenderInput, catalogIds: Set<string>, externalIds = true): Manifest {
   // Claim IMDb/TMDB ids only when some show is matched: otherwise apps would ask us about every title.
   const streamPrefixes = externalIds ? ['iltv_', 'tt', 'tmdb:'] : ['iltv_'];
@@ -331,6 +336,8 @@ export function buildManifest(input: RenderInput, catalogIds: Set<string>, exter
     name: input.name ?? 'Israel TV',
     description: describe(input.sources ?? [...SOURCES]),
     contactEmail: CONTACT_EMAIL,
+    // Apps with a guide grid ask the live row for a day's programmes (`date`); see core epg.ts.
+    ...(hasGuide(input) ? { behaviorHints: { epgProvider: true } } : {}),
     ...(input.stremioAddonsConfig ? { stremioAddonsConfig: input.stremioAddonsConfig } : {}),
     resources: [
       'catalog',
@@ -353,6 +360,7 @@ export function buildManifest(input: RenderInput, catalogIds: Set<string>, exter
           { name: 'search' },
           { name: 'skip' },
           ...(genres.length ? [{ name: 'genre', options: genres }] : []),
+          ...(c.type === 'tv' && hasGuide(input) ? [{ name: 'date' }] : []),
         ],
       };
     }),
@@ -416,7 +424,13 @@ export function renderSite(input: RenderInput): SiteFiles {
   if (input.live.length > 0) {
     const row: MetaPreview[] = [];
     for (const ch of input.live) {
-      const p: MetaPreview = { id: ch.id, type: 'tv', name: rtl(ch.name), posterShape: 'square' };
+      const p: MetaPreview = {
+        id: ch.id,
+        type: 'tv',
+        name: rtl(ch.name),
+        posterShape: 'square',
+        behaviorHints: { isLive: true },
+      };
       if (ch.logo) p.poster = ch.logo;
       if (ch.description) p.description = rtl(ch.description);
       row.push(p);
@@ -515,5 +529,6 @@ export function renderSite(input: RenderInput): SiteFiles {
   files.set(sitePaths.registry, json(input.registry));
   files.set(sitePaths.contract, json(CONTRACT));
   if (input.freshness) files.set(sitePaths.freshness, json(input.freshness));
+  if (input.live.length > 0) files.set(sitePaths.epg, json(input.guide ?? {}));
   return files;
 }

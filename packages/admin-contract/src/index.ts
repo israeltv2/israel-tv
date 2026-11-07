@@ -174,6 +174,30 @@ export const SourcesSchema = z.object({
   kan: z
     .object({ pending: z.number(), shows: z.number(), showsDone: z.number(), backoffUntil: iso.optional() })
     .optional(),
+  /** Every live channel: each stream's last daily check, and its programme guide. */
+  live: z
+    .object({
+      checkedAt: iso.optional(),
+      channels: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          streams: z.array(
+            z.object({
+              title: z.string(),
+              via: z.string(),
+              outcome: z.string(),
+              statuses: z.string().optional(),
+              detail: z.string().optional(),
+            }),
+          ),
+          guide: z
+            .object({ at: iso, programmes: z.number(), until: iso.optional(), error: z.string().optional() })
+            .optional(),
+        }),
+      ),
+    })
+    .optional(),
 });
 
 /** One play or failure, for lists that lead to its trace. */

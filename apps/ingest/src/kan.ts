@@ -15,10 +15,12 @@ import {
   cleanShow,
   DAY_MS,
   HOUR_MS,
+  nextDay,
   parseEpisodeHint,
   type ScrapedEpisode,
   type ScrapedSeason,
   type ScrapedShow,
+  zonedDay,
 } from '@israel-tv/core';
 import {
   cleanKanTitle,
@@ -33,6 +35,7 @@ import {
 } from '@israel-tv/kan';
 import type { ProxyEndpoint } from '@israel-tv/net';
 import type { Store } from '@israel-tv/store';
+import { KAN_GUIDE_CHANNELS, parseKanGuide, storeGuide } from './epg.ts';
 import { latestAirDate } from './runner.ts';
 
 export interface KanLobby {
@@ -127,7 +130,12 @@ interface CrawlState {
   goodEpisode?: Record<string, string>;
   /** Episode pages whose player offered subtitles, and one sample of what it gave (to learn their shape). */
   subtitles?: { n: number; url: string; sample: string };
+  /** Guide pages read (live programme guide): `<channel id>|<yyyy-mm-dd>` → when. */
+  guideAt?: Record<string, string>;
 }
+
+/** A guide page (one channel, one day) is read again after this long. */
+const GUIDE_EVERY_MS = 12 * HOUR_MS;
 
 const STATE_KEY = 'kan:crawl';
 /** Browser errors that mean the connection is down (proxy, network, browser), not that one page is broken. */
@@ -174,6 +182,8 @@ export interface KanCrawlOptions {
   log?: (line: string) => void;
   /** Where to keep our copies of show images (none: images are not copied). */
   artworkDir?: string;
+  /** Read Kan's live programme guide pages too (default true). */
+  guide?: boolean;
 }
 
 /**
@@ -457,6 +467,33 @@ export async function crawlKan(
             show.artTriedAt = new Date(now).toISOString();
       }
       log(`kan: ${Object.keys(state.shows).length} shows known`);
+    }
+
+    // 1b. One live-guide page per slice when one is due: today's and tomorrow's schedule of each Kan channel.
+    if (opts.guide !== false && pages < opts.pagesPerRun) {
+      const today = zonedDay(now, 'Asia/Jerusalem');
+      const days = [today, nextDay(today)];
+      const at = state.guideAt ?? {};
+      for (const k of Object.keys(at)) if (!days.includes(k.split('|')[1] ?? '')) delete at[k];
+      const due = Object.entries(KAN_GUIDE_CHANNELS)
+        .flatMap(([id, ch]) => days.map((day) => ({ id, ch, day })))
+        .find(
+          (x) => !at[`${x.id}|${x.day}`] || now - Date.parse(at[`${x.id}|${x.day}`] ?? '') > GUIDE_EVERY_MS,
+        );
+      if (due) {
+        const [y, m, d] = due.day.split('-');
+        const url = `https://www.kan.org.il/tv-guide/?channelId=${due.ch}&day=${d}-${m}-${y}`;
+        try {
+          const rows = parseKanGuide(await load(url, 'listing'));
+          if (rows.length > 0) storeGuide(store, due.id, rows, now);
+          else warn(null, `Kan guide ${url}: no programmes on the page (layout changed?)`);
+        } catch (err) {
+          rethrowOutage(err);
+          warn(null, `Kan guide ${url}: ${(err as Error).message}`);
+        }
+        at[`${due.id}|${due.day}`] = new Date(now).toISOString();
+        state.guideAt = at;
+      }
     }
 
     // 2. Show pages that are due (never read, airing, or a week old). While episode pages are waiting,
@@ -848,6 +885,8 @@ export function kanCrawlOptions(
     pageIntervalMs: config.scraping.browserPageIntervalSec * 1000,
     airingWindowDays: config.schedule.airingWindowDays,
     artworkDir: kanArtworkDir(config),
+    // Kan's live channels' guide comes through this browser too (epg.ts).
+    guide: config.sources.live,
     log,
   };
 }

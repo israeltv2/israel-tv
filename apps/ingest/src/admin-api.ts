@@ -25,7 +25,9 @@ import { RELEASE_VERSION } from '@israel-tv/runtime';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { csrfFor } from './admin-auth.ts';
+import { GUIDE_KEY, type GuideState } from './epg.ts';
 import { kanProgress } from './kan.ts';
+import { LIVE_CHECK_KEY, type LiveCheck } from './live.ts';
 import { API_VERSION, DATA_VERSION } from './publish.ts';
 
 /** What the API reads from the running daemon (it does not import the daemon: no cycle). */
@@ -309,6 +311,38 @@ export function sources(d: Daemon, now = Date.now()): Sources {
   const catalogOf = (source: string) =>
     Object.entries(fresh?.catalogs ?? {}).find(([, s]) => s === source)?.[0];
   const kan = kanProgress(d.store);
+  const check = d.store.getState<LiveCheck>(LIVE_CHECK_KEY);
+  const guides = d.store.getState<GuideState>(GUIDE_KEY) ?? {};
+  const live: Sources['live'] = d.config.sources.live
+    ? {
+        ...(check ? { checkedAt: check.at } : {}),
+        channels: LIVE_CHANNELS.map((c) => {
+          const g = guides[c.id];
+          const last = g?.rows.at(-1);
+          return {
+            id: c.id,
+            name: c.name,
+            streams: (check?.channels[c.id] ?? []).map((x) => ({
+              title: x.title,
+              via: x.via,
+              outcome: x.outcome,
+              ...(x.statuses.length ? { statuses: x.statuses.join('/') } : {}),
+              ...(x.detail ? { detail: x.detail } : {}),
+            })),
+            ...(g
+              ? {
+                  guide: {
+                    at: g.at,
+                    programmes: g.rows.filter((r) => r[1] > now).length,
+                    ...(last ? { until: new Date(last[1]).toISOString() } : {}),
+                    ...(g.error ? { error: g.error } : {}),
+                  },
+                }
+              : {}),
+          };
+        }),
+      }
+    : undefined;
   const canaries = d.events
     .events({ kind: 'canary', since: new Date(now - 14 * DAY_MS).toISOString(), limit: 1000 })
     .reverse();
@@ -375,6 +409,7 @@ export function sources(d: Daemon, now = Date.now()): Sources {
       exits: d.geo.proxies.map((server) => d.exits.get(server) ?? { server, ok: 0, errors: 0 }),
     },
     ...(kan ? { kan } : {}),
+    ...(live ? { live } : {}),
   };
 }
 
