@@ -56,27 +56,30 @@ function SrTable({
   caption: string;
 }) {
   return (
-    <table className="sr-only">
-      <caption>{caption}</caption>
-      <thead>
-        <tr>
-          <th>Day</th>
-          {series.map((s) => (
-            <th key={s.key}>{s.name}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={String(r.day)}>
-            <td>{String(r.day)}</td>
+    // The wrapper hides it: a table ignores the 1px box of `sr-only` and would make the page taller.
+    <div className="sr-only">
+      <table>
+        <caption>{caption}</caption>
+        <thead>
+          <tr>
+            <th>Day</th>
             {series.map((s) => (
-              <td key={s.key}>{String(r[s.key] ?? 0)}</td>
+              <th key={s.key}>{s.name}</th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={String(r.day)}>
+              <td>{String(r.day)}</td>
+              {series.map((s) => (
+                <td key={s.key}>{String(r[s.key] ?? 0)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -98,7 +101,7 @@ export function StackedDays({
   height?: number;
 }) {
   return (
-    <figure aria-label={caption}>
+    <figure aria-label={caption} className="relative">
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={rows} margin={{ top: 4, right: 4, bottom: 0, left: -8 }} accessibilityLayer>
           <CartesianGrid vertical={false} />
@@ -142,7 +145,7 @@ export function DayLines({
   height?: number;
 }) {
   return (
-    <figure aria-label={caption}>
+    <figure aria-label={caption} className="relative">
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} accessibilityLayer>
           <CartesianGrid vertical={false} />

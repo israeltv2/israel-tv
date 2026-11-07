@@ -182,6 +182,7 @@ export const FIXTURES: Responses = {
       { source: 'live', health: 'ok', lastGoodAt: ago(40), cadenceHours: 24, stale: false },
     ],
     lastPublishAt: ago(18),
+    sinceRelease: { revision: '907969a1c0de', at: ago(600), plays: 9, failures: 0 },
     quota: { requests: 3293, requestsLimit: 100_000, aeWrites: 95, aeLimit: 100_000 },
   },
   sources: {
@@ -482,7 +483,7 @@ export const FIXTURES: Responses = {
     platform: 'darwin x64',
     uptimeSec: 3 * 86_400 + 4 * 3600 + 1200,
     startedAt: iso(NOW - (3 * 86_400 + 4 * 3600 + 1200) * 1000),
-    memoryMB: { process: 212.4, freeSystem: 2100, totalSystem: 16_384 },
+    memoryMB: { process: 212.4, freeSystem: 640, availableSystem: 9_800, totalSystem: 16_384 },
     diskFreeMB: 41_300,
     diskTotalMB: 476_000,
     databases: [

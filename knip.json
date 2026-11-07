@@ -17,5 +17,6 @@
     }
   },
   "ignoreDependencies": ["wrangler", "pino-roll", "@swc/core"],
-  "ignoreExportsUsedInFile": true
+  "ignoreExportsUsedInFile": true,
+  "ignoreBinaries": ["vm_stat"]
 }

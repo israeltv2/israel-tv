@@ -85,6 +85,10 @@ export const OverviewSchema = z.object({
     }),
   ),
   lastPublishAt: iso.optional(),
+  /** This home's plays and failures since the running version was deployed (a fix shows at once). */
+  sinceRelease: z
+    .object({ revision: z.string(), at: iso, plays: z.number(), failures: z.number() })
+    .optional(),
   /** Today's Cloudflare free-plan use (public addon), when read. */
   quota: z
     .object({ requests: z.number(), requestsLimit: z.number(), aeWrites: z.number(), aeLimit: z.number() })
@@ -299,7 +303,16 @@ export const SystemSchema = z.object({
   platform: z.string(),
   uptimeSec: z.number(),
   startedAt: iso,
-  memoryMB: z.object({ process: z.number(), freeSystem: z.number(), totalSystem: z.number() }),
+  /**
+   * `availableSystem`: what programs can still get without the system swapping (free, inactive and purgeable memory
+   * on macOS, MemAvailable on Linux); `freeSystem` alone leaves out the file cache and reads as nearly full.
+   */
+  memoryMB: z.object({
+    process: z.number(),
+    freeSystem: z.number(),
+    availableSystem: z.number(),
+    totalSystem: z.number(),
+  }),
   diskFreeMB: z.number().optional(),
   diskTotalMB: z.number().optional(),
   databases: z.array(

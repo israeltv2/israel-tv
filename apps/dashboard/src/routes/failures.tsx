@@ -58,12 +58,22 @@ export function Failures() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Failed plays · 7 days" value={num(total)} {...(total ? { tone: 'var(--error)' } : {})} />
         <Kpi
-          label="Failure rate"
+          label="Failure rate · 7 days"
           value={attempts ? pct(o?.failureRate7d ?? 0, 1) : '—'}
-          sub={attempts ? `of ${num(attempts)} plays` : 'no plays'}
+          sub={
+            o?.sinceRelease && o.sinceRelease.plays + o.sinceRelease.failures
+              ? `${num(o.sinceRelease.failures)} of ${num(o.sinceRelease.plays + o.sinceRelease.failures)} since this version`
+              : attempts
+                ? `of ${num(attempts)} plays`
+                : 'no plays'
+          }
         />
         <Kpi label="Kinds of failure" value={num(f.groups.length)} sub="source · stage · status · reason" />
-        <Kpi label="One title only" value={num(episodeOnly)} sub="the source itself played" />
+        <Kpi
+          label="Single title refused"
+          value={num(episodeOnly)}
+          sub="one episode would not play; its source kept playing"
+        />
       </div>
       <Card>
         <CardHeader title="Failures per day" description="By source, last 7 days" />

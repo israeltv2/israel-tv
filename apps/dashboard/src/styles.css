@@ -70,6 +70,7 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    background: var(--bg);
   }
   body {
     @apply bg-bg text-fg font-sans antialiased;
