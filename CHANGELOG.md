@@ -3,6 +3,25 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.3.0](https://github.com/israeltv2/israel-tv/compare/v0.2.2...v0.3.0) (2026-11-07)
+
+
+### Features
+
+* programme guide, more live channels, measured Israel-only labels, new addon ids and audit fixes ([#115](https://github.com/israeltv2/israel-tv/issues/115)) ([f70f712](https://github.com/israeltv2/israel-tv/commit/f70f712c2bc04e1579ddaf7d0be7e6a19d490230))
+* the owner's dashboard rebuilt (React, Tailwind, Recharts) with a health verdict, source cards and play traces ([#112](https://github.com/israeltv2/israel-tv/issues/112)) ([7317981](https://github.com/israeltv2/israel-tv/commit/73179811497c223b6c1d08ef1a14c2c365b3b881))
+
+
+### Bug Fixes
+
+* a new release's manifest is published at start and cached for five minutes ([#109](https://github.com/israeltv2/israel-tv/issues/109)) ([907969a](https://github.com/israeltv2/israel-tv/commit/907969acfe88d1592446efd3d61ead02a11b7b12))
+* dashboard polish — real memory use, full-height layout, clearer cards, failures since this version, Kan art retried every 6 h ([#114](https://github.com/israeltv2/israel-tv/issues/114)) ([61698d6](https://github.com/israeltv2/israel-tv/commit/61698d6fc173367229f1c1c92edd547e10df7cea))
+* Kan probes take at most half of each call, so Reshet qualities are measured too ([#119](https://github.com/israeltv2/israel-tv/issues/119)) ([2c58d35](https://github.com/israeltv2/israel-tv/commit/2c58d354d0b70519a07d7e5b598690ab99483fed))
+* Mako CloudFront fallback, canary that tells a dead episode from a broken source, probes kept out of usage, featured-video Mako pages, bot-block retries ([#111](https://github.com/israeltv2/israel-tv/issues/111)) ([494c177](https://github.com/israeltv2/israel-tv/commit/494c17748dba8a0cf071fd6ce9eaa734cfcbcd12))
+* Reshet stills stored before sizing are published at 640×360 too ([#118](https://github.com/israeltv2/israel-tv/issues/118)) ([0d4b83c](https://github.com/israeltv2/israel-tv/commit/0d4b83c2a16448d3cca768bf5079bae84ead77e8))
+* the live check plays media playlists (Channel 14, ynet 720p) instead of calling them broken ([#117](https://github.com/israeltv2/israel-tv/issues/117)) ([9e8f370](https://github.com/israeltv2/israel-tv/commit/9e8f37087ed8920e707fbd4c612f038a0a27c23c))
+* top shows list only shows that were played ([#113](https://github.com/israeltv2/israel-tv/issues/113)) ([342472e](https://github.com/israeltv2/israel-tv/commit/342472ec4c8b3f9c629ea4f3413de1990fc20763))
+
 ## [0.2.2](https://github.com/israeltv2/israel-tv/compare/v0.2.1...v0.2.2) (2026-11-06)
 
 
