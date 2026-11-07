@@ -67,10 +67,13 @@ warnings). It is rendered at publish time from the same data as `/status.json`; 
 times into "3 hours ago" in the reader's time zone (without it they read "7 Nov, 03:30 Israel time"). Its times are
 `<time>` elements, which the publisher leaves out when it compares status files, so a quiet run uploads nothing.
 
-Nothing private is published: every string in the status goes through `publicText` (packages/render), which
-replaces IP addresses, local host names (`*.local`, `*.lan`, `localhost`, …), file paths and any web address not on
-a broadcaster's or well-known public host with `[private address]` / `[path]`. The live check's stream addresses and
-the home helper's address are never copied into it.
+Nothing private is published: every string in the status goes through `publicText` (packages/render). Kept: web
+addresses on the broadcasters' hosts and a few well-known public ones (`PUBLIC_HOSTS`: not workers.dev or
+cloudflare.com), as origin and path only (no user, password, query or fragment), and the public addon's own origin
+(`publisher.publicUrl` or the deployed address). Replaced with `[private address]` / `[path]`: every other web
+address, host names without a scheme (`proxy.example.net:3128`, as Node's connection errors print them), LAN names
+with a port (`mac-mini:7703`), `localhost`, IP addresses and file paths (`/Users/…`, `/Library/…`, `~/…`, `C:\…`,
+`C:/…`). The live check's stream addresses and the home helper's address are never copied into it.
 
 `/status.json` keeps every field above and adds (all optional, for older readers):
 

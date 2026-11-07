@@ -1633,7 +1633,9 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
   browser when the page is older than it.
 - **Scrubbed by allowlist.** Error texts can carry the home helper's address, a tunnel, a LAN IP or a file path.
   Rather than trying to name what is private, `publicText` keeps only web addresses on the broadcasters' and
-  well-known public hosts and replaces every other address, local host name and path. Applied to everything in the
+  well-known public hosts (origin and path: queries carry tickets and tokens) and the public addon's exact origin, and
+  replaces every other address — with or without a scheme, single-word LAN names with a port — and every path.
+  workers.dev and cloudflare.com are not allowed: the private API Worker lives there too. Applied to everything in the
   status file, both in `status.json` and on the page.
 - **Two languages for the landing page, one for status.** The landing page is the viewer's way in, so it exists in
   English (`/`) and Hebrew (`/he/`, `dir="rtl"`) with `hreflang` links; the status page is English with the Hebrew row

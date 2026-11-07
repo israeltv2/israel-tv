@@ -5,7 +5,7 @@
 import { type Health, type StatusCatalog, type StatusFile, sitePaths } from '@israel-tv/core';
 import { CATALOG_LOGO, catalogAppName, catalogName, sourceName } from './names.ts';
 import { bdi, esc, footer, head, israelTime, num, topBar, when } from './page.ts';
-import { publicStatus } from './public-text.ts';
+import { type PublicTextOptions, publicStatus } from './public-text.ts';
 
 export type Level = Health | 'info';
 type Source = StatusFile['sources'][number];
@@ -426,8 +426,8 @@ function rowsOf(status: StatusFile): StatusCatalog[] {
 }
 
 /** The public status page. */
-export function renderStatusHtml(raw: StatusFile): string {
-  const status = publicStatus(raw);
+export function renderStatusHtml(raw: StatusFile, opts: PublicTextOptions = {}): string {
+  const status = publicStatus(raw, opts);
   const o = overall(status);
   // The channel tiles are published with the live row.
   const logos = !!status.live;

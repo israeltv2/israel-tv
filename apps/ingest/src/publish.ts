@@ -448,9 +448,12 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   const audit = auditSite(files, store);
   store.setState('catalog:audit', audit);
   const published = JSON.parse(String(files.get(sitePaths.status))) as StatusFile;
-  const audited = publicStatus({ ...published, audit });
+  // Only the public addon's own address may be named besides the broadcasters' (never a Worker, tunnel or helper).
+  const own = publicBase(config, store);
+  const origins = own ? { origins: [own] } : {};
+  const audited = publicStatus({ ...published, audit }, origins);
   files.set(sitePaths.status, JSON.stringify(audited));
-  files.set(sitePaths.statusPage, renderStatusHtml(audited));
+  files.set(sitePaths.statusPage, renderStatusHtml(audited, origins));
   // With the public address known, write it into every file now: no file then needs the Worker for it.
   const base = publicBase(config, store);
   if (base) {

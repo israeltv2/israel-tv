@@ -546,7 +546,8 @@ export function renderSite(input: RenderInput): SiteFiles {
   const manifest = buildManifest(input, new Set(rows.keys()), Object.keys(extIds).length > 0);
   files.set(sitePaths.manifest, json(manifest));
   // The status and the pages carry the rows as published: these counts are what the apps show.
-  const status = publicStatus({ ...input.status, catalogs: publishedCatalogs(input, listed) });
+  const origins = input.publicUrl ? { origins: [input.publicUrl] } : {};
+  const status = publicStatus({ ...input.status, catalogs: publishedCatalogs(input, listed) }, origins);
   const landing = {
     name: manifest.name,
     description: manifest.description,
@@ -568,7 +569,7 @@ export function renderSite(input: RenderInput): SiteFiles {
   files.set(sitePaths.search, json(search));
   files.set(sitePaths.extIds, json(extIds));
   files.set(sitePaths.status, json(status));
-  files.set(sitePaths.statusPage, renderStatusHtml(status));
+  files.set(sitePaths.statusPage, renderStatusHtml(status, origins));
   files.set(sitePaths.registry, json(input.registry));
   files.set(sitePaths.contract, json(CONTRACT));
   if (input.freshness) files.set(sitePaths.freshness, json(input.freshness));

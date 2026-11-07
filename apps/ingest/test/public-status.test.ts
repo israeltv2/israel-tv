@@ -2,9 +2,9 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { LIVE_CHANNELS, parseConfig } from '@israel-tv/core';
-import { renderStatusHtml } from '@israel-tv/render';
+import { publicStatus, publicText, renderStatusHtml } from '@israel-tv/render';
 import { Store } from '@israel-tv/store';
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { liveChannels, refreshSchedule, runHistory } from '../src/public-status.ts';
 import { writeSite } from '../src/publish.ts';
 
@@ -84,4 +84,68 @@ test('a quiet run does not rewrite the status page: its times are left out of th
     renderStatusHtml({ generatedAt: at, health: 'ok', sources: [], failingShows: [], warnings: [] });
   writeSite(d, new Map([['status.html', page('2026-11-06T05:00:00.000Z')]]));
   expect(writeSite(d, new Map([['status.html', page('2026-11-06T09:41:00.000Z')]])).changed).toEqual([]);
+});
+
+describe('nothing private reaches status.json or /status', () => {
+  const LEAKS: [string, RegExp][] = [
+    ['getaddrinfo ENOTFOUND tv-helper.example-owner.com', /tv-helper|example-owner/],
+    ['connect ECONNREFUSED proxy.example.net:3128', /proxy\.example|3128/],
+    [
+      'fetch failed: https://israel-tv-api.someone.workers.dev/admin?token=abc',
+      /someone|workers\.dev|token|abc/,
+    ],
+    ['deploy: https://dash.cloudflare.com/0123abcd/workers/x', /cloudflare|0123abcd/],
+    ['play https://user:secret@www.mako.co.il/x?ticket=SECRET#frag', /user|secret|SECRET|ticket|frag/],
+    ['resolver mac-mini:7703 did not answer', /mac-mini|7703/],
+    ['wrote /Library/Application Support/israel-tv/x.db', /Library/],
+    ['wrote /Users/someone/israel-tv/data/catalog.db', /someone/],
+    ['wrote C:/Users/someone/israel-tv/catalog.db', /someone/],
+    ['wrote C:\\Users\\someone\\catalog.db', /someone/],
+    ['connect ECONNREFUSED 192.168.4.20:7701', /192\.168/],
+    ['connect ECONNREFUSED [fd00::12]:7701', /fd00/],
+    ['helper http://media-box.local:7701/stream', /media-box/],
+    ['localhost:7700 refused', /localhost/],
+    [
+      'browser did not start: proxy at http://127.0.0.1:3128 refused (see /home/someone/.cache/ms-playwright)',
+      /127\.0|someone/,
+    ],
+  ];
+  test.each(LEAKS)('%s', (text, leak) => {
+    const status = {
+      generatedAt: '2026-11-07T06:00:00Z',
+      health: 'error' as const,
+      publish: `last publish failed: ${text}`,
+      sources: [
+        {
+          source: 'mako',
+          health: 'error' as const,
+          shows: 1,
+          episodes: 1,
+          lastFullRun: { at: '2026-11-07T01:30:00Z', status: 'failed', error: text },
+          notes: [text],
+        },
+      ],
+      failingShows: [{ id: 'iltv_mako_1', title: 'x', error: text, lastOkAt: '2026-11-06T01:30:00Z' }],
+      warnings: [{ at: '2026-11-07T01:30:00Z', code: 'source-note', message: text }],
+    };
+    expect(JSON.stringify(publicStatus(status))).not.toMatch(leak);
+    expect(renderStatusHtml(status)).not.toMatch(leak);
+  });
+
+  test('public addresses stay (origin and path only), and so do ids, keys and times', () => {
+    expect(
+      publicText('net::ERR_PROXY_CONNECTION_FAILED at https://www.kan.org.il/content/kan/kan-11/p-1/2/?x=1'),
+    ).toBe('net::ERR_PROXY_CONNECTION_FAILED at https://www.kan.org.il/content/kan/kan-11/p-1/2/');
+    expect(publicText('browser did not start: Chrome exited (code 1)')).toBe(
+      'browser did not start: Chrome exited (code 1)',
+    );
+    const ours =
+      'kan:72126 iltv_mako_535:1:1 S1E4 21:30:00 2026-11-07T06:48:28.210Z status.json Node.js www.mako.co.il';
+    expect(publicText(ours)).toBe(ours);
+    // The public addon's own origin, and only it.
+    const own = 'https://israel-tv.example-host.dev';
+    expect(publicText(`see ${own}/status and https://other.example-host.dev/x`, { origins: [own] })).toBe(
+      `see ${own}/status and [private address]`,
+    );
+  });
 });
