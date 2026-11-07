@@ -3,6 +3,14 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.7.9](https://github.com/israeltv2/israel-tv/compare/v0.7.8...v0.7.9) (2026-11-07)
+
+
+### Bug Fixes
+
+* **ingest:** a printed-number migration clears the numbering warnings it resolves ([#159](https://github.com/israeltv2/israel-tv/issues/159)) ([ae66480](https://github.com/israeltv2/israel-tv/commit/ae664802a2a89a188d26160b721d21d6020a25ad))
+* **kan:** a slice whose browser closes during a restart is stopped, not an outage ([#157](https://github.com/israeltv2/israel-tv/issues/157)) ([0c8c17a](https://github.com/israeltv2/israel-tv/commit/0c8c17a0fff30105e4e8ef95be0118e7d670ff51))
+
 ## [0.7.8](https://github.com/israeltv2/israel-tv/compare/v0.7.7...v0.7.8) (2026-11-07)
 
 
