@@ -7,7 +7,7 @@ your links. "Full instance" means the [at home](local-only.md) and [Cloudflare](
 
 ## Docker
 
-Any system with Docker (Windows and macOS with Docker Desktop, Linux, NAS). Images for amd64 and arm64 (Raspberry Pi):
+Any system with Docker (Windows and macOS with Docker Desktop, Linux, NAS). Images for amd64 and arm64 (a 64-bit Raspberry Pi system; 32-bit systems are not supported):
 
 - **Helper:** the one-line `docker run` in [home helper](home-helper.md#the-easy-way-docker) (`--restart unless-stopped`
   brings it back after a restart).

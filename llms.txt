@@ -1,8 +1,8 @@
 # Israel TV
 
-> A free addon that brings Israeli TV — Keshet 12 (Mako), Reshet 13, Kan 11, Kan Kids & Teens and 16 live channels —
-> into the Stremio and Nuvio apps. Most people only install the public link
-> https://israel-tv.israeltv2.workers.dev/manifest.json. Keshet 12, and Israel-only episodes when abroad, need a small
+> A free addon that brings Israeli TV — Keshet 12 (Mako), Reshet 13, Kan 11, Kan Kids & Teens, Kan's archive and 24
+> live channels with a programme guide — into the Stremio and Nuvio apps. Most people only install the public link
+> https://israel-tv.israeltv2.workers.dev/manifest.json. Keshet 12, and the episodes marked "זמין לצפייה רק בישראל" (only in Israel) when abroad, need a small
 > self-hosted "home helper" (the resolver) on the viewer's own network. Anyone can also run the whole thing
 > (at home, or on a free Cloudflare account). TypeScript/Node 24 monorepo, AGPL-3.0, no accounts, hosts no video.
 

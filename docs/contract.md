@@ -32,16 +32,16 @@ Anything else (titles, artwork, numbering) is the catalog's business and is not 
 
 ## What the resolver does with it
 
-| Episode has             | The resolver offers                                                                                                                                 | The catalog offers                |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `mako`                  | One "Mako" stream: on each play, a fresh ticket and the master playlist fetched with the player's User-Agent (video then goes player ↔ Mako's CDN). | nothing (Mako needs the resolver) |
-| `direct`, playable here | nothing (it checks the direct stream from its own network, cached for 6 hours per show)                                                             | the direct stream                 |
-| `direct`, refused here  | One "דרך ישראל · via Israel" stream relayed through its geo proxy (only with a proxy configured)                                                    | the direct stream ("ישראל בלבד")  |
+| Episode has             | The resolver offers                                                                                                                                 | The catalog offers                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `mako`                  | One "Mako" stream: on each play, a fresh ticket and the master playlist fetched with the player's User-Agent (video then goes player ↔ Mako's CDN). | nothing (Mako needs the resolver)           |
+| `direct`, playable here | nothing (it checks the direct stream from its own network, cached for 6 hours per show)                                                             | the direct stream                           |
+| `direct`, refused here  | One "דרך החיבור הישראלי שלך" (via your Israeli connection) stream relayed through its geo proxy (only with a proxy configured)                      | the direct stream ("זמין לצפייה רק בישראל") |
 
 So at most one stream per addon for any episode, and the only time a viewer sees two is the last row — abroad,
 the catalog's direct stream (which will not play there) next to the resolver's relay. That pair is
 deliberate: the catalog is public and stateless and cannot know where a viewer is; its stream is labelled
-Israel-only, and the resolver's is labelled "via Israel".
+Israel-only, and the resolver's is labelled "דרך החיבור הישראלי שלך" (via your Israeli connection).
 
 ## Versions
 

@@ -1470,3 +1470,121 @@ rate also shows the count since the running version was deployed (`sinceRelease`
 revision), so a fix shows at once instead of after a week. A Kan show with the placeholder poster had its image copy
 refused (HTTP 403) once and waited a day; failed Kan image copies are now retried every 6 hours (31 shows lacked
 their own copy), as slices rotate across proxy exits.
+
+## Round 7: audit fixes, programme guide, more live channels, new addon ids (2026-11-07)
+
+A black-box user-journey audit (from Cyprus, outside Israel) and a research pass over similar projects. Measured
+2026-11-07 from outside Israel unless noted.
+
+**Correctness**
+
+- **"Israel only" from a real check, not a rule.** Every Kan stream said "זמין לצפייה רק בישראל", but whole Kan titles
+  play abroad (iltv_kan_31, iltv_kan_68: playlist 200 from Cyprus) while others are refused at the playlist (HTTP 403:
+  iltv_kan_101). Kan decides per title. The host is outside Israel exactly when it has a geo proxy into Israel, so it
+  asks Kan directly (no proxy): the newest episode of each title, playlist → variant → first segment, once a week per
+  title; 403/451 → labelled, a full pass → not labelled, anything else → no change (the label stays until it can be
+  told). Inside Israel nothing is probed and Kan keeps the label. Live: a stream is labelled only when the daily live
+  check from abroad was refused; all Kan live channels played from Cyprus, so none is labelled today. The resolver's
+  relay was already decided by trying the direct stream from the viewer's network, so it needed no change.
+- **Reshet plays abroad** (11 of 11 sampled episodes): docs said otherwise and now say "most play; a few are
+  labelled". Reshet's label stays Kaltura's own access-control flag (profile 3387861).
+- **Docs quoted labels the app never shows** ("ישראל בלבד", "דרך ישראל · via Israel"): every page now quotes the real
+  strings, "זמין לצפייה רק בישראל" and "דרך החיבור הישראלי שלך".
+- **Keshet 12 with no stream and no reason:** every Mako show page now ends with a line saying its episodes need the
+  home helper (with where to get it). Not a placeholder "stream" pointing at the guide: Nuvio treats `externalUrl` as a
+  video URL (its `Stream.getStreamUrl()` is `url ?: externalUrl`), so the guide link would open in the player and fail —
+  on the very app most viewers use, and also for people who have the helper.
+- **Kan "ok" while far from complete:** an unfinished first fill (shows its lobbies list with no episode yet) is amber on
+  `/status` with "first fill of <row> in progress: N of M shows, P episode pages to read", and the row starts with a
+  "⏳ עדיין בטעינה: N מתוך M התוכניות כבר כאן" item. On the live instance all 168 show pages were read but 1,857 episode
+  pages waited, in an order (most recently read show first) that left Tehran with none after a day. Episode pages are
+  now read breadth-first: newly published ones, then the shows with the fewest episodes, in lobby order.
+- **More Kan:** the preschool lobby (kankids.org.il/lobby-kids/tiny/, 29 shows) joins the Kids row; Kan's archive
+  lobby (kan.org.il/lobby/series/, 183 classic series such as זהו זה!) becomes a row of its own, **כאן ארכיון**, read
+  only when no other Kan show has pages waiting (its show pages too), so it never delays current shows. Archive
+  episode pages parse like the others (checked on p-671183). Their "published" date is the upload date, not the
+  original broadcast — the year line of an archive show says when Kan put it online.
+- **Paging at any offset:** an app may ask any `skip=` (the audit asked 50, 20, 99 and got nothing); stored pages are every
+  100, so any other offset is cut from the two stored pages around it.
+- **Hebrew prefix letters in search:** a word with a leading ה/ו/ב/ל/מ/ש/כ (or ו + one of them) also matches without it,
+  on both sides ("שף" finds "משחקי השף", "לצהל" finds "צה״ל"). Words of two letters or fewer keep their letter.
+  Because מ/ש/כ also begin many plain words ("אסטר" now matches "מאסטר"), matches found only that way are listed after
+  the plain ones.
+- **Reshet episode stills** were 120×90 (Kaltura's image service default when no size is asked, 1,630 of 1,767): asked
+  for at 640×360. **Reshet quality** was assumed 720p; iltv_reshet_108:1:9 tops at 960×540. Each episode's master
+  playlist is read once (its tallest RESOLUTION) by the stream probes; until then the name says only "רשת 13".
+- **Entities:** every named and numeric entity is decoded (`&#x27;` was left in 21 Reshet descriptions).
+- **Channel 14's backup** refused https (port 443 closed); the broadcaster's own API now names
+  `https://ch14channel14-cdn.encoders.immergo.tv/2/streamPlaylist.m3u8` (720p), which is used.
+- **Trailers** ("טריילר", "… | טריילר", promos, teasers) are not episodes: dropped at the source boundary, before
+  numbering (a new one never takes an episode number), and from rendering of the two already stored (iltv_kan_6:1:3,
+  iltv_kan_53:1:4 were the last numbers of their seasons, so nothing moved; their stored numbers are kept and never
+  reused). Numbering stays frozen; no migration was needed.
+- **"עונות קודמות" (iltv_reshet_78):** Reshet's own archive bucket of 138 episodes from 2010–2017 next to the year
+  seasons. It is a real season on the site; renumbering it would move published episodes, so it stays season 1. Only
+  its name, repeated on every episode title, is dropped (as for other generic bucket names).
+- **Site prompts** ("… בעמוד כאן תסריטים >>") are dropped from descriptions.
+- **Year line:** first and latest episode year, "2024–2026", one year when they are the same (owner's call; this
+  replaces "2024–present"). Whether the show still runs is in `status` ("Returning Series"/"Ended"), which apps show
+  next to it; Nuvio shows a single year of a running show as "2026 -".
+- **Genres:** one name per genre across sources ("לייף סטייל" → "לייפסטייל", "שעשועון" → "שעשועונים", "תעודה" and "דוקו
+  ותחקירים" → "דוקומנטרי", "תחקיר" → "תחקירים", "אוכל" → "בישול").
+- **Newcomers:** `/` is a short page (what this is, the install link with a Stremio button, the project, the status);
+  any method but GET/HEAD answers 405 with `Allow: GET, HEAD` and a sentence; the resolver-only example points at the
+  real public catalog and logs where the docs say; the docs say Raspberry Pi needs its 64-bit system (the images are
+  amd64 and arm64; no armv7 image is built).
+- **Streams only for the declared types:** `series` for shows, `tv` for live channels; `/stream/movie/…` is empty.
+
+**Live**
+
+- **Programme guide** from the broadcasters' own schedules only (no third-party guide files of unknown licence):
+  Keshet 12 (mako.co.il EPGResponse: UTC start + duration), Reshet 13 (13tv.co.il/tv-guide/ `__NEXT_DATA__`, Israel
+  time, no ends: the next start), Channel 14 (c14.co.il wp-json, which its robots.txt allows; Israel-time starts and
+  ends), the Knesset (knesset.tv's schedule page), and Kan 11, Kan Educational and Makan 33 (kan.org.il/tv-guide/,
+  server-rendered per channel and day, UTC starts) through the Kan browser at one page per crawl slice. Mako's robots.txt
+  disallows `/AjaxPage`; the project already reads Mako through it at a polite pace, and the guide adds one request
+  every 6 hours. Not covered: i24 (its API holds an undated weekly template whose day numbering and time zone could
+  not be confirmed, and its own site no longer shows a schedule), Channel 10 (behind Vercel's bot checkpoint, and
+  reported to be closing), Channel 24, ynet and the 24/7 loop channels (no schedule published).
+- **How the guide reaches apps:** Stremio's EPG (SDK docs/epg.md, 2026-09): `behaviorHints.epgProvider` in the
+  manifest, a `date` extra on the live row, and `metasDetailed` pages with each channel's programmes for a UTC day.
+  Programmes are **never** put in a channel's own meta as `videos`: Nuvio treats any meta with videos as a series
+  (`isSeries = type == SERIES || videos.isNotEmpty()` in its MetaDetailsScreen), which would replace the live play
+  button with an episode list. Instead every live tile's description starts with "עכשיו: … (עד 21:00) · אחר כך 21:00:
+  …", computed at request time from `epg.json` (live meta pages now run through the Worker: `/meta/tv/*` joined
+  `run_worker_first`). A guide entry's id (`<channel>:epg:<start>`) plays its channel, in the addon and the resolver.
+- **Captioned feeds:** Keshet 12 with captions for the hard of hearing (a Mako path on CloudFront, played with a ticket
+  like the other Mako channels: 200/200/206), Kan 11's (already there), the Knesset's (its "נגיש" feed is the channel
+  with Hebrew captions burned in, as knesset.tv names it: now "כתוביות"). Reshet 13's captioned feed needs an `Origin`
+  header and an Israeli address at its CDN: not offered.
+- **Backups:** a second Reshet 13 backup (720p), ynet's adaptive playlist first (720p/480p), Kan 11/Kan
+  Educational/Makan 33 as DASH (the same CDN as their HLS: covers a packager fault, not a CDN outage). DASH carries
+  `notWebReady` (Stremio in a browser hands it to its streaming server); Nuvio recognises DASH by its content
+  (checked in its PlayerMediaSourceFactory), Stremio's desktop player plays it.
+- **New channels** (free, public, measured): Channel 9 (Russian-language, 1080p), Reshet 13's comedy, vacation and
+  reality 24/7 channels (1080p), and Keshet's comedy, drama, music and food 24/7 channels (Mako paths, played with a
+  ticket: 200/200/206; through the home helper). Their tiles are our own text tiles. Left out: Channel 16 and Kabbalah
+  66 (what they are and their terms not confirmed), 100FM's studio camera, Musayof (does not answer), Hala TV (no public
+  stream found), Big Brother 24/7 (seasonal, gone).
+- **Every live stream checked daily:** the live check (with the full run) plays every stream of every channel, Mako
+  channels through the home helper; a dead backup is named on `/status` (amber), a channel with no working stream is
+  red, a refusal abroad is a label. The dashboard's Sources page lists each stream and each guide.
+- **Radio row: not built.** Every station plays abroad, but as Icecast MP3/AAC (Kan's HLS radio playlists are empty;
+  Makan radio is DASH only). Nuvio plays progressive URLs with parallel ranged reads when that setting is on, which an
+  endless Icecast stream does not survive; Stremio's desktop player would play them but shows a black screen. Without
+  a TV to confirm, a row that may not play in the main app is worse than none. Revisit with an HLS source per station.
+- **VOD from Channel 14, i24 and the Knesset: not this round.** Channel 14 has a VOD API behind its apps (the same
+  one that names its live feeds), i24 publishes clips, the Knesset an archive of sessions. Each is a new reader with
+  its own numbering and terms to check; recorded for a later round.
+
+**Manifest**
+
+- **New ids:** `community.israel-tv` was generic, and apps and directories key installs on the id. Now
+  `io.github.israeltv2.israel-tv` (catalog), `….resolver` (home helper) and `….resolver.remote` (away from home),
+  before the stremio-addons.net listing is approved. Show and episode ids did not change, so watch progress stays;
+  people reinstall both addons once.
+- `contactEmail` (the project address), `behaviorHints.isLive` on live items, `epgProvider` when there is a guide.
+  No `countryWhitelist`: it would hide labelled streams instead of showing them (visible failures over hiding).
+  Nuvio's optional catalog hints were not needed.
+- `stremioAddonsConfig`: config `addon.stremioAddonsConfig` puts stremio-addons.net's signature in the manifest once
+  it is issued (the owner pastes it).

@@ -7,9 +7,14 @@ What to check on the TV/phone after installing. `<addon>` is your addon's base U
 ## Install
 
 - [ ] Add `<addon>/manifest.json` in the app (Nuvio: Settings → Addons → Add addon; Stremio: Addons → search box → paste).
+- [ ] **Installed before 2026-11-07?** The addons got new ids (`io.github.israeltv2.israel-tv` and
+  `….resolver`): remove both old entries and add both links again. Watch progress is kept (show and episode ids did
+  not change).
+- [ ] Opening `<addon>/` in a browser shows a short page with the install link (not an error).
 - [ ] Add `<resolver>/manifest.json` the same way, on a device at home.
-- [ ] Home screen / Discover shows the rows **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער**
-  (a "⏳ still loading" item until the Kan crawl has found its first show) and **שידור חי**.
+- [ ] Home screen / Discover shows the rows **קשת 12**, **רשת 13**, **כאן 11**, **כאן חינוכית: ילדים ונוער**,
+  **כאן ארכיון** and **שידור חי**. While Kan's first read is still running, its rows start with a "⏳ עדיין בטעינה …"
+  item saying how many shows are in so far.
 - [ ] Both addons show their logo in the app's addon list; live channel tiles show the channel logos.
 - [ ] Rows look stale? Nuvio caches catalog rows for hours: pull to refresh, or reopen the app later. The order
   of rows between addons (this addon's rows vs. others) is set in Nuvio's settings (home screen / catalog
@@ -21,7 +26,9 @@ What to check on the TV/phone after installing. `<addon>` is your addon's base U
 ## Catalogs and metadata
 
 - [ ] Rows list newest-airing shows first; scrolling a row loads more (pages of 100).
-- [ ] Search finds a show typed without final letters or quotes (e.g. `מאסטר שפ`, `צהל`).
+- [ ] Search finds a show typed without final letters or quotes (e.g. `מאסטר שפ`, `צהל`), and words with a
+  Hebrew prefix letter either way (`שף` finds "משחקי השף"; `לצהל` finds "צה״ל").
+- [ ] Scrolling far down a row (Nuvio asks for odd offsets) keeps loading shows to the end.
 - [ ] A show opens with posters, description and its seasons. Named seasons (e.g. "VIP 5") appear as
   season numbers from 101 up, with the season name at the start of each episode title.
 - [ ] A daily show (e.g. the evening news) lists recent dates as episodes, newest at the end of the season.
@@ -31,12 +38,18 @@ What to check on the TV/phone after installing. `<addon>` is your addon's base U
 - [ ] **Mako** episode (e.g. ארץ נהדרת, latest season): the stream "Israel TV · Mako" from the resolver
   plays, and seeking works.
 - [ ] **Reshet** episode: plays directly inside Israel (one stream, from the addon; the resolver adds none at
-  home). Outside Israel, the "דרך ישראל · via Israel" stream from the resolver plays (needs the geo proxy
+  home). Outside Israel, the "דרך החיבור הישראלי שלך" stream from the resolver plays (needs the geo proxy
   configured). If a start feels slow, look up the play on the admin page `/usage` (time to the first playlist).
-- [ ] **Kan** episode (after the crawl has filled some): "ישראל בלבד" plays inside Israel; outside, the
-  "דרך ישראל · via Israel" stream plays.
-- [ ] **Live:** כאן 11, רשת 13, עכשיו 14, i24, ערוץ הכנסת play from the addon; קשת 12 and ערוץ 24 play
-  through the resolver.
+- [ ] **Kan** episode (after the crawl has filled some): titles marked "זמין לצפייה רק בישראל" play inside Israel; outside, the
+  "דרך החיבור הישראלי שלך" stream plays. Titles without the mark play anywhere.
+- [ ] **Live:** כאן 11, רשת 13, עכשיו 14, i24, ערוץ הכנסת, ערוץ 9 and 13's comedy, vacation and reality channels play
+  from the addon; קשת 12, ערוץ 24 and Keshet's comedy, drama, music and food channels play through the resolver.
+- [ ] **Live, captioned and backups:** קשת 12 · כתוביות לכבדי שמיעה (resolver), כאן 11 · כתוביות and ערוץ הכנסת ·
+  כתוביות show captions in the picture; a "· גיבוי (DASH)" stream on Kan's channels plays in Nuvio and Stremio's
+  desktop app.
+- [ ] **Live guide:** a live tile's description starts with "עכשיו: … · אחר כך …"; the channel still opens with a play
+  button (no episode list). Stremio's TV-guide view (where the app has one) shows the programmes of קשת 12, רשת 13,
+  כאן 11, כאן חינוכית, מכאן 33, עכשיו 14 and ערוץ הכנסת.
 - [ ] Watch half an episode, stop, reopen: the app offers to resume at the same point (ids are stable).
 
 ## From another catalog
@@ -64,4 +77,4 @@ What to check on the TV/phone after installing. `<addon>` is your addon's base U
 - [ ] For an immediate re-read of one show: `curl -X POST -H "Authorization: Bearer <admin token>" http://<host>:7702/refresh/<series-id>` from the
   home network. The series id (e.g. `iltv_mako_12`) is in the row's search results:
   `curl -s '<addon>/catalog/series/iltv_keshet12/search=<word>.json'` (one word of the title, or `%20` for spaces) → `metas[].id` (rows:
-  `iltv_keshet12`, `iltv_reshet13`, `iltv_kan11`, `iltv_kankids`).
+  `iltv_keshet12`, `iltv_reshet13`, `iltv_kan11`, `iltv_kankids`, `iltv_kanarchive`).
