@@ -96,7 +96,9 @@ export class EventStore {
   /**
    * Once: before the canary's plays carried its `canary-` id, they were counted as a viewer's (a canary failing on
    * a source fault then read as viewers' failures on the dashboard). Such a play is the one the canary reported a
-   * moment later for the same title; it gets the prefix now, and the days it fell on are rolled up again.
+   * moment later for the same title, from a client the canary itself used within a day (seen on its tagged plays):
+   * a viewer watching the same title at that moment is someone else and keeps theirs. It gets the prefix now, and
+   * the days it fell on are rolled up again, unless a day's raw events may already be partly pruned.
    */
   private retagCanaryPlays(): void {
     if (this.getMeta('fix:canary-plays')) return;
@@ -109,7 +111,9 @@ export class EventStore {
         on c.kind = 'canary' and c.show_id = e.show_id and coalesce(c.episode_id, '') = coalesce(e.episode_id, '')
           and c.ts >= e.ts and (julianday(c.ts) - julianday(e.ts)) * 86400 <= ${CANARY_REPORT_S}
         where e.kind = 'stream_request' and e.ts < ${bound} and e.play_id is not null
-          and e.play_id not like 'canary-%' and e.play_id not like 'probe-%'`)
+          and e.play_id not like 'canary-%' and e.play_id not like 'probe-%'
+          and e.client in (select k.client from ${t.events} k where k.play_id like 'canary-%'
+            and k.client is not null and abs(julianday(k.ts) - julianday(e.ts)) <= 1)`)
       .map((r) => r.id);
     const days = new Set<string>();
     this.db.transaction((tx) => {
@@ -120,8 +124,17 @@ export class EventStore {
       }
     });
     const rolled = this.getMeta('rollup:last');
+    // A day is rebuilt from raw events only when all of them are still here: after the first day kept, or the
+    // first day itself when it began after anything could have been pruned (retention, or the size cap's week).
+    const first = this.db.get<{ ts: string | null }>(sql`select min(ts) as ts from ${t.events}`)?.ts;
+    const keptDays = this.overCap() ? 7 : EVENT_RETENTION_DAYS;
+    const prunedBefore = Date.now() - keptDays * DAY_MS;
+    const whole = (day: string) =>
+      !!first &&
+      (day > this.dayOf(first) ||
+        (day === this.dayOf(first) && Date.parse(this.dayRange(day).from) >= prunedBefore));
     for (const day of [...days].sort()) {
-      if (!rolled || day > rolled) continue;
+      if (!rolled || day > rolled || !whole(day)) continue;
       this.db
         .delete(t.dailyUsage)
         .where(and(eq(t.dailyUsage.day, day), eq(t.dailyUsage.origin, 'home')))

@@ -175,6 +175,9 @@ test('once, the canary plays from before its plays were tagged are retagged, and
   a.record(ev({ ts: at('09:36.916'), kind: 'stream_request', playId: 'c2', ...live, client: 'k' }));
   a.record(ev({ ts: at('09:37.470'), ...canary, outcome: 'error', episodeId: ep }));
   a.record(ev({ ts: at('09:37.471'), ...canary, ...live }));
+  // A viewer on the same channel at the same moment as the canary: not the canary's (another client).
+  a.record(ev({ ts: at('09:20.000'), kind: 'stream_request', playId: 'v0', ...live, client: 'v' }));
+  a.record(ev({ ts: at('09:21.000'), ...failed, playId: 'v0', ...live, client: 'v' }));
   // Someone else's play of the same title, minutes later: not the canary's.
   a.record(ev({ ts: at('12:22.191'), kind: 'stream_request', playId: 'v1', episodeId: ep, client: 'v' }));
   a.record(ev({ ts: at('12:22.833'), ...failed, playId: 'v1', episodeId: ep, client: 'v' }));
@@ -185,7 +188,7 @@ test('once, the canary plays from before its plays were tagged are retagged, and
   );
   a.maintain(Date.parse('2026-11-06T03:00:00Z'));
   const total = (s: EventStore) => s.daily(day, 'home').find((r) => r.source === '' && r.showId === '');
-  expect(total(a)?.failures).toBe(2);
+  expect(total(a)?.failures).toBe(3);
   a.db.$client.exec("delete from meta where key = 'fix:canary-plays'");
   a.close();
   const b = EventStore.open(path);
@@ -193,10 +196,11 @@ test('once, the canary plays from before its plays were tagged are retagged, and
     'canary-c1',
     'canary-c2',
     'canary-x',
+    'v0',
     'v1',
   ]);
-  expect(b.events({ kind: 'failure', viewersOnly: true }).map((e) => e.playId)).toEqual(['v1']);
-  expect(total(b)?.failures).toBe(1);
+  expect(b.events({ kind: 'failure', viewersOnly: true }).map((e) => e.playId)).toEqual(['v1', 'v0']);
+  expect(total(b)?.failures).toBe(2);
   expect(JSON.parse(b.getMeta('fix:canary-plays') ?? '{}')).toMatchObject({ plays: 2 });
   b.close();
 });
@@ -227,4 +231,31 @@ test('counting starts on the first event (home) or the first daily total (public
   const il = EventStore.open(':memory:', { timeZone: 'Asia/Jerusalem' });
   il.record(ev({ ts: '2026-11-04T23:30:00.000Z', kind: 'run', component: 'ingest' }));
   expect(il.countedSince('home')).toBe('2026-11-05');
+});
+
+test('the canary retag leaves a day alone whose raw events may be partly pruned already', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const path = join(mkdtempSync(join(tmpdir(), 'iltv-events-')), 'events.sqlite');
+  const a = EventStore.open(path);
+  // The oldest day kept began before the retention cutoff: its first hours may be gone.
+  const t0 = Date.now() - 30 * 86_400_000 + 30_000;
+  const at = (s: number) => new Date(t0 + s * 1000).toISOString();
+  const old = a.dayOf(t0);
+  const ep = 'iltv_mako_15:9:46';
+  a.record(ev({ ts: at(0), kind: 'stream_request', playId: 'c1', episodeId: ep, client: 'k' }));
+  a.record(ev({ ts: at(1), kind: 'failure', outcome: 'error', playId: 'c1', episodeId: ep, client: 'k' }));
+  a.record(ev({ ts: at(6), kind: 'canary', component: 'canary', outcome: 'error', episodeId: ep }));
+  a.record(ev({ ts: at(600), kind: 'stream_request', playId: 'canary-x', episodeId: ep, client: 'k' }));
+  const kept = { source: '', showId: '', plays: 40, uniqueClients: 3, failures: 9, minutesWatched: 0 };
+  a.putDaily([{ ...kept, day: old, origin: 'home' }]);
+  a.setMeta('rollup:last', old);
+  a.db.$client.exec("delete from meta where key = 'fix:canary-plays'");
+  a.close();
+  const b = EventStore.open(path);
+  // The play is retagged, but the day's total is not rebuilt from what is left of it.
+  expect(b.events({ playId: 'canary-c1' })).toHaveLength(2);
+  expect(b.daily(old, 'home').find((r) => r.source === '' && r.showId === '')).toMatchObject(kept);
+  b.close();
 });
