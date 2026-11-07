@@ -3,6 +3,14 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.4.1](https://github.com/israeltv2/israel-tv/compare/v0.4.0...v0.4.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **kan:** try every missing show image again now that the session clears Kan's bot check ([#128](https://github.com/israeltv2/israel-tv/issues/128)) ([5909b96](https://github.com/israeltv2/israel-tv/commit/5909b96a2ebe0f3ab1c848365491b87b0cbd00bb))
+* security review of 0.4.0 — Reshet list pages stay on Reshet and capped, credentials hidden on /status, private Kan profile, Vary: Host ([#126](https://github.com/israeltv2/israel-tv/issues/126)) ([4229758](https://github.com/israeltv2/israel-tv/commit/4229758d76f9a3a21a95f66b3bb01240518d5ab7))
+
 ## [0.4.0](https://github.com/israeltv2/israel-tv/compare/v0.3.0...v0.4.0) (2026-11-07)
 
 
