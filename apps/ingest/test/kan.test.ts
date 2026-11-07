@@ -930,3 +930,68 @@ test('the app is trusted for a show only when at least two of its episodes agree
     ]),
   ).toBe(false);
 });
+
+test('queue: fresh first, then shows still giving their two evidence pages, then app-trusted, then page-only', async () => {
+  const { episodeQueue } = await import('../src/kan.ts');
+  const store = Store.open(':memory:');
+  const mk = (n: string, extra: object = {}) => [
+    `https://www.kan.org.il/content/kan/kan-11/p-${n}/`,
+    {
+      origin: 'https://www.kan.org.il',
+      catalog: 'iltv_kan11',
+      checkedAt: '2026-11-06T00:00:00Z',
+      pending: [`https://www.kan.org.il/content/kan/kan-11/p-${n}/1${n}/`],
+      failed: [],
+      ...extra,
+    },
+  ];
+  const shows = Object.fromEntries([
+    mk('1', { app: 'disagrees' }),
+    mk('2', { app: 'trusted' }),
+    mk('3'),
+    mk('4', { app: 'unlisted' }),
+    mk('5', { fresh: ['https://www.kan.org.il/content/kan/kan-11/p-5/15/'], app: 'disagrees' }),
+  ]);
+  const order = episodeQueue(store, shows, Date.now(), () => 0).map(([k]) => k.split('/').at(-2));
+  expect(order).toEqual(['p-5', 'p-3', 'p-2', 'p-1', 'p-4']);
+});
+
+test('a new show reads only its two evidence pages per turn when the app cannot be trusted for it', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  // The app lists the show with another season: never trusted, so after its two evidence pages the show yields.
+  const l = {
+    ...base,
+    async text(url: string) {
+      return /program\?id=1006421/.test(url)
+        ? {
+            status: 200,
+            body: JSON.stringify({
+              entry: [
+                { id: '1006639', title: 'x', extensions: { analyticsCustomProperties: { season: 9 } } },
+              ],
+            }),
+            challenged: false,
+          }
+        : { status: 404, body: '', challenged: false };
+    },
+  };
+  // Lobbies and the show page first, then one slice for episodes.
+  for (let i = 0; i < 5; i++) await crawlKan(store, { ...opts(l, 20), streamPlays: async () => true });
+  type S = { shows: Record<string, { app?: string }> };
+  const s = store.getState<S>('kan:crawl')?.shows['https://www.kan.org.il/content/kan/kan-11/p-1006421/'];
+  expect(s?.app).toBe('disagrees');
+  expect(kanEpisodes(store).length).toBeGreaterThanOrEqual(2);
+});
+
+test('after a bot check the pace halves for a day', async () => {
+  const store = Store.open(':memory:');
+  const l = loader(routes);
+  await crawlKan(store, opts(l, 4));
+  const st = store.getState<{ lastChallengeAt?: string; backoffUntil?: string }>('kan:crawl') ?? {};
+  st.lastChallengeAt = new Date().toISOString();
+  store.setState('kan:crawl', st);
+  const r = await crawlKan(store, opts(l, 10));
+  expect(r.pages).toBeLessThanOrEqual(5);
+  expect(r.note).toMatch(/calm pace/);
+});

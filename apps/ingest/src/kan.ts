@@ -106,6 +106,11 @@ interface ShowState {
   failed: string[];
   /** Episode pages that are trailers, not episodes; kept so they never re-enter the queue. */
   skipped?: string[];
+  /**
+   * What the app API proved for this show: its list agrees with the pages (`trusted`), contradicts them
+   * (`disagrees`), or the show has no app id (`unlisted`). Unset until known. Orders the episode queue.
+   */
+  app?: 'trusted' | 'disagrees' | 'unlisted';
   /** The show's id in Kan's app API when its page address has none (kankids slugs), from the app's category lists. */
   appId?: string;
   /** Episode pages whose video Kan took down (broadcast rights ended); counted on /status, never queued again. */
@@ -158,6 +163,8 @@ interface CrawlState {
   subtitles?: { n: number; url: string; sample: string };
   /** Guide pages read (live programme guide): `<channel id>|<yyyy-mm-dd>` → when. */
   guideAt?: Record<string, string>;
+  /** The last time a page or image met Cloudflare's bot check (the pace is halved for a day after it). */
+  lastChallengeAt?: string;
   /** Pages and images loaded per day (UTC) and how many of them met Cloudflare's bot check: the measured rate. */
   botCheck?: Record<string, BotCheckDay>;
 }
@@ -313,6 +320,15 @@ export async function crawlKan(
   }
   if (opts.browser.type === 'none')
     return { pages: 0, newEpisodes: 0, note: 'browser.type is none: Kan is off' };
+  // Pace: the configured one while Kan's bot check stays quiet; half the pages, twice the pause for a day after it
+  // stopped anything (on top of the 45-minute stop the challenge itself causes). docs/decisions.md "Kan's pace".
+  const calm = !!state.lastChallengeAt && now - Date.parse(state.lastChallengeAt) < DAY_MS;
+  if (calm)
+    opts = {
+      ...opts,
+      pagesPerRun: Math.max(2, Math.ceil(opts.pagesPerRun / 2)),
+      pageIntervalMs: opts.pageIntervalMs * 2,
+    };
 
   const runId = store.startRun('crawl', 'kan');
   let loader: PageLoader | undefined = opts.loader;
@@ -344,10 +360,16 @@ export async function crawlKan(
     days[day] ??= { pages: 0, challenged: 0, images: 0, imagesChallenged: 0 };
     const d = days[day];
     d.pages++;
-    if (r.challenged || isChallenge(r.html)) d.challenged++;
+    if (r.challenged || isChallenge(r.html)) {
+      d.challenged++;
+      state.lastChallengeAt = new Date().toISOString();
+    }
     for (const img of [...(r.image ? [r.image] : []), ...(r.images ?? [])]) {
       d.images++;
-      if (img.challenged) d.imagesChallenged++;
+      if (img.challenged) {
+        d.imagesChallenged++;
+        state.lastChallengeAt = new Date().toISOString();
+      }
     }
     for (const k of Object.keys(days).sort().slice(0, -14)) delete days[k];
   };
@@ -522,7 +544,7 @@ export async function crawlKan(
     });
   /** A show's episodes in the app API by Kan's page id (all pages of the list), or undefined. */
   const appFeed = async (key: string, s: ShowState): Promise<Map<string, AppItem> | undefined> => {
-    const programId = /\/p-(\d+)\/$/.exec(key)?.[1] ?? s.appId;
+    const programId = appProgramId(key, s);
     if (!programId || !useApp) return undefined;
     const items = new Map<string, AppItem>();
     for (let from = 1, n = 0; n < 10; n++) {
@@ -798,14 +820,20 @@ export async function crawlKan(
       const listed = s.pending.length > 0 && pages < opts.pagesPerRun ? await appFeed(key, s) : undefined;
       // Trusted only where it agrees with what the pages gave this show (measured: the app's season differs from
       // the page player's for some shows, e.g. "s8" in the app where the page has no season, stored as 1).
-      const trusted = () =>
-        !!listed &&
-        appAgrees(
-          store,
-          seriesId,
-          listed,
-          batch.map((b) => ({ ...b.episode, season: b.season ?? 1 })),
-        );
+      const verdict = () =>
+        listed
+          ? appVerdict(
+              store,
+              seriesId,
+              listed,
+              batch.map((b) => ({ ...b.episode, season: b.season ?? 1 })),
+            )
+          : 'unknown';
+      const trusted = () => verdict() === 'agrees';
+      if (!listed && !appProgramId(key, s)) s.app = 'unlisted';
+      const storedCount = episodeCount(store, seriesId);
+      // A show still giving its evidence reads only APP_AGREEMENT pages in this phase, so every show gets its turn.
+      const evidencePhase = !s.app && storedCount < APP_AGREEMENT;
       try {
         while (s.pending.length > 0) {
           const url = s.pending[0] as string;
@@ -852,6 +880,7 @@ export async function crawlKan(
           }
           // Only a page read costs the slice's page budget.
           if (pages >= opts.pagesPerRun) break;
+          if (evidencePhase && storedCount + batch.length >= APP_AGREEMENT) break;
           let page: ReturnType<typeof classifyEpisodePage>;
           try {
             page = classifyEpisodePage(await load(url, 'episode'), origin(url), url);
@@ -895,6 +924,11 @@ export async function crawlKan(
           s.pending.shift();
         }
       } finally {
+        if (listed) {
+          const v = verdict();
+          if (v === 'agrees') s.app = 'trusted';
+          else if (v === 'disagrees') s.app = 'disagrees';
+        }
         // Episodes read before a block are kept, never re-read.
         if (batch.length > 0) newEpisodes += saveEpisodes(store, key, s, batch, runId);
       }
@@ -936,7 +970,7 @@ export async function crawlKan(
     const pendingTotal = shows.reduce((n, s) => n + s.pending.length, 0);
     // Shows paused on an episode page that failed: visible on /status for as long as they wait.
     const waitingShows = shows.filter((s) => s.pending[0] && s.retry?.[s.pending[0]]).length;
-    note = `${pages} pages, +${newEpisodes} episodes (${fromApp} named by the app API), ${pendingTotal} episode pages still to read`;
+    note = `${pages} pages${calm ? ' (calm pace: a bot check in the last day)' : ''}, +${newEpisodes} episodes (${fromApp} named by the app API), ${pendingTotal} episode pages still to read`;
     if (appProblems.length > 0)
       warn(
         null,
@@ -1030,6 +1064,17 @@ export function stillFilling(p: KanRowProgress | undefined): boolean {
  * then shows with the fewest episodes so far, so the first fill makes every show watchable before it completes any
  * long back catalogue (Tehran waited behind shows with 100 pages); the archive row breaks ties. Ties keep the lobby order.
  */
+/**
+ * Where a show stands in the queue (after newly published episodes): 0 its first APP_AGREEMENT pages, the evidence
+ * that unlocks the app API for it; 1 shows the app is trusted for (filled from the app in bulk, outside the page
+ * budget) or not judged yet; 2 shows that read every page (the app disagrees with their pages, or does not list them).
+ */
+function appTier(s: ShowState, have: number): number {
+  if (s.app === 'disagrees' || s.app === 'unlisted') return 2;
+  if (s.app === 'trusted') return 1;
+  return have < APP_AGREEMENT ? 0 : 1;
+}
+
 export function episodeQueue(
   store: Pick<Store, 'findSeriesId' | 'getShow'>,
   shows: Record<string, ShowState>,
@@ -1044,12 +1089,18 @@ export function episodeQueue(
   const rank = new Map(
     ready.map(([key, s], i) => [
       key,
-      [s.fresh?.length ? 0 : 1, have(key), KAN_LATER.has(s.catalog) ? 1 : 0, i] as const,
+      [
+        s.fresh?.length ? 0 : 1,
+        appTier(s, have(key)),
+        have(key),
+        KAN_LATER.has(s.catalog) ? 1 : 0,
+        i,
+      ] as const,
     ]),
   );
   const cmp = (a: string, b: string) => {
-    const x = rank.get(a) ?? [0, 0, 0, 0];
-    const y = rank.get(b) ?? [0, 0, 0, 0];
+    const x = rank.get(a) ?? [0, 0, 0, 0, 0];
+    const y = rank.get(b) ?? [0, 0, 0, 0, 0];
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return (x[i] ?? 0) - (y[i] ?? 0);
     return 0;
   };
@@ -1197,6 +1248,18 @@ export function kanBotCheck(store: Pick<Store, 'getState'>): Record<string, BotC
   return store.getState<CrawlState>(STATE_KEY)?.botCheck ?? {};
 }
 
+/** A show's id in Kan's app API: its page id, or the id the app's category lists gave a slug address. */
+function appProgramId(key: string, s: ShowState): string | undefined {
+  return /\/p-(\d+)\/$/.exec(key)?.[1] ?? s.appId;
+}
+
+/** Episodes stored for a show. */
+function episodeCount(store: Pick<Store, 'getShow'>, seriesId: string | undefined): number {
+  return seriesId
+    ? (store.getShow(seriesId)?.show.seasons.reduce((n, x) => n + x.episodes.length, 0) ?? 0)
+    : 0;
+}
+
 /** Stored episodes of a show that must agree with its app list before the app names any of its new episodes. */
 export const APP_AGREEMENT = 2;
 
@@ -1218,6 +1281,16 @@ export function appAgrees(
     streams: { url: string }[];
   }[] = [],
 ): boolean {
+  return appVerdict(store, seriesId, feed, read) === 'agrees';
+}
+
+/** appAgrees, with the reason when it does not: the app contradicts the pages, or there is not enough evidence yet. */
+export function appVerdict(
+  store: Pick<Store, 'getShow'>,
+  seriesId: string | undefined,
+  feed: Map<string, AppItem>,
+  read: Parameters<typeof appAgrees>[3] = [],
+): 'agrees' | 'disagrees' | 'unknown' {
   const show = seriesId ? store.getShow(seriesId)?.show : undefined;
   const stored = (show?.seasons ?? []).flatMap((x) =>
     x.episodes.map((e) => ({ ...e, season: Number(/\|s(\d+)$/.exec(x.key)?.[1] ?? Number.NaN) })),
@@ -1232,10 +1305,10 @@ export function appAgrees(
       (item.seasonNumber ?? 1) === e.season &&
       (!item.published || !e.airDate || item.published === e.airDate) &&
       (item.stream.kind !== 'redge' || item.stream.url === e.streams[0]?.url);
-    if (!same) return false;
+    if (!same) return 'disagrees';
     agree++;
   }
-  return agree >= APP_AGREEMENT;
+  return agree >= APP_AGREEMENT ? 'agrees' : 'unknown';
 }
 
 /** Episode pages skipped because Kan took the video down (rights ended) or the page holds no video. */

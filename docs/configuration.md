@@ -189,8 +189,8 @@ On start, if there was no full run in the last 24 hours, one starts immediately.
 | ------------------------ | ------- | --------------------------------------------------------------------------------------------------------------- |
 | `delayMs`                | `1000`  | Pause between requests to the same site.                                                                        |
 | `minShareOfPrevious`     | `0.8`   | A full run whose index lists fewer shows than this share of the previous run is rejected (last good data kept). |
-| `browserPagesPerRun`     | `12`    | Kan pages per crawl slice.                                                                                      |
-| `browserPageIntervalSec` | `20`    | Pause between Kan pages.                                                                                        |
+| `browserPagesPerRun`     | `20`    | Kan pages per crawl slice.                                                                                      |
+| `browserPageIntervalSec` | `12`    | Pause between Kan pages.                                                                                        |
 
 ## `tmdb` (optional)
 
