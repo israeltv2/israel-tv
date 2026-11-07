@@ -404,7 +404,11 @@ export function renumberPrinted(
   const runId = store.startRun('show', 'renumber');
   store.transaction(() => {
     for (const p of plans) {
-      if (report.moves.some((m) => m.seriesId === p.seriesId)) store.replaceAssignments(p.seriesId, p.next);
+      if (report.moves.some((m) => m.seriesId === p.seriesId)) {
+        store.replaceAssignments(p.seriesId, p.next);
+        // The read's "now פרק N at the source" / "collides" notes are what this move resolves.
+        store.clearWarnings(p.seriesId, ['source-renumbered', 'episode-number-taken']);
+      }
       if (p.refreshed) {
         const row = store.getShow(p.seriesId);
         store.saveShow(p.seriesId, p.show, { seasons: [], episodes: [] }, latestAirDate(p.show), false);
