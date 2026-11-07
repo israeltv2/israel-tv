@@ -1752,10 +1752,14 @@ could not name yet.
 
 **Queue** (after newly published episodes, which stay first):
 
-1. Shows still giving their evidence (fewer than two episodes, the app's verdict unknown): at most two pages each per
-   turn, so every show unlocks (or fails to unlock) the app quickly.
-2. Shows the app is trusted for: filled from the app in bulk, outside the page budget (each episode still checked).
-3. Page-only shows: the app disagrees with their pages, or does not list them. Their pages, as before.
+1. Shows the app is trusted for: one request each, then filled from the app in bulk, outside the page budget (each
+   episode still checked).
+2. Shows not judged yet that already have two episodes: one request decides them.
+3. Shows still giving their evidence (fewer than two episodes): at most two pages each per turn.
+4. Page-only shows: the app disagrees with their pages, or does not list them. Their pages, as before.
+
+(0.6.0 put the evidence pages first; measured, the page budget then ran out before any trusted show got its turn, so
+the order is by cost: cheapest unlock first.)
 
 Each show's verdict (`trusted`, `disagrees`, `unlisted`) is kept in the crawl state; "disagrees" is final (the app is
 never used for that show), "trusted" is re-checked against the episodes read in every slice.

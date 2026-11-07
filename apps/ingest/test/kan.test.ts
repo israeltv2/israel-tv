@@ -931,7 +931,7 @@ test('the app is trusted for a show only when at least two of its episodes agree
   ).toBe(false);
 });
 
-test('queue: fresh first, then shows still giving their two evidence pages, then app-trusted, then page-only', async () => {
+test('queue: fresh first, then app-trusted, then shows giving their evidence, then page-only', async () => {
   const { episodeQueue } = await import('../src/kan.ts');
   const store = Store.open(':memory:');
   const mk = (n: string, extra: object = {}) => [
@@ -949,11 +949,13 @@ test('queue: fresh first, then shows still giving their two evidence pages, then
     mk('1', { app: 'disagrees' }),
     mk('2', { app: 'trusted' }),
     mk('3'),
+    mk('6', { app: undefined }),
     mk('4', { app: 'unlisted' }),
     mk('5', { fresh: ['https://www.kan.org.il/content/kan/kan-11/p-5/15/'], app: 'disagrees' }),
   ]);
   const order = episodeQueue(store, shows, Date.now(), () => 0).map(([k]) => k.split('/').at(-2));
-  expect(order).toEqual(['p-5', 'p-3', 'p-2', 'p-1', 'p-4']);
+  // p-3 and p-6 have no episodes yet: evidence pages; p-2 is trusted (one request, then the app in bulk).
+  expect(order).toEqual(['p-5', 'p-2', 'p-3', 'p-6', 'p-1', 'p-4']);
 });
 
 test('a new show reads only its two evidence pages per turn when the app cannot be trusted for it', async () => {

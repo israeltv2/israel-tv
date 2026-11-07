@@ -1065,14 +1065,16 @@ export function stillFilling(p: KanRowProgress | undefined): boolean {
  * long back catalogue (Tehran waited behind shows with 100 pages); the archive row breaks ties. Ties keep the lobby order.
  */
 /**
- * Where a show stands in the queue (after newly published episodes): 0 its first APP_AGREEMENT pages, the evidence
- * that unlocks the app API for it; 1 shows the app is trusted for (filled from the app in bulk, outside the page
- * budget) or not judged yet; 2 shows that read every page (the app disagrees with their pages, or does not list them).
+ * Where a show stands in the queue (after newly published episodes), cheapest unlock first: 0 shows the app is
+ * trusted for (one request, then filled in bulk outside the page budget); 1 shows not judged yet that already have
+ * APP_AGREEMENT episodes (one request decides them); 2 shows still giving their evidence (up to APP_AGREEMENT pages);
+ * 3 shows that read every page (the app disagrees with their pages, or does not list them). Measured on 0.6.0: with
+ * the evidence pages first, the page budget ran out before any trusted show got its turn.
  */
 function appTier(s: ShowState, have: number): number {
-  if (s.app === 'disagrees' || s.app === 'unlisted') return 2;
-  if (s.app === 'trusted') return 1;
-  return have < APP_AGREEMENT ? 0 : 1;
+  if (s.app === 'disagrees' || s.app === 'unlisted') return 3;
+  if (s.app === 'trusted') return 0;
+  return have < APP_AGREEMENT ? 2 : 1;
 }
 
 export function episodeQueue(
