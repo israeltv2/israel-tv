@@ -3,6 +3,7 @@
 // search (/search/). Pre-rendered with the site from the same data the apps get, so search engines and link
 // previews see everything; the pages link to the apps ("Watch in Stremio") and to the broadcaster's own player.
 // No video plays here (docs/decisions.md, "No playback on the website").
+
 import {
   CATALOGS,
   type GuideFile,
@@ -11,10 +12,10 @@ import {
   type MetaPreview,
   sitePaths,
 } from '@israel-tv/core';
+import { script, style } from './assets.ts';
 import { CATALOG_MARK } from './names.ts';
 import {
   absolute,
-  BRAND,
   esc,
   externalLinks,
   footer,
@@ -168,99 +169,7 @@ export function guideList(rows: GuideRow[], shown = 2): string {
     .join('')}</ol>`;
 }
 
-const LIBRARY_CSS = `
-.page-head{padding-block:40px 8px}
-.page-head h1{font-size:clamp(3rem,9vw,5.6rem);margin:0}
-.page-head .lead{color:var(--muted);max-width:44rem;font-size:1.05rem;margin:.4em 0 0}
-.crumbs{display:flex;flex-wrap:wrap;gap:6px;font-size:.9rem;color:var(--muted);margin:0 0 10px;padding:0}
-.crumbs a{color:var(--muted)}
-.crumbs li{list-style:none}.crumbs ol{display:contents}
-.crumbs li{display:inline-flex;align-items:center}
-.crumbs li+li::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);margin-inline:4px 10px;opacity:.75}
-[dir=rtl] .crumbs li+li::before{transform:rotate(135deg)}
-.searchbox{display:flex;gap:8px;margin-top:22px;max-width:34rem}
-.searchbox input{flex:1;min-width:0;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:12px 18px;min-height:48px}
-.searchbox input:focus{outline:2px solid var(--accent);outline-offset:1px}
-.shelf{padding-block:26px 6px}
-.shelf-head{display:flex;align-items:baseline;gap:14px;margin-bottom:12px}
-.shelf-head h2{margin:0;font-size:clamp(2rem,4.4vw,2.7rem)}
-.shelf-head .count{color:var(--muted);font-size:.9rem}
-.shelf-head a.all{margin-inline-start:auto;font-weight:600;white-space:nowrap}
-.strip{display:grid;grid-auto-flow:column;grid-auto-columns:clamp(118px,15vw,168px);gap:14px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:12px 8px 16px;margin:-8px -8px 0;scroll-padding-inline:8px;scrollbar-width:thin}
-.strip>*{scroll-snap-align:start}
-.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(42vw,150px),1fr));gap:22px 14px}
-@media (min-width:720px){.tiles{grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}}
-.tile{display:flex;flex-direction:column;gap:6px;color:var(--fg);text-decoration:none;min-width:0}
-.tile .poster{transition:transform .25s var(--ease-out),box-shadow .25s var(--ease-out);box-shadow:0 0 0 1px var(--border)}
-.tile .blank{display:grid;place-items:center;font:700 3rem/1 var(--display);color:var(--muted)}
-.tile .t{font-weight:600;font-size:.95rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.tile .y{font-size:.8rem;color:var(--muted)}
-@media (hover:hover){.tile:hover .poster{transform:translateY(-4px);box-shadow:0 0 0 2px var(--accent),var(--shadow)}}
-.tile:focus-visible{outline:none}.tile:focus-visible .poster{box-shadow:0 0 0 3px var(--accent)}
-.filters{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 26px}
-.chip{font:inherit;font-size:.9rem;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--fg);cursor:pointer;text-decoration:none;transition:background-color .15s var(--ease-out),border-color .15s var(--ease-out)}
-.chip:hover{border-color:var(--accent)}
-.chip[aria-current=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
-.note{border-inline-start:3px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:10px 14px;margin:14px 0;max-width:46rem}
-.channels-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr))}
-.chan{display:grid;grid-template-columns:56px 1fr;grid-template-rows:auto 1fr auto;gap:4px 14px;align-items:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
-.chan>.logo-tile{grid-row:span 2}
-.row-title{display:flex;align-items:center;gap:16px}
-.chan h2,.chan h3{margin:0;font:600 1.1rem/1.3 var(--body)}
-.chan .acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-self:end}
-.chan .acts .btn{min-height:40px;padding:6px 14px;font-size:.9rem}
-.tag{display:inline-block;font-size:.72rem;font-weight:600;color:var(--warn);border:1px solid currentColor;border-radius:6px;padding:0 6px;margin-inline-start:6px;vertical-align:2px}
-.guide{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px;font-size:.92rem}
-.guide li{display:grid;grid-template-columns:3.2em 1fr;gap:8px;color:var(--muted)}
-.guide li.now{color:var(--fg)}
-.guide li.now .pg{font-weight:600}
-.guide li.now::after{content:"";grid-column:1/-1;height:3px;border-radius:3px;background:linear-gradient(to left,var(--on-air) calc(var(--p,0)*100%),var(--surface-2) 0)}
-[dir=ltr] .guide li.now::after{background:linear-gradient(to right,var(--on-air) calc(var(--p,0)*100%),var(--surface-2) 0)}
-.guide .at{font-variant-numeric:tabular-nums}
-.guide.empty{display:none}
-.strip.live{grid-auto-columns:clamp(220px,26vw,280px)}
-.strip.live .chan{height:100%}
-.show-hero{position:relative;isolation:isolate;overflow:hidden;color:var(--hero-fg);background:#0b0a10}
-.show-hero .bg{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;opacity:.5}
-.show-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,var(--bg) 2%,rgb(13 12 18/80%) 40%,rgb(13 12 18/45%)),linear-gradient(to left,rgb(13 12 18/85%),transparent 75%)}
-.show-hero .wrap{display:grid;gap:22px;padding-block:96px 36px;align-items:end}
-@media (min-width:760px){.show-hero .wrap{grid-template-columns:260px 1fr;padding-block:120px 48px;gap:36px}}
-.show-hero .poster{max-width:200px;justify-self:center;box-shadow:0 20px 50px rgb(0 0 0/55%)}
-@media (max-width:759px){.show-hero .acts .btn{flex:1 1 100%}}
-@media (min-width:760px){.show-hero .poster{max-width:none;justify-self:stretch}}
-.show-hero h1{font-size:clamp(3rem,9vw,6rem);margin:0}
-.show-hero .crumbs,.show-hero .crumbs a{color:var(--hero-muted)}
-.facts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0;list-style:none}
-.facts li{font-size:.85rem;padding:3px 12px;border-radius:999px;background:rgb(255 255 255/9%);border:1px solid rgb(255 255 255/16%);color:var(--hero-fg)}
-.facts li:has(a){padding:0}.facts a{display:block;padding:3px 12px;color:${BRAND.stone};text-decoration:none;border-radius:inherit}
-.facts a:hover{background:rgb(255 255 255/16%)}.facts li:has(a:hover){border-color:var(--accent)}
-.show-hero .desc{max-width:44rem;color:var(--hero-muted);font-size:1.05rem;margin:16px 0 0;white-space:pre-line}
-.show-hero .acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-.show-hero .small{color:var(--hero-muted);margin:14px 0 0;max-width:44rem}
-.show-hero .small a{color:var(--hero-fg)}
-:root[data-theme=light] .show-hero::after{background:linear-gradient(to top,#0d0c12 2%,rgb(13 12 18/80%) 40%,rgb(13 12 18/45%)),linear-gradient(to left,rgb(13 12 18/85%),transparent 75%)}
-.seasons{padding-block:32px 8px}
-.seasons>.wrap>h2{margin-bottom:14px}
-.season>summary{font-size:1.05rem}
-.season>summary .count{margin-inline-start:auto;color:var(--muted);font-weight:400;font-size:.9rem}
-.eps{list-style:none;margin:0;padding:0 12px 12px;display:grid;gap:4px}
-.ep{display:grid;grid-template-columns:minmax(0,128px) 1fr;gap:4px 14px;padding:10px 6px;border-radius:12px;align-items:start}
-@media (min-width:720px){.ep{grid-template-columns:200px 1fr}}
-.ep{position:relative}.ep:hover{background:var(--surface-2)}
-.ep h3 a::after{content:"";position:absolute;inset:0;border-radius:inherit}
-.ep h3 a:focus-visible{outline:none}.ep:has(h3 a:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
-.ep .still{grid-row:span 3;aspect-ratio:16/9;width:100%;height:auto;object-fit:cover;border-radius:8px;background:var(--surface-2)}
-.ep .still.blank{display:grid;place-items:center;font:700 2rem/1 var(--display);color:var(--muted)}
-.ep h3{margin:0;font-size:1rem}
-.ep h3 a{color:var(--fg);text-decoration:none}
-.ep h3 a:hover{color:var(--accent)}
-.ep .meta{font-size:.82rem;color:var(--muted)}
-.ep p{margin:0;font-size:.9rem;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.more{padding:4px 18px 16px;color:var(--muted);font-size:.9rem;margin:0}
-.older{columns:2 12rem;margin:8px 0 0;padding-inline-start:20px;color:var(--muted)}
-.how{padding-block:28px 8px}
-.results-info{color:var(--muted);min-height:1.6em;margin:18px 0}
-`;
+const LIBRARY_CSS = style('library.css');
 
 interface PageOpts {
   title: string;
@@ -370,11 +279,7 @@ function libraryHome(input: LibraryInput): string {
 }
 
 /** The genre filter's script: show only the tiles of the chosen genre (all of them without the script). */
-const FILTER_SCRIPT = `(function(){var bs=document.querySelectorAll('.filters .chip'),ts=document.querySelectorAll('.tiles .tile');
-function pick(g){bs.forEach(function(x){if(x.dataset.g===g)x.setAttribute('aria-current','true');else x.removeAttribute('aria-current')});
-ts.forEach(function(t){t.hidden=!!g&&('|'+(t.dataset.g||'')+'|').indexOf('|'+g+'|')<0})}
-bs.forEach(function(b){b.addEventListener('click',function(e){if(e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();pick(b.dataset.g);history.replaceState(null,'',b.getAttribute('href'))})});
-var f=document.querySelector('.filters');if(f){f.removeAttribute('hidden');var g=new URLSearchParams(location.search).get('g')||'';if([].some.call(bs,function(b){return b.dataset.g===g}))pick(g)}})();`;
+const FILTER_SCRIPT = script('genre-filter.js');
 
 function rowPage(r: LibraryRow): string {
   const name = rowName(r.id);
@@ -622,25 +527,7 @@ function livePage(input: LibraryInput): string {
 }
 
 /** Search over search.json, in the browser (the same matching rules as the apps' search, simplified). */
-const SEARCH_SCRIPT = `(function(){var F={'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ'},P='הובלמשכ';
-function norm(s){return s.normalize('NFKD').replace(/[\\u0591-\\u05C7]/g,'').replace(/[ךםןףץ]/g,function(c){return F[c]}).toLowerCase().replace(/[׳״'"\`]/g,'').replace(/[^\\p{L}\\p{N}]+/gu,' ').trim()}
-function strip(w){var n=w[0]==='ו'&&w.length>3&&P.indexOf(w[1])>=0?2:1;return w.length-n>=2&&P.indexOf(w[0])>=0?w.slice(n):''}
-function score(key,q){var ws=key.split(' '),ex=ws.map(strip).filter(Boolean),best=1;
-for(var i=0;i<q.length;i++){var w=q[i],hit=ws.some(function(k){return k.indexOf(w)===0});if(hit)continue;
-var w2=strip(w);if(ex.some(function(k){return k.indexOf(w)===0})||(w2&&ws.some(function(k){return k.indexOf(w2)===0}))){best=2;continue}return 0}return best}
-var d=document,f=d.getElementById('q'),out=d.getElementById('results'),info=d.getElementById('info'),rows=null,
-esc=function(s){return s.replace(/[&<>"']/g,function(c){return '&#'+c.charCodeAt(0)+';'})},
-clean=function(s){return s.replace(/[\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]/g,'')};
-function sized(u){return /^https:\\/\\/media\\d*\\.reshet\\.tv\\/image\\/upload\\//.test(u)&&!/\\/upload\\/[a-z]_/.test(u)?u.replace('/image/upload/','/image/upload/w_220,c_limit,f_auto,q_auto/'):u}
-function run(){var q=norm(f.value);history.replaceState(null,'',q?'?q='+encodeURIComponent(f.value):location.pathname);
-if(!q){out.innerHTML='';info.textContent='';return}if(!rows){info.textContent='טוען…';return}
-var ws=q.split(' '),hits=[];rows.forEach(function(r){var s=score(r[4],ws);if(s)hits.push([s,r])});hits.sort(function(a,b){return a[0]-b[0]});
-info.textContent=hits.length?(hits.length===1?'נמצאה תוכנית אחת':'נמצאו '+hits.length+' תוצאות'):'לא נמצא כלום. נסו בעברית, כמו שהערוץ כותב את השם.';
-out.innerHTML=hits.slice(0,120).map(function(h){var r=h[1],live=r[1]==='tv',href=live?'/live/#'+r[0]:'/show/'+r[0]+'/',img=r[5]?sized(r[5].replace('{{israel-tv-origin}}','')):'';
-return '<a class="tile" href="'+href+'">'+(img?'<img class="poster" src="'+esc(img)+'" alt="" loading="lazy" width="220" height="330"'+(live?' style="object-fit:contain;padding:18%"':'')+'>':'<span class="poster blank" aria-hidden="true"></span>')+'<span class="t" dir="auto">'+esc(clean(r[3]))+'</span></a>'}).join('')}
-f.addEventListener('input',run);f.value=new URLSearchParams(location.search).get('q')||'';
-fetch('/search.json').then(function(r){return r.json()}).then(function(j){rows=j;run()},function(){info.textContent='החיפוש לא נטען. נסו לרענן את הדף.'});
-f.focus();run()})();`;
+const SEARCH_SCRIPT = script('search.js');
 
 function searchPage(): string {
   return page(

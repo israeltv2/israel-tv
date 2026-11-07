@@ -11,9 +11,7 @@ import { LANDING, LIBRARY, SITE_STATUS } from './fixtures/site.ts';
 const landing = {
   ...LANDING,
   publicUrl: 'https://addon.example.dev',
-  guide: LIBRARY.guide,
-  wall: [],
-  rowPosters: {},
+  ...(LIBRARY.guide ? { guide: LIBRARY.guide } : {}),
 };
 const library = renderLibrary(LIBRARY);
 const PAGES: Record<string, string> = {

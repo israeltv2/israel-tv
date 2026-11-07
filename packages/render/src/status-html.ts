@@ -2,7 +2,9 @@
 // for watching — then a card per row, the live channels and, folded away, the details contributors need. Rendered
 // from the status file alone (the same data as /status.json), pre-rendered; a few lines of script only make the
 // times relative.
+
 import { type Health, type StatusCatalog, type StatusFile, sitePaths } from '@israel-tv/core';
+import { style } from './assets.ts';
 import { fillChip } from './library-html.ts';
 import { CATALOG_MARK, catalogAppName, catalogName, sourceName } from './names.ts';
 import {
@@ -390,47 +392,7 @@ function contributorDetails(status: StatusFile): string {
   return parts.join('');
 }
 
-const STATUS_CSS = `
-.hero-status{padding-block:28px 8px}
-.overall{display:flex;gap:16px;align-items:flex-start;padding:22px;border-radius:18px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow)}
-.overall .dot{flex:none;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--ok-bg);color:var(--ok)}
-.overall.warn .dot{background:var(--warn-bg);color:var(--warn)}.overall.error .dot{background:var(--error-bg);color:var(--error)}
-.overall.info .dot{background:var(--accent-soft);color:var(--accent)}
-.overall .dot svg{width:24px;height:24px}
-.overall h1{font-size:clamp(2.1rem,5vw,2.9rem);margin:0 0 6px}
-.overall p{margin:0;color:var(--muted)}
-.updated{margin:12px 2px 0;font-size:.875rem;color:var(--muted)}
-.rows{padding-block:24px}
-.row-card{display:flex;flex-direction:column;gap:10px}
-.row-head{display:flex;align-items:center;gap:12px}
-.row-title{display:flex;flex-direction:column;margin-inline-end:auto;min-width:0}
-.row-title h3{margin:0}
-.row-line{margin:0;font-size:.95rem}
-.facts{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.facts li{display:flex;flex-direction:column;background:var(--surface-2);border-radius:10px;padding:8px 10px;font-size:.9rem}
-.facts li span{font-size:.75rem;color:var(--muted)}
-.facts li.wide{grid-column:1/-1}
-.facts strong{font-size:1.1rem;font-variant-numeric:tabular-nums}
-.next{margin:0}
-.said{margin:0;padding-inline-start:18px}
-.hist-wrap{margin-top:auto;padding-top:4px}
-.hist{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;height:26px}
-.hist .d{border-radius:3px;background:var(--none)}
-.hist .ok{background:var(--ok)}.hist .warn{background:var(--warn)}.hist .error{background:var(--error)}
-.hist-legend{display:flex;justify-content:space-between;margin-top:4px;font-size:.75rem}
-.channels{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr))}
-.ch .pill{font-size:.72rem;padding:2px 8px}
-.ch{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px}
-.ch-name{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px;font-weight:550;line-height:1.3}
-.tag{font-size:.7rem;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:0 6px}
-.count{font-size:.8rem;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:0 8px;font-weight:600}
-details.inner{margin-block:6px;background:var(--surface-2)}
-.warn-list,.names{margin:0;padding-inline-start:18px}
-.warn-list li{margin-block:8px;overflow-wrap:anywhere}
-.names{columns:2 14rem}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin-top:8px}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:5px;vertical-align:-1px}
-`;
+const STATUS_CSS = style('status.css');
 
 const LEVEL_ICON: Record<Level, string> = {
   ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
