@@ -819,7 +819,12 @@ export async function crawlKan(
       const pageKey = (u: string) => kanEpisodeKey({ id: String(/(\d+)\/$/.exec(u)?.[1]) });
       s.undated = page.episodes
         .map((e) => `${s.origin}${e.path}`)
-        .filter((u) => known.has(pageKey(u)) && !dated.has(pageKey(u)));
+        .filter(
+          (u) =>
+            known.has(pageKey(u)) &&
+            !dated.has(pageKey(u)) &&
+            !(s.held ?? []).some((h) => h.episode.key === pageKey(u)),
+        );
       if (s.undated.length === 0) delete s.undated;
       // Pages given up on (after several tries) stay given up: they never re-enter the ordered queue, where
       // they would hold back newer episodes and, if they ever loaded, be numbered after them.

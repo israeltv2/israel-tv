@@ -1986,3 +1986,9 @@ Measured on a copy of the live database and the runs/warnings of the three days 
 - **Site text in a title** (iltv_mako_654: "… | סרט דוקומנטרי לצפייה ישירה. makoTV"): Mako's page title carries a
   search-engine line and the site's name. Removed at the source and by the title cleaner in general; over all
   38,857 stored episode titles nothing the catalog audit calls site text is left.
+- **Review fixes (same day, before the Reshet migration ran):** one-time migrations run only in the service
+  (`start`), never in another command a deploy runs while the old service still writes; the Reshet migration uses
+  only the seasons the full read returned (a season kept from stored data has the old reader's numbers) and runs
+  only after a complete read (status ok, no show delayed), else it waits for the next full run; the Kan data refresh
+  keeps a show's error and listing state; a full run stopped for a restart no longer resets the bot-check retry
+  list.

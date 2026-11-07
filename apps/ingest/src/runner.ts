@@ -36,6 +36,8 @@ export interface RunSummary {
   requests: number;
   ms: number;
   error?: string;
+  /** Per saved show, the seasons this read returned episodes for (the others are kept from the stored data). */
+  fetched?: Record<string, string[]>;
 }
 
 /** A failure that means the site is refusing us (bot wall, rate limit), not a problem with one show. */
@@ -107,7 +109,12 @@ export function thinReason(prev: ScrapedShow | undefined, next: ScrapedShow): st
 }
 
 export type IngestResult =
-  | { kind: 'saved'; seriesId: string; newEpisodes: number }
+  | {
+      kind: 'saved';
+      seriesId: string;
+      newEpisodes: number /** Seasons this read returned episodes for. */;
+      fetched: string[];
+    }
   /** The source lists the show but it has no episodes yet; nothing is published or allocated. */
   | { kind: 'empty' };
 
@@ -210,7 +217,7 @@ export async function ingestShow(
     latestAirDate(show),
     prev !== undefined,
   );
-  return { kind: 'saved', seriesId, newEpisodes };
+  return { kind: 'saved', seriesId, newEpisodes, fetched: [...fetched] };
 }
 
 async function runShows(
@@ -234,6 +241,7 @@ async function runShows(
   let otherFailures = 0;
   const list = opts.limit ? entries.slice(0, opts.limit) : entries;
   let halted = false;
+  const fetchedSeasons: Record<string, string[]> = {};
   for (const [i, entry] of list.entries()) {
     // A safe point: the show before this one is saved, this one not started.
     if (opts.signal?.aborted) {
@@ -250,6 +258,7 @@ async function runShows(
         continue;
       }
       newEpisodes += r.newEpisodes;
+      fetchedSeasons[r.seriesId] = r.fetched;
       if (r.newEpisodes > 0) log(`[${i + 1}/${list.length}] ${entry.title}: +${r.newEpisodes} episodes`);
     } catch (err) {
       const msg = `${entry.title}: ${(err as Error).message}`;
@@ -294,6 +303,7 @@ async function runShows(
     newEpisodes,
     requests: adapter.requests,
     ms: Date.now() - t0,
+    fetched: fetchedSeasons,
     ...(errors.length
       ? { error: errors.slice(0, 5).join(' | ') + (errors.length > 5 ? ` | +${errors.length - 5} more` : '') }
       : {}),
@@ -485,7 +495,7 @@ export function deferBlocked(
   const blocked = summary.blocked ?? [];
   if (blocked.length === 0) return undefined;
   const now = opts.now ?? Date.now();
-  const fullId = store.lastRun('full', source)?.id ?? runId;
+  const fullId = store.lastRun('full', source, { settled: true })?.id ?? runId;
   const prev = store.getState<BlockedRetry | null>(retryKey(source));
   const base: BlockedRetry =
     prev && prev.runId === fullId

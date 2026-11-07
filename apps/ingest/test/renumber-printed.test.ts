@@ -261,7 +261,20 @@ test('Reshet migration moves a show the full read reached', () => {
     },
     undefined,
   );
-  const line = afterFullRun(store, dir, 'reshet', { status: 'partial', startedAt: '2000-01-01' });
+  // An incomplete read (partial, or a show delayed by a bot check) waits for the next full run.
+  expect(afterFullRun(store, dir, 'reshet', { status: 'partial', startedAt: '2000-01-01' })).toBeUndefined();
+  expect(
+    afterFullRun(store, dir, 'reshet', { status: 'ok', startedAt: '2000-01-01', blocked: [{}] }),
+  ).toBeUndefined();
+  // A season the read did not return (kept from the stored data, old reader's numbers) is left alone.
+  expect(
+    renumberPrinted(store, dir, 'reshet', { dryRun: true, fetched: { [id]: ['r|other'] } })?.moves,
+  ).toEqual([]);
+  const line = afterFullRun(store, dir, 'reshet', {
+    status: 'ok',
+    startedAt: '2000-01-01',
+    fetched: { [id]: ['r|s2'] },
+  });
   expect(line).toMatch(/2 episodes moved in 1 seasons of 1 shows/);
   expect(numbers(store.assignments(id))).toEqual({ '1_a': 2, '1_b': 1 });
 });
