@@ -38,7 +38,14 @@ import {
   workerVersions,
   writeSite,
 } from './publish.ts';
-import { renumberKanReshet, renumberNamedSeasons, repairReshetSplit } from './renumber.ts';
+import {
+  afterFullRun,
+  printedLine,
+  renumberKanReshet,
+  renumberNamedSeasons,
+  renumberPrinted,
+  repairReshetSplit,
+} from './renumber.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
 import { probesAbroad } from './stream-probe.ts';
@@ -160,6 +167,7 @@ async function main(argv: string[]): Promise<number> {
   const renumber = renumberKanReshet(store, config.backup.dir);
   const named = renumberNamedSeasons(store, config.backup.dir);
   const repair = repairReshetSplit(store);
+  const kanPrinted = renumberPrinted(store, config.backup.dir, 'kan');
   const renumberLine =
     [
       renumber
@@ -171,6 +179,7 @@ async function main(argv: string[]): Promise<number> {
       repair
         ? `one-time repair ${repair.id}: ${repair.shows} Reshet daily shows re-split by year, ${repair.dropped} empty season numbers dropped (no episode moved)`
         : '',
+      kanPrinted ? printedLine(kanPrinted) : '',
     ]
       .filter(Boolean)
       .join('\n') || undefined;
@@ -206,7 +215,17 @@ async function main(argv: string[]): Promise<number> {
     switch (cmd) {
       case 'full': {
         let ok = true;
-        for (const a of pick(values.source)) ok = (await runFull(store, a, opts)).status !== 'failed' && ok;
+        for (const a of pick(values.source)) {
+          const startedAt = new Date().toISOString();
+          const r = await runFull(store, a, opts);
+          ok = r.status !== 'failed' && ok;
+          const line = afterFullRun(store, config.backup.dir, a.source, {
+            ...r,
+            startedAt,
+            limited: values.limit !== undefined,
+          });
+          if (line) log(line);
+        }
         if (config.sources.live && (!values.source || values.source === 'live')) {
           const r = await checkLive(store, { abroad: probesAbroad(config) });
           log(

@@ -373,6 +373,35 @@ test('a lone server error at the end of a slice is settled with the lobby, and s
   }
   expect(charged).toBe(true);
   expect(store.lastRun('crawl', 'kan')?.status).toBe('partial');
+  // The next slice, with the page's retry not yet due: the show waits, which is a note, not another partial slice.
+  const { kanSkippedPages } = await import('../src/kan.ts');
+  await crawlKan(store, opts(base, 10));
+  expect(store.lastRun('crawl', 'kan')?.status).toBe('ok');
+  expect(kanSkippedPages(store).waiting).toBe(1);
+});
+
+test('a show whose failed page is due for its retry is read first, before the backlog', async () => {
+  const { episodeQueue } = await import('../src/kan.ts');
+  const store = Store.open(':memory:');
+  const page = (show: number, n: number) => `https://www.kan.org.il/content/kan/kan-11/p-${show}/${n}/`;
+  const shows = {
+    'https://www.kan.org.il/content/kan/kan-11/p-1/': {
+      origin: 'https://www.kan.org.il',
+      catalog: 'iltv_kan11',
+      pending: [page(1, 1)],
+      failed: [],
+      fresh: [page(1, 1)],
+    },
+    'https://www.kan.org.il/content/kan/kan-11/p-2/': {
+      origin: 'https://www.kan.org.il',
+      catalog: 'iltv_kan11',
+      pending: [page(2, 1), page(2, 2)],
+      failed: [],
+      retry: { [page(2, 1)]: { n: 1, at: '2026-11-06T00:00:00Z' } },
+    },
+  };
+  const order = episodeQueue(store, shows, Date.now(), () => 0).map(([k]) => k.split('/').at(-2));
+  expect(order).toEqual(['p-2', 'p-1']);
 });
 
 test('an outage of episode pages alone, with the lobby up, never charges the waiting page', async () => {
@@ -774,7 +803,7 @@ test('episode pages Kan took down or that hold no video are skipped at once, cou
   expect(Object.keys(s?.retry ?? {})).toEqual([]);
   // No warning blames the layout.
   const { kanSkippedPages } = await import('../src/kan.ts');
-  expect(kanSkippedPages(store)).toEqual({ removed: 1, notVideo: 1 });
+  expect(kanSkippedPages(store)).toEqual({ removed: 1, notVideo: 1, gaveUp: 0, waiting: 0 });
 });
 
 test('a bot check that answers 200 is still a bot check: the slice backs off and nothing is charged', async () => {
@@ -996,4 +1025,48 @@ test('after a bot check the pace halves for a day', async () => {
   const r = await crawlKan(store, opts(l, 10));
   expect(r.pages).toBeLessThanOrEqual(5);
   expect(r.note).toMatch(/calm pace/);
+});
+
+test('an unnumbered episode waits behind its printed siblings, so "פרק 2" keeps number 2', async () => {
+  // מלכת השכונה (2026-11-07): "מה לא עובד?" was read before "פרק 2" and took 2; "פרק 2" became 5.
+  const store = Store.open(':memory:');
+  const ids = [
+    '1006639',
+    '1006640',
+    '1007199',
+    '1007369',
+    '1007413',
+    '1007416',
+    '1007417',
+    '1007426',
+    '1007449',
+  ];
+  const titleOf = (id: string) => {
+    const i = ids.indexOf(id);
+    return i === 1 ? 'מאחורי הקלעים' : `פרק ${i === 0 ? 1 : i} - חלק`;
+  };
+  const base = loader(routes);
+  // The player config carries the title JSON-escaped (\u05D7…): replace the recorded title's end in that form.
+  const esc = (t: string) =>
+    [...t]
+      .map((c) =>
+        c === ' ' ? c : `\\u${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`,
+      )
+      .join('');
+  const original = esc('מתכוננים לאירוויזיון');
+  const l = {
+    ...base,
+    async load(url: string) {
+      const r = await base.load(url);
+      const id = /\/s1\/(\d+)\/$/.exec(url)?.[1];
+      return id && r.status === 200 ? { ...r, html: r.html.replaceAll(original, esc(titleOf(id))) } : r;
+    },
+  };
+  for (let i = 0; i < 80 && kanEpisodes(store).length < 9; i++) await crawlKan(store, opts(l, 4));
+  const show = store.listShows({ source: 'kan' })[0];
+  const byKey = new Map(store.assignments(show?.seriesId ?? '').episodes.map((e) => [e.key, e.episode]));
+  expect(byKey.get('kan:1007199')).toBe(2);
+  expect(byKey.get('kan:1007449')).toBe(8);
+  expect(byKey.get('kan:1006640')).toBe(9);
+  expect(store.recentWarnings().filter((w) => w.code === 'episode-number-taken')).toEqual([]);
 });

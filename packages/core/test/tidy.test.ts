@@ -10,6 +10,12 @@ test('text: entities decoded (also double-encoded), every space one plain space'
 
 test('episode titles lose what the app already shows (the live cases)', () => {
   expect(tidyEpisodeTitle('מקום לדאגה, עונה 1, פרק 1', 'מקום לדאגה')).toBe('פרק 1');
+  // Mako's page title with its search-engine line and the site's name (iltv_mako_654, 2026-11-07).
+  expect(tidyEpisodeTitle('היא תצא בלי כלום | סרט דוקומנטרי לצפייה ישירה. makoTV', 'היא תצא בלי כלום')).toBe(
+    'סרט דוקומנטרי',
+  );
+  expect(tidyEpisodeTitle('הסרט | פרק 3 | לצפייה ישירה', 'סדרה')).toBe('הסרט | פרק 3');
+  expect(tidyEpisodeTitle('ביקור ב-mako', 'סדרה')).toBe('ביקור ב-mako');
   expect(tidyEpisodeTitle('המועדון עם שחר חסון | עונה 2 | דדו מילמן', 'המועדון עם שחר חסון')).toBe(
     'דדו מילמן',
   );

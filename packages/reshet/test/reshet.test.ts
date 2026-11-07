@@ -469,3 +469,26 @@ test('list pages never leave Reshet and never exceed the per-show limit, whateve
   const huge = parseShowSitePage(real.replace('"max_page":2', '"max_page":1000000000'), where).morePages;
   expect(huge).toHaveLength(SITE_LIST_PAGES);
 });
+
+test("the number printed in an episode's title beats Kaltura's EpisodeNumber (often a list position)", async () => {
+  const { fromOld } = await import('../src/parse.ts');
+  // טלוויזיה מהעתיד season 2 (2026-11-07): the special is EpisodeNumber 1, "פרק 1" is 2, … "פרק 12" is 13.
+  const e = (name: string, n: number) =>
+    fromOld({ id: name, name, entryId: `1_${n}`, metas: { EpisodeNumber: n } } as Parameters<
+      typeof fromOld
+    >[0]);
+  expect(e('טלוויזיה מהעתיד, עונה 2, פרק 1', 2)?.numberHint).toBe(1);
+  expect(e('טלוויזיה מהעתיד, עונה 2: ספיישל עצמאות', 1)?.numberHint).toBe(1);
+});
+
+test('a printed number two episodes of a season claim is dropped from both', async () => {
+  const { dropCollidingHints } = await import('../src/parse.ts');
+  const ep = (key: string, numberHint?: number) => ({
+    key,
+    title: key,
+    streams: [],
+    ...(numberHint ? { numberHint } : {}),
+  });
+  const out = dropCollidingHints([ep('a', 1), ep('b', 3), ep('c', 3), ep('d')]);
+  expect(out.map((e) => e.numberHint)).toEqual([1, undefined, undefined, undefined]);
+});

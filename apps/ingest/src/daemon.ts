@@ -33,6 +33,7 @@ import { checkLive, type LiveCheckOptions } from './live.ts';
 import { localAddonApp } from './local-server.ts';
 import { pullPublicUsage } from './public-usage.ts';
 import { activeSources, analyticsOff, buildStatus, cleanSecrets, publishSite } from './publish.ts';
+import { afterFullRun } from './renumber.ts';
 import {
   type BlockedRetry,
   type RunOptions,
@@ -180,7 +181,13 @@ export class Daemon {
   fullRun(): void {
     this.enqueue('full', async () => {
       const adapters = createAdapters(this.config);
-      for (const make of Object.values(adapters)) await runFull(this.store, make(), this.runOpts);
+      for (const make of Object.values(adapters)) {
+        const adapter = make();
+        const startedAt = new Date().toISOString();
+        const r = await runFull(this.store, adapter, this.runOpts);
+        const line = afterFullRun(this.store, this.config.backup.dir, adapter.source, { ...r, startedAt });
+        if (line) this.log(line);
+      }
       if (this.config.sources.live) await checkLive(this.store, this.liveCheckOptions());
       await this.probeStreams(1500);
       await this.refreshGuides();

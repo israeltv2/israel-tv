@@ -133,6 +133,11 @@ interface ShowState {
   retry?: Record<string, { n: number; at: string }>;
   /** Pages of episodes we have without an air date (read before dates were kept), re-read when time is left. */
   undated?: string[];
+  /**
+   * Episodes read without a printed number, held back until the show's other pages are read (see saveEpisodes), so
+   * they never take a number a printed episode read after them needs.
+   */
+  held?: { episode: ScrapedEpisode; season: number | undefined; url: string }[];
 }
 
 /**
@@ -180,10 +185,13 @@ const CONNECTION_DOWN =
   /ERR_PROXY|ERR_TUNNEL|ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE|ERR_SOCKS|Target (page, context or browser )?closed|browser has been closed/i;
 /**
  * An episode page charged with a failure (its own: a 404, no player on it, or a server error while comparable
- * pages load) is tried this many times, at least RETRY_GAP_MS apart (so over at least a day), before it is skipped.
+ * pages load) is tried this many times, at least RETRY_GAP_MS apart (so over about half a day), before it is
+ * skipped. A due retry goes first in the queue (episodeQueue), so a waiting show is settled within that time: with
+ * a 12-hour gap and retries queued behind the backlog, 3 shows waited for days and kept every slice "partial"
+ * (~150 slices, 2026-11-05..07).
  */
-const MAX_EPISODE_TRIES = 3;
-const RETRY_GAP_MS = 12 * HOUR_MS;
+export const MAX_EPISODE_TRIES = 3;
+export const RETRY_GAP_MS = 6 * HOUR_MS;
 /** At most this many app-named episodes per slice (each costs one master-playlist check on Kan's CDN). */
 const MAX_STREAM_CHECKS = 400;
 
@@ -758,9 +766,11 @@ export async function crawlKan(
       if (page.description) s.description = page.description;
       const image = s.lobbyPoster ?? absolute(page.image, s.origin);
       if (image) s.image = image;
-      const known = new Set(
-        id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
-      );
+      // Read already: stored, or held back until the show's other pages are read (never queued again).
+      const known = new Set([
+        ...(id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : []),
+        ...(s.held ?? []).map((h) => h.episode.key),
+      ]);
       const seenBefore = new Set([
         ...s.pending,
         ...s.failed,
@@ -921,9 +931,9 @@ export async function crawlKan(
             s.pending.shift();
             continue;
           }
-          batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
           state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
           delete s.retry?.[url];
+          batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
           s.pending.shift();
         }
       } finally {
@@ -932,12 +942,16 @@ export async function crawlKan(
           if (v === 'agrees') s.app = 'trusted';
           else if (v === 'disagrees') s.app = 'disagrees';
         }
-        // Episodes read before a block are kept, never re-read.
-        if (batch.length > 0) newEpisodes += saveEpisodes(store, key, s, batch, runId);
+        // Episodes read before a block are kept, never re-read. Held episodes are saved once their show is read.
+        if (batch.length > 0 || (s.held?.length && s.pending.length === 0))
+          newEpisodes += saveEpisodes(store, key, s, batch, runId);
       }
       // With the page budget spent, shows still get their app list (its own budget) and their app-named episodes.
       if (pages >= opts.pagesPerRun && feeds >= opts.pagesPerRun) break;
     }
+    // Held episodes of shows with nothing left to read (their last pages went away or were skipped): saved now.
+    for (const [key, s] of Object.entries(state.shows))
+      if (s.held?.length && s.pending.length === 0) newEpisodes += saveEpisodes(store, key, s, [], runId);
     // 3b. With pages left in the slice, the air dates of episodes read before dates were kept. Low priority: a
     //     page that fails is dropped from this list (no retries, no warnings); an outage still stops the slice.
     for (const [key, s] of Object.entries(state.shows)) {
@@ -980,22 +994,22 @@ export async function crawlKan(
         null,
         `Kan app API: ${appProblems.length} ${appProblems.length === 1 ? 'request' : 'requests'} not usable, read from the pages instead (e.g. ${appProblems[0]})`,
       );
+    if (waitingShows > 0)
+      note += `; ${waitingShows} ${waitingShows === 1 ? 'show waits' : 'shows wait'} for another read of an episode page that failed earlier`;
     const issues = [
       ...(problems > 0 ? [`${problems} Kan pages could not be read`] : []),
-      ...(waitingShows > 0 ? [`${waitingShows} Kan shows wait to retry an episode page`] : []),
       ...(unsettled > 0
         ? [`${unsettled} Kan pages answered a server error (not yet known whose fault)`]
         : []),
     ];
-    // Pages that could not be read, shows waiting to retry one, and open suspects make the slice partial, so
-    // they show on /status.
+    // Only what went wrong in THIS slice makes it partial (pages that failed now, open suspects). A show still
+    // waiting for the retry of a page that failed in an earlier slice is that slice's failure, already reported:
+    // it is a note here and on /status (kanSkippedPages), settled within MAX_EPISODE_TRIES × RETRY_GAP_MS.
     store.finishRun(runId, {
       status: issues.length > 0 ? 'partial' : 'ok',
       requests: pages,
       newEpisodes,
-      ...(issues.length > 0
-        ? { showsFailed: problems + waitingShows, error: `${issues.join('; ')} (see warnings)` }
-        : {}),
+      ...(issues.length > 0 ? { showsFailed: problems, error: `${issues.join('; ')} (see warnings)` } : {}),
     });
   } catch (err) {
     // An outage (challenge, proxy refusal, connection down, no browser, a site answering server errors): stop
@@ -1092,10 +1106,14 @@ export function episodeQueue(
     return id ? (store.getShow(id)?.show.seasons.reduce((n, x) => n + x.episodes.length, 0) ?? 0) : 0;
   };
   const ready = Object.entries(shows).filter(([, s]) => s.pending.length > 0 && retryAfter(s) <= now);
+  // A show waiting on a failed page whose retry is due goes first: one page read settles it (read, or one try
+  // closer to being skipped), so retries converge instead of waiting behind the whole backlog.
+  const retryDue = (s: ShowState) => (s.pending[0] && s.retry?.[s.pending[0]] ? 0 : 1);
   const rank = new Map(
     ready.map(([key, s], i) => [
       key,
       [
+        retryDue(s),
         s.fresh?.length ? 0 : 1,
         appTier(s, have(key)),
         have(key),
@@ -1105,8 +1123,8 @@ export function episodeQueue(
     ]),
   );
   const cmp = (a: string, b: string) => {
-    const x = rank.get(a) ?? [0, 0, 0, 0, 0];
-    const y = rank.get(b) ?? [0, 0, 0, 0, 0];
+    const x = rank.get(a) ?? [0, 0, 0, 0, 0, 0];
+    const y = rank.get(b) ?? [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return (x[i] ?? 0) - (y[i] ?? 0);
     return 0;
   };
@@ -1115,9 +1133,35 @@ export function episodeQueue(
   return ready.sort(([a], [b]) => cmp(a, b));
 }
 
-function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[], runId: number): number {
+/**
+ * Which of a show's unnumbered episodes wait. Kan prints most episode numbers in titles ("פרק 2 - …"), and the crawl
+ * reads a show over several slices: an unnumbered episode (an extra, a special) saved before its printed siblings
+ * takes the next number, which a printed one read later needs (מלכת השכונה, 2026-11-07: "מה לא עובד?" took 2 and
+ * "פרק 2" became 5). So while the show still has pages to read, its unnumbered episodes wait when the show prints
+ * numbers (a show's very first episode, unnumbered, cannot know that yet: it is taken as it comes). A show that
+ * prints no numbers is saved as it is read.
+ */
+export function heldBack(
+  items: BatchItem[],
+  ctx: { pendingPages: number; storedPrints: boolean },
+): BatchItem[] {
+  if (ctx.pendingPages === 0) return [];
+  const prints = ctx.storedPrints || items.some((b) => b.episode.numberHint);
+  return prints ? items.filter((b) => !b.episode.numberHint) : [];
+}
+
+function saveEpisodes(store: Store, key: string, s: ShowState, read: BatchItem[], runId: number): number {
   const seriesId = store.seriesIdFor('kan', key);
   const prev = store.getShow(seriesId)?.show;
+  const all = [...(s.held ?? []), ...read];
+  const hold = heldBack(all, {
+    pendingPages: s.pending.length,
+    storedPrints: (prev?.seasons ?? []).some((x) => x.episodes.some((e) => e.numberHint)),
+  });
+  if (hold.length > 0) s.held = hold;
+  else delete s.held;
+  const batch = all.filter((b) => !hold.includes(b));
+  if (batch.length === 0) return 0;
   const base: ScrapedShow = prev ?? {
     source: 'kan',
     key,
@@ -1317,12 +1361,22 @@ export function appVerdict(
   return agree >= APP_AGREEMENT ? 'agrees' : 'unknown';
 }
 
-/** Episode pages skipped because Kan took the video down (rights ended) or the page holds no video. */
-export function kanSkippedPages(store: Pick<Store, 'getState'>): { removed: number; notVideo: number } {
+/**
+ * Episode pages skipped because Kan took the video down (rights ended) or the page holds no video, pages given up on
+ * after MAX_EPISODE_TRIES failed reads, and shows paused until a failed page's next try.
+ */
+export function kanSkippedPages(store: Pick<Store, 'getState'>): {
+  removed: number;
+  notVideo: number;
+  gaveUp: number;
+  waiting: number;
+} {
   const shows = Object.values(store.getState<CrawlState>(STATE_KEY)?.shows ?? {});
   return {
     removed: shows.reduce((n, s) => n + (s.removed?.length ?? 0), 0),
     notVideo: shows.reduce((n, s) => n + (s.notVideo?.length ?? 0), 0),
+    gaveUp: shows.reduce((n, s) => n + (s.failed?.length ?? 0), 0),
+    waiting: shows.filter((s) => s.pending[0] && s.retry?.[s.pending[0]]).length,
   };
 }
 

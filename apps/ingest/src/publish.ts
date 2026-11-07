@@ -40,6 +40,8 @@ import {
   kanBotCheck,
   kanRowProgress,
   kanSkippedPages,
+  MAX_EPISODE_TRIES,
+  RETRY_GAP_MS,
   stillFilling,
 } from './kan.ts';
 import { LIVE_CHECK_KEY, type LiveCheck, liveRender } from './live.ts';
@@ -181,6 +183,14 @@ export function buildStatus(
       if (skipped.notVideo > 0)
         notes.push(
           `${skipped.notVideo} pages Kan lists among episodes are articles or promos without video (skipped)`,
+        );
+      if (skipped.waiting > 0)
+        notes.push(
+          `${skipped.waiting} Kan ${skipped.waiting === 1 ? 'show waits' : 'shows wait'} to read an episode page again that failed to load (tried up to ${MAX_EPISODE_TRIES} times, ${RETRY_GAP_MS / HOUR_MS} hours apart; the show's later episodes follow it)`,
+        );
+      if (skipped.gaveUp > 0)
+        notes.push(
+          `${skipped.gaveUp} Kan episode pages failed to load ${MAX_EPISODE_TRIES} times and were skipped`,
         );
     }
     // Listed by the site with nothing to watch: a count here, the titles in `emptyShows` (an expandable list).

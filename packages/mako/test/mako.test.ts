@@ -250,6 +250,7 @@ describe('pages with no episode list, only a featured video (recorded 2026-11-07
 test('featured-video titles lose the "watch now" boilerplate', async () => {
   const { cleanVodTitle } = await import('../src/parse.ts');
   expect(cleanVodTitle('669 - הסרט המלא לצפייה ישירה | 12+')).toBe('669');
+  expect(cleanVodTitle('היא תצא בלי כלום | סרט דוקומנטרי לצפייה ישירה. makoTV')).toBe('היא תצא בלי כלום');
   expect(cleanVodTitle('הסטנדאפ של קובי מימון - המופע המלא לצפייה ישירה | 12+')).toBe(
     'הסטנדאפ של קובי מימון',
   );
