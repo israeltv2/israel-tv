@@ -1866,6 +1866,26 @@ below.
 - Row cards share rows (CSS subgrid): header, counts, where it plays, posters line up across a row of cards. Five
   cards are laid out as two wide and three narrow, four as two by two.
 
+**The renderer's structure (round 9, section 7: "is the framework right?").**
+
+- **Not Astro.** The pages are rendered on the home machine from the live database at publish time, and only changed
+  files are uploaded. A site generator would add a full build step and its toolchain to every publish and work against
+  that incremental model, for benefits available more cheaply.
+- **Components with escaping by default, no build step.** The brief proposed `hono/jsx`. JSX needs a compile step:
+  the publisher (on the home machine, in the Docker image and for anyone running from a clone) runs the TypeScript
+  sources directly with Node's type stripping, which cannot read JSX, so JSX would have put a required build in front of
+  every publish. The same goals are met with a tagged template (`packages/render/src/html.ts`, 40 lines): every value
+  put into a page is escaped unless it is markup made the same way (a component's output) or explicitly `raw()` (our
+  own styles, scripts, JSON-LD, authored copy). The ~80 manual `esc()` calls are gone; components (`head`, `topBar`,
+  `footer`, `logoTile`, `tile`, `channelCard`, `episodeItem`, `fillChip`, row and status cards) take typed props and
+  return `Html`. Links that leave the site are made consistent in one pass over each finished page (`externalLinks`).
+- **Styles and browser scripts are real files**: `src/styles/*.css` (compacted when inlined) and `src/client/*.js`
+  (readable modern JavaScript; comments dropped when inlined), read once per publish and inlined, so a page is still one
+  request. The search page builds its results as elements, not markup from data.
+- **Proof:** every page type is snapshotted from the fixtures (markup, styles, scripts:
+  `packages/render/test/__snapshots__/pages/`) before the change; after it the markup of every page is byte-identical,
+  the styles equal after normalising notation, and the scripts were rewritten (tested in the browser design check).
+
 ## Round 10, live and publishing: only real problems are errors (2026-11-07)
 
 Measured on the home instance (runs, warnings, events.sqlite, logs; last 3 days) before changing anything.
@@ -1902,24 +1922,3 @@ Measured on the home instance (runs, warnings, events.sqlite, logs; last 3 days)
   were already relabelled.
 - **Not done:** the live check does not play refused Kan streams through the relay (each relay play is a geo proxy session, and the
   proxy provider locks the login after ~10 quick sessions); the daily canary already plays a relayed Kan title.
-||||||| parent of bcd9dcf (refactor(site): pages built from components that escape by default)
-
-**The renderer's structure (round 9, section 7: "is the framework right?").**
-
-- **Not Astro.** The pages are rendered on the home machine from the live database at publish time, and only changed
-  files are uploaded. A site generator would add a full build step and its toolchain to every publish and work against
-  that incremental model, for benefits available more cheaply.
-- **Components with escaping by default, no build step.** The brief proposed `hono/jsx`. JSX needs a compile step:
-  the publisher (on the home machine, in the Docker image and for anyone running from a clone) runs the TypeScript
-  sources directly with Node's type stripping, which cannot read JSX, so JSX would have put a required build in front of
-  every publish. The same goals are met with a tagged template (`packages/render/src/html.ts`, 40 lines): every value
-  put into a page is escaped unless it is markup made the same way (a component's output) or explicitly `raw()` (our
-  own styles, scripts, JSON-LD, authored copy). The ~80 manual `esc()` calls are gone; components (`head`, `topBar`,
-  `footer`, `logoTile`, `tile`, `channelCard`, `episodeItem`, `fillChip`, row and status cards) take typed props and
-  return `Html`. Links that leave the site are made consistent in one pass over each finished page (`externalLinks`).
-- **Styles and browser scripts are real files**: `src/styles/*.css` (compacted when inlined) and `src/client/*.js`
-  (readable modern JavaScript; comments dropped when inlined), read once per publish and inlined, so a page is still one
-  request. The search page builds its results as elements, not markup from data.
-- **Proof:** every page type is snapshotted from the fixtures (markup, styles, scripts:
-  `packages/render/test/__snapshots__/pages/`) before the change; after it the markup of every page is byte-identical,
-  the styles equal after normalising notation, and the scripts were rewritten (tested in the browser design check).
