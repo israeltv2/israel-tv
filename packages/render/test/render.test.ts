@@ -389,3 +389,26 @@ test('a show whose only stored episode is a trailer is not listed (and has no pa
   expect(files.has('meta/series/iltv_mako_54.json')).toBe(false);
   expect(read(files, 'search.json')).toEqual([]);
 });
+
+test('Kaltura episode stills stored unsized are published at 640×360', () => {
+  const s = yearShow(['2026-10-01']);
+  const still = 'https://images.frp1.ott.kaltura.com/Service.svc/GetImage/p/5031/entry_id/abc/version/10';
+  const files = renderSite({
+    ...base,
+    shows: [
+      {
+        ...s,
+        show: {
+          ...s.show,
+          seasons: s.show.seasons.map((x) => ({
+            ...x,
+            episodes: x.episodes.map((e) => ({ ...e, thumbnail: still })),
+          })),
+        },
+      },
+    ],
+  });
+  expect(read(files, 'meta/series/iltv_mako_54.json').meta.videos[0].thumbnail).toBe(
+    `${still}/width/640/height/360`,
+  );
+});

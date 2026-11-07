@@ -6,6 +6,7 @@
 // both templates.
 import {
   cleanGenres,
+  kalturaImage,
   parseDottedDate,
   parseEpisodeHint,
   type ScrapedEpisode,
@@ -172,13 +173,6 @@ const img = (o: z.infer<typeof ImageObj>) => o?.d ?? o?.m ?? undefined;
  */
 export function episodeThumb(url: string | null | undefined): string | undefined {
   return url ? kalturaImage(url, 640, 360) : undefined;
-}
-
-/** A Kaltura image-service address at a given size (unchanged when it is not one, or already sized). */
-export function kalturaImage(url: string, width: number, height: number): string {
-  if (/\/Service\.svc\/GetImage\//i.test(url) && !/\/width\/\d+/i.test(url))
-    return `${url.replace(/\/+$/, '')}/width/${width}/height/${height}`;
-  return url;
 }
 
 /** The common episode shape for both page templates. */
