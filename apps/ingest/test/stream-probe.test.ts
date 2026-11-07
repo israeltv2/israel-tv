@@ -164,3 +164,19 @@ describe('probeStreams → published labels', () => {
     expect(f.asked).toEqual([]);
   });
 });
+
+test('probes ask only public https addresses, also after a redirect', async () => {
+  const { publicHttps } = await import('../src/stream-probe.ts');
+  for (const u of [
+    'http://cdn.test/m.m3u8',
+    'https://127.0.0.1/x',
+    'https://192.168.1.5/x',
+    'https://[::1]/x',
+    'https://localhost/x',
+  ])
+    expect(publicHttps(u), u).toBe(false);
+  expect(publicHttps('https://r.il.cdn-redge.media/x.m3u8')).toBe(true);
+  const intoLan: ProbeFetch = async () =>
+    new Response(null, { status: 302, headers: { location: 'https://10.0.0.2:7702/admin' } });
+  expect(await probeHls('https://cdn.test/m.m3u8', intoLan)).toMatchObject({ result: 'failed', status: 400 });
+});

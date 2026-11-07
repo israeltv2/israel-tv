@@ -15,6 +15,7 @@ import {
   cleanShow,
   DAY_MS,
   HOUR_MS,
+  isTrailer,
   nextDay,
   parseEpisodeHint,
   type ScrapedEpisode,
@@ -94,6 +95,8 @@ interface ShowState {
   pending: string[];
   /** Episode pages given up on after several tries; kept so they never re-enter the queue. */
   failed: string[];
+  /** Episode pages that are trailers, not episodes; kept so they never re-enter the queue. */
+  skipped?: string[];
   /** Last time a re-read of the show page found new episode links (not set by the first read). */
   lastNewAt?: string;
   /** Episode pages found as new on a re-read (newly published), as opposed to the first fill's backlog. */
@@ -483,16 +486,17 @@ export async function crawlKan(
       if (due) {
         const [y, m, d] = due.day.split('-');
         const url = `https://www.kan.org.il/tv-guide/?channelId=${due.ch}&day=${d}-${m}-${y}`;
+        // Recorded first: a guide page that fails waits its turn like one that loads, and never stops the crawl
+        // (the guide is an extra; shows and episodes go on, and a real outage shows on the next page anyway).
+        at[`${due.id}|${due.day}`] = new Date(now).toISOString();
+        state.guideAt = at;
         try {
           const rows = parseKanGuide(await load(url, 'listing'));
           if (rows.length > 0) storeGuide(store, due.id, rows, now);
           else warn(null, `Kan guide ${url}: no programmes on the page (layout changed?)`);
         } catch (err) {
-          rethrowOutage(err);
           warn(null, `Kan guide ${url}: ${(err as Error).message}`);
         }
-        at[`${due.id}|${due.day}`] = new Date(now).toISOString();
-        state.guideAt = at;
       }
     }
 
@@ -558,7 +562,7 @@ export async function crawlKan(
       const known = new Set(
         id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
       );
-      const seenBefore = new Set([...s.pending, ...s.failed]);
+      const seenBefore = new Set([...s.pending, ...s.failed, ...(s.skipped ?? [])]);
       const dated = new Set(
         id
           ? (store
@@ -573,7 +577,7 @@ export async function crawlKan(
       if (s.undated.length === 0) delete s.undated;
       // Pages given up on (after several tries) stay given up: they never re-enter the ordered queue, where
       // they would hold back newer episodes and, if they ever loaded, be numbered after them.
-      const gaveUp = new Set(s.failed);
+      const gaveUp = new Set([...s.failed, ...(s.skipped ?? [])]);
       s.pending = page.episodes
         .map((e) => `${s.origin}${e.path}`)
         .filter((u) => !known.has(kanEpisodeKey({ id: String(/(\d+)\/$/.exec(u)?.[1]) })) && !gaveUp.has(u));
@@ -643,6 +647,13 @@ export async function crawlKan(
             continue;
           }
           if (e.subtitles !== undefined) noteSubtitles(url, e.subtitles);
+          // A trailer is not an episode: remembered, so its page never re-enters the queue as "new".
+          if (isTrailer(e.title)) {
+            s.skipped = [...new Set([...(s.skipped ?? []), url])];
+            if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
+            s.pending.shift();
+            continue;
+          }
           batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
           state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
           delete s.retry?.[url];

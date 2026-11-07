@@ -98,3 +98,12 @@ test('labels: "Israel only" only where the check from abroad was refused; withou
     ?.streams.find((s) => s.url.includes('livedash'));
   expect(dash?.behaviorHints).toEqual({ notWebReady: true });
 });
+
+test('a DASH backup counts as playing when its manifest answers', async () => {
+  const { playCheck } = await import('../src/canary.ts');
+  const dash = (async () =>
+    new Response('<?xml version="1.0"?>\n<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic"></MPD>', {
+      headers: { 'content-type': 'application/dash+xml' },
+    })) as unknown as typeof fetch;
+  expect(await playCheck('https://cdn.test/live.livx?dvr=1', dash)).toEqual({ statuses: [200] });
+});

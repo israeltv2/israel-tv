@@ -58,18 +58,60 @@ const firstUri = (playlist: string) =>
     .map((l) => l.trim())
     .find((l) => l && !l.startsWith('#'));
 
+/** Playlists larger than this are not playlists. */
+const MAX_PLAYLIST_BYTES = 2 * 1024 * 1024;
+
+/** Only public https addresses are asked (a playlist pointing into this network is refused). */
+export function publicHttps(u: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(u);
+  } catch {
+    return false;
+  }
+  const h = url.hostname.replace(/^\[|\]$/g, '');
+  if (url.protocol !== 'https:' || h === 'localhost' || h.endsWith('.local')) return false;
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return false;
+  return !/^(::1?|f[cd][0-9a-f]{2}:|fe80:)/i.test(h);
+}
+
+async function textUpTo(r: Response, max = MAX_PLAYLIST_BYTES): Promise<string> {
+  const len = Number(r.headers.get('content-length') ?? 0);
+  if (len > max) {
+    await r.body?.cancel();
+    return '';
+  }
+  const text = await r.text();
+  return text.length > max ? '' : text;
+}
+
 /** Master → first variant → first segment (2 KB of it), following redirects. `segment: false` stops at the master. */
 export async function probeHls(
   url: string,
   fetchImpl: ProbeFetch = fetch,
   opts: { segment?: boolean } = {},
 ): Promise<HlsProbe> {
-  const get = async (u: string, range = false) =>
-    fetchImpl(u, {
-      redirect: 'follow',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { 'user-agent': UA, ...(range ? { range: 'bytes=0-2047' } : {}) },
-    });
+  /** One request, following up to 5 redirects by hand so every hop is a public https address. */
+  const get = async (u: string, range = false): Promise<Response> => {
+    let at = u;
+    for (let hop = 0; hop < 6; hop++) {
+      if (!publicHttps(at)) return new Response(null, { status: 400 });
+      const r = await fetchImpl(at, {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: { 'user-agent': UA, ...(range ? { range: 'bytes=0-2047' } : {}) },
+      });
+      const loc = r.status >= 300 && r.status < 400 ? r.headers.get('location') : null;
+      if (!loc) {
+        // Remember where the answer came from (relative playlist entries resolve against it).
+        if (at !== u) Object.defineProperty(r, 'url', { value: at });
+        return r;
+      }
+      await r.body?.cancel();
+      at = new URL(loc, at).toString();
+    }
+    return new Response(null, { status: 508 });
+  };
   const judge = (status: number, step: NonNullable<HlsProbe['step']>): HlsProbe => ({
     result: status === 403 || status === 451 ? 'refused' : 'failed',
     status,
@@ -78,7 +120,7 @@ export async function probeHls(
   try {
     const m = await get(url);
     if (!m.ok) return judge(m.status, 'master');
-    const master = await m.text();
+    const master = await textUpTo(m);
     if (!master.includes('#EXTM3U')) return judge(m.status, 'master');
     const height = maxHeight(master);
     const withHeight = height ? { maxHeight: height } : {};
@@ -92,7 +134,7 @@ export async function probeHls(
     if (master.includes('#EXT-X-STREAM-INF')) {
       const v = await get(vUrl);
       if (!v.ok) return { ...judge(v.status, 'variant'), ...withHeight };
-      media = await v.text();
+      media = await textUpTo(v);
       mediaUrl = v.url || vUrl;
     }
     const segUri = firstUri(media);

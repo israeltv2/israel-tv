@@ -18,8 +18,8 @@ export const ENVELOPE_PATH = '/__israel-tv/router';
 /** Marks an API answer asking for files (body: `{ need: string[] }`). */
 export const NEED_HEADER = 'x-israel-tv-need';
 
-/** Rounds of "need files" per request, and files per round. */
-export const MAX_ROUNDS = 4;
+/** Rounds of "need files" per request (the live row reads three files: row, freshness, guide), and files per round. */
+export const MAX_ROUNDS = 6;
 export const MAX_FILES = 8;
 
 export interface RouterEnvelope {

@@ -77,8 +77,9 @@ export function cleanDescription(raw: string | undefined | null): string | undef
   let t = tidyText(raw).replace(/%%[a-z_]+%%/gi, ' ');
   t = tidyText(t)
     .replace(/^(?:חדשות 13|רשת 13|ערוץ 13|קשת 12|N12)\s*\|\s*/, '')
-    // A closing pointer to another page of the site ("… בעמוד כאן תסריטים >>"): the link is not here.
-    .replace(/(?:^|(?<=[.!?:]))\s*[^.!?:]*(?:>>|»)\s*$/, '')
+    // A closing pointer to another page of the site ("… בעמוד כאן תסריטים >>"): the link is not here. Only ">>"
+    // (a closing » ends quoted names: "הסדרה החדשה של «כאן»").
+    .replace(/(?:^|(?<=[.!?:]))\s*[^.!?:]*>>\s*$/, '')
     .replace(/\s*\|[^|]*לצפייה ישירה[^|]*$/, '')
     .replace(/\s*[-–,]?\s*(?:פרקים מלאים\s*)?לצפייה ישירה\s*$/, '')
     .trim();

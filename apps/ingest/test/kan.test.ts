@@ -689,3 +689,57 @@ test('the live guide: one Kan guide page per slice, each channel today and tomor
     'iltv_live_makan33',
   ]);
 });
+
+test('a trailer page is skipped for good: never stored, never re-queued, never makes the show "airing"', async () => {
+  const store = Store.open(':memory:');
+  const titleJson =
+    '"title":"\\u05D7\\u05D1\\u05E8\\u05D9 \\u0022\\u05E7\\u05D5\\u05E4\\u05D4 \\u05E8\\u05D0\\u05E9\\u05D9\\u05EA\\u0022 \\u05DE\\u05EA\\u05DB\\u05D5\\u05E0\\u05E0\\u05D9\\u05DD \\u05DC\\u05D0\\u05D9\\u05E8\\u05D5\\u05D5\\u05D9\\u05D6\\u05D9\\u05D5\\u05DF"';
+  const base = loader(routes);
+  let trailerUrl = '';
+  const l = {
+    ...base,
+    async load(url: string) {
+      const r = await base.load(url);
+      // The first episode page of the show is a trailer.
+      if (!trailerUrl && /\/p-1006421\/s1\/\d+\/$/.test(url)) trailerUrl = url;
+      return url === trailerUrl ? { ...r, html: r.html.replace(titleJson, '"title":"טריילר"') } : r;
+    },
+  };
+  for (let i = 0; i < 40 && kanEpisodes(store).length < 8; i++) await crawlKan(store, opts(l, 10));
+  expect(trailerUrl).not.toBe('');
+  expect(kanEpisodes(store).some((e) => e.title === 'טריילר')).toBe(false);
+  type S = {
+    shows: Record<string, { skipped?: string[]; pending: string[]; lastNewAt?: string; checkedAt?: string }>;
+  };
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-1006421/';
+  const before = store.getState<S>('kan:crawl')?.shows[key];
+  expect(before?.skipped).toEqual([trailerUrl]);
+  // A re-read of the show page finds the trailer link again: not pending, not new.
+  const state = store.getState<S>('kan:crawl');
+  for (const s of Object.values(state?.shows ?? {})) if (s.checkedAt) s.checkedAt = '2026-01-01T00:00:00Z';
+  store.setState('kan:crawl', state);
+  const lastNewAt = before?.lastNewAt;
+  for (let i = 0; i < 40; i++) {
+    await crawlKan(store, opts(l, 10));
+    const now = store.getState<S>('kan:crawl')?.shows[key];
+    if (now?.checkedAt !== '2026-01-01T00:00:00Z') break;
+  }
+  const after = store.getState<S>('kan:crawl')?.shows[key];
+  expect(after?.pending).not.toContain(trailerUrl);
+  expect(after?.lastNewAt).toBe(lastNewAt);
+});
+
+test('a Kan guide page that is refused never stops the crawl', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes, new Set());
+  const l = {
+    ...base,
+    async load(url: string) {
+      if (url.includes('/tv-guide/')) return { status: 403, html: '', challenged: true };
+      return base.load(url);
+    },
+  };
+  const r = await crawlKan(store, { ...opts(l, 6), guide: true });
+  expect(r.failed).toBeUndefined();
+  expect(r.pages).toBe(6);
+});

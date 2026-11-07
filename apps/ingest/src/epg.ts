@@ -47,15 +47,21 @@ const clean = (s: string | null | undefined) => {
   return t || undefined;
 };
 
+/** At most this many programmes per channel from one read (two weeks of a busy channel), titles this long. */
+const MAX_ROWS = 1500;
+const MAX_TITLE = 120;
+
 /** Programmes by start, with a missing end taken from the next start (the last one gets an hour). */
 export function toRows(items: Item[]): GuideRow[] {
   const sorted = items
+    .map((i) => ({ ...i, title: i.title.slice(0, MAX_TITLE) }))
     .filter((i) => Number.isFinite(i.start) && i.title)
     .sort((a, b) => a.start - b.start)
     .filter((i, n, all) => n === 0 || i.start !== all[n - 1]?.start);
-  return sorted.map((i, n) => {
+  return sorted.slice(0, MAX_ROWS).map((i, n) => {
     const end = i.end ?? sorted[n + 1]?.start ?? i.start + HOUR_MS;
-    const row: GuideRow = [i.start, end, i.title];
+    // A programme never runs past the next one's start, nor longer than a day.
+    const row: GuideRow = [i.start, Math.min(end, sorted[n + 1]?.start ?? end, i.start + DAY_MS), i.title];
     const desc = i.description && i.description !== i.title ? i.description.slice(0, 300) : undefined;
     if (desc || i.image) row.push(desc ?? '');
     if (i.image) row.push(i.image);
@@ -227,7 +233,9 @@ export function parseKanGuide(html: string, origin = 'https://www.kan.org.il'): 
       start: Date.UTC(y ?? 0, (mo ?? 1) - 1, d, h, mi),
       title,
       ...(desc ? { description: desc } : {}),
-      ...(img ? { image: new URL(img.replace(/&amp;/g, '&'), origin).toString() } : {}),
+      ...(img && /^https:\/\//.test(new URL(img.replace(/&amp;/g, '&'), origin).toString())
+        ? { image: new URL(img.replace(/&amp;/g, '&'), origin).toString() }
+        : {}),
     });
   }
   return toRows(items);

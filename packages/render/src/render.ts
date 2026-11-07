@@ -165,6 +165,10 @@ function seasonLabel(a: SeasonAssignment | undefined, title: string): string | u
   return t;
 }
 
+/** Something to watch: numbered episodes that are still in the show (a show with only a trailer has none). */
+const hasVideos = (s: RenderShow) =>
+  s.episodes.length > 0 && s.show.seasons.some((x) => x.episodes.length > 0);
+
 /** A show without trailers and promos (read before they were left out at the source boundary; model.ts). */
 function withoutTrailers(s: RenderShow): RenderShow {
   if (!s.show.seasons.some((x) => x.episodes.some((e) => isTrailer(e.title)))) return s;
@@ -375,7 +379,7 @@ export function renderSite(input: RenderInput): SiteFiles {
 
   const now = input.now ?? Date.now();
   input = { ...input, shows: input.shows.map(withoutTrailers) };
-  const listed = input.shows.filter((s) => s.state === 'listed' && s.episodes.length > 0);
+  const listed = input.shows.filter((s) => s.state === 'listed' && hasVideos(s));
   listed.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
   for (const s of listed) {
     const row = rows.get(s.catalog) ?? [];
@@ -402,7 +406,7 @@ export function renderSite(input: RenderInput): SiteFiles {
 
   // Meta and streams for every show ever published (delisted ones too, so watch history still opens).
   for (const s of input.shows) {
-    if (s.episodes.length === 0) continue;
+    if (!hasVideos(s)) continue;
     files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s, now) }));
     for (const [season, streams] of seasonStreamFiles(s, input.probes)) {
       files.set(sitePaths.seasonStreams(s.seriesId, season), json(streams));

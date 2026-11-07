@@ -1570,9 +1570,10 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
   channels through the home helper; a dead backup is named on `/status` (amber), a channel with no working stream is
   red, a refusal abroad is a label. The dashboard's Sources page lists each stream and each guide.
 - **Radio row: not built.** Every station plays abroad, but as Icecast MP3/AAC (Kan's HLS radio playlists are empty;
-  Makan radio is DASH only). Nuvio plays progressive URLs with parallel ranged reads when that setting is on, which an
-  endless Icecast stream does not survive; Stremio's desktop player would play them but shows a black screen. Without
-  a TV to confirm, a row that may not play in the main app is worse than none. Revisit with an HLS source per station.
+  Makan radio is DASH only). Nuvio plays progressive URLs with parallel ranged reads when that setting is on (its
+  PlayerMediaSourceFactory), which an endless Icecast stream may well not survive (not tested on a device); Stremio's
+  desktop player would play them over a black screen. Without a TV to confirm, a row that may not play in the main
+  app is worse than none. Revisit with an HLS source per station (103FM has one) and a device test.
 - **VOD from Channel 14, i24 and the Knesset: not this round.** Channel 14 has a VOD API behind its apps (the same
   one that names its live feeds), i24 publishes clips, the Knesset an archive of sessions. Each is a new reader with
   its own numbering and terms to check; recorded for a later round.

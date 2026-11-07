@@ -252,3 +252,26 @@ describe('live guide', () => {
     });
   });
 });
+
+test('a stale row: the next page starts one earlier, so no show is skipped', async () => {
+  const stale = {
+    ...files,
+    'freshness.json': {
+      publishedAt: '2026-01-01T00:00:00Z',
+      catalogs: { iltv_reshet13: 'reshet' },
+      sources: { reshet: { cadenceHours: 24, lastGoodAt: '2026-01-01T00:00:00Z' } },
+    },
+  };
+  const a = createAddonApp({
+    read: async (p) => {
+      const f = stale[p as keyof typeof stale];
+      return f === undefined ? undefined : typeof f === 'string' ? f : JSON.stringify(f);
+    },
+  });
+  const ids = async (path: string) =>
+    ((await (await a.request(path)).json()) as { metas: { id: string }[] }).metas.map((m) => m.id);
+  const first = await ids('/catalog/series/iltv_reshet13.json');
+  expect(first).toHaveLength(101);
+  expect(first.at(-1)).toBe('iltv_reshet_100');
+  expect(await ids(`/catalog/series/iltv_reshet13/skip=${first.length}.json`)).toEqual(['iltv_reshet_101']);
+});

@@ -148,7 +148,18 @@ export async function ingestShow(
     store.markShowFailed(knownId as string, `kept last good data: ${why}`);
     throw new Error(why);
   }
-  const show = cleanShow(dedupeEpisodes(mergePartial(prev?.show, scraped, fetched)));
+  const raw = dedupeEpisodes(mergePartial(prev?.show, scraped, fetched));
+  const show = cleanShow(raw);
+  // Only a trailer so far (cleanShow leaves trailers out): nothing to watch yet, not a failed read.
+  if (episodeCount(show) === 0 && episodeCount(raw) > 0) {
+    store.addWarnings(runId, knownId ?? null, [
+      {
+        code: 'source-note',
+        message: `${entry.title}: only a trailer so far (not in the catalog until an episode)`,
+      },
+    ]);
+    return { kind: 'empty' };
+  }
   if (!prev && episodeCount(show) === 0) {
     // Listed by the source but with nothing to watch: not in the catalog, and always said so.
     const notes = scraped.notes?.length ? scraped.notes : ['listed, but its page has no episodes'];

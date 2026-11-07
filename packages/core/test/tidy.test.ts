@@ -56,6 +56,9 @@ test('a closing pointer to another page of the site is dropped', async () => {
     'סדרה על הכלא.',
   );
   expect(cleanDescription('סדרה על הכלא >> ועוד')).toBe('סדרה על הכלא >> ועוד');
+  // Names in «» are not pointers.
+  expect(cleanDescription('הסדרה החדשה של «כאן»')).toBe('הסדרה החדשה של «כאן»');
+  expect(cleanDescription('עונה חדשה. בכיכובם של «רוני» ו«דנה»')).toBe('עונה חדשה. בכיכובם של «רוני» ו«דנה»');
 });
 
 test('descriptions lose what sites add for search engines (the live cases)', async () => {

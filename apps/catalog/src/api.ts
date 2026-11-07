@@ -30,6 +30,18 @@ const fallback = { stream: memoryLimiter(LIMITS.stream), search: memoryLimiter(L
 /** Catalog files the router sent, shared by requests for a minute (the catalog changes at most every half hour). */
 const FILE_TTL_MS = 60_000;
 const files = new Map<string, { text: string | null; at: number }>();
+/** At most this many files kept (unaligned paging and unknown ids would otherwise grow the map forever). */
+const MAX_KEPT = 500;
+
+function remember(path: string, text: string | null): void {
+  files.delete(path);
+  files.set(path, { text, at: Date.now() });
+  // A Map keeps insertion order: the first entries are the oldest.
+  for (const k of files.keys()) {
+    if (files.size <= MAX_KEPT) break;
+    files.delete(k);
+  }
+}
 
 /** A catalog file this request needs and the router has not sent yet. */
 class NeedFile extends Error {
@@ -100,8 +112,7 @@ export default {
     }
     if (e?.v !== ROUTER_CONTRACT_VERSION || typeof e.url !== 'string') return refuse(e ?? {});
     for (const [path, text] of Object.entries(e.files ?? {}))
-      if (safeSitePath(path))
-        files.set(path, { text: typeof text === 'string' ? text : null, at: Date.now() });
+      if (safeSitePath(path)) remember(path, typeof text === 'string' ? text : null);
     const request = new Request(e.url, {
       method: e.method === 'HEAD' ? 'HEAD' : 'GET',
       headers: {

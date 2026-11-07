@@ -125,7 +125,7 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     const extra = new URLSearchParams(extraRaw);
     const search = extra.get('search')?.trim();
     const genre = extra.get('genre')?.trim();
-    const skip = Math.max(0, Number(extra.get('skip') ?? 0) || 0);
+    let skip = Math.max(0, Number(extra.get('skip') ?? 0) || 0);
     const headers = { 'cache-control': CACHE.list };
     const asPreview = ([hid, htype, , name, , poster, genres]: SearchRow) => ({
       id: hid,
@@ -158,6 +158,12 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
       }
       hits.push(...later.slice(0, MAX_SEARCH - hits.length));
       return c.json({ metas: hits.map(asPreview) }, 200, headers);
+    }
+    // A stale row's first page carries one extra item (the notice), so apps that page by what they received ask
+    // one further: step back one so no show is skipped.
+    if (skip > 0 && !extra.has('date')) {
+      const fresh = await readJson<Freshness>(sitePaths.freshness, true);
+      if (fresh && staleSince(fresh, id)) skip -= 1;
     }
     // Pages are stored every CATALOG_PAGE_SIZE items; any other offset is cut from the two pages around it.
     const offset = skip % CATALOG_PAGE_SIZE;

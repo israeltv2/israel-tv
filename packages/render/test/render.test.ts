@@ -372,3 +372,20 @@ test('a row still filling shows a ⏳ item first', () => {
   expect(read(files, 'meta/series/iltv_status_iltv_keshet12_filling.json').meta.videos).toEqual([]);
   expect(metas[1].id).toBe('iltv_mako_54');
 });
+
+test('a show whose only stored episode is a trailer is not listed (and has no page)', () => {
+  const s = yearShow(['2026-10-01']);
+  const trailerOnly: RenderShow = {
+    ...s,
+    show: {
+      ...s.show,
+      seasons: s.show.seasons.map((x) => ({
+        ...x,
+        episodes: x.episodes.map((e) => ({ ...e, title: 'טריילר' })),
+      })),
+    },
+  };
+  const files = renderSite({ ...base, shows: [trailerOnly] });
+  expect(files.has('meta/series/iltv_mako_54.json')).toBe(false);
+  expect(read(files, 'search.json')).toEqual([]);
+});
