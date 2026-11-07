@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.8.1](https://github.com/israeltv2/israel-tv/compare/v0.8.0...v0.8.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **ingest:** remote-url prints its install hint once ([#162](https://github.com/israeltv2/israel-tv/issues/162)) ([f9e2cd1](https://github.com/israeltv2/israel-tv/commit/f9e2cd1ff2002f786d56885588a0f1c3be880714))
+
 ## [0.8.0](https://github.com/israeltv2/israel-tv/compare/v0.7.9...v0.8.0) (2026-11-07)
 
 
