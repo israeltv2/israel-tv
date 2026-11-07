@@ -20,8 +20,10 @@ What to check on the TV/phone after installing. `<addon>` is your addon's base U
   of rows between addons (this addon's rows vs. others) is set in Nuvio's settings (home screen / catalog
   order), not by the addon.
 
-- [ ] Away from home (phone on mobile data): add the link `pnpm israel-tv remote-url` (resolver-only: `pnpm resolver remote-url`) prints (the "Israel TV · Mako (away
-  from home)" addon) and play a Mako episode and קשת 12 live. Remove it again from devices you don't own.
+- [ ] With a tunnel ([guide](setup/tunnel.md)): install only the link `pnpm israel-tv remote-url` (resolver-only:
+  `pnpm resolver remote-url`) prints, in place of the home-network helper link ("Israel TV · home helper" either way).
+  At home, a Keshet 12 episode and an Israel-only one ("דרך החיבור הישראלי שלך") play; on the phone on mobile data, a
+  Keshet 12 episode and קשת 12 live play. Remove it again from devices you don't own.
 
 ## Catalogs and metadata
 

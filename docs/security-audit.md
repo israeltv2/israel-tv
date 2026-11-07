@@ -9,9 +9,10 @@ How Israel TV protects its users and the people who run it, and the record of it
   search, streams and status, through a private binding, to an API Worker that has no public address. The router
   reads only safe catalog paths for the API; the API refuses envelopes of another contract version.
 - **Per-client limits** on search and streams; Cloudflare's daily cap bounds cost.
-- **The home helper has no public surface.** It answers on the home network. The optional away-from-home door is a
-  narrow allowlist of Mako routes behind a long secret token (compared in constant time), rate-limited, with no relay
-  and no admin; anything else is an empty 404.
+- **The home helper has no public surface.** It answers on the home network. The optional tunnel door is a
+  narrow allowlist (manifest, stream answers, Mako's play playlists) behind a long secret token (compared in constant
+  time), rate-limited, with no relay route and no admin; anything else is an empty 404. Relayed streams are offered
+  through it only to the home's own public address, and point at the home-network door (2026-11-07).
 - **The relay goes only to the broadcasters' own hosts** (https only), and checks every redirect; a catalog cannot make
   a home helper reach anything else. Catalog files are size-capped and schema-checked.
 - **The admin page** answers only on private network addresses, needs its own token (cookie, `HttpOnly`,

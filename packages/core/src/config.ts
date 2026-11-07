@@ -148,8 +148,9 @@ export const ConfigSchema = z.strictObject({
       /** Geo-blocked Reshet/Kan video through the geo proxy, only when refused from here (needs `geo`). */
       geoRelay: z.strictObject({ enabled: z.boolean().default(true) }).prefault({}),
       /**
-       * Mako playback away from home, through a tunnel you run (e.g. Cloudflare Tunnel) to this port: Mako routes
-       * only, behind a secret path token, never any video relay. See docs/configuration.md.
+       * The helper's tunnel door: the helper reachable from anywhere through a tunnel you run (e.g. Cloudflare
+       * Tunnel) to this port, so one installed link works at home and away. Behind a secret path token, never any
+       * video through it. See docs/configuration.md and docs/setup/tunnel.md.
        */
       remote: z
         .strictObject({
@@ -161,6 +162,21 @@ export const ConfigSchema = z.strictObject({
           tokenEnv: envName.default('ISRAEL_TV_REMOTE_TOKEN'),
           playsPerMinute: z.number().int().positive().default(30),
           requestsPerMinute: z.number().int().positive().default(240),
+          /**
+           * So that this one link also works at home: a request from the home network's own public address also
+           * gets the relayed ("via your Israeli connection") streams, pointing at the helper's address on the home
+           * network (`lanUrl`, e.g. http://192.0.2.10:7701), so video never passes through the tunnel. Off while
+           * `lanUrl` is unset. The home address is learned from `addressUrls` (Cloudflare's trace endpoints).
+           */
+          home: z
+            .strictObject({
+              lanUrl: z.url().optional(),
+              addressUrls: z
+                .array(z.url())
+                .default(['https://1.1.1.1/cdn-cgi/trace', 'https://[2606:4700:4700::1111]/cdn-cgi/trace']),
+              refreshMinutes: z.number().positive().default(10),
+            })
+            .prefault({}),
         })
         .prefault({}),
     })

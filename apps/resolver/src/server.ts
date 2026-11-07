@@ -1,6 +1,7 @@
 // Resolver wiring: episode details (the home database on a full host, or a published catalog for a resolver that
 // runs on its own) + geo adapter from the config.
 
+import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -20,11 +21,15 @@ import { createGeoFetch, proxyEndpoints } from '@israel-tv/net';
 import type { z } from 'zod';
 import { createResolverApp, type ExternalHit, type ResolverDeps } from './app.ts';
 import { brandImage } from './branding.ts';
+import { homeAddress } from './home-address.ts';
 import { createRemoteResolverApp } from './remote.ts';
 
 export function resolverApp(
   config: Config,
-  opts: Pick<ResolverDeps, 'log' | 'onRelay' | 'onEvent' | 'sessions' | 'salt' | 'clientAddress'> & {
+  opts: Pick<
+    ResolverDeps,
+    'log' | 'onRelay' | 'onEvent' | 'sessions' | 'salt' | 'clientAddress' | 'secret'
+  > & {
     env?: NodeJS.ProcessEnv;
   } = {},
 ) {
@@ -42,10 +47,25 @@ export function resolverApp(
   });
 }
 
-/** The remote (Mako-only) resolver for the tunnel, or a reason it cannot run. */
+/** Why the tunnel door offers no relayed streams at home, or undefined when it does. */
+export function homeRelayProblem(config: Config, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  if (!config.resolver.remote.home.lanUrl)
+    return 'resolver.remote.home.lanUrl is not set: the tunnel link plays Mako and live channels only';
+  if (!config.resolver.enabled) return 'the home-network helper (resolver.enabled) is off';
+  if (!config.resolver.geoRelay.enabled) return 'resolver.geoRelay is off';
+  if (proxyEndpoints(config.geo, env).length === 0) return 'no geo proxy is configured';
+  return undefined;
+}
+
+/**
+ * The helper's tunnel door, or a reason it cannot run. Pass the home-network door's relay `secret` so the relayed
+ * streams it offers at home play there.
+ */
 export function remoteResolverApp(
   config: Config,
-  opts: Pick<ResolverDeps, 'log' | 'onEvent' | 'sessions' | 'salt'> & { env?: NodeJS.ProcessEnv } = {},
+  opts: Pick<ResolverDeps, 'log' | 'onEvent' | 'sessions' | 'salt' | 'secret'> & {
+    env?: NodeJS.ProcessEnv;
+  } = {},
 ): ReturnType<typeof createRemoteResolverApp> | { error: string } {
   const r = config.resolver.remote;
   const { env = process.env, ...extra } = opts;
@@ -59,12 +79,28 @@ export function remoteResolverApp(
     };
   const logo = brandImage(config.branding.dir, 'resolver-logo');
   const background = brandImage(config.branding.dir, 'background');
+  const log = extra.log?.('resolver');
+  const problem = homeRelayProblem(config, env);
+  let home: { isHome(address: string): Promise<boolean>; lanUrl: string } | undefined;
+  if (problem) log?.(`tunnel door: no relayed streams at home (${problem})`);
+  else if (r.home.lanUrl && extra.secret) {
+    const h = homeAddress({
+      fetch: (url, init) => fetch(url, init),
+      urls: r.home.addressUrls,
+      refreshMs: r.home.refreshMinutes * 60_000,
+      salt: extra.salt ?? randomBytes(16).toString('hex'),
+      ...(log ? { log } : {}),
+    });
+    void h.refresh();
+    home = { isHome: h.isHome, lanUrl: r.home.lanUrl };
+  } else log?.('tunnel door: no relayed streams at home (no shared relay secret was passed)');
   return createRemoteResolverApp(
     {
       token,
       publicUrl: r.publicUrl,
       playsPerMinute: r.playsPerMinute,
       requestsPerMinute: r.requestsPerMinute,
+      ...(home ? { home } : {}),
     },
     {
       ...extra,

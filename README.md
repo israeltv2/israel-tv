@@ -73,10 +73,18 @@ Some titles **only play from Israel** — that is the broadcaster's choice, not 
 
 Keshet 12 only lets a video play when your own home internet asks for it. So Keshet 12 needs a small **home helper**:
 a little program on a computer that stays on at home (a desktop PC or Mac, a storage box or a Raspberry Pi), which you
-add to your app as a second link. It then plays at home; on a phone outside the house it needs extra technical setup.
+add to your app as a second link. So the whole install is two links: the public one above, and one helper link.
 Setting it up takes 15 minutes to an hour the first time, and that computer has to stay on:
 **[Set up the home helper](docs/setup/home-helper.md)**. You can also ask an AI assistant to do it for you:
 [a guide written for assistants](docs/setup/for-agents.md).
+
+The helper link comes in two kinds; install one of them, on the account all your devices share:
+
+- **Home only** (the easy way): its home-network link. It plays at home; on a phone outside the house the helper's
+  sources do not play.
+- **Home and away**, with a Cloudflare Tunnel (needs a domain of your own and some technical setup): its tunnel link
+  instead. At home it plays everything the home-only link does; away it plays Keshet 12. No video goes through the
+  tunnel. **[The helper through a Cloudflare Tunnel](docs/setup/tunnel.md)**.
 
 ## Watching from abroad?
 

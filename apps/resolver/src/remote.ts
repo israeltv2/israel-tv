@@ -1,16 +1,20 @@
-// The remote resolver: Mako playback (mako-auth) reachable from outside the home through a tunnel, for viewers
-// away from home. Deliberately narrow:
+// The helper's tunnel door: the helper reachable from anywhere through a tunnel, so that one installed link works
+// both at home and away. Deliberately narrow:
 //
 // - every path starts with a long secret token (compared in constant time); anything else is a bare 404;
-// - only the Mako routes exist here: the manifest, Mako stream requests and the ~1 KB play playlists. No relay
-//   (geo-relay is off: no video ever passes through the tunnel) and nothing of the admin page;
-// - per-client limits (the tunnel passes the client's address; it is only hashed, never kept).
+// - only the manifest, stream requests and Mako's ~1 KB play playlists exist here. No relay route (no video ever
+//   passes through the tunnel) and nothing of the admin page;
+// - a request from the home network's own public address (`home`) is answered like the home-network door would:
+//   relayed Reshet/Kan streams included where they are refused, but pointing at the helper's home-network address,
+//   so their video stays on the home network. Away, those streams are left out (Mako still plays);
+// - per-client limits (the tunnel passes the client's address; it is only hashed, never kept or logged).
 //
 // It listens on its own port, on 127.0.0.1 by default, for the tunnel connector on the same machine.
 import { timingSafeEqual } from 'node:crypto';
 import { REMOTE_RESOLVER_ADDON_ID } from '@israel-tv/core';
+import type { GeoFetch } from '@israel-tv/net';
 import { Hono } from 'hono';
-import { createResolverApp, type ResolverDeps } from './app.ts';
+import { createResolverApp, HELPER_NAME, type ResolverDeps } from './app.ts';
 
 export interface RemoteOptions {
   /** The secret path token (at least 32 characters). */
@@ -20,13 +24,29 @@ export interface RemoteOptions {
   /** Per client per minute: play starts (each fetches a Mako ticket), and all requests. */
   playsPerMinute: number;
   requestsPerMinute: number;
+  /**
+   * Relayed streams for requests from home: whether a client address is the home network's, and the helper's
+   * address on the home network (its relay route answers there). Without it this door offers Mako only. The
+   * relay URLs are signed, so `deps.secret` must be the home-network door's.
+   */
+  home?: { isHome(address: string): Promise<boolean>; lanUrl: string };
 }
 
-/** The only paths served (after the token). */
-const ALLOWED = [
+/**
+ * The relay module needs a geo fetch to exist, but this door never mounts the relay route, so nothing may ever go
+ * through it here.
+ */
+const noRelayHere: GeoFetch = async () => {
+  throw new Error('no relay through the tunnel door');
+};
+
+/** The only paths served (after the token); Reshet and Kan stream requests only with `home`. */
+const allowedPaths = (home: boolean) => [
   /^\/manifest\.json$/,
   /^\/(logo\.png|background\.jpg)$/,
-  /^\/stream\/(series|tv)\/(iltv_mako_|iltv_live_|tt\d|tmdb%3A|tmdb:)[^/]*\.json$/,
+  home
+    ? /^\/stream\/(series|tv)\/(iltv_mako_|iltv_reshet_|iltv_kan_|iltv_live_|tt\d|tmdb%3A|tmdb:)[^/]*\.json$/
+    : /^\/stream\/(series|tv)\/(iltv_mako_|iltv_live_|tt\d|tmdb%3A|tmdb:)[^/]*\.json$/,
   /^\/play\/mako\/[^/]+\.m3u8$/,
   /^\/play\/mako-live\/iltv_live_[a-z0-9_]+\/\d+\.m3u8$/,
 ];
@@ -54,7 +74,17 @@ function windowLimiter(perMinute: number, now: () => number) {
 
 export function createRemoteResolverApp(
   o: RemoteOptions,
-  deps: Omit<ResolverDeps, 'geoFetch' | 'publicBase' | 'manifest' | 'modules' | 'clientAddress'>,
+  deps: Omit<
+    ResolverDeps,
+    | 'geoFetch'
+    | 'publicBase'
+    | 'manifest'
+    | 'modules'
+    | 'clientAddress'
+    | 'relayBase'
+    | 'serveRelay'
+    | 'onRelay'
+  >,
   now: () => number = Date.now,
 ) {
   if (o.token.length < 32) throw new Error('the remote resolver token must be at least 32 characters');
@@ -64,18 +94,28 @@ export function createRemoteResolverApp(
     );
   const base = `${o.publicUrl.replace(/\/+$/, '')}/${o.token}`;
   const clientOf = (headers: Headers) => headers.get('cf-connecting-ip') ?? 'unknown';
+  const home = o.home;
+  const lanBase = home?.lanUrl.replace(/\/+$/, '');
   const inner = createResolverApp({
     ...deps,
-    modules: { makoAuth: true, geoRelay: false },
+    modules: { makoAuth: true, geoRelay: !!home },
+    ...(home ? { geoFetch: noRelayHere } : {}),
+    serveRelay: false,
     publicBase: () => base,
+    relayBase: async (c) => (home && (await home.isHome(clientOf(c.req.raw.headers))) ? lanBase : undefined),
     clientAddress: (c) => clientOf(c.req.raw.headers),
     manifest: {
       id: REMOTE_RESOLVER_ADDON_ID,
-      name: 'Israel TV · Mako (away from home)',
-      description: 'Plays Mako (Keshet 12) episodes and live channels from anywhere, through your home.',
-      idPrefixes: ['iltv_mako_', 'iltv_live_', 'tt', 'tmdb:'],
+      name: HELPER_NAME,
+      description: home
+        ? 'Plays Keshet 12 and live channels anywhere, through your home; at home also Reshet and Kan where they are refused.'
+        : 'Plays Keshet 12 and live channels anywhere, through your home.',
+      idPrefixes: home
+        ? ['iltv_mako_', 'iltv_reshet_', 'iltv_kan_', 'iltv_live_', 'tt', 'tmdb:']
+        : ['iltv_mako_', 'iltv_live_', 'tt', 'tmdb:'],
     },
   });
+  const ALLOWED = allowedPaths(!!home);
   const plays = windowLimiter(o.playsPerMinute, now);
   const requests = windowLimiter(o.requestsPerMinute, now);
   const app = new Hono();

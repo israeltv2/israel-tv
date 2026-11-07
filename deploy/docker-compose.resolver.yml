@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
     ports:
       - "7701:7701" # the resolver: keep it off the internet (no login; relays through your proxy)
-      # Mako away from home (resolver.remote): for a tunnel connector on this host only.
+      # The helper through your tunnel (resolver.remote): for a tunnel connector on this host only.
       - "127.0.0.1:7703:7703"
     volumes:
       - ./resolver-data:/data

@@ -36,7 +36,14 @@ export async function checkProxy(config: Config, out: (line: string) => void = c
   return ok > 0 ? 0 : 1;
 }
 
-/** The away-from-home (remote resolver) install link. */
+/** What to say next to the tunnel link (on stderr: stdout stays the bare link, for scripts). */
+export function remoteUrlHint(config: Config): string {
+  return config.resolver.remote.home.lanUrl
+    ? 'Install this one link on your account, instead of the home-network link: it plays at home (Reshet and Kan relayed where refused, video on your network) and away (Keshet 12 and live channels).'
+    : 'Install this one link on your account, instead of the home-network link: it plays Keshet 12 and live channels at home and away. Set resolver.remote.home.lanUrl so that at home it also offers the relayed Reshet and Kan streams.';
+}
+
+/** The helper's tunnel link (resolver.remote): the one helper link to install when a tunnel is set up. */
 export function remoteUrl(config: Config, env: NodeJS.ProcessEnv = process.env): string {
   const r = config.resolver.remote;
   const token = env[r.tokenEnv];

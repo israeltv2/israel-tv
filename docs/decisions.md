@@ -705,6 +705,25 @@ The token is in `.env`, so it is scrubbed from every log line like the other sec
 names the address without it. No video can pass through the tunnel (no relay route), and the admin port is a
 different listener that the tunnel is never pointed at.
 
+### One helper link for home and away (2026-11-07)
+
+Why: an app account (Stremio, Nuvio) syncs its addons to every device signed in to it, and the usual household has
+one. So the TV that never leaves home and the phone that does get the same helper links. With both doors installed,
+Keshet 12 showed twice at home and the home-network link was dead away. One link must work everywhere.
+
+Design: with a tunnel, people install only the tunnel link. It is the same helper, under the same name. A request
+through the tunnel from the home network's own public address (`cf-connecting-ip`; IPv6 compared by its /64) is
+answered like the home-network door would: direct first, and the relayed Reshet/Kan stream where it is refused
+here. The relayed stream's URL points at the home-network door (`resolver.remote.home.lanUrl`), which serves it; the
+tunnel door still has no relay route, so video never crosses the tunnel. Both doors sign relay URLs with one secret
+per process. Mako stream URLs keep pointing through the tunnel, at home too, so an answer still plays when the phone
+leaves. From anywhere else Reshet/Kan answer no stream (the public catalog's direct ones are already there). The
+home address is learned by the helper itself from Cloudflare's `/cdn-cgi/trace` (on 1.1.1.1, and its IPv6 address),
+every 10 minutes and again on a mismatch at most once a minute; it stays in memory, logs carry a salted hash. A
+phone at home on mobile data looks away, which is fine. Without `lanUrl` the tunnel door is Mako-only as before,
+and Reshet/Kan stream requests stay an empty 404 there. The two doors keep their own manifest ids, so an existing
+install of either keeps working; a tunnel install made before this needs reinstalling once to ask for Reshet/Kan.
+
 ### Security review, round 2
 
 One finding, fixed: a failed Cloudflare deploy's error (wrangler's message names the account id in the API path)
