@@ -3,6 +3,21 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.4.0](https://github.com/israeltv2/israel-tv/compare/v0.3.0...v0.4.0) (2026-11-07)
+
+
+### Features
+
+* public landing and status pages, icons and SEO ([#123](https://github.com/israeltv2/israel-tv/issues/123)) ([9d23720](https://github.com/israeltv2/israel-tv/commit/9d237204b0e9bf3a55dce16487c5373848e75dd8))
+
+
+### Bug Fixes
+
+* Kan clears its bot check (patchright, persistent profile), classifies episode pages, fills the archive row ([#125](https://github.com/israeltv2/israel-tv/issues/125)) ([d59e5ab](https://github.com/israeltv2/israel-tv/commit/d59e5ab5e75153c389c450ed25974657bb769dcf))
+* **mako:** strip a trailing separator left after Mako's boilerplate in film titles ([#120](https://github.com/israeltv2/israel-tv/issues/120)) ([9044d02](https://github.com/israeltv2/israel-tv/commit/9044d02d42c7dca6c766ad1f05db16ae1c3d7a84))
+* real images on every dashboard row, image audit, dashboard icon, honest usage numbers ([#122](https://github.com/israeltv2/israel-tv/issues/122)) ([7bceef4](https://github.com/israeltv2/israel-tv/commit/7bceef4af69b10e9374e61f4769fa580f14cca6f))
+* **reshet:** read 30 "empty" shows from their own site pages; placeholder episode numbers ignored ([#124](https://github.com/israeltv2/israel-tv/issues/124)) ([717564b](https://github.com/israeltv2/israel-tv/commit/717564ba748d560f6aa86ceca781465db4b50eb7))
+
 ## [0.3.0](https://github.com/israeltv2/israel-tv/compare/v0.2.2...v0.3.0) (2026-11-07)
 
 
