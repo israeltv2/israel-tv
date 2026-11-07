@@ -3,7 +3,7 @@ import { ChevronRight, Globe } from 'lucide-react';
 import { ActionButton } from '#components/actions.tsx';
 import { Ago, Empty, LoadError, PageHeader, SourceTag, When } from '#components/bits.tsx';
 import { CanaryStrip } from '#components/canary-strip.tsx';
-import { asHealth, HealthPill } from '#components/health.tsx';
+import { asHealth, HealthPill, runHealth, runLabel } from '#components/health.tsx';
 import { Poster } from '#components/poster.tsx';
 import { Badge } from '#components/ui/badge.tsx';
 import { Card, CardBody, CardHeader } from '#components/ui/card.tsx';
@@ -196,18 +196,7 @@ function SourceCard({ s }: { s: Source }) {
                         </td>
                         <td className="px-3 py-1">{r.kind}</td>
                         <td className="px-3 py-1">
-                          <HealthPill
-                            state={
-                              r.status === 'ok'
-                                ? 'ok'
-                                : r.status === 'running'
-                                  ? 'unknown'
-                                  : r.status === 'partial'
-                                    ? 'warn'
-                                    : 'error'
-                            }
-                            label={r.status}
-                          />
+                          <HealthPill state={runHealth(r.status)} label={runLabel(r.status)} />
                         </td>
                         <td className="px-3 py-1 text-end">
                           {r.showsOk} / {r.showsFailed}

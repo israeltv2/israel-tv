@@ -1,7 +1,7 @@
 // Source adapters: each source lists its shows and reads one show into the common model.
 import type { Config, ScrapedShow, Source } from '@israel-tv/core';
 import * as mako from '@israel-tv/mako';
-import { createFetcher, type Fetcher } from '@israel-tv/net';
+import { type BlockStats, createFetcher, type Fetcher } from '@israel-tv/net';
 import * as reshet from '@israel-tv/reshet';
 
 export interface ShowEntry {
@@ -19,6 +19,8 @@ export interface SourceAdapter {
     opts: { currentSeasonOnly: boolean; stored?: ScrapedShow },
   ): Promise<ScrapedShow>;
   readonly requests: number;
+  /** Bot-check pages met so far, when the source's fetcher can tell. */
+  readonly blocks?: BlockStats | undefined;
 }
 
 export function makoAdapter(f: Fetcher): SourceAdapter {
@@ -28,6 +30,9 @@ export function makoAdapter(f: Fetcher): SourceAdapter {
     fetchShow: (entry, opts) => mako.fetchShow(f, entry, opts),
     get requests() {
       return f.requests;
+    },
+    get blocks() {
+      return f.blocks;
     },
   };
 }
@@ -45,6 +50,9 @@ export function reshetAdapter(f: Fetcher): SourceAdapter {
       ),
     get requests() {
       return f.requests;
+    },
+    get blocks() {
+      return f.blocks;
     },
   };
 }

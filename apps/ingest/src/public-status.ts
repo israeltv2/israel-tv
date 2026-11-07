@@ -65,6 +65,7 @@ export function runHistory(
     const i = at.get(day(Date.parse(r.startedAt)));
     const t = i === undefined ? undefined : tally.get(source)?.[i];
     if (!t) continue;
+    // (Runs stopped for a restart are not in finishedRunsSince: they count neither way.)
     if (r.status === 'failed') t.failed++;
     else t.good++;
   }

@@ -2,6 +2,7 @@ import type { ScrapedEpisode, ScrapedSeason, ScrapedShow } from '@israel-tv/core
 import type { Fetcher } from '@israel-tv/net';
 import { blockedEntries, kalturaPost } from './kaltura.ts';
 import {
+  dropCollidingHints,
   type ParsedSeason,
   parseAllShows,
   parseSeasonPage,
@@ -175,7 +176,7 @@ export async function fetchShow(
   const out: ScrapedSeason[] = seasons.map((x) => ({
     key: `${entry.key}|s${x.s.id}`,
     title: single ? '' : x.s.title,
-    episodes: x.episodes,
+    episodes: dropCollidingHints(x.episodes),
   }));
   return untitledSeasonsByYear({
     source: 'reshet',

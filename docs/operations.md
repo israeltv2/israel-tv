@@ -17,6 +17,7 @@
 | `check-proxy`                                                                 | Checks each configured geo proxy answers and exits in Israel, and says why when not.                                                                                                                                                                                       |
 | `match`                                                                       | TMDB/IMDb lookup.                                                                                                                                                                                                                                                          |
 | `status`                                                                      | Recent runs and warnings.                                                                                                                                                                                                                                                  |
+| `idle [--wait SECONDS]`                                                       | Exit 0 when no run is in progress, 3 when one is; `--wait 300` waits up to 300 seconds for one to end. For deploy scripts (see "Restarting safely").                                                                                                                       |
 | `events [--play P] [--kind K] [--errors] [--since 2h] [--show S] [--limit N]` | Usage and diagnostics events as JSON lines, oldest first (`pnpm logs …` is the same).                                                                                                                                                                                      |
 | `usage`                                                                       | The usage dashboard's figures as JSON (`pnpm usage`; "playing now" is only on the running service's `/usage.json`).                                                                                                                                                        |
 | `admin-url`                                                                   | The admin page's link with its token.                                                                                                                                                                                                                                      |
@@ -54,6 +55,11 @@ only there (`pnpm resolver events --errors`). At start it logs `catalog check: �
   four channels are checked at play time, so 12 of the 16 are counted).
 - **error** — last full run failed, nothing succeeded in 36 hours, or a source has no shows. The affected
   catalog row gets a "⚠" first item with the reason.
+
+A run marked **stopped** ("stopped for restart") was cut short because the service was stopped or restarted. It is
+not a failure: health, the notes, the day-by-day history and the dashboard's failure lists ignore it, and judge the
+source on the last run that ended by itself. A run marked **failed** with "interrupted: the process ended without a
+clean stop" was left open by a crash, a forced kill or a power cut.
 
 `failingShows` lists shows whose last read failed (still served from last good data); `warnings` lists
 numbering conflicts, renumberings at the source, thin results and dead season links.
@@ -301,11 +307,17 @@ Episode pages are read breadth-first: newly published episodes, then the shows w
 
 ### Shows the site refused (bot protection)
 
-Mako and Reshet sometimes answer a show page with a bot-protection page in the nightly full read. Those shows are
-not lost: their last good data stays, and the daemon reads just those shows again later the same night, after 30
-minutes, 1 hour and 2 hours. The source stays green while retries are pending or once they succeed; it turns amber
-only for shows still refused after the third retry (named on `/status`, and in `blocked` per source). Other
-failures in the run are not retried and show as before.
+Mako and Reshet sometimes answer a show page with a bot-protection page (Mako's is Radware: a redirect to
+`validate.perfdrive.com`). The check scores each request, so a reader of the site's JSON (Mako's) first asks again a little later, with fresh
+browser headers and no cookies (after about 5, 15 and 30 seconds, with jitter); that usually gets the data. A show
+still refused is delayed, not lost, and the run is not marked partial or failed for it: its last good data stays, a
+labelled note says so ("Mako's bot check delayed N shows; retried at …"), and the daemon reads just those shows
+again later, after 30 minutes, 1 hour and 2 hours. This holds for the nightly full read, the airing checks and a
+single-show refresh. The source stays green while retries are pending or once they succeed; it turns amber only for
+shows still refused after the third retry (named on `/status`, in `blocked` per source, and listed as failing shows),
+or when the site refuses three shows in a row (the run stops there and is partial). `/status` also says how many of
+the day's requests met the bot check, how many a quick retry read, and how many shows were delayed. Other failures
+in the run are not retried and show as before.
 
 ### Images: checking what viewers see
 
@@ -457,6 +469,40 @@ come back too). Keep a copy of `registry.json` somewhere else from time to time 
 Drill (2026-11-06): the published registry (783 series, 1,665 seasons, 36,580 episode numbers) restored into an
 empty folder, then a fresh read of 9 real shows (6 Mako, 4 Reshet, one without episodes): all 3,527 of their
 episodes came back with exactly the published season and episode numbers, none differed.
+
+## Restarting safely
+
+Stopping the service (Ctrl-C, or the service manager's stop, which sends SIGTERM) does not cut work off in the
+middle:
+
+1. Nothing new starts: no queued job, no scheduled run, no new Kan crawl slice.
+2. The work in progress stops at its next safe point: a full run or an airing check after the show it is reading,
+   a Kan crawl slice before its next page (its progress is saved), a publish when its upload is done.
+3. The run is recorded as **stopped** ("stopped for restart"), not failed, and the service exits.
+4. It waits at most 60 seconds. Whatever is still open then is closed as stopped too. A second Ctrl-C or stop
+   exits at once.
+
+After the restart:
+
+- A **full run** that was stopped is finished first, for the sources it had not read yet. (A full run cut short by
+  a crash is not restarted on its own, so a crash cannot repeat in a loop; it waits for the nightly run, or for the
+  "no full run in 24 hours" rule.)
+- The **Kan crawl** goes on from where it was: its queue is saved after every page.
+- An **airing check** is not repeated: the next scheduled one reads the same shows.
+- The catalog is **published** first, so anything read before the stop goes out.
+
+What a deploy should do:
+
+- Give the service more than 60 seconds to stop. The files in `deploy/` do: launchd `ExitTimeOut` 90 (its default
+  is 20 seconds, after which it kills the process), systemd `TimeoutStopSec=90`, Docker `stop_grace_period: 90s`
+  (its default is 10 seconds). If you made your launchd plist or unit file before this, add that line to it.
+- Then restart as usual (below). No other step is needed.
+- Optional, to avoid cutting a long full run short: wait for a quiet moment first with
+  `pnpm israel-tv idle --wait 600` (exits 0 when no run is in progress, 3 if one still is after 10 minutes).
+  `/status` on the admin port shows the same thing live: `daemon.running`, `daemon.kanSlice`, and
+  `daemon.stopping` while a stop is under way.
+- Windows: the task cannot be asked to stop gently, so `install-task.ps1 -Restart` and `-Stop` first wait (up to 5
+  minutes) with `idle`, then stop it.
 
 ## Updating
 

@@ -44,7 +44,7 @@ import {
   parseShowPage,
 } from '@israel-tv/kan';
 import { createGeoFetch, type ProxyEndpoint } from '@israel-tv/net';
-import type { Store } from '@israel-tv/store';
+import { STOPPED_FOR_RESTART, type Store } from '@israel-tv/store';
 import { KAN_GUIDE_CHANNELS, parseKanGuide, storeGuide } from './epg.ts';
 import { latestAirDate } from './runner.ts';
 
@@ -133,6 +133,11 @@ interface ShowState {
   retry?: Record<string, { n: number; at: string }>;
   /** Pages of episodes we have without an air date (read before dates were kept), re-read when time is left. */
   undated?: string[];
+  /**
+   * Episodes read without a printed number, held back until the show's other pages are read (see saveEpisodes), so
+   * they never take a number a printed episode read after them needs.
+   */
+  held?: { episode: ScrapedEpisode; season: number | undefined; url: string }[];
 }
 
 /**
@@ -180,10 +185,13 @@ const CONNECTION_DOWN =
   /ERR_PROXY|ERR_TUNNEL|ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE|ERR_SOCKS|Target (page, context or browser )?closed|browser has been closed/i;
 /**
  * An episode page charged with a failure (its own: a 404, no player on it, or a server error while comparable
- * pages load) is tried this many times, at least RETRY_GAP_MS apart (so over at least a day), before it is skipped.
+ * pages load) is tried this many times, at least RETRY_GAP_MS apart (so over about half a day), before it is
+ * skipped. A due retry goes first in the queue (episodeQueue), so a waiting show is settled within that time: with
+ * a 12-hour gap and retries queued behind the backlog, 3 shows waited for days and kept every slice "partial"
+ * (~150 slices, 2026-11-05..07).
  */
-const MAX_EPISODE_TRIES = 3;
-const RETRY_GAP_MS = 12 * HOUR_MS;
+export const MAX_EPISODE_TRIES = 3;
+export const RETRY_GAP_MS = 6 * HOUR_MS;
 /** At most this many app-named episodes per slice (each costs one master-playlist check on Kan's CDN). */
 const MAX_STREAM_CHECKS = 400;
 
@@ -199,6 +207,12 @@ class KanLoadError extends Error {
   constructor(message: string, failure: Failure) {
     super(message);
     this.failure = failure;
+  }
+}
+/** The service is stopping (a restart): the slice ends at this page boundary, saves its progress, and is `stopped`. */
+class StopRequested extends KanLoadError {
+  constructor() {
+    super(STOPPED_FOR_RESTART, 'outage');
   }
 }
 /** Anything thrown that is not a load error (a page that does not parse) is the page's own problem. */
@@ -231,6 +245,11 @@ export interface KanCrawlOptions {
   maxStreamChecks?: number;
   /** Read Kan's live programme guide pages too (default true). */
   guide?: boolean;
+  /**
+   * Aborted when the service is stopping: the slice ends before its next page (pauses between pages are cut
+   * short), keeps what it read, and is recorded as `stopped`, not failed. The next slice goes on from the queue.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -297,6 +316,8 @@ export async function crawlKan(
   artSaved?: number;
   note: string;
   failed?: boolean;
+  /** Ended early because the service is stopping (see KanCrawlOptions.signal). */
+  halted?: boolean;
   readShows?: string[];
   attemptedShows?: string[];
 }> {
@@ -337,6 +358,8 @@ export async function crawlKan(
   let artSaved = 0;
   let problems = 0;
   let stopped = false;
+  /** Ended at a safe point because the service is stopping (not a failure). */
+  let halted = false;
   /** Server errors in a row, per site (kan.org.il and kankids.org.il fail independently). */
   const serverErrors = new Map<string, number>();
   /**
@@ -403,10 +426,19 @@ export async function crawlKan(
   let lastImage: LoadedPage['image'];
   /** The images fetched along with the last page that asked for several (a lobby's posters). */
   let lastImages: LoadedPage['images'];
+  /** A safe point (between pages): end the slice here when the service is stopping. */
+  const checkStop = () => {
+    if (opts.signal?.aborted) throw new StopRequested();
+  };
+  /** The pause between requests, cut short when the service is stopping. */
+  const pause = (ms: number) =>
+    sleep(ms, undefined, opts.signal ? { signal: opts.signal } : {}).catch(() => undefined);
   const load = async (url: string, kind: Kind = 'listing', loadOpts?: LoadOptions) => {
     lastImage = undefined;
     lastImages = undefined;
-    if (pages > 0) await sleep(opts.pageIntervalMs);
+    checkStop();
+    if (pages > 0) await pause(opts.pageIntervalMs);
+    checkStop();
     pages++;
     let r: Awaited<ReturnType<PageLoader['load']>>;
     try {
@@ -486,7 +518,9 @@ export async function crawlKan(
     if (!useApp || feeds >= opts.pagesPerRun) return undefined;
     // App lists are small JSON: a quarter of the page pause between them, and a budget of their own, so page reads
     // never starve the one request that lets the app name a show's episodes (measured on 0.6.1: 0 named per slice).
-    if (pages + feeds > 0) await sleep(Math.round(opts.pageIntervalMs / 4));
+    checkStop();
+    if (pages + feeds > 0) await pause(Math.round(opts.pageIntervalMs / 4));
+    checkStop();
     try {
       loader ??= await createChromeLoader(
         opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
@@ -694,6 +728,11 @@ export async function crawlKan(
           if (rows.length > 0) storeGuide(store, due.id, rows, now);
           else warn(null, `Kan guide ${url}: no programmes on the page (layout changed?)`);
         } catch (err) {
+          if (err instanceof StopRequested) {
+            // Not tried: due again next slice.
+            delete at[`${due.id}|${due.day}`];
+            throw err;
+          }
           warn(null, `Kan guide ${url}: ${(err as Error).message}`);
         }
       }
@@ -758,9 +797,11 @@ export async function crawlKan(
       if (page.description) s.description = page.description;
       const image = s.lobbyPoster ?? absolute(page.image, s.origin);
       if (image) s.image = image;
-      const known = new Set(
-        id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
-      );
+      // Read already: stored, or held back until the show's other pages are read (never queued again).
+      const known = new Set([
+        ...(id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : []),
+        ...(s.held ?? []).map((h) => h.episode.key),
+      ]);
       const seenBefore = new Set([
         ...s.pending,
         ...s.failed,
@@ -839,6 +880,7 @@ export async function crawlKan(
       const evidencePhase = !s.app && storedCount < APP_AGREEMENT;
       try {
         while (s.pending.length > 0) {
+          checkStop();
           const url = s.pending[0] as string;
           // Kan episodes are numbered in reading order (page-id order), so never read past a gap: a failing page
           // stays first, the show pauses, and the page is tried again later; only after several tries is it
@@ -921,9 +963,9 @@ export async function crawlKan(
             s.pending.shift();
             continue;
           }
-          batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
           state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
           delete s.retry?.[url];
+          batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
           s.pending.shift();
         }
       } finally {
@@ -932,12 +974,16 @@ export async function crawlKan(
           if (v === 'agrees') s.app = 'trusted';
           else if (v === 'disagrees') s.app = 'disagrees';
         }
-        // Episodes read before a block are kept, never re-read.
-        if (batch.length > 0) newEpisodes += saveEpisodes(store, key, s, batch, runId);
+        // Episodes read before a block are kept, never re-read. Held episodes are saved once their show is read.
+        if (batch.length > 0 || (s.held?.length && s.pending.length === 0))
+          newEpisodes += saveEpisodes(store, key, s, batch, runId);
       }
       // With the page budget spent, shows still get their app list (its own budget) and their app-named episodes.
       if (pages >= opts.pagesPerRun && feeds >= opts.pagesPerRun) break;
     }
+    // Held episodes of shows with nothing left to read (their last pages went away or were skipped): saved now.
+    for (const [key, s] of Object.entries(state.shows))
+      if (s.held?.length && s.pending.length === 0) newEpisodes += saveEpisodes(store, key, s, [], runId);
     // 3b. With pages left in the slice, the air dates of episodes read before dates were kept. Low priority: a
     //     page that fails is dropped from this list (no retries, no warnings); an outage still stops the slice.
     for (const [key, s] of Object.entries(state.shows)) {
@@ -980,35 +1026,43 @@ export async function crawlKan(
         null,
         `Kan app API: ${appProblems.length} ${appProblems.length === 1 ? 'request' : 'requests'} not usable, read from the pages instead (e.g. ${appProblems[0]})`,
       );
+    if (waitingShows > 0)
+      note += `; ${waitingShows} ${waitingShows === 1 ? 'show waits' : 'shows wait'} for another read of an episode page that failed earlier`;
     const issues = [
       ...(problems > 0 ? [`${problems} Kan pages could not be read`] : []),
-      ...(waitingShows > 0 ? [`${waitingShows} Kan shows wait to retry an episode page`] : []),
       ...(unsettled > 0
         ? [`${unsettled} Kan pages answered a server error (not yet known whose fault)`]
         : []),
     ];
-    // Pages that could not be read, shows waiting to retry one, and open suspects make the slice partial, so
-    // they show on /status.
+    // Only what went wrong in THIS slice makes it partial (pages that failed now, open suspects). A show still
+    // waiting for the retry of a page that failed in an earlier slice is that slice's failure, already reported:
+    // it is a note here and on /status (kanSkippedPages), settled within MAX_EPISODE_TRIES × RETRY_GAP_MS.
     store.finishRun(runId, {
       status: issues.length > 0 ? 'partial' : 'ok',
       requests: pages,
       newEpisodes,
-      ...(issues.length > 0
-        ? { showsFailed: problems + waitingShows, error: `${issues.join('; ')} (see warnings)` }
-        : {}),
+      ...(issues.length > 0 ? { showsFailed: problems, error: `${issues.join('; ')} (see warnings)` } : {}),
     });
   } catch (err) {
-    // An outage (challenge, proxy refusal, connection down, no browser, a site answering server errors): stop
-    // and wait well before trying again.
-    stopped = true;
-    state.backoffUntil = new Date(Date.now() + 45 * 60_000).toISOString();
-    note = `stopped: ${(err as Error).message}; next try after ${state.backoffUntil}`;
-    store.finishRun(runId, {
-      status: newEpisodes > 0 ? 'partial' : 'failed',
-      requests: pages,
-      newEpisodes,
-      error: note,
-    });
+    if (err instanceof StopRequested) {
+      // The service is stopping: what was read is kept (the state is saved below), nothing backs off, and the next
+      // slice goes on from the queue. Not a failure.
+      note = `${STOPPED_FOR_RESTART} after ${pages} ${pages === 1 ? 'page' : 'pages'} + ${feeds} app lists, +${newEpisodes} episodes`;
+      store.finishRun(runId, { status: 'stopped', requests: pages, newEpisodes, error: note });
+      halted = true;
+    } else {
+      // An outage (challenge, proxy refusal, connection down, no browser, a site answering server errors): stop
+      // and wait well before trying again.
+      stopped = true;
+      state.backoffUntil = new Date(Date.now() + 45 * 60_000).toISOString();
+      note = `stopped: ${(err as Error).message}; next try after ${state.backoffUntil}`;
+      store.finishRun(runId, {
+        status: newEpisodes > 0 ? 'partial' : 'failed',
+        requests: pages,
+        newEpisodes,
+        error: note,
+      });
+    }
   } finally {
     reportArt();
     store.setState(STATE_KEY, state);
@@ -1023,6 +1077,7 @@ export async function crawlKan(
     readShows,
     attemptedShows,
     ...(stopped ? { failed: true } : {}),
+    ...(halted ? { halted: true } : {}),
   };
 }
 
@@ -1092,10 +1147,14 @@ export function episodeQueue(
     return id ? (store.getShow(id)?.show.seasons.reduce((n, x) => n + x.episodes.length, 0) ?? 0) : 0;
   };
   const ready = Object.entries(shows).filter(([, s]) => s.pending.length > 0 && retryAfter(s) <= now);
+  // A show waiting on a failed page whose retry is due goes first: one page read settles it (read, or one try
+  // closer to being skipped), so retries converge instead of waiting behind the whole backlog.
+  const retryDue = (s: ShowState) => (s.pending[0] && s.retry?.[s.pending[0]] ? 0 : 1);
   const rank = new Map(
     ready.map(([key, s], i) => [
       key,
       [
+        retryDue(s),
         s.fresh?.length ? 0 : 1,
         appTier(s, have(key)),
         have(key),
@@ -1105,8 +1164,8 @@ export function episodeQueue(
     ]),
   );
   const cmp = (a: string, b: string) => {
-    const x = rank.get(a) ?? [0, 0, 0, 0, 0];
-    const y = rank.get(b) ?? [0, 0, 0, 0, 0];
+    const x = rank.get(a) ?? [0, 0, 0, 0, 0, 0];
+    const y = rank.get(b) ?? [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return (x[i] ?? 0) - (y[i] ?? 0);
     return 0;
   };
@@ -1115,9 +1174,35 @@ export function episodeQueue(
   return ready.sort(([a], [b]) => cmp(a, b));
 }
 
-function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[], runId: number): number {
+/**
+ * Which of a show's unnumbered episodes wait. Kan prints most episode numbers in titles ("פרק 2 - …"), and the crawl
+ * reads a show over several slices: an unnumbered episode (an extra, a special) saved before its printed siblings
+ * takes the next number, which a printed one read later needs (מלכת השכונה, 2026-11-07: "מה לא עובד?" took 2 and
+ * "פרק 2" became 5). So while the show still has pages to read, its unnumbered episodes wait when the show prints
+ * numbers (a show's very first episode, unnumbered, cannot know that yet: it is taken as it comes). A show that
+ * prints no numbers is saved as it is read.
+ */
+export function heldBack(
+  items: BatchItem[],
+  ctx: { pendingPages: number; storedPrints: boolean },
+): BatchItem[] {
+  if (ctx.pendingPages === 0) return [];
+  const prints = ctx.storedPrints || items.some((b) => b.episode.numberHint);
+  return prints ? items.filter((b) => !b.episode.numberHint) : [];
+}
+
+function saveEpisodes(store: Store, key: string, s: ShowState, read: BatchItem[], runId: number): number {
   const seriesId = store.seriesIdFor('kan', key);
   const prev = store.getShow(seriesId)?.show;
+  const all = [...(s.held ?? []), ...read];
+  const hold = heldBack(all, {
+    pendingPages: s.pending.length,
+    storedPrints: (prev?.seasons ?? []).some((x) => x.episodes.some((e) => e.numberHint)),
+  });
+  if (hold.length > 0) s.held = hold;
+  else delete s.held;
+  const batch = all.filter((b) => !hold.includes(b));
+  if (batch.length === 0) return 0;
   const base: ScrapedShow = prev ?? {
     source: 'kan',
     key,
@@ -1317,12 +1402,22 @@ export function appVerdict(
   return agree >= APP_AGREEMENT ? 'agrees' : 'unknown';
 }
 
-/** Episode pages skipped because Kan took the video down (rights ended) or the page holds no video. */
-export function kanSkippedPages(store: Pick<Store, 'getState'>): { removed: number; notVideo: number } {
+/**
+ * Episode pages skipped because Kan took the video down (rights ended) or the page holds no video, pages given up on
+ * after MAX_EPISODE_TRIES failed reads, and shows paused until a failed page's next try.
+ */
+export function kanSkippedPages(store: Pick<Store, 'getState'>): {
+  removed: number;
+  notVideo: number;
+  gaveUp: number;
+  waiting: number;
+} {
   const shows = Object.values(store.getState<CrawlState>(STATE_KEY)?.shows ?? {});
   return {
     removed: shows.reduce((n, s) => n + (s.removed?.length ?? 0), 0),
     notVideo: shows.reduce((n, s) => n + (s.notVideo?.length ?? 0), 0),
+    gaveUp: shows.reduce((n, s) => n + (s.failed?.length ?? 0), 0),
+    waiting: shows.filter((s) => s.pending[0] && s.retry?.[s.pending[0]]).length,
   };
 }
 

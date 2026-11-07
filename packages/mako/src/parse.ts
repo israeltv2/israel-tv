@@ -74,12 +74,16 @@ export function featuredOnly(page: ShowPage): NonNullable<ShowPage['vod']> | und
 
 /** A page's title without Mako's "watch now" boilerplate ("… לצפייה ישירה | 12+", "- הסרט המלא", "- המופע המלא"). */
 export function cleanVodTitle(seoTitle: string | undefined): string {
-  return (seoTitle ?? '')
-    .replace(/\s*\|\s*12\+.*$/, '')
-    .replace(/\s*לצפייה ישירה\s*$/, '')
-    .replace(/\s*-?\s*(הסרט המלא|המופע המלא|פרקים מלאים|עמוד הסרט)\s*$/, '')
-    .replace(/[\s|\-–·]+$/, '')
-    .trim();
+  return (
+    (seoTitle ?? '')
+      .replace(/\s*\|\s*12\+.*$/, '')
+      // "… | סרט דוקומנטרי לצפייה ישירה. makoTV": the page's search-engine line after the title.
+      .replace(/\s*\|[^|]*לצפייה ישירה[^|]*$/, '')
+      .replace(/\s*לצפייה ישירה\s*$/, '')
+      .replace(/\s*-?\s*(הסרט המלא|המופע המלא|פרקים מלאים|עמוד הסרט)\s*$/, '')
+      .replace(/[\s|\-–·]+$/, '')
+      .trim()
+  );
 }
 
 /** The one episode of a page that only features a video, from the video's own page when it could be read. */

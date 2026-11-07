@@ -41,6 +41,8 @@ export function tidyText(s: string): string {
 }
 
 const SEP = String.raw`\s*[,|:\-–]\s*`;
+/** A site's own name at the very end of a title, after a separator or sentence end ("… ישירה. makoTV"). */
+const SITE_SIGNATURE = /\s*[.|·]\s*(?:makoTV|mako|N12|13TV)\s*$|\s+makoTV\s*$/i;
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
@@ -56,8 +58,12 @@ export function tidyEpisodeTitle(title: string, showTitle: string): string {
   t = t
     .replace(new RegExp(`^עונה\\s*\\d+(?:${SEP}|$)`), '')
     // Filler endings: "the full episode/programme" ("פרק 1 המלא" → "פרק 1").
+    // A site's name signing off a title ("… לצפייה ישירה. makoTV", measured on Mako's page titles).
+    .replace(SITE_SIGNATURE, '')
+    // A trailing "| … לצפייה ישירה …" segment is the page's search-engine line, not part of the title.
+    .replace(/\s*\|[^|]*לצפייה ישירה[^|]*$/, '')
     .replace(/\s*[-–]?\s*(?:הפרק המלא|(?:ה)?(?:תכנית|תוכנית) המלאה|המלאה|המלא)\s*$/, '')
-    .replace(/\s*[-–,]?\s*לצפייה ישירה\s*$/, '')
+    .replace(/\s*[-–,]?\s*לצפייה ישירה[.!]?\s*$/, '')
     .replace(/\s*[|\-–·:,]+\s*$/, '')
     .replace(/^\s*[|\-–·:,]+\s*/, '')
     .trim();

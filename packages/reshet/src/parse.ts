@@ -257,7 +257,9 @@ function oldSeason(list: z.infer<typeof OldEpisode>[]): ScrapedEpisode[] {
 export function fromOld(e: z.infer<typeof OldEpisode>): ScrapedEpisode | undefined {
   if (!e.entryId) return undefined;
   return episode(e.entryId, e.name, {
-    numberHint: e.metas?.EpisodeNumber ?? parseEpisodeHint(e.name),
+    // The number printed in the title is the broadcaster's own and what viewers read; Kaltura's EpisodeNumber field
+    // is often a list position instead ("טלוויזיה מהעתיד" season 2: the special is 1, "פרק 1" is 2; 2026-11-07).
+    numberHint: parseEpisodeHint(e.name) ?? e.metas?.EpisodeNumber ?? undefined,
     // A date in the title is the air date; otherwise startDate (see oldSeason for when that is the show's).
     airDate: parseDottedDate(e.name) ?? epochDay(e.startDate),
     description: e.description,
@@ -339,6 +341,21 @@ export function parseShowPage(html: string): ParsedShowPage {
     };
   }
   throw new Error('show page has neither a VodPlaylist grid nor a program (layout changed?)');
+}
+
+/**
+ * A printed number that two episodes of one season claim is no episode number (a title's "פרק 3" next to another
+ * episode's Kaltura number 3, "חוזרים לפספוסים" 2026-11-07): neither keeps it, so the season is numbered by the rules
+ * for unnumbered episodes instead of one taking the number and the other being reported as a clash on every read.
+ */
+export function dropCollidingHints(episodes: ScrapedEpisode[]): ScrapedEpisode[] {
+  const uses = new Map<number, number>();
+  for (const e of episodes) if (e.numberHint) uses.set(e.numberHint, (uses.get(e.numberHint) ?? 0) + 1);
+  return episodes.map((e) => {
+    if (!e.numberHint || (uses.get(e.numberHint) ?? 0) < 2) return e;
+    const { numberHint: _, ...rest } = e;
+    return rest;
+  });
 }
 
 /** Episodes from an older-template season page. */

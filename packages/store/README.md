@@ -10,7 +10,9 @@ so it lives in its own package with its own migrations and a backup and restore 
 - Series ids per source key (`seriesIdFor`), counters that only go up, and stored numbering (`assignments`).
 - Saving a good read atomically (`saveShow`): new numbers are added, stored ones never change.
 - Show state: listed / delisted, last checked, last failure, airing shows, external (TMDB/IMDb) ids.
-- Runs (`startRun`, `finishRun`, `lastGoodRun`, `closeStaleRuns`) and numbering warnings, pruned after 60 days.
+- Runs (`startRun`, `finishRun`, `lastGoodRun`, `closeStaleRuns`) and numbering warnings, pruned after 60 days. A run
+  cut short by a deliberate stop is `stopped` (not a failure): `noteShutdown` marks the stop, `stopOpenRuns` closes
+  what is still open, and `closeStaleRuns` labels a leftover run `stopped` or `failed` (a crash) at the next start.
 - The id registry for `registry.json` (`registry`) and rebuilding it into an empty database (`restoreRegistry`).
 - Consistent copies for the nightly backup (`backupTo`).
 
@@ -31,7 +33,8 @@ so it lives in its own package with its own migrations and a backup and restore 
   `markShowFailed`, `showStamp`.
 - External ids: `setExternalIds`, `showsToMatch`, `seriesWithExternalIds`, `externalSeries`.
 - Runs and warnings: `startRun`, `finishRun`, `recentRuns`, `lastRun`, `firstRun`, `lastGoodRun`,
-  `closeStaleRuns`, `addWarnings`, `recentWarnings`, `prune`; `onRunFinished` callback.
+  `closeStaleRuns`, `noteShutdown`, `stopOpenRuns`, `openRuns`, `addWarnings`, `recentWarnings`, `prune`;
+  `onRunFinished` callback.
 - Other: `getState`, `setState`, `backupTo`, `close`; types `ShowRow`, `RunRow`, `RunKind`, `RunStatus`, `WarningRow`.
 
 ## Run and test it alone

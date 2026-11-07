@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { assignNumbers, type ScrapedShow } from '@israel-tv/core';
 import { expect, test } from 'vitest';
-import { Store } from '../src/store.ts';
+import { INTERRUPTED, SHUTDOWN_KEY, STOPPED_FOR_RESTART, Store } from '../src/store.ts';
 
 const tmp = () => join(mkdtempSync(join(tmpdir(), 'iltv-store-')), 'db.sqlite');
 
@@ -67,8 +67,45 @@ test('runs and stale-run cleanup', () => {
   const r = s.startRun('full', 'mako');
   // Called at startup, before this process starts runs: a run with our own pid is a leftover (e.g. pid 1 in
   // a container); a run of another live process is kept.
-  expect(s.closeStaleRuns(() => true)).toBe(1);
-  expect(s.lastRun('full', 'mako')).toMatchObject({ id: r, status: 'failed' });
+  expect(s.closeStaleRuns(() => true)).toEqual({ stopped: 0, failed: 1 });
+  // No deliberate stop was recorded: a crash, a kill or a power cut, labelled so.
+  expect(s.lastRun('full', 'mako')).toMatchObject({ id: r, status: 'failed', error: INTERRUPTED });
+});
+
+test('a run left open by a process that had begun a deliberate stop is closed as stopped, not failed', () => {
+  const s = Store.open(tmp());
+  const gone = 999_999;
+  const insert = (scope: string, pid: number) =>
+    s.db.$client
+      .prepare("INSERT INTO runs (kind, scope, startedAt, status, pid) VALUES ('crawl', ?, ?, 'running', ?)")
+      .run(scope, new Date().toISOString(), pid);
+  insert('kan', gone);
+  insert('kan:other', gone + 1); // another process, gone without a stop
+  s.noteShutdown(gone);
+  expect(s.closeStaleRuns(() => false)).toEqual({ stopped: 1, failed: 1 });
+  expect(s.lastRun('crawl', 'kan')).toMatchObject({ status: 'stopped' });
+  expect(s.lastRun('crawl', 'kan')?.error).toMatch(/^stopped for restart/);
+  expect(s.lastRun('crawl', 'kan:other')).toMatchObject({ status: 'failed', error: INTERRUPTED });
+  // Used once: a later process with the same pid does not inherit it.
+  expect(s.getState(SHUTDOWN_KEY)).toBeNull();
+  // Stopped runs judge nothing: not the last settled run, not good, not in the history.
+  expect(s.lastRun('crawl', 'kan', { settled: true })).toBeUndefined();
+  expect(s.lastGoodRun('crawl', 'kan')).toBeUndefined();
+  expect(s.finishedRunsSince('2000-01-01', ['crawl'])).toHaveLength(1);
+});
+
+test('a stop that runs out of time closes only its own open runs, as stopped', () => {
+  const s = Store.open(tmp());
+  const mine = s.startRun('publish', 'local');
+  s.db.$client
+    .prepare(
+      "INSERT INTO runs (kind, scope, startedAt, status, pid) VALUES ('full', 'mako', ?, 'running', 1)",
+    )
+    .run(new Date().toISOString());
+  expect(s.openRuns((pid) => pid === process.pid).map((r) => r.id)).toEqual([mine]);
+  expect(s.stopOpenRuns()).toBe(1);
+  expect(s.lastRun('publish', 'local')).toMatchObject({ status: 'stopped', error: STOPPED_FOR_RESTART });
+  expect(s.lastRun('full', 'mako')?.status).toBe('running');
 });
 
 test('a warning already recorded for the same show is not repeated', () => {
