@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.6.0](https://github.com/israeltv2/israel-tv/compare/v0.5.0...v0.6.0) (2026-11-07)
+
+
+### Features
+
+* **kan:** queue evidence pages first, then the app in bulk, then page-only shows; faster pace that calms down after a bot check ([#131](https://github.com/israeltv2/israel-tv/issues/131)) ([cf41d41](https://github.com/israeltv2/israel-tv/commit/cf41d4127530efda0a88f5e3bc0f380f9d768d5b))
+
 ## [0.5.0](https://github.com/israeltv2/israel-tv/compare/v0.4.1...v0.5.0) (2026-11-07)
 
 
