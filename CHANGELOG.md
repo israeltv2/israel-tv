@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.7.3](https://github.com/israeltv2/israel-tv/compare/v0.7.2...v0.7.3) (2026-11-07)
+
+
+### Bug Fixes
+
+* **site:** owner review — new-tab external links, RTL icons and bidi titles, copy pass, consistent logo tiles and row cards ([#143](https://github.com/israeltv2/israel-tv/issues/143)) ([7f0cde5](https://github.com/israeltv2/israel-tv/commit/7f0cde529adef65bb152282fa4b274bff3f86569))
+
 ## [0.7.2](https://github.com/israeltv2/israel-tv/compare/v0.7.1...v0.7.2) (2026-11-07)
 
 
