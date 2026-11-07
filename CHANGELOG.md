@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.6.2](https://github.com/israeltv2/israel-tv/compare/v0.6.1...v0.6.2) (2026-11-07)
+
+
+### Bug Fixes
+
+* **kan:** app lists get their own budget, so page reads never starve the request that unlocks a show ([#135](https://github.com/israeltv2/israel-tv/issues/135)) ([1cd2790](https://github.com/israeltv2/israel-tv/commit/1cd2790ca1b32ac18bd59f3d1a5d79fe8f9f3dc1))
+
 ## [0.6.1](https://github.com/israeltv2/israel-tv/compare/v0.6.0...v0.6.1) (2026-11-07)
 
 
