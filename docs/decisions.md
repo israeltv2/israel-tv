@@ -1761,6 +1761,11 @@ could not name yet.
 (0.6.0 put the evidence pages first; measured, the page budget then ran out before any trusted show got its turn, so
 the order is by cost: cheapest unlock first.)
 
+**App lists have their own budget** (as many requests per slice as the page budget, a quarter of the page pause
+between them): measured on 0.6.1, show pages, fresh episodes and pages the app cannot name used up the page budget
+before most shows got their app list, so slices named 0–1 episodes from the app. A real slice on a copy of the live
+database with this change: +89 episodes, 17 shows trusted, 0 stored ids or numbers changed.
+
 Each show's verdict (`trusted`, `disagrees`, `unlisted`) is kept in the crawl state; "disagrees" is final (the app is
 never used for that show), "trusted" is re-checked against the episodes read in every slice.
 

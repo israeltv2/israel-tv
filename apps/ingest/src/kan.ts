@@ -483,8 +483,10 @@ export async function crawlKan(
   const useApp = opts.appApi !== false;
   /** JSON from the app API through the same session and pacing as a page; undefined when it is not usable. */
   const loadJson = async (url: string): Promise<unknown> => {
-    if (!useApp) return undefined;
-    if (pages > 0) await sleep(opts.pageIntervalMs);
+    if (!useApp || feeds >= opts.pagesPerRun) return undefined;
+    // App lists are small JSON: a quarter of the page pause between them, and a budget of their own, so page reads
+    // never starve the one request that lets the app name a show's episodes (measured on 0.6.1: 0 named per slice).
+    if (pages + feeds > 0) await sleep(Math.round(opts.pageIntervalMs / 4));
     try {
       loader ??= await createChromeLoader(
         opts.browser as Extract<BrowserConfig, { type: 'chrome' }>,
@@ -495,7 +497,7 @@ export async function crawlKan(
       throw new KanLoadError(`browser did not start: ${firstLine(err)}`, 'outage');
     }
     if (!loader.text) return undefined;
-    pages++;
+    feeds++;
     let r: Awaited<ReturnType<NonNullable<PageLoader['text']>>>;
     try {
       r = await loader.text(url);
@@ -519,6 +521,8 @@ export async function crawlKan(
       return undefined;
     }
   };
+  /** App API requests in this slice (their own budget: as many as the page budget). */
+  let feeds = 0;
   /** Problems with the app API in this slice (the crawl falls back to pages; one warning at the end). */
   const appProblems: string[] = [];
   /** Episodes named from the app API in this slice (no page read). */
@@ -653,7 +657,6 @@ export async function crawlKan(
       const slugs = Object.entries(state.shows).filter(([k, s]) => !/\/p-\d+\/$/.test(k) && !s.appId);
       if (slugs.length > 0)
         for (const category of KAN_APP_CATEGORIES) {
-          if (pages >= opts.pagesPerRun) break;
           const json = await loadJson(appCategoryUrl(category));
           if (json === undefined) continue;
           try {
@@ -817,7 +820,7 @@ export async function crawlKan(
       const seriesId = store.findSeriesId('kan', key);
       const batch: BatchItem[] = [];
       // The show's app list, read once (only when it has episodes waiting and the slice has room for it).
-      const listed = s.pending.length > 0 && pages < opts.pagesPerRun ? await appFeed(key, s) : undefined;
+      const listed = s.pending.length > 0 ? await appFeed(key, s) : undefined;
       // Trusted only where it agrees with what the pages gave this show (measured: the app's season differs from
       // the page player's for some shows, e.g. "s8" in the app where the page has no season, stored as 1).
       const verdict = () =>
@@ -932,7 +935,8 @@ export async function crawlKan(
         // Episodes read before a block are kept, never re-read.
         if (batch.length > 0) newEpisodes += saveEpisodes(store, key, s, batch, runId);
       }
-      if (pages >= opts.pagesPerRun) break;
+      // With the page budget spent, shows still get their app list (its own budget) and their app-named episodes.
+      if (pages >= opts.pagesPerRun && feeds >= opts.pagesPerRun) break;
     }
     // 3b. With pages left in the slice, the air dates of episodes read before dates were kept. Low priority: a
     //     page that fails is dropped from this list (no retries, no warnings); an outage still stops the slice.
@@ -970,7 +974,7 @@ export async function crawlKan(
     const pendingTotal = shows.reduce((n, s) => n + s.pending.length, 0);
     // Shows paused on an episode page that failed: visible on /status for as long as they wait.
     const waitingShows = shows.filter((s) => s.pending[0] && s.retry?.[s.pending[0]]).length;
-    note = `${pages} pages${calm ? ' (calm pace: a bot check in the last day)' : ''}, +${newEpisodes} episodes (${fromApp} named by the app API), ${pendingTotal} episode pages still to read`;
+    note = `${pages} pages + ${feeds} app lists${calm ? ' (calm pace: a bot check in the last day)' : ''}, +${newEpisodes} episodes (${fromApp} named by the app API), ${pendingTotal} episode pages still to read`;
     if (appProblems.length > 0)
       warn(
         null,
