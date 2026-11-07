@@ -44,6 +44,7 @@
   const input = d.getElementById('q');
   const results = d.getElementById('results');
   const info = d.getElementById('info');
+  const empty = d.getElementById('empty');
   let rows = null;
 
   const tile = ([id, type, , name, , poster]) => {
@@ -81,6 +82,7 @@
   const run = () => {
     const q = normalize(input.value);
     history.replaceState(null, '', q ? `?q=${encodeURIComponent(input.value)}` : location.pathname);
+    empty.hidden = true;
     if (!q) {
       results.replaceChildren();
       info.textContent = '';
@@ -101,6 +103,7 @@
         : `נמצאו ${hits.length} תוצאות`
       : 'לא נמצא כלום. נסו לחפש בעברית, כמו שהשם כתוב באתר הערוץ.';
     results.replaceChildren(...hits.slice(0, 120).map(([, r]) => tile(r)));
+    empty.hidden = hits.length > 0;
   };
 
   input.addEventListener('input', run);

@@ -103,6 +103,8 @@ export interface PageHead {
   image?: string;
   /** Open Graph type (default "website"). */
   ogType?: string;
+  /** The robots rule (default "index,follow"). */
+  robots?: string;
 }
 
 /** The fonts a page needs before its first paint: its language's reading face and the headline face. */
@@ -139,7 +141,7 @@ export function head(h: PageHead, extraCss = ''): Html {
 <link rel="canonical" href="${url}">${Object.entries(h.alternates ?? {}).map(
     ([l, p]) => html`<link rel="alternate" hreflang="${l}" href="${absolute(p)}">`,
   )}${h.alternates?.en !== undefined ? html`<link rel="alternate" hreflang="x-default" href="${absolute(h.alternates.en)}">` : ''}
-<meta name="robots" content="index,follow">
+<meta name="robots" content="${h.robots ?? 'index,follow'}">
 <meta name="theme-color" content="${BRAND.night}">
 <link rel="icon" href="/${sitePaths.favicon}" sizes="32x32"><link rel="icon" href="/${sitePaths.faviconSvg}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/${sitePaths.appleTouchIcon}"><link rel="manifest" href="/${sitePaths.webManifest}">
@@ -222,7 +224,7 @@ export function footer(lang: Lang, extra: Child = ''): Html {
 </nav>${extra}
 <p class="fine">${
     he
-      ? html`קוד פתוח ברישיון <a href="${LICENSE_URL}">AGPL-3.0</a>. Israel TV לא מאחסן וידאו: האפליקציה מנגנת ישירות מהשירותים החינמיים של הגופים המשדרים. בלי חשבונות ובלי מעקב.`
+      ? html`קוד פתוח, ברישיון <a href="${LICENSE_URL}">AGPL-3.0</a>. אין כאן אחסון של וידאו: האפליקציה מנגנת ישירות מהשירותים החינמיים של הערוצים. בלי חשבונות ובלי מעקב.`
       : html`Open source under the <a href="${LICENSE_URL}">AGPL-3.0</a> license. Israel TV hosts no video: your app plays it straight from the broadcasters' own free services. No accounts, no tracking.`
   }</p>
 </div></footer>
@@ -259,7 +261,8 @@ export function externalLinks(page: Html | string, lang: Lang): string {
     if (!/^https?:\/\//.test(href) || href.startsWith(ORIGIN_TOKEN)) return all;
     const rest = attrs.replace(/\s(target|rel)="[^"]*"/g, '');
     const button = /\sclass="[^"]*\bbtn\b/.test(attrs);
-    return `<a${rest} target="_blank" rel="noopener noreferrer">${body}${button ? '' : EXT_ICON}<span class="sr">${note}</span></a>`;
+    // A word joiner keeps the arrow on the line of the link's last word.
+    return `<a${rest} target="_blank" rel="noopener noreferrer">${body}${button ? '' : `\u2060${EXT_ICON}`}<span class="sr">${note}</span></a>`;
   });
 }
 

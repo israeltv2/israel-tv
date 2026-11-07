@@ -337,6 +337,14 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     return seasonStreams(ext.id, season, Number(m[3]));
   }
 
-  app.notFound((c) => c.json({ error: 'not found' }, 404));
+  // A person who opens an address that does not exist gets the site's not-found page; apps get JSON.
+  app.notFound(async (c) => {
+    if ((c.req.header('accept') ?? '').includes('text/html')) {
+      const page = await reader.read(sitePaths.notFound);
+      if (page)
+        return c.body(page, 404, { 'content-type': 'text/html; charset=utf-8', 'cache-control': CACHE.list });
+    }
+    return c.json({ error: 'not found' }, 404);
+  });
   return app;
 }

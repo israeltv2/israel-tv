@@ -290,7 +290,7 @@
   display: none;
 }
 .strip.live {
-  grid-auto-columns: clamp(220px, 26vw, 280px);
+  grid-auto-columns: clamp(264px, 26vw, 300px);
 }
 .strip.live .chan {
   height: 100%;
@@ -527,4 +527,17 @@
   color: var(--muted);
   min-height: 1.6em;
   margin: 18px 0;
+}
+
+/* The not-found page's ways back in. */
+.browse {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+/* The not-found page's English line sits on the same side as the Hebrew one. */
+.not-found [lang="en"] {
+  text-align: right;
 }

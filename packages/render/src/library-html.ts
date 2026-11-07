@@ -97,7 +97,7 @@ export function fillChip(f: { inCatalog: number; known: number }, lang: 'he' | '
 const WHERE: Record<string, string> = {
   mako: 'הפרקים של קשת 12 מתנגנים דרך העוזר הביתי שלכם, בארץ ובחו״ל.',
   reshet: 'מתנגן בארץ, ורוב הפרקים מתנגנים גם בחו״ל.',
-  kan: 'מתנגן בארץ; בחו״ל, התוכניות שכאן מתירה לצפייה מחוץ לישראל.',
+  kan: 'מתנגן בארץ. בחו״ל מתנגנות התוכניות שכאן מתירה לצפייה מחוץ לישראל.',
 };
 
 const HELPER_DOC = `${PROJECT_URL}/blob/main/docs/setup/home-helper.md`;
@@ -183,6 +183,8 @@ interface PageOpts {
   over?: boolean;
   css?: string;
   script?: string;
+  /** "noindex" for a page search engines should not keep (the not-found page). */
+  robots?: string;
 }
 
 /** A library page: Hebrew, right to left, the site's header and footer. */
@@ -197,6 +199,7 @@ function page(o: PageOpts, body: Html): string {
         ...(o.jsonLd ? { jsonLd: o.jsonLd } : {}),
         ...(o.image ? { image: o.image } : {}),
         ...(o.ogType ? { ogType: o.ogType } : {}),
+        ...(o.robots ? { robots: o.robots } : {}),
       },
       LIBRARY_CSS + (o.css ?? ''),
     )}<body>
@@ -537,6 +540,26 @@ function searchPage(): string {
 <p class="results-info" id="info" role="status" aria-live="polite"></p>
 <noscript><p class="note">החיפוש עובד רק עם JavaScript. אפשר לדפדף ב<a href="/library/">ספרייה</a>.</p></noscript>
 <div class="tiles" id="results"></div>
+<p class="empty-hint" id="empty" hidden>אפשר גם לדפדף ב<a href="/library/">ספרייה</a>, או לראות <a href="/live/">מה משודר עכשיו</a>.</p>
+</div>`,
+  );
+}
+
+/** The page for an address that does not exist: in both languages, with the ways back in. */
+function notFoundPage(): string {
+  return page(
+    {
+      title: 'הדף לא נמצא | Israel TV',
+      description: 'הכתובת הזאת לא קיימת ב-Israel TV.',
+      path: '404.html',
+      section: 'library',
+      robots: 'noindex',
+    },
+    html`<div class="wrap page-head not-found"><h1>הדף לא נמצא</h1>
+<p class="lead">אולי התוכנית הוסרה, או שהכתובת השתנתה. אפשר לחפש אותה, או להתחיל מהספרייה.</p>
+<p class="lead" lang="en" dir="ltr">This page does not exist. Search for the show, or start from the library.</p>
+<form class="searchbox" action="/search/" method="get" role="search"><input type="search" name="q" placeholder="חיפוש תוכנית" aria-label="חיפוש תוכנית"><button class="btn btn-primary" type="submit">${ICONS.search}חיפוש</button></form>
+<p class="browse"><a class="btn btn-plain" href="/library/">לספרייה</a><a class="btn btn-plain" href="/he/">לדף הבית</a><a class="btn btn-plain" href="/" lang="en" hreflang="en">Home (English)</a></p>
 </div>`,
   );
 }
@@ -552,6 +575,7 @@ export function renderLibrary(input: LibraryInput): Map<string, string> {
   }
   if (input.live.length) files.set(sitePaths.livePage, livePage(input));
   files.set(sitePaths.searchPage, searchPage());
+  files.set(sitePaths.notFound, notFoundPage());
   return files;
 }
 

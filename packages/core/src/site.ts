@@ -37,6 +37,8 @@ export const sitePaths = {
   showPage: (seriesId: string) => `show/${seriesId}/index.html`,
   livePage: 'live/index.html',
   searchPage: 'search/index.html',
+  /** The page for an address that does not exist. */
+  notFound: '404.html',
   catalog: (type: string, id: string, skip = 0) =>
     // Later pages are stored as skip-N (not skip=N: some static hosts redirect '=' to '%3D'); the addon
     // app maps Stremio's `/skip=N.json` URL onto them.
@@ -114,6 +116,10 @@ export interface StatusFile {
     notes: string[];
     /** Titles the site lists with nothing to watch (from the last complete full read), kept out of the catalog. */
     emptyShows?: string[];
+    /** Pages the site lists among episodes that are not played: rights ended, or not a video (Kan). */
+    skipped?: { noLongerOffered: number; notVideo: number };
+    /** The site's bot check today: page loads it stopped, of all (Kan). */
+    botCheck?: { challenged: number; pages: number };
     /** Shows the last full run was refused (bot protection) and their retries later that night. */
     blocked?: { pending: string[]; recovered: string[]; attempts: number; nextAt?: string };
   }[];
@@ -138,8 +144,8 @@ export interface StatusCatalog {
   source: string;
   shows: number;
   episodes: number;
-  /** A row still in its first fill (Kan): shows in the catalog of those the site lists. */
-  filling?: { inCatalog: number; known: number };
+  /** A row still in its first fill (Kan): shows in the catalog of those the site lists, episode pages still to read. */
+  filling?: { inCatalog: number; known: number; pagesToRead?: number };
 }
 
 export interface StatusLiveChannel {

@@ -172,6 +172,9 @@ export function buildStatus(
       health = 'error';
       notes.push('no shows');
     }
+    // The same facts as some notes, as fields: the status page words them itself (in either language).
+    let skippedPages: { noLongerOffered: number; notVideo: number } | undefined;
+    let botCheck: { challenged: number; pages: number } | undefined;
     // Kan fills over days: until every listed show is in, the source is not "ok" (its rows say so too).
     if (source === 'kan') {
       for (const [catalog, p] of Object.entries(kanRowProgress(store))) {
@@ -185,12 +188,14 @@ export function buildStatus(
       }
       // Pages Kan lists as episodes with nothing to play: expected, explained, not a warning.
       const skipped = kanSkippedPages(store);
+      skippedPages = { noLongerOffered: skipped.removed, notVideo: skipped.notVideo };
       if (skipped.removed > 0)
         notes.push(
           `${skipped.removed} Kan episodes are no longer offered by Kan (their broadcast rights ended), so they are not in the catalog`,
         );
       // Kan's bot check, measured: any page it stopped today is said plainly (the crawl waits and tries again).
       const today = kanBotCheck(store)[new Date().toISOString().slice(0, 10)];
+      if (today?.pages) botCheck = { challenged: today.challenged, pages: today.pages };
       if (today?.challenged)
         notes.push(
           `Kan's bot check stopped ${today.challenged} of ${today.pages} page loads today; the crawl waits and tries again`,
@@ -231,6 +236,10 @@ export function buildStatus(
         : {}),
       ...(airing ? { lastAiringRun: { at: airing.startedAt, status: airing.status } } : {}),
       notes,
+      ...(skippedPages && (skippedPages.noLongerOffered || skippedPages.notVideo)
+        ? { skipped: skippedPages }
+        : {}),
+      ...(botCheck ? { botCheck } : {}),
       ...(empty.length ? { emptyShows: empty } : {}),
       ...(retry && retry.runId === last?.id
         ? {

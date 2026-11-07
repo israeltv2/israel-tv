@@ -6,6 +6,6 @@
   "main": "src/router.ts",
   "compatibility_date": "2026-11-01",
   "workers_dev": true,
-  "assets": { "directory": "../../data/site", "binding": "ASSETS", "not_found_handling": "none" },
+  "assets": { "directory": "../../data/site", "binding": "ASSETS", "not_found_handling": "404-page" },
   "observability": { "enabled": true }
 }
