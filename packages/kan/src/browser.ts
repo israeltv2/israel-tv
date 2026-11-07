@@ -45,6 +45,8 @@ export interface LoadOptions {
 
 export interface PageLoader {
   load(url: string, opts?: LoadOptions): Promise<LoadedPage>;
+  /** A JSON address (Kan's app API) read in the same session: its answer as text. */
+  text?(url: string): Promise<{ status: number; body: string; challenged: boolean }>;
   close(): Promise<void>;
 }
 
@@ -283,6 +285,20 @@ function loaderFor(context: BrowserContext): PageLoader {
         };
       } finally {
         for (const tab of tabs) await tab.close().catch(() => {});
+      }
+    },
+    async text(url) {
+      const page = await context.newPage();
+      try {
+        const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+        const body = (await res?.text()) ?? '';
+        return {
+          status: res?.status() ?? 0,
+          body,
+          challenged: res?.headers()['cf-mitigated'] === 'challenge' || isChallenge(body),
+        };
+      } finally {
+        await page.close().catch(() => {});
       }
     },
     close: () => context.close(),

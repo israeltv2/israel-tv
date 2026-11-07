@@ -796,3 +796,137 @@ test('a bot check that answers 200 is still a bot check: the slice backs off and
   const shows = Object.values(store.getState<S>('kan:crawl')?.shows ?? {});
   expect(shows.every((s) => !s.retry || Object.keys(s.retry).length === 0)).toBe(true);
 });
+
+/** Episode pages whose player plays the Kaltura entry `1_e<page id>` (as most Kan shows' pages do). */
+function kalturaPages(l: ReturnType<typeof loader>) {
+  return {
+    ...l,
+    async load(url: string) {
+      const r = await l.load(url);
+      const id = /\/s1\/(\d+)\/$/.exec(url)?.[1];
+      return id ? { ...r, html: r.html.replace(/\/vod\/\d+\//g, `/vod/1_e${id}/`) } : r;
+    },
+  };
+}
+
+test("Kan's app API names the same episodes with the same ids and numbers as the pages, falling back to pages", async () => {
+  const showKey = 'https://www.kan.org.il/content/kan/kan-11/p-1006421/';
+  // 1. Pages only: the reference.
+  const ref = Store.open(':memory:');
+  const pagesOnly = kalturaPages(loader(routes));
+  for (let i = 0; i < 40 && kanEpisodes(ref).length < 9; i++)
+    await crawlKan(ref, { ...opts(pagesOnly, 10), appApi: false });
+  const refShow = ref.listShows({ source: 'kan' }).find((x) => x.show.key === showKey);
+  const refEps = refShow?.show.seasons.flatMap((x) => x.episodes) ?? [];
+  expect(refEps).toHaveLength(9);
+  const number = (st: Store, id: string) =>
+    Object.fromEntries(st.assignments(id).episodes.map((e) => [e.key, `S${e.season}E${e.episode}`]));
+  // 2. The app API lists the same episodes (as the app does: same titles, seasons and dates), each with a Kaltura
+  //    entry; one is missing from it and one entry's stream does not answer: those two are read from their pages.
+  const missing = refEps[3]?.key ?? '';
+  const silent = refEps[6]?.key ?? '';
+  const feed = {
+    title: 'אירוויזיון',
+    entry: refEps
+      .filter((e) => e.key !== missing)
+      .map((e) => ({
+        id: e.key.slice(4),
+        title: e.title,
+        published: `${e.airDate}T12:00:00+02:00`,
+        content: {
+          type: 'video/hls',
+          src: `https://cdnapisec.kaltura.com/p/1/sp/1/playManifest/entryId/1_e${e.key.slice(4)}/format/applehttp/x.m3u8`,
+        },
+        extensions: { analyticsCustomProperties: { season: 1 } },
+      })),
+  };
+  const app = Store.open(':memory:');
+  const base = loader(routes);
+  const appTexts: string[] = [];
+  const withApp = {
+    ...kalturaPages(base),
+    async text(url: string) {
+      appTexts.push(url);
+      return /program\?id=1006421/.test(url)
+        ? { status: 200, body: JSON.stringify(feed), challenged: false }
+        : { status: 404, body: '', challenged: false };
+    },
+  };
+  const checked: string[] = [];
+  const streamPlays = async (u: string) => {
+    checked.push(u);
+    return !u.includes(`/1_e${silent.slice(4)}/`);
+  };
+  for (let i = 0; i < 40 && kanEpisodes(app).length < 9; i++)
+    await crawlKan(app, { ...opts(withApp, 10), streamPlays });
+  const appShow = app.listShows({ source: 'kan' }).find((x) => x.show.key === showKey);
+  expect(appShow?.seriesId).toBe(refShow?.seriesId);
+  // Same ids, same season/episode numbers.
+  expect(number(app, appShow?.seriesId ?? '')).toEqual(number(ref, refShow?.seriesId ?? ''));
+  // Read as pages: the first two (the evidence that the app agrees with the pages for this show), the one missing
+  // from the app and the one whose stream does not answer. Everything else was named by the app.
+  const episodePages = base.urls.filter((u) => /\/s1\/\d+\/$/.test(u));
+  expect(episodePages.map((u) => `kan:${/(\d+)\/$/.exec(u)?.[1]}`).sort()).toEqual(
+    [refEps[0]?.key, refEps[1]?.key, missing, silent].sort(),
+  );
+  expect(appTexts.some((u) => u.includes('program?id=1006421'))).toBe(true);
+  // App-named episodes carry the Redge stream of their Kaltura entry; page-read ones keep the page's stream.
+  const eps = appShow?.show.seasons.flatMap((x) => x.episodes) ?? [];
+  const named = eps.find((e) => e.key === refEps[2]?.key);
+  expect(named?.streams[0]?.url).toBe(
+    `https://r.il.cdn-redge.media/webcache/gorigin/hls/oil/kancdn/vod/1_e${refEps[2]?.key.slice(4)}/LIBCODER_SMOOTH_1080_KAN/Manifest.ism/playlist.m3u8?fmp4`,
+  );
+  // 3. An app list that disagrees with the pages (another season, as measured for some shows) is never used.
+  const other = Store.open(':memory:');
+  const base2 = loader(routes);
+  const wrong = {
+    ...feed,
+    entry: feed.entry.map((e) => ({ ...e, extensions: { analyticsCustomProperties: { season: 8 } } })),
+  };
+  const disagreeing = {
+    ...kalturaPages(base2),
+    async text(url: string) {
+      return /program\?id=1006421/.test(url)
+        ? { status: 200, body: JSON.stringify(wrong), challenged: false }
+        : { status: 404, body: '', challenged: false };
+    },
+  };
+  for (let i = 0; i < 40 && kanEpisodes(other).length < 9; i++)
+    await crawlKan(other, { ...opts(disagreeing, 10), streamPlays: async () => true });
+  const otherShow = other.listShows({ source: 'kan' }).find((x) => x.show.key === showKey);
+  expect(number(other, otherShow?.seriesId ?? '')).toEqual(number(ref, refShow?.seriesId ?? ''));
+  expect(base2.urls.filter((u) => /\/s1\/\d+\/$/.test(u))).toHaveLength(9);
+  expect(eps.find((e) => e.key === silent)?.streams[0]?.url).toBe(refEps[6]?.streams[0]?.url);
+});
+
+test('the app is trusted for a show only when at least two of its episodes agree, stream included', async () => {
+  const { appAgrees } = await import('../src/kan.ts');
+  const { redgeUrl } = await import('@israel-tv/kan');
+  const store = { getShow: () => undefined };
+  const item = (id: string, entry: string) =>
+    [
+      id,
+      { id, title: `פרק ${id}`, seasonNumber: 1, stream: { kind: 'redge' as const, url: redgeUrl(entry) } },
+    ] as const;
+  const feed = new Map([item('1', '1_a'), item('2', '1_b'), item('3', '1_c')]);
+  const read = (id: string, url: string) => ({
+    key: `kan:${id}`,
+    title: `פרק ${id}`,
+    season: 1,
+    streams: [{ url }],
+  });
+  expect(appAgrees(store, undefined, feed, [read('1', redgeUrl('1_a'))])).toBe(false); // one is not enough
+  expect(appAgrees(store, undefined, feed, [read('1', redgeUrl('1_a')), read('2', redgeUrl('1_b'))])).toBe(
+    true,
+  );
+  // The page played another asset for one of them: never trusted.
+  const numeric =
+    'https://r.il.cdn-redge.media/webcache/gorigin/hls/oil/kancdn/vod/2104131/LIBCODER_SMOOTH_1080_KAN/Manifest.ism/playlist.m3u8?fmp4';
+  expect(
+    appAgrees(store, undefined, feed, [
+      read('1', redgeUrl('1_a')),
+      read('2', redgeUrl('1_b')),
+      read('3', numeric),
+    ]),
+  ).toBe(false);
+});

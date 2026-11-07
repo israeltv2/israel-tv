@@ -1648,3 +1648,98 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
 - **Not indexed:** the addon's JSON (`X-Robots-Tag: noindex` from the app and in `_headers`; `Disallow` in
   robots.txt). The pages say `index,follow`.
 - **No analytics, no donation links, no web fonts** (system fonts with Hebrew fallbacks).
+
+## Kan's bot check (2026-11-07)
+
+Kan's pages and images sit behind Cloudflare. Measured from outside Israel through the Israeli proxy exits:
+
+| Setup                                                                                                                  | Pages challenged                      | Images challenged             |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------- |
+| Stock Playwright, fresh browser context per page (what ran until now; 2 days of logs)                                  | 0 of ~555                             | 129 of 273 on one lobby (47%) |
+| Stock Playwright, one persistent profile, pages in a row                                                               | 4 of 5 on kan.org.il (kankids passed) | –                             |
+| **patchright, one persistent profile** (Google Chrome and Chrome for Testing, two exits, a reused and a fresh profile) | **0 of 34**                           | **0 of ~3,000**               |
+
+- The per-page fresh session got pages through (Cloudflare lets the first navigation of a session in), but it never
+  earned a clearance, so nearly half of every page's own images were answered with `cf-mitigated: challenge`: that
+  is why 156 of 350 Kan shows had no copied poster ("could not copy its image (HTTP 403)") and the dashboard showed
+  a placeholder. It also cost a new proxy session per page, which is why pages were spaced 75 s apart.
+- **Chosen: [patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright) (`patchright-core`, Apache-2.0), a
+  drop-in Playwright build that removes the automation giveaways** (`navigator.webdriver`, `--enable-automation`,
+  the `Runtime.enable` leak), with **one persistent profile per proxy exit** (`kan-browser-<exit>/` next to the database) reused across
+  slices, the sandbox on (no `--no-sandbox` bar), no custom user agent or viewport, Israeli locale and time zone,
+  and **one sticky proxy exit** (the first configured one; Cloudflare's `cf_clearance` cookie is tied to the exit's
+  address). The managed check then clears on its own on the first page, as for a person's browser; we never click
+  or solve anything, and no paid solving service is involved.
+- Pacing follows: one browser per slice, pages 20 s apart, 12 pages per 10-minute slice (about 1,700 pages a day at
+  most, less than one page a minute on average), concurrency 1. The first fill of every Kan row (about 2,200
+  episode pages plus the archive) takes days less than before.
+- **Considered and not taken:** FlareSolverr/Byparr (an extra service to run, and they solve the same way a stealth
+  browser does); rebrowser-playwright-core (the same fix, kept as the fallback); camoufox/nodriver/undetected-chromedriver
+  (Python, or a different browser engine; patchright keeps the Playwright API this code already uses); `cf_clearance`
+  replay into plain HTTP (needs the same TLS fingerprint as the browser).
+- **Kan's app API** names most episodes without a page read since 0.5: see "Kan's app API" below.
+- **Reported, not hidden:** a page that still meets the check is "blocked by Kan's bot check (Cloudflare)"; the
+  slice stops and waits 45 minutes, and no page is charged. The crawl keeps a per-day tally (`kan:crawl` →
+  `botCheck`: pages, challenged, images, images challenged; two weeks), and `/status` says how many page loads the
+  check stopped today when it stopped any.
+- **Tuning:** `scraping.browserPagesPerRun` and `scraping.browserPageIntervalSec` (docs/configuration.md). If the
+  tally shows challenges: delete `kan-browser-<exit>/` (a fresh profile clears again), check that the first `geo.urls`
+  entry still answers, then slow the pace. Only one process may use the profile at a time (Chrome locks it): run
+  `israel-tv kan` by hand only while the daemon is stopped.
+
+**Episode pages that are not episodes.** The four pages reported as "no video player config on the page (layout
+changed?)" were none of them a layout change. Two were episodes Kan took down when their rights ended (a
+`rights-expired` overlay where the player was: "בשל הסכמי זכויות שידור, … כבר לא זמין לצפייה"); one was an interview
+article linked among the episodes (a VideoObject with an empty `contentUrl`); one show's episodes were all taken down.
+Episode pages are now classified: a video; the bot check (also when it answers 200); removed; not a video; or
+unknown. Removed and not-a-video pages are skipped at once, never retried, and counted on `/status`; only an
+unknown page is retried (three times, a day apart) and then given up visibly. A page with a Redge `contentUrl` but
+no player config is read from its VideoObject.
+
+**The archive row was empty** ("0 of 171 shows in the catalog, 0 episode pages to read") because its show pages, like
+its episodes, waited until every other Kan row had nothing left to read, which at the old pace was a week away. The
+archive's show pages are now read after the other rows' due ones in each slice, and episode pages of all rows share
+one queue: newly published first, then the show with the fewest episodes (the archive only loses ties).
+
+## Kan's app API (2026-11-07)
+
+Kan's mobile app reads JSON from `mobapi.kan.org.il/api/mobile`: `program?id=<show page id>` lists every episode of
+a show (200 per page, `&from=` for more), `subClass?id=<category>` lists a category's shows. From abroad it answers
+`403 cf-mitigated: challenge`, like the site; inside the cleared browser session it answers 200. Behaviour learned
+from public responses (and from what the Idan Plus Kodi addon requests); no code taken.
+
+What it gives, measured against every stored Kan episode it lists (the live database, 2026-11-07):
+
+- **The same ids:** an item's `id` is the episode's web page id, so its key is the stored `kan:<id>`; a show's
+  program id is its `p-<id>`, and kankids shows with a slug address get theirs from the kids categories (4453, 4462).
+- **The same title, season and publication day** as the episode page gives (the fields the numbering rules read);
+  counts in the dry run below.
+- **Streams:** a Kaltura `playManifest` URL. When the web page plays the Kaltura entry, its Redge URL is exactly
+  `…/kancdn/vod/<entry id>/LIBCODER_SMOOTH_1080_KAN/Manifest.ism/playlist.m3u8?fmp4`; when the page plays another
+  (numeric) Redge asset, that derived URL answers 404 (9 of 9 such cases). Some items carry a YouTube id instead.
+
+How it is used (ids and numbers frozen):
+
+- The crawl reads the same episodes in the same order: show pages still list the episode pages to read, oldest
+  first, and a show never reads past a gap. For a show with pages waiting, the slice reads its app list once (one
+  request instead of one page per episode). Each waiting episode the app names with a Kaltura entry whose derived
+  Redge master answers 200 through the geo proxy is taken from the app (same id, title, season, date, and the same
+  stream the page plays); anything else (missing from the app, YouTube, an empty entry, a master that does not
+  answer) is read from its page exactly as before, in its turn. New episodes are numbered by the existing rules.
+- Only page reads count against the slice's page budget; app-named episodes are capped at 400 per slice (each costs
+  one small master-playlist request on Kan's CDN). If the app answers anything unusable, the slice reads pages and
+  warns once.
+- **Trusted per show, on evidence:** the app's season is not always the page's (42 of 356 stored episodes: the app
+  says "s8" or nothing where the page player said 1 or 2), and some shows' pages play numeric Redge assets where the
+  app names a Kaltura entry (33 stored episodes; 27 of those derived addresses answer 404, 5 answer 200 with another
+  asset). So the app names a show's episodes only once at least two of its episodes read from pages (stored, or read
+  earlier in the slice) are listed by the app with the same title, season, day and stream, and none differs; a new
+  show reads its first two episodes from pages. 87 shows agree fully; 15 never use the app. Remaining risk, accepted:
+  a new episode of an agreeing show whose page switches to a numeric asset while its Kaltura entry still plays would
+  get the Kaltura stream (it plays; ids and numbers are unaffected).
+
+**Dry run on a copy of the live database (2026-11-07):** the crawl with the app API, every web page answering 404 so
+only app-named episodes could be added, real stream checks through the geo proxy: **all 390 stored Kan episodes kept
+their ids and S/E numbers (0 changed, 0 gone); 208 new episodes named by the app** (214 stream checks). In production
+about 735 more follow once their shows' two evidence pages are read; the rest of the 2,348 waiting pages (shows the
+app plays from YouTube, shows that disagree, withdrawn episodes) are read as pages, as before.
