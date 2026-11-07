@@ -238,12 +238,17 @@ ${
 function libraryHome(input: LibraryInput): string {
   const total = input.rows.reduce((n, r) => n + r.shows.length, 0);
   const episodes = input.rows.reduce((n, r) => n + r.shows.reduce((k, s) => k + episodesOf(s.meta), 0), 0);
+  // The first strip is on screen when the page opens: its first posters load at once, the very first one first.
   const shelves = input.rows
     .filter((r) => r.shows.length > 0)
     .map(
-      (r) => html`<section class="shelf" aria-labelledby="h-${rowSlug(r.id)}"><div class="wrap">
+      (r, k) => html`<section class="shelf" aria-labelledby="h-${rowSlug(r.id)}"><div class="wrap">
 <div class="shelf-head"><h2 id="h-${rowSlug(r.id)}">${rowName(r.id)}</h2><span class="count">${countShows(r.shows.length)}</span><a class="all" href="${rowHref(r.id)}">לכל התוכניות</a></div>
-<div class="strip">${r.shows.slice(0, STRIP).map((s) => tile(s.meta, { width: 220 }))}</div>
+<div class="strip">${r.shows
+        .slice(0, STRIP)
+        .map((s, i) =>
+          tile(s.meta, { width: 220, eager: k === 0 && i < 2, first: k === 0 && i === 0 }),
+        )}</div>
 </div></section>`,
     );
   const live = input.live.length
