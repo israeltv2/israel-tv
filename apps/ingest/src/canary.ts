@@ -128,6 +128,15 @@ export async function playCheck(
     if (/<MPD[\s>]/.test(text.slice(0, 4096))) return { statuses };
     let next = firstUri(text, base);
     if (!next) return { statuses, step: 'master', detail: 'master lists nothing' };
+    // A media playlist (no variants: Channel 14, ynet's 720p) lists segments itself: its first entry is the segment.
+    if (!/#EXT-X-STREAM-INF/.test(text)) {
+      const r = await get(next, true);
+      statuses.push(r.status);
+      await r.body?.cancel();
+      return r.status === 200 || r.status === 206
+        ? { statuses }
+        : { statuses, step: 'segment', detail: `segment HTTP ${r.status}` };
+    }
     // Variant playlists (a master may point at another master), then the first segment. What a URL is comes
     // from its answer (a playlist starts with #EXTM3U), not from its name.
     for (let level = 0; level < 3; level++) {

@@ -107,3 +107,14 @@ test('a DASH backup counts as playing when its manifest answers', async () => {
     })) as unknown as typeof fetch;
   expect(await playCheck('https://cdn.test/live.livx?dvr=1', dash)).toEqual({ statuses: [200] });
 });
+
+test('a media playlist (no variants) plays when its first segment answers', async () => {
+  const { playCheck } = await import('../src/canary.ts');
+  const media = (async (input: string | URL | Request) =>
+    String(input).endsWith('.ts')
+      ? new Response('x', { status: 206 })
+      : new Response('#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nseg1.ts\n')) as unknown as typeof fetch;
+  expect(await playCheck('https://cdn.test/live/streamPlaylist.m3u8', media)).toEqual({
+    statuses: [200, 206],
+  });
+});
