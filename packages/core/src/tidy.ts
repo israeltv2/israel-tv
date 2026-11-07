@@ -117,3 +117,13 @@ const TRAILER =
 export function isTrailer(title: string): boolean {
   return TRAILER.test(tidyText(title));
 }
+
+/**
+ * A Kaltura image-service address at a given size (unchanged when it is not one, or already sized). Without a size
+ * the service answers 120×90 (Reshet's episode stills, measured 2026-11-07).
+ */
+export function kalturaImage(url: string, width: number, height: number): string {
+  if (/\/Service\.svc\/GetImage\//i.test(url) && !/\/width\/\d+/i.test(url))
+    return `${url.replace(/\/+$/, '')}/width/${width}/height/${height}`;
+  return url;
+}

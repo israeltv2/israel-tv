@@ -15,6 +15,7 @@ import {
   type GuideFile,
   ISRAEL_ONLY,
   isTrailer,
+  kalturaImage,
   LIVE_ALIASES,
   type Manifest,
   type Meta,
@@ -199,7 +200,8 @@ function videosFor(s: RenderShow): Video[] {
         episode: a.episode,
       };
       if (ep.airDate) v.released = `${ep.airDate}T00:00:00.000Z`;
-      if (ep.thumbnail) v.thumbnail = ep.thumbnail;
+      // Stored before stills were sized (the reader sizes them now): sized here too.
+      if (ep.thumbnail) v.thumbnail = kalturaImage(ep.thumbnail, 640, 360);
       if (ep.description) v.overview = rtl(tidyText(ep.description));
       videos.push(v);
     }
