@@ -12,6 +12,11 @@ export const SOURCE_LABELS: Record<string, string> = {
 
 /** Said on a stream that plays only from an Israeli connection. */
 export const ISRAEL_ONLY = 'זמין לצפייה רק בישראל';
+/**
+ * Said on a live stream the broadcaster blocks outside Israel for some programmes only (Kan's channels, measured
+ * from abroad: refused for a programme's length, then playing again).
+ */
+export const ISRAEL_ONLY_SOMETIMES = 'לפעמים זמין רק בישראל';
 
 /**
  * The best quality of a stream when its address says it: Kan names its ladder there (`…_1080_KAN/…`). Others are

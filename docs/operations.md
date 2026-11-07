@@ -148,8 +148,11 @@ The sections:
 - **Plays** — plays per day by source, the time to the first playlist (median and 95th percentile, per day), the most
   watched shows with posters, the most played episodes and the recent plays, each opening its trace.
 - **Failures** — failed plays in 7 days, the rate, failures per day by source, the groups (source, stage, status,
-  reason; "one title" when only that title failed) with a 7-day bar, and the recent failures. The project's own checks
-  (`x-israel-tv-probe`) are never counted.
+  reason; "one title" when only that title failed) with a 7-day bar and a sentence in plain words, and the recent
+  failures. The project's own checks (`x-israel-tv-probe`) are never counted, and neither are the home helper's
+  `not-mine` answers. Failures recorded before their cause was fixed (`KNOWN_FIXES` in apps/ingest admin-api.ts: the
+  fix's date and what was done) stay listed, dimmed and marked "fixed", but are not counted as open problems, here or
+  in the health line.
 - **Trace** (`#/trace/<playId>`, from any play or failure) — every event of one play on a timeline: offset from the
   start, which part (resolver, mako-auth, geo-relay), what happened, its status and how long it took, the upstream
   statuses in order (`playlist 200, cdn AKAMAI, ticket 200, master 403, …`) and the full detail.
@@ -210,15 +213,15 @@ ingest. WAL mode; events are written in batches. Two tables:
 | `latency_ms` | time taken (for a play: time to the first playlist)                                    |
 | `detail`     | JSON: upstream statuses, reason, stage, bytes, segments, duration, run counts          |
 
-| `kind`           | Recorded by          | When                                                                               |
-| ---------------- | -------------------- | ---------------------------------------------------------------------------------- |
-| `stream_request` | resolver             | It answered a stream request: what it offered and why (`detail.offered`, `notes`). |
-| `play_start`     | mako-auth            | A Mako play got its master playlist (latency = time to it; `detail.upstream`).     |
-| `ticket_fetch`   | mako-auth            | A Mako entitlement (ticket) fetch.                                                 |
-| `relay_session`  | geo-relay            | One relayed play, written when it ends: duration, bytes, segments, errors.         |
-| `failure`        | mako-auth, geo-relay | A play that failed: `detail.stage` (`play`, `relay`), upstream statuses, reason.   |
-| `run`            | ingest               | A finished run: full, airing, show, Kan crawl slice, publish, match.               |
-| `canary`         | canary               | The daily playback check of one title (see below).                                 |
+| `kind`           | Recorded by          | When                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stream_request` | resolver             | It answered a stream request: what it offered and why (`detail.offered`, `notes`). Outcome `not-mine` when it has no job for that id (another addon's title, a channel or title the public addon plays): apps ask every addon for every id, so that is normal and never a failure. `error` when it had one and failed it (Mako, a relay, one of our own titles it does not know). |
+| `play_start`     | mako-auth            | A Mako play got its master playlist (latency = time to it; `detail.upstream`).                                                                                                                                                                                                                                                                                                    |
+| `ticket_fetch`   | mako-auth            | A Mako entitlement (ticket) fetch.                                                                                                                                                                                                                                                                                                                                                |
+| `relay_session`  | geo-relay            | One relayed play, written when it ends: duration, bytes, segments, errors.                                                                                                                                                                                                                                                                                                        |
+| `failure`        | mako-auth, geo-relay | A play that failed: `detail.stage` (`play`, `relay`), upstream statuses, reason.                                                                                                                                                                                                                                                                                                  |
+| `run`            | ingest               | A finished run: full, airing, show, Kan crawl slice, publish, match.                                                                                                                                                                                                                                                                                                              |
+| `canary`         | canary               | The daily playback check of one title (see below).                                                                                                                                                                                                                                                                                                                                |
 
 **`daily_usage`** — per day, origin (`home` or `public`), source and show (`''` = all), the number of plays,
 unique clients, failures and minutes watched (known only for relayed plays). Kept a year. Home rows are rolled
@@ -264,8 +267,14 @@ carry `x-israel-tv-probe: canary`, so its plays never count as usage or failures
 - **Live check** (with each full run): every stream of every live channel is played (playlist → variant → first
   segment): the public addon's own streams directly, and the Mako channels through this instance's home helper. A
   channel is red when none of its streams plays; a single dead stream (a backup) makes the live source amber and is
-  named on `/status`. From abroad (an instance with a geo proxy) a refusal (403/451) is the "זמין לצפייה רק בישראל"
-  label on that stream, not a fault. Results: kv `live:check`; the dashboard's Sources page lists every stream.
+  named on `/status`. A stream that fails is played once more 30 seconds later before it counts (what a viewer
+  pressing play again would see); a refusal from abroad is not (a programme's block lasts). From abroad (an instance with a geo proxy) a refusal (403/451) is a label,
+  not a fault: each stream keeps its last 20 outcomes (`recent`: `o` played, `r` refused, `f` failed), and a stream
+  refused in every one of them says "זמין לצפייה רק בישראל", one refused in some says "לפעמים זמין רק בישראל". Kan's
+  channels (`geo` in packages/core live.ts) always say at least the latter: Kan blocks some programmes outside Israel
+  (measured: Kan Educational refused for 22 minutes, then playing again), and the home helper relays them then.
+  Results: kv `live:check`; the dashboard's Sources page lists every stream (a refusal from abroad is grey; hover for
+  its history).
 - **Stream probes** (after each full run, up to 1,500 reads, and each airing check, up to 300): Kan titles are asked
   from abroad, directly (newest episode, playlist → variant → segment), once a week per title; a title refused there
   is labelled "only in Israel", one that plays is not, and one that could not be told keeps the label. Reshet
@@ -400,8 +409,14 @@ replace `data/israel-tv.sqlite` with it (and delete `israel-tv.sqlite-wal` / `-s
 Back up `data/israel-tv.sqlite` (the ids and numbers live there). The addon also serves `/registry.json`
 (the id registry) as an off-machine copy. Rendered files are disposable: `publish` recreates them.
 
-A failed upload to Cloudflare shows as `publish` on `/status` (overall health `error`, with Cloudflare's
-reason) and is retried after the next run. With a geo proxy, the admin `/status` also has `geo`: the
+A publish that meets Cloudflare's own trouble (a 5xx, "no healthy upstream", a malformed API answer, a timeout) is
+tried again within the same publish, up to 4 tries with growing pauses (15 s, 60 s, 3 min, each 50–100% of that
+at random). A try resumes the last one: wrangler uploads files by content hash and Cloudflare answers which it still
+lacks. A setup problem (token, account, permissions) fails at once and says what to check; Cloudflare's own trouble
+says it is on Cloudflare's side. On `/status`, `publish` (overall health `error`) appears at once for a setup
+problem, and for Cloudflare's trouble only after 3 failed publishes in a row (each with its retries; runs stopped by
+a restart are skipped); meanwhile the public copy is the last good one, and every failed publish is in the runs
+(dashboard: Catalog & deploys). A failed publish is tried again after the next run either way. With a geo proxy, the admin `/status` also has `geo`: the
 proxies, and when relaying through them last worked or failed (and why).
 
 ### Rolling back on Cloudflare

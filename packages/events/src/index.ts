@@ -7,6 +7,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import {
   EVENT_RETENTION_DAYS,
+  type EventOutcome,
+  LIVE_CHANNELS,
   NOT_INTERNAL_SQL,
   nextDay,
   ROLLUP_RETENTION_DAYS,
@@ -30,7 +32,7 @@ export type DailyRow = typeof t.dailyUsage.$inferSelect;
 export interface EventFilter {
   playId?: string;
   kind?: string;
-  outcome?: 'ok' | 'error';
+  outcome?: EventOutcome;
   since?: string;
   showId?: string;
   limit?: number;
@@ -78,7 +80,24 @@ export class EventStore {
     migrate(s.db, { migrationsFolder: MIGRATIONS });
     s.retagProbes();
     s.retagCanaryPlays();
+    s.retagNotMine();
     return s;
+  }
+
+  /**
+   * Once: the helper's answers for ids it has nothing to add to (another addon's title, a channel the public addon
+   * plays) were recorded as errors before the `not-mine` outcome existed. Mako titles keep theirs: those need the
+   * helper, so nothing offered there was a real failure; so do series titles (all such old events were live ones).
+   */
+  private retagNotMine(): void {
+    if (this.getMeta('fix:not-mine')) return;
+    const makoChannels = LIVE_CHANNELS.filter((c) => c.mako?.length).map((c) => sql`${c.id}`);
+    const n = this.db.run(sql`update ${t.events} set outcome = 'not-mine'
+      where kind = 'stream_request' and outcome = 'error'
+        and json_extract(detail, '$.offered') = 'no stream for this id here'
+        and (source is null or source = 'live')
+        and coalesce(show_id, '') not in (${sql.join(makoChannels, sql`, `)})`);
+    this.setMeta('fix:not-mine', JSON.stringify({ at: new Date().toISOString(), events: n.changes }));
   }
 
   /**
@@ -481,7 +500,9 @@ export function queryEvents(events: EventStore, q: Record<string, string | undef
   return events.events({
     ...(q.playId ? { playId: q.playId } : {}),
     ...(q.kind ? { kind: q.kind } : {}),
-    ...(q.outcome === 'ok' || q.outcome === 'error' ? { outcome: q.outcome } : {}),
+    ...(q.outcome === 'ok' || q.outcome === 'error' || q.outcome === 'not-mine'
+      ? { outcome: q.outcome }
+      : {}),
     ...(q.show ? { showId: q.show } : {}),
     ...(since ? { since } : {}),
     limit: Math.min(Number(q.limit) || 100, 1000),
