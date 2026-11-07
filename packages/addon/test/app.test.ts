@@ -302,3 +302,19 @@ test('a stale row: the next page starts one earlier, so no show is skipped', asy
   expect(first.at(-1)).toBe('iltv_reshet_100');
   expect(await ids(`/catalog/series/iltv_reshet13/skip=${first.length}.json`)).toEqual(['iltv_reshet_101']);
 });
+
+test('a page that names the address it was asked on varies by Host (no cross-host cache poisoning)', async () => {
+  const { ORIGIN_TOKEN } = await import('@israel-tv/core/edge');
+  const page = createAddonApp({
+    read: async (p) =>
+      p === 'index.html'
+        ? `<link rel="canonical" href="${ORIGIN_TOKEN}/">`
+        : p === 'status.html'
+          ? '<p>x</p>'
+          : undefined,
+  });
+  const res = await page.request('https://a.example/');
+  expect(await res.text()).toContain('href="https://a.example/"');
+  expect(res.headers.get('vary')).toBe('Host');
+  expect((await page.request('https://a.example/status')).headers.get('vary')).toBeNull();
+});

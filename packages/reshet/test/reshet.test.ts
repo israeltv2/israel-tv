@@ -452,3 +452,20 @@ test("a Kaltura EpisodeNumber shared by a season's episodes is a placeholder: th
   expect(eps.map((e) => e.numberHint)).toEqual([7, 3, 6, 4, 5, 1, 2]);
   expect(eps[0]?.title).toBe('חבורת היח"צנים');
 });
+
+test('list pages never leave Reshet and never exceed the per-show limit, whatever a page claims', async () => {
+  const { parseShowSitePage, SITE_LIST_PAGES } = await import('../src/parse.ts');
+  const where = {
+    show: '/entertainment/the-x-factor-israel/',
+    page: '/entertainment/the-x-factor-israel/season-04/episodes/',
+  };
+  const real = html('page-x-factor-episodes');
+  const base = '"base":"/entertainment/the-x-factor-israel/season-04/episodes/page/%#%"';
+  expect(parseShowSitePage(real, where).morePages).toEqual([
+    '/entertainment/the-x-factor-israel/season-04/episodes/page/2/',
+  ]);
+  for (const evil of ['@evil.example/%#%', '//evil.example/%#%', '.evil.example/%#%'])
+    expect(parseShowSitePage(real.replace(base, `"base":"${evil}"`), where).morePages, evil).toEqual([]);
+  const huge = parseShowSitePage(real.replace('"max_page":2', '"max_page":1000000000'), where).morePages;
+  expect(huge).toHaveLength(SITE_LIST_PAGES);
+});

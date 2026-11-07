@@ -130,7 +130,10 @@ export async function createChromeLoader(
   let lastError: unknown;
   let locked = false;
   const profile = opts.profileDir ?? (await mkdtemp(join(tmpdir(), 'israel-tv-kan-')));
-  mkdirSync(profile, { recursive: true });
+  // The profile holds Cloudflare's clearance cookie: this user only.
+  mkdirSync(profile, { recursive: true, mode: 0o700 });
+  const dropThrowaway = () =>
+    opts.profileDir ? Promise.resolve() : rm(profile, { recursive: true, force: true }).catch(() => {});
   for (const candidate of browserCandidates(cfg.executablePath)) {
     try {
       context = await launch(candidate);
@@ -141,6 +144,7 @@ export async function createChromeLoader(
     }
   }
   if (!context) {
+    await dropThrowaway();
     // Chrome locks a profile: another crawl (the daemon's slice, or `israel-tv kan` by hand) is using it.
     if (locked)
       throw new Error(`the Kan browser profile ${profile} is in use by another run; try again when it ends`);
@@ -153,8 +157,11 @@ export async function createChromeLoader(
   return {
     ...loader,
     async close() {
-      await loader.close();
-      if (!opts.profileDir) await rm(profile, { recursive: true, force: true });
+      try {
+        await loader.close();
+      } finally {
+        await dropThrowaway();
+      }
     },
   };
 

@@ -81,10 +81,21 @@ const hostOf = (origin: string) => {
   }
 };
 
+/**
+ * Credentials written outside a web address ("proxy user:secret@host", "Bearer …", "token=…"): replaced before
+ * anything else, so the host after them is still judged on its own. (Inside an address, `new URL` drops them.)
+ */
+function hideSecrets(text: string): string {
+  return text
+    .replace(/(?<![\w/:@.-])[^\s"'<>@/:]+:[^\s"'<>@/]+@/g, `${PRIVATE}@`)
+    .replace(/\b(Bearer|Basic|Token)\s+[\w.~+/=-]{8,}/gi, `$1 ${PRIVATE}`)
+    .replace(/\b(token|password|passwd|secret|api_?key|ticket)=[^\s&"'<>]+/gi, `$1=${PRIVATE}`);
+}
+
 /** Text with private addresses, host names and paths replaced by placeholders. */
 export function publicText(text: string, opts: PublicTextOptions = {}): string {
   const origins = opts.origins ?? [];
-  return text.replace(TOKEN, (m, url, path, ip, ipv6, host, single) => {
+  return hideSecrets(text).replace(TOKEN, (m, url, path, ip, ipv6, host, single) => {
     if (url) {
       try {
         const u = new URL(url);

@@ -10,6 +10,7 @@ import {
   guideVideos,
   liveChannelOf,
   normalizeForSearch,
+  ORIGIN_TOKEN,
   parseVideoId,
   type SearchRow,
   type SeasonStreams,
@@ -76,7 +77,11 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
     const type = c.res.headers.get('content-type') ?? '';
     if (/json|html|xml|text\/plain/.test(type)) {
       const body = await c.res.text();
-      c.res = new Response(withOrigin(body, new URL(c.req.url).origin), c.res);
+      const origin = new URL(c.req.url).origin;
+      c.res = new Response(withOrigin(body, origin), c.res);
+      // The body names the address it was asked on (a self-host without publicUrl): a shared cache must not
+      // hand one host's copy to another.
+      if (body.includes(ORIGIN_TOKEN)) c.header('Vary', 'Host');
     }
     // The addon's data is not a page: kept out of search results.
     if (/json/.test(type)) c.header('X-Robots-Tag', 'noindex');
