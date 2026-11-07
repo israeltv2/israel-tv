@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.7.1](https://github.com/israeltv2/israel-tv/compare/v0.7.0...v0.7.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **site:** no layout shift when the fonts arrive or the header text rewraps ([#139](https://github.com/israeltv2/israel-tv/issues/139)) ([ee5615c](https://github.com/israeltv2/israel-tv/commit/ee5615c928a0a7e04fe630901c9b9751f474b3f5))
+
 ## [0.7.0](https://github.com/israeltv2/israel-tv/compare/v0.6.2...v0.7.0) (2026-11-07)
 
 
