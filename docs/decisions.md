@@ -1992,3 +1992,9 @@ Measured on a copy of the live database and the runs/warnings of the three days 
   only after a complete read (status ok, no show delayed), else it waits for the next full run; the Kan data refresh
   keeps a show's error and listing state; a full run stopped for a restart no longer resets the bot-check retry
   list.
+- **Live result (2026-11-07):** Kan migration at the 13:56Z deploy (9 episodes in 4 shows); Reshet migration right after
+  the 14:45Z full read (270 shows ok, 0 failed): 1,183 episodes in 100 seasons of 58 shows, as in the dry run. 0
+  duplicate season/episode numbers; a re-evaluation of every listed show gives 0 numbering warnings for Reshet and
+  Kan. The read's 1,105 "source-renumbered" notes were logged before the migration resolved them: the 4,559 Reshet
+  and Kan numbering warnings older than the migration were deleted (still in the migration's backup), and a
+  migration now clears the warnings of the shows it moves.

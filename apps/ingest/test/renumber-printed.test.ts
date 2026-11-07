@@ -180,6 +180,9 @@ function kanStore() {
 
 test('Kan migration: backup, one pass, every move reported, the guard re-taken, never twice', () => {
   const { dir, store, id } = kanStore();
+  store.addWarnings(store.startRun('crawl', 'kan'), id, [
+    { code: 'episode-number-taken', message: 'episode kan:3 "פרק 2" collides in season 1; numbered 5' },
+  ]);
   const dry = renumberPrinted(store, dir, 'kan', { dryRun: true });
   expect(dry?.moves.map((m) => `${m.key} ${m.from}→${m.to}`)).toEqual(['kan:3 5→2', 'kan:2 2→5']);
   expect(numbers(store.assignments(id))['kan:3']).toBe(5); // a dry run changes nothing
@@ -203,6 +206,7 @@ test('Kan migration: backup, one pass, every move reported, the guard re-taken, 
   if (!after) throw new Error('no show');
   expect(assignNumbers(after, store.assignments(id)).warnings).toEqual([]);
   expect(checkNumbering(store).ok).toBe(true);
+  expect(store.recentWarnings().filter((w) => w.seriesId === id)).toEqual([]);
   expect(renumberPrinted(store, dir, 'kan')).toBeUndefined();
 });
 

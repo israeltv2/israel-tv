@@ -750,6 +750,14 @@ export class Store {
     return out;
   }
 
+  /** Remove a series' warnings of these codes (a recorded migration resolved them). Returns how many. */
+  clearWarnings(seriesId: string, codes: readonly string[]): number {
+    return this.db
+      .delete(t.warnings)
+      .where(and(eq(t.warnings.seriesId, seriesId), inArray(t.warnings.code, [...codes])))
+      .run().changes as number;
+  }
+
   /** Record warnings; one already recorded for the same show with the same text is not repeated. */
   addWarnings(
     runId: number | null,
