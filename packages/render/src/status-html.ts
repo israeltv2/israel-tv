@@ -3,8 +3,21 @@
 // from the status file alone (the same data as /status.json), pre-rendered; a few lines of script only make the
 // times relative.
 import { type Health, type StatusCatalog, type StatusFile, sitePaths } from '@israel-tv/core';
-import { CATALOG_LOGO, catalogAppName, catalogName, sourceName } from './names.ts';
-import { bdi, esc, footer, head, israelTime, num, siteNav, topBar, when } from './page.ts';
+import { fillChip } from './library-html.ts';
+import { CATALOG_MARK, catalogAppName, catalogName, sourceName } from './names.ts';
+import {
+  bdi,
+  esc,
+  externalLinks,
+  footer,
+  head,
+  israelTime,
+  logoTile,
+  num,
+  siteNav,
+  topBar,
+  when,
+} from './page.ts';
 import { type PublicTextOptions, publicStatus } from './public-text.ts';
 
 export type Level = Health | 'info';
@@ -184,11 +197,12 @@ function card(c: StatusCatalog, status: StatusFile, logos: boolean): string {
   const s = status.sources.find((x) => x.source === c.source);
   const st = rowState(c, s, status);
   const live = c.source === 'live';
-  const logo = live
-    ? sitePaths.faviconSvg
+  // The live row has no single channel: the site's own icon, in the same tile.
+  const tile = live
+    ? `<span class="logo-tile" style="--s:44px"><img src="/${sitePaths.faviconSvg}" alt="" width="44" height="44"></span>`
     : logos
-      ? sitePaths.channelLogo(CATALOG_LOGO[c.id] ?? '')
-      : undefined;
+      ? logoTile(CATALOG_MARK[c.id], 44)
+      : '';
   const sched = status.schedule;
   const facts: string[] = [];
   if (live) {
@@ -197,7 +211,9 @@ function card(c: StatusCatalog, status: StatusFile, logos: boolean): string {
     if (status.live) facts.push(`<li><span>Last checked</span>${when(status.live.at)}</li>`);
   } else {
     facts.push(
-      `<li><span>Shows</span><strong>${num(c.shows)}</strong></li><li><span>Episodes</span><strong>${num(c.episodes)}</strong></li>`,
+      c.filling && c.shows === 0
+        ? `<li class="wide">${fillChip(c.filling, 'en')}</li>`
+        : `<li><span>Shows</span><strong>${num(c.shows)}</strong></li><li><span>Episodes</span><strong>${num(c.episodes)}</strong></li>`,
     );
     const last = s?.lastFullRun;
     if (last)
@@ -219,7 +235,7 @@ function card(c: StatusCatalog, status: StatusFile, logos: boolean): string {
         : '.'
     }`;
   return `<article class="card row-card" aria-labelledby="row-${esc(c.id)}">
-<div class="row-head">${logo ? `<img src="/${esc(logo)}" alt="" width="40" height="40" loading="lazy">` : ''}
+<div class="row-head">${tile}
 <div class="row-title"><h3 id="row-${esc(c.id)}">${esc(catalogName(c.id, 'en'))}</h3><span class="muted small"><bdi lang="he" dir="rtl">${esc(catalogAppName(c.id))}</bdi></span></div>
 <span class="pill ${st.level}">${esc(st.label)}</span></div>
 <p class="row-line">${esc(st.line)}</p>
@@ -242,9 +258,7 @@ function liveGrid(status: StatusFile, logos: boolean): string {
   }. Channels marked <strong>home helper</strong> play only through your own <a href="/#helper">home helper</a>.</p>
 <ul class="channels">${live.channels
     .map(
-      (
-        ch,
-      ) => `<li class="ch"><span class="ch-logo">${logos ? `<img src="/${esc(sitePaths.channelLogo(ch.id))}" alt="" width="36" height="36" loading="lazy">` : ''}</span>
+      (ch) => `<li class="ch">${logoTile(logos ? { logo: ch.id } : undefined, 40)}
 <span class="ch-name">${bdi(ch.name)}${ch.helper ? '<span class="tag">home helper</span>' : ''}${ch.israelOnly ? '<span class="tag">Israel only</span>' : ''}</span>
 <span class="pill ${cls[ch.state]}">${word[ch.state]}</span></li>`,
     )
@@ -389,13 +403,13 @@ const STATUS_CSS = `
 .rows{padding-block:24px}
 .row-card{display:flex;flex-direction:column;gap:10px}
 .row-head{display:flex;align-items:center;gap:12px}
-.row-head img{border-radius:10px;background:var(--surface-2)}
 .row-title{display:flex;flex-direction:column;margin-inline-end:auto;min-width:0}
 .row-title h3{margin:0}
 .row-line{margin:0;font-size:.95rem}
 .facts{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .facts li{display:flex;flex-direction:column;background:var(--surface-2);border-radius:10px;padding:8px 10px;font-size:.9rem}
 .facts li span{font-size:.75rem;color:var(--muted)}
+.facts li.wide{grid-column:1/-1}
 .facts strong{font-size:1.1rem;font-variant-numeric:tabular-nums}
 .next{margin:0}
 .said{margin:0;padding-inline-start:18px}
@@ -407,7 +421,6 @@ const STATUS_CSS = `
 .channels{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr))}
 .ch .pill{font-size:.72rem;padding:2px 8px}
 .ch{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px}
-.ch-logo{width:36px;height:36px;flex:none;border-radius:8px;overflow:hidden;background:var(--surface-2)}
 .ch-name{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px;font-weight:550;line-height:1.3}
 .tag{font-size:.7rem;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:0 6px}
 .count{font-size:.8rem;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:0 8px;font-weight:600}
@@ -446,15 +459,16 @@ export function renderStatusHtml(raw: StatusFile, opts: PublicTextOptions = {}):
   // The channel tiles are published with the live row.
   const logos = !!status.live;
   const rows = rowsOf(status);
-  return `${head(
-    {
-      lang: 'en',
-      title: 'Israel TV status: is everything working?',
-      description: `${o.title}. Live status of Israel TV, the free Stremio and Nuvio addon for Keshet 12, Reshet 13, Kan and Israeli live channels: what is up to date, what is playing, and the last 30 days.`,
-      path: 'status',
-    },
-    STATUS_CSS,
-  )}<body>
+  return externalLinks(
+    `${head(
+      {
+        lang: 'en',
+        title: 'Israel TV status: is everything working?',
+        description: `${o.title}. Live status of Israel TV, the free Stremio and Nuvio addon for Keshet 12, Reshet 13, Kan and Israeli live channels: what is up to date, what is playing, and the last 30 days.`,
+        path: 'status',
+      },
+      STATUS_CSS,
+    )}<body>
 ${topBar('en', siteNav('en', 'status', [{ href: '/#install', label: 'Install', optional: true }]))}
 <main id="main">
 <div class="wrap hero-status">
@@ -476,5 +490,7 @@ ${contributorDetails(status)}
 </main>
 ${footer('en')}
 </body></html>
-`;
+`,
+    'en',
+  );
 }

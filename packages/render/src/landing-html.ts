@@ -3,20 +3,22 @@
 // one click, the home helper and watching from abroad in plain words, questions, and where the project lives.
 // Pre-rendered: the page reads complete without its few lines of script.
 import { type GuideFile, sitePaths } from '@israel-tv/core';
-import { channelGuide, plain, rowHref } from './library-html.ts';
-import { CATALOG_LOGO, catalogAppName, catalogName } from './names.ts';
+import { channelGuide, fillChip, plain, rowHref } from './library-html.ts';
+import { CATALOG_MARK, catalogAppName, catalogName } from './names.ts';
 import {
   absolute,
   BRAND,
   bdi,
   DOCS_URL,
   esc,
+  externalLinks,
   footer,
   head,
   ICONS,
   ISSUES_URL,
   type Lang,
   LICENSE_URL,
+  logoTile,
   num,
   PROJECT_URL,
   siteNav,
@@ -120,32 +122,36 @@ const LANDING_CSS = `
 .tick:hover .drift,.tick:focus-within .drift{animation-play-state:paused}
 .tk{display:inline-flex;align-items:center;gap:10px;padding:10px 22px;color:var(--hero-fg);text-decoration:none;white-space:nowrap;border-inline-end:1px solid rgb(255 255 255/12%);direction:rtl}
 .tk:hover b{color:${BRAND.stone}}
-.tk img{width:26px;height:26px;border-radius:6px;background:#fff1}
+.tk .logo-tile{--s:28px}
 .tk .g{color:var(--hero-muted)}
 .tk .g.empty{display:none}
 .section-lead{color:var(--muted);max-width:44rem;margin-bottom:24px;font-size:1.05rem}
-.rows-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
-.row{position:relative;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;transition:border-color .2s var(--ease-out)}
+.rows-grid{display:grid;gap:14px;grid-template-columns:1fr}
+@media (min-width:640px){.rows-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:960px){.rows-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.row{grid-column:span 2}
+.rows-grid.n2 .row:nth-child(-n+2),.rows-grid.n1 .row:nth-child(-n+4){grid-column:span 3}}
+.row{position:relative;display:grid;grid-row:span 4;grid-template-rows:subgrid;gap:12px;transition:border-color .2s var(--ease-out)}
 .row:hover{border-color:var(--accent)}
-.row img{grid-row:span 2;border-radius:12px;background:var(--surface-2)}
-.row h3{margin:0;font:700 1.9rem/1 var(--display)}
+.row-head{display:flex;align-items:center;gap:14px;min-height:52px}
+.row-name{min-width:0;display:flex;flex-direction:column;justify-content:center}
+.row h3{margin:0;font:700 1.75rem/1.05 var(--display);overflow-wrap:anywhere}
 .row h3 a{color:var(--fg);text-decoration:none}
 .row h3 a::after{content:"";position:absolute;inset:0;border-radius:inherit}
-.row .en{color:var(--muted);font-size:.9rem}
-.row dl{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0 0;font-size:.9rem}
+.row .en{color:var(--muted);font-size:.88rem}
+.row .counts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;font-size:.95rem;margin:0;color:var(--muted)}
+.row .counts strong{color:var(--fg)}
+.row dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:.9rem;align-content:start}
 .row dt{color:var(--muted)}.row dd{margin:0}
-.row .counts{grid-column:1/-1;font-size:.95rem;margin:6px 0 0}
-.row .posters{grid-column:1/-1;display:flex;margin-top:12px;direction:ltr}
+.row .posters{display:flex;direction:ltr;min-height:0;align-self:end}
+.row .posters:empty{display:none}
 .row .posters img{width:23%;height:auto;aspect-ratio:2/3;object-fit:cover;border-radius:8px;margin-inline-end:-6%;box-shadow:0 6px 18px rgb(0 0 0/40%);border:2px solid var(--surface);transition:transform .3s var(--ease-out)}
 @media (hover:hover){.row:hover .posters img{transform:translateY(-4px) rotate(-2deg)}.row:hover .posters img:nth-child(2n){transform:translateY(-6px) rotate(2deg)}}
 .home{color:var(--warn);font-weight:600}
 .channels{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr))}
 .channels li a{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px;font-weight:600;color:var(--fg);text-decoration:none;height:100%;transition:border-color .2s var(--ease-out)}
 .channels li a:hover{border-color:var(--accent)}
-.channels img{border-radius:8px;flex:none;background:var(--surface-2)}
 .channels .nm{display:flex;flex-direction:column;align-items:flex-start;min-width:0;line-height:1.3}
 .channels .tag{font-size:.7rem;font-weight:600;color:var(--warn);border:1px solid currentColor;border-radius:6px;padding:0 6px;margin-top:3px;white-space:nowrap}
-.filling{grid-column:1/-1;margin:4px 0 0;font-size:.85rem;color:var(--accent)}
 .steps{counter-reset:s;list-style:none;margin:0;padding:0;display:grid;gap:14px}
 .steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
 .steps li::before{content:counter(s);width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:700 1.3rem/1 var(--display);background:var(--accent-soft);color:var(--accent)}
@@ -211,39 +217,34 @@ export function renderLandingHtml(input: LandingInput, lang: Lang = 'en'): strin
       )} · ${t(lang, 'Status page', 'דף המצב')}</a>`
     : `<a class="status-chip" href="/status"><i aria-hidden="true"></i>${t(lang, 'Status page', 'דף המצב')}</a>`;
 
+  // One card per row, every card built the same way: a header (logo tile, name), the counts or the first-fill line,
+  // where it plays, and a fan of posters. The parts line up across cards (subgrid), whatever is in them.
   const rowCards = shows
     .map((c) => {
       const where = WHERE[c.source]?.[lang];
-      const logo = input.live.length ? CATALOG_LOGO[c.id] : undefined;
+      const mark = CATALOG_MARK[c.id];
       const posters = (input.rowPosters?.[c.id] ?? []).slice(0, 5);
-      return `<article class="card row">${logo ? `<img src="/${esc(sitePaths.channelLogo(logo))}" alt="" width="52" height="52" loading="lazy">` : ''}
-<h3><a href="${rowHref(c.id)}"><bdi lang="he" dir="rtl">${esc(catalogAppName(c.id))}</bdi></a></h3>${he ? '' : `<span class="en">${esc(catalogName(c.id, 'en'))}</span>`}
-<p class="counts"><strong>${num(c.shows, lang)}</strong> ${t(lang, 'shows', 'תוכניות')} · <strong>${num(c.episodes, lang)}</strong> ${t(lang, 'episodes', 'פרקים')}</p>
-${
-  c.filling
-    ? `<p class="filling">${t(
-        lang,
-        `Still filling: ${num(c.filling.inCatalog)} of ${num(c.filling.known)} shows so far, the rest over the next days.`,
-        `עדיין מתמלאת: ${num(c.filling.inCatalog, lang)} מתוך ${num(c.filling.known, lang)} תוכניות עד עכשיו, השאר בימים הקרובים.`,
-      )}</p>`
-    : ''
-}
+      const counts =
+        c.filling && c.shows === 0
+          ? fillChip(c.filling, lang)
+          : `<span><strong>${num(c.shows, lang)}</strong> ${t(lang, 'shows', 'תוכניות')}</span><span><strong>${num(c.episodes, lang)}</strong> ${t(lang, 'episodes', 'פרקים')}</span>${c.filling ? fillChip(c.filling, lang) : ''}`;
+      return `<article class="card row">
+<header class="row-head">${logoTile(mark, 52)}<div class="row-name"><h3><a href="${rowHref(c.id)}"><bdi lang="he" dir="rtl">${esc(catalogAppName(c.id))}</bdi></a></h3>${he ? '' : `<span class="en">${esc(catalogName(c.id, 'en'))}</span>`}</div></header>
+<div class="counts">${counts}</div>
 ${
   where
     ? `<dl><dt>${t(lang, 'In Israel', 'בישראל')}</dt><dd${where.helper ? ' class="home"' : ''}>${esc(where.israel)}</dd><dt>${t(lang, 'Abroad', 'בחו״ל')}</dt><dd${where.helper ? ' class="home"' : ''}>${esc(where.abroad)}</dd></dl>`
-    : ''
-}${
-  posters.length
-    ? `<div class="posters" aria-hidden="true">${posters.map((u) => `<img src="${esc(sized(u, 160))}" alt="" width="80" height="120" loading="lazy" decoding="async">`).join('')}</div>`
-    : ''
-}</article>`;
+    : '<dl></dl>'
+}
+<div class="posters" aria-hidden="true">${posters.map((u) => `<img src="${esc(sized(u, 160))}" alt="" width="80" height="120" loading="lazy" decoding="async">`).join('')}</div>
+</article>`;
     })
     .join('');
 
   const channels = input.live
     .map(
       (c) =>
-        `<li><a href="/live/#${esc(c.id)}">${c.logo ? `<img src="/${esc(sitePaths.channelLogo(c.id))}" alt="" width="36" height="36" loading="lazy">` : ''}<span class="nm">${bdi(c.name)}${
+        `<li><a href="/live/#${esc(c.id)}">${logoTile(c.logo ? { logo: c.id } : undefined, 40)}<span class="nm">${bdi(c.name)}${
           c.helper ? `<span class="tag">${t(lang, 'home helper', 'עוזר ביתי')}</span>` : ''
         }</span></a></li>`,
     )
@@ -265,7 +266,7 @@ ${
         ],
         [
           'משהו לא מתנגן.',
-          `בדקו את <a href="/status">דף המצב</a>, ואז <a href="${BROKEN_URL}">ספרו לנו</a> איזו תוכנית ואיזה פרק. אם כתוב „${ISRAEL_ONLY_LABEL}” ואתם בחו״ל, זו החלטה של הגוף המשדר.`,
+          `בדקו את <a href="/status">דף המצב</a>, ואז <a href="${BROKEN_URL}">ספרו לנו</a> איזו תוכנית ואיזה פרק. אם כתוב "${ISRAEL_ONLY_LABEL}" ואתם בחו״ל, זו החלטה של הגוף המשדר.`,
         ],
         [
           'החיפוש לא מוצא כלום.',
@@ -345,7 +346,7 @@ ${
     onAir
       .map(
         ({ c, rows }) =>
-          `<a class="tk" href="/live/#${esc(c.id)}">${c.logo ? `<img src="/${esc(sitePaths.channelLogo(c.id))}" alt="" width="26" height="26" loading="lazy">` : ''}<b dir="auto">${esc(plain(c.name))}</b><span class="g" data-guide="1">${rows
+          `<a class="tk" href="/live/#${esc(c.id)}">${logoTile(c.logo ? { logo: c.id } : undefined, 28)}<b dir="auto">${esc(plain(c.name))}</b><span class="g" data-guide="1">${rows
             .map(
               (r, i) =>
                 `<span data-s="${r[0]}" data-e="${r[1]}"${i > 0 ? ' hidden' : ''} dir="auto">${esc(plain(r[2]))}</span>`,
@@ -357,27 +358,28 @@ ${
     ? `<div class="lower"><span class="label">${t(lang, 'On air', 'בשידור')}</span><div class="tick" role="region" aria-label="${t(lang, 'On the air now', 'משודר עכשיו')}"><div class="drift">${ticker()}</div></div></div>`
     : '';
 
-  return `${head(
-    {
-      lang,
-      title,
-      description,
-      path: he ? 'he/' : '',
-      alternates: { en: '', he: 'he/' },
-      jsonLd,
-    },
-    LANDING_CSS,
-  )}<body>
+  return externalLinks(
+    `${head(
+      {
+        lang,
+        title,
+        description,
+        path: he ? 'he/' : '',
+        alternates: { en: '', he: 'he/' },
+        jsonLd,
+      },
+      LANDING_CSS,
+    )}<body>
 ${topBar(lang, nav, { over: true, home })}
 <main id="main">
 <div class="hero">${lanes ? `<div class="wall" aria-hidden="true">${lanes}</div>` : ''}<div class="wrap hero-copy">
 <span class="kicker">${t(lang, 'A free addon for Stremio and Nuvio', 'תוסף חינמי ל-Stremio ול-Nuvio')}</span>
 <h1>${t(lang, 'Israeli TV, in the app you already use', 'טלוויזיה ישראלית, באפליקציה שכבר יש לכם')}</h1>
 <p class="lead">${t(
-    lang,
-    `Keshet 12, Reshet 13, Kan${liveCount ? ` and ${liveCount} live channels` : ''}: thousands of episodes in Hebrew, newest first. Free, no account, nothing to sign up for.`,
-    `קשת 12, רשת 13, כאן${liveCount ? ` ו-${liveCount} ערוצים בשידור חי` : ''}: אלפי פרקים, החדשים ראשונים. בחינם, בלי חשבון ובלי הרשמה.`,
-  )}</p>
+      lang,
+      `Keshet 12, Reshet 13, Kan${liveCount ? ` and ${liveCount} live channels` : ''}. Free, no account.`,
+      `קשת 12, רשת 13, כאן${liveCount ? ` ו-${liveCount} ערוצים בשידור חי` : ''}. בחינם ובלי הרשמה.`,
+    )}</p>
 <div class="actions">
 <a class="btn btn-primary" href="${esc(stremio)}" data-stremio>${ICONS.play}${t(lang, 'Install in Stremio', 'התקנה ב-Stremio')}</a>
 <button class="btn btn-ghost" type="button" data-copy="manifest-url" data-done="${t(lang, 'Copied', 'הועתק')}">${ICONS.copy}<span>${t(lang, 'Copy the link', 'העתקת הקישור')}</span></button>
@@ -395,18 +397,18 @@ ${statusChip}
 <section id="watch" aria-labelledby="watch-h"><div class="wrap">
 <h2 id="watch-h">${t(lang, 'What you can watch', 'מה אפשר לראות')}</h2>
 <p class="section-lead">${t(
-    lang,
-    `After you add it, your app has new rows: ${rowNames.join(', ')}. Shows are in Hebrew, newest episode first, with search and show pages. Episodes keep their numbers for good, so your progress stays put.`,
-    `אחרי ההוספה יופיעו באפליקציה שורות חדשות: ${rowNames.join(', ')}. התוכניות בעברית, הפרק החדש ראשון, עם חיפוש ודפי תוכנית. מספרי הפרקים לא משתנים, כך שהמקום שבו עצרתם נשמר.`,
-  )}</p>
-<div class="rows-grid">${rowCards}</div>
+      lang,
+      `After you add it, your app has new rows: ${rowNames.join(', ')}. Everything is in Hebrew, with search and show pages. Episode numbers never change, so your place is kept.`,
+      `אחרי ההוספה יופיעו באפליקציה שורות חדשות: ${rowNames.join(', ')}. הכול בעברית, עם חיפוש ודפי תוכנית. מספרי הפרקים לא משתנים, כך שהמקום שבו עצרתם נשמר.`,
+    )}</p>
+<div class="rows-grid n${shows.length % 3}">${rowCards}</div>
 ${
   liveCount
     ? `<h3 style="margin-top:32px">${t(lang, 'Live channels', 'ערוצים בשידור חי')}</h3>
 <p class="section-lead">${t(
         lang,
         `With what is on now and next. Apps with a TV-guide screen also get the full programme guide.${helperChannels.length ? ' Channels marked “home helper” play only through your own home helper.' : ''}`,
-        `עם מה משודר עכשיו ומה הבא. באפליקציות עם מסך לוח שידורים מופיע גם לוח השידורים המלא.${helperChannels.length ? ' ערוצים שמסומנים „עוזר ביתי” מתנגנים רק דרך העוזר הביתי שלכם.' : ''}`,
+        `עם מה שמשודר עכשיו ומה הבא. באפליקציות עם לוח שידורים מופיע גם הלוח המלא.${helperChannels.length ? ' ערוצים שמסומנים "עוזר ביתי" מתנגנים רק דרך העוזר הביתי.' : ''}`,
       )}</p>
 <ul class="channels">${channels}</ul>`
     : ''
@@ -420,10 +422,10 @@ ${
 <div class="grid two">
 <div class="card"><h3>Stremio</h3><ol class="steps">
 <li><span>${t(
-    lang,
-    `Press <a href="${esc(stremio)}" data-stremio>Install in Stremio</a> on this page, on a computer or phone that has Stremio. No Stremio app here? Use <a href="${esc(stremioWeb)}" data-stremio-web>Stremio’s website</a>.`,
-    `לחצו על <a href="${esc(stremio)}" data-stremio>התקנה ב-Stremio</a> בדף הזה, במחשב או בטלפון שמותקן בהם Stremio. אין כאן את האפליקציה? השתמשו ב<a href="${esc(stremioWeb)}" data-stremio-web>אתר של Stremio</a>.`,
-  )}</span></li>
+      lang,
+      `Press <a href="${esc(stremio)}" data-stremio>Install in Stremio</a> on this page, on a computer or phone that has Stremio. No Stremio app here? Use <a href="${esc(stremioWeb)}" data-stremio-web>Stremio’s website</a>.`,
+      `לחצו על <a href="${esc(stremio)}" data-stremio>התקנה ב-Stremio</a> בדף הזה, במחשב או בטלפון שמותקן בהם Stremio. אין כאן את האפליקציה? השתמשו ב<a href="${esc(stremioWeb)}" data-stremio-web>אתר של Stremio</a>.`,
+    )}</span></li>
 <li><span>${t(lang, 'Or: open <strong>Addons</strong> in Stremio, paste the link into the search box and choose <strong>Install</strong>.', 'או: פתחו ב-Stremio את <strong>Addons</strong>, הדביקו את הקישור בתיבת החיפוש ובחרו <strong>Install</strong>.')}</span></li>
 <li><span>${t(lang, 'Signed in to Stremio? It then appears in all your Stremio apps, the TV too.', 'מחוברים לחשבון Stremio? התוסף יופיע בכל האפליקציות שלכם, גם בטלוויזיה.')}</span></li>
 </ol></div>
@@ -434,10 +436,10 @@ ${
 </ol></div>
 </div>
 <p class="callout">${t(
-    lang,
-    '<strong>On a TV?</strong> Typing a link with a remote is no fun: add it on your phone or computer, signed in to the same Stremio account, and it shows up on the TV too.',
-    '<strong>בטלוויזיה?</strong> להקליד קישור עם שלט זה לא כיף: הוסיפו אותו בטלפון או במחשב, מחוברים לאותו חשבון Stremio, והוא יופיע גם בטלוויזיה.',
-  )}</p>
+      lang,
+      '<strong>On a TV?</strong> Typing a link with a remote is no fun: add it on your phone or computer, signed in to the same Stremio account, and it shows up on the TV too.',
+      '<strong>בטלוויזיה?</strong> להקליד קישור עם שלט זה לא כיף: הוסיפו אותו בטלפון או במחשב, מחוברים לאותו חשבון Stremio, והוא יופיע גם בטלוויזיה.',
+    )}</p>
 </div></section>
 
 ${
@@ -471,21 +473,21 @@ ${
 <h2 id="abroad-h">${t(lang, 'Watching from abroad', 'צפייה מחו״ל')}</h2>
 <div class="grid two"><div>
 <p>${t(
-    lang,
-    'Everything in the catalog shows up anywhere in the world. Most live channels and most of Reshet 13 play anywhere, and so do the Kan titles the broadcaster allows abroad.',
-    'כל מה שבקטלוג מופיע בכל מקום בעולם. רוב הערוצים החיים ורוב התוכן של רשת 13 מתנגנים בכל מקום, וכך גם תוכניות כאן שהגוף המשדר מתיר לצפייה בחו״ל.',
-  )}</p>
+      lang,
+      'Everything in the catalog shows up anywhere in the world. Most live channels and most of Reshet 13 play anywhere, and so do the Kan titles the broadcaster allows abroad.',
+      'כל מה שבקטלוג מופיע בכל מקום בעולם. רוב הערוצים החיים ורוב התוכן של רשת 13 מתנגנים בכל מקום, וכך גם תוכניות כאן שהגוף המשדר מתיר לצפייה בחו״ל.',
+    )}</p>
 <p>${t(
-    lang,
-    `A stream that plays only from an Israeli internet connection says so in the app: <span class="he-label" lang="he" dir="rtl">${ISRAEL_ONLY_LABEL}</span> (only in Israel). That is the broadcaster’s choice, not the app’s.`,
-    `וידאו שמתנגן רק מחיבור אינטרנט ישראלי מסומן באפליקציה: <span class="he-label">${ISRAEL_ONLY_LABEL}</span>. זו החלטה של הגוף המשדר, לא של האפליקציה.`,
-  )}</p>
+      lang,
+      `A stream that plays only from an Israeli internet connection says so in the app: <span class="he-label" lang="he" dir="rtl">${ISRAEL_ONLY_LABEL}</span> (only in Israel). That is the broadcaster’s choice, not the app’s.`,
+      `וידאו שמתנגן רק מחיבור אינטרנט ישראלי מסומן באפליקציה: <span class="he-label">${ISRAEL_ONLY_LABEL}</span>. זו החלטה של הגוף המשדר, לא של האפליקציה.`,
+    )}</p>
 </div><div class="card">
 <p>${t(
-    lang,
-    'Keshet 12 plays with the home helper on your home network, wherever in the world your home is. The home helper can also fetch the Israel-only titles for you, through a VPN or proxy service with an Israeli location that you may already pay for. Those titles then show a second source, <span class="he-label" lang="he" dir="rtl">דרך החיבור הישראלי שלך</span>: pick that one.',
-    'קשת 12 מתנגנת עם העוזר הביתי ברשת הביתית שלכם, בכל מקום בעולם שבו הבית נמצא. העוזר הביתי יכול גם להביא את התוכניות שזמינות רק בישראל, דרך שירות VPN או פרוקסי עם מיקום ישראלי (שירות בתשלום שאולי כבר יש לכם). לתוכניות האלה יופיע אז מקור נוסף, <span class="he-label">דרך החיבור הישראלי שלך</span>: בחרו בו.',
-  )}</p>
+      lang,
+      'Keshet 12 plays with the home helper on your home network, wherever in the world your home is. The home helper can also fetch the Israel-only titles for you, through a VPN or proxy service with an Israeli location that you may already pay for. Those titles then show a second source, <span class="he-label" lang="he" dir="rtl">דרך החיבור הישראלי שלך</span>: pick that one.',
+      'קשת 12 מתנגנת עם העוזר הביתי ברשת הביתית שלכם, בכל מקום בעולם שבו הבית נמצא. העוזר הביתי יכול גם להביא את התוכניות שזמינות רק בישראל, דרך שירות VPN או פרוקסי עם מיקום ישראלי (שירות בתשלום שאולי כבר יש לכם). לתוכניות האלה יופיע אז מקור נוסף, <span class="he-label">דרך החיבור הישראלי שלך</span>: בחרו בו.',
+    )}</p>
 <p><a href="${ABROAD_DOC}">${t(lang, 'How to set that up', 'איך מגדירים את זה')}</a></p>
 </div></div>
 </div></section>
@@ -498,10 +500,10 @@ ${faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><div class="body"><p
 <section class="alt" aria-labelledby="oss-h"><div class="wrap">
 <h2 id="oss-h">${t(lang, 'Open source, run by volunteers', 'קוד פתוח, בהתנדבות')}</h2>
 <p class="section-lead">${t(
-    lang,
-    `Israel TV reads the broadcasters’ public sites slowly, keeps every show and episode under a permanent number, and points your app at the broadcasters’ own video. Anyone can read the code, report a problem, help fix a channel whose site changed, or <a href="${SELF_HOST_DOC}">run their own copy</a>. Licensed <a href="${LICENSE_URL}">AGPL-3.0</a>.`,
-    `Israel TV קורא את האתרים הציבוריים של הגופים המשדרים לאט, שומר כל תוכנית וכל פרק תחת מספר קבוע, ומפנה את האפליקציה לווידאו של הגופים המשדרים עצמם. כל אחד יכול לקרוא את הקוד, לדווח על בעיה, לעזור לתקן ערוץ שהאתר שלו השתנה, או <a href="${SELF_HOST_DOC}">להריץ עותק משלו</a>. רישיון <a href="${LICENSE_URL}">AGPL-3.0</a>.`,
-  )}</p>
+      lang,
+      `Israel TV reads the broadcasters’ public sites slowly, keeps every show and episode under a permanent number, and points your app at the broadcasters’ own video. Anyone can read the code, report a problem, help fix a channel whose site changed, or <a href="${SELF_HOST_DOC}">run their own copy</a>. Licensed <a href="${LICENSE_URL}">AGPL-3.0</a>.`,
+      `Israel TV קורא את האתרים הציבוריים של הגופים המשדרים לאט, שומר כל תוכנית וכל פרק תחת מספר קבוע, ומפנה את האפליקציה לווידאו של הגופים המשדרים עצמם. כל אחד יכול לקרוא את הקוד, לדווח על בעיה, לעזור לתקן ערוץ שהאתר שלו השתנה, או <a href="${SELF_HOST_DOC}">להריץ עותק משלו</a>. רישיון <a href="${LICENSE_URL}">AGPL-3.0</a>.`,
+    )}</p>
 <div class="oss">
 <a class="btn btn-plain" href="${PROJECT_URL}">${ICONS.github}${t(lang, 'Source code', 'קוד המקור')}</a>
 <a class="btn btn-plain" href="${ISSUES_URL}">${t(lang, 'Report a problem', 'דיווח על בעיה')}</a>
@@ -512,7 +514,9 @@ ${faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><div class="body"><p
 </main>
 ${footer(lang)}
 </body></html>
-`;
+`,
+    lang,
+  );
 }
 
 /** The status headline in Hebrew, for the landing page's chip. */

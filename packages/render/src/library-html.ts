@@ -11,14 +11,16 @@ import {
   type MetaPreview,
   sitePaths,
 } from '@israel-tv/core';
-import { CATALOG_LOGO } from './names.ts';
+import { CATALOG_MARK } from './names.ts';
 import {
   absolute,
   BRAND,
   esc,
+  externalLinks,
   footer,
   head,
   ICONS,
+  logoTile,
   num,
   PROJECT_URL,
   siteNav,
@@ -79,6 +81,16 @@ const LIVE_PAGES: Record<string, string> = {
   iltv_live_i24fr: 'https://www.i24news.tv/fr/tv/live',
   iltv_live_i24ar: 'https://www.i24news.tv/ar/tv/live',
 };
+
+/** A row's first fill, as a short line with a progress bar. */
+export function fillChip(f: { inCatalog: number; known: number }, lang: 'he' | 'en'): string {
+  const pct = f.known ? Math.min(100, Math.round((f.inCatalog / f.known) * 100)) : 0;
+  const text =
+    lang === 'he'
+      ? `נטען לראשונה: ${num(f.inCatalog, 'he')} מתוך ${num(f.known, 'he')}`
+      : `First load: ${num(f.inCatalog)} of ${num(f.known)}`;
+  return `<span class="chip-fill"><span>${text}</span><span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${f.known}" aria-valuenow="${f.inCatalog}" aria-label="${text}"><i style="width:${pct}%"></i></span></span>`;
+}
 
 /** Where each source plays, in a sentence. */
 const WHERE: Record<string, string> = {
@@ -192,7 +204,8 @@ const LIBRARY_CSS = `
 .note{border-inline-start:3px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:10px 14px;margin:14px 0;max-width:46rem}
 .channels-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr))}
 .chan{display:grid;grid-template-columns:56px 1fr;grid-template-rows:auto 1fr auto;gap:4px 14px;align-items:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
-.chan>img,.chan>.logo-blank{grid-row:span 2;width:56px;height:56px;border-radius:12px;background:var(--surface-2);object-fit:contain}
+.chan>.logo-tile{grid-row:span 2}
+.row-title{display:flex;align-items:center;gap:16px}
 .chan h2,.chan h3{margin:0;font:600 1.1rem/1.3 var(--body)}
 .chan .acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-self:end}
 .chan .acts .btn{min-height:40px;padding:6px 14px;font-size:.9rem}
@@ -264,6 +277,10 @@ interface PageOpts {
 
 /** A library page: Hebrew, right to left, the site's header and footer. */
 function page(o: PageOpts, body: string): string {
+  return externalLinks(page0(o, body), 'he');
+}
+
+function page0(o: PageOpts, body: string): string {
   return `${head(
     {
       lang: 'he',
@@ -288,10 +305,7 @@ const countShows = (n: number) => (n === 1 ? 'תוכנית אחת' : `${num(n, '
 const countEpisodes = (n: number) => (n === 1 ? 'פרק אחד' : `${num(n, 'he')} פרקים`);
 const episodesOf = (m: Meta) => (m.videos ?? []).length;
 
-const channelLogo = (c: LibraryChannel, size = 56) =>
-  c.logo
-    ? `<img src="/${esc(sitePaths.channelLogo(c.id))}" alt="" width="${size}" height="${size}" loading="lazy">`
-    : '<span class="logo-blank" aria-hidden="true"></span>';
+const channelLogo = (c: LibraryChannel, size = 56) => logoTile(c.logo ? { logo: c.id } : undefined, size);
 
 function channelCard(c: LibraryChannel, input: LibraryInput, heading: 'h2' | 'h3', full: boolean): string {
   const rows = channelGuide(input.guide, c.id);
@@ -349,7 +363,7 @@ function libraryHome(input: LibraryInput): string {
       },
     },
     `<div class="wrap page-head"><h1>הספרייה</h1>
-<p class="lead">${countShows(total)} ו-${countEpisodes(episodes)} מקשת 12, רשת 13 וכאן, הפרקים החדשים ראשונים. לוחצים על תוכנית, ומשם ישר לאפליקציה.</p>
+<p class="lead">${countShows(total)} ו-${countEpisodes(episodes)} מקשת 12, רשת 13 וכאן. בחרו תוכנית ופתחו אותה באפליקציה.</p>
 <form class="searchbox" action="/search/" method="get" role="search"><input type="search" name="q" placeholder="חיפוש תוכנית" aria-label="חיפוש תוכנית"><button class="btn btn-primary" type="submit">${ICONS.search}חיפוש</button></form>
 </div>${live}${shelves}`,
   );
@@ -373,11 +387,11 @@ function rowPage(r: LibraryRow): string {
     .slice(0, 24)
     .map(([g]) => g);
   const episodes = r.shows.reduce((n, s) => n + episodesOf(s.meta), 0);
-  const logo = CATALOG_LOGO[r.id];
+  const mark = CATALOG_MARK[r.id];
   return page(
     {
       title: `${name}: כל התוכניות לצפייה | Israel TV`,
-      description: `${countShows(r.shows.length)} ו-${countEpisodes(episodes)} של ${name}, הפרקים החדשים ראשונים. צפייה ב-Stremio וב-Nuvio, בחינם.`,
+      description: `${countShows(r.shows.length)} ו-${countEpisodes(episodes)} של ${name}. לצפייה ב-Stremio וב-Nuvio, בחינם.`,
       path: rowHref(r.id).slice(1),
       section: 'library',
       ...(genres.length ? { script: FILTER_SCRIPT } : {}),
@@ -396,13 +410,9 @@ function rowPage(r: LibraryRow): string {
     },
     `<div class="wrap page-head">
 <nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li>${esc(name)}</li></ol></nav>
-<h1>${logo ? `<img src="/${esc(sitePaths.channelLogo(logo))}" alt="" width="64" height="64" style="vertical-align:-8px;border-radius:14px;margin-inline-end:14px">` : ''}${esc(name)}</h1>
-<p class="lead">${countShows(r.shows.length)} ו-${countEpisodes(episodes)}, הפרקים החדשים ראשונים. ${esc(WHERE[r.source] ?? '')}</p>
-${
-  r.filling
-    ? `<p class="note">השורה עדיין מתמלאת: ${num(r.filling.inCatalog, 'he')} מתוך ${num(r.filling.known, 'he')} התוכניות כבר כאן, השאר יגיעו בימים הקרובים.</p>`
-    : ''
-}
+<h1 class="row-title">${mark ? logoTile(mark, 64) : ''}<span>${esc(name)}</span></h1>
+<p class="lead">${countShows(r.shows.length)} ו-${countEpisodes(episodes)}. ${esc(WHERE[r.source] ?? '')}</p>
+${r.filling ? `<p>${fillChip(r.filling, 'he')}</p>` : ''}
 ${
   genres.length
     ? `<nav class="filters" aria-label="סינון לפי סוגה" hidden><a class="chip" href="${rowHref(r.id)}" data-g="" aria-current="true">הכול</a>${genres
@@ -480,7 +490,7 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
       const long = vs.length > 40;
       const sorted = [...vs].sort((a, b) => (long ? -1 : 1) * ((a.episode ?? 0) - (b.episode ?? 0)));
       const shown = sorted.slice(0, EPISODES_PER_SEASON);
-      return `<details class="season"${i === 0 ? ' open' : ''}><summary><span dir="auto">${esc(seasonName(n, vs))}</span><span class="count">${countEpisodes(vs.length)}${long ? ', החדשים ראשונים' : ''}</span></summary>
+      return `<details class="season"${i === 0 ? ' open' : ''}><summary><span dir="auto">${esc(seasonName(n, vs))}</span><span class="count">${countEpisodes(vs.length)}</span></summary>
 <ol class="eps">${shown.map((v) => episodeItem(m, v, named)).join('')}</ol>${
         vs.length > shown.length
           ? `<p class="more">ועוד ${countEpisodes(vs.length - shown.length)} באפליקציה.</p>`
@@ -563,7 +573,7 @@ ${description ? `<p class="desc" dir="auto">${esc(description)}</p>` : ''}
     }</div>
 <p class="small">${
       s.source === 'mako' ? `הפרקים של קשת 12 מתנגנים דרך <a href="${HELPER_DOC}">העוזר הביתי</a> שלכם. ` : ''
-    }הכפתור פותח את התוכנית ב-Stremio, אם Israel TV כבר מותקן שם (<a href="/he/#install">התקנה בדקה</a>). ב-Nuvio: מוסיפים את Israel TV ומחפשים „${esc(name)}”.</p>
+    }הכפתור פותח את התוכנית ב-Stremio, אם Israel TV מותקן שם (<a href="/he/#install">איך מתקינים</a>). ב-Nuvio, אחרי ההתקנה, חפשו "<bdi>${esc(name)}</bdi>".</p>
 </div></div></header>
 <section class="seasons" aria-labelledby="eps-h"><div class="wrap">
 <h2 id="eps-h">פרקים</h2>
@@ -605,7 +615,7 @@ function livePage(input: LibraryInput): string {
       },
     },
     `<div class="wrap page-head"><h1>שידור חי</h1>
-<p class="lead">${num(input.live.length, 'he')} ערוצים, עם מה משודר עכשיו ומה הבא (שעון ישראל). הכפתור פותח את הערוץ ב-Stremio; באפליקציות עם מסך לוח שידורים מופיע הלוח המלא. ערוצים שמסומנים „עוזר ביתי” מתנגנים רק דרך <a href="${HELPER_DOC}">העוזר הביתי</a> שלכם.</p>
+<p class="lead">${num(input.live.length, 'he')} ערוצים ומה משודר בהם עכשיו, לפי שעון ישראל. ערוצים שמסומנים "עוזר ביתי" מתנגנים רק דרך <a href="${HELPER_DOC}">העוזר הביתי</a>.</p>
 </div>
 <section style="padding-top:24px"><div class="wrap"><div class="channels-grid">${input.live.map((c) => channelCard(c, input, 'h2', true)).join('')}</div></div></section>`,
   );
@@ -644,7 +654,7 @@ function searchPage(): string {
     `<div class="wrap page-head"><h1>חיפוש</h1>
 <form class="searchbox" action="/search/" method="get" role="search" onsubmit="return false"><input id="q" type="search" name="q" placeholder="שם התוכנית או הערוץ" aria-label="שם התוכנית או הערוץ" autocomplete="off"></form>
 <p class="results-info" id="info" role="status" aria-live="polite"></p>
-<noscript><p class="note">החיפוש צריך JavaScript. אפשר לדפדף ב<a href="/library/">ספרייה</a>.</p></noscript>
+<noscript><p class="note">החיפוש עובד רק עם JavaScript. אפשר לדפדף ב<a href="/library/">ספרייה</a>.</p></noscript>
 <div class="tiles" id="results"></div>
 </div>`,
   );

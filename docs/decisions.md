@@ -1845,3 +1845,23 @@ with stills), the live channels with now/next, and search (details in operations
 
 The large row's score is its first Mako poster (not resizable) on a server without compression; see the live numbers
 below.
+
+**Owner review of the live site (round 9, sections 4–5):**
+
+- Links that leave the site open in a new tab (`target="_blank" rel="noopener noreferrer"`), with a hidden "opens in
+  a new tab" for screen readers and, on text links, a small arrow (buttons already carry an icon). Applied to every
+  finished page in one place (`externalLinks`, page.ts) and checked by a test over every rendered page. App links
+  (`stremio://`) and the site's own links stay in the same tab.
+- Right to left: icons stay at the label's inline start (document order in a flex row); directional ones (the
+  external arrow, breadcrumb separator) are mirrored in Hebrew; media, search, theme and copy icons are not. The
+  season chevron points to the inline end when closed and down when open in both directions (drawn with physical
+  borders, so it does not flip twice).
+- Bidi: a Hebrew page's tab title starts with a right-to-left mark and isolates its Latin names, so "Israel TV" stays
+  whole. Hebrew quotes are plain `"…"` around an isolated title.
+- Copy: "newest first" and similar filler removed; plural imperatives throughout the Hebrew pages.
+- One logo tile everywhere (row cards, live tiles, status cards, the ticker): the same box, padding and corner, the
+  logo contained. Kan's archive has no channel of its own, so it gets a lettered tile ("כאן / ארכיון"), never Kan 11's
+  logo. A row in its first fill shows "First load: 1 of 171" with a bar instead of zeros, and the posters of the shows
+  it lists before their episodes arrive.
+- Row cards share rows (CSS subgrid): header, counts, where it plays, posters line up across a row of cards. Five
+  cards are laid out as two wide and three narrow, four as two by two.

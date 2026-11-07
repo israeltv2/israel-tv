@@ -583,7 +583,17 @@ export function renderSite(input: RenderInput): SiteFiles {
     status: overall(status),
     ...(input.publicUrl ? { publicUrl: input.publicUrl } : {}),
     wall: posterWall(libraryRows),
-    rowPosters: Object.fromEntries(libraryRows.map((r) => [r.id, posterWall([r], 5).map((w) => w.poster)])),
+    // A row's posters, from every show it lists: a row in its first fill has posters before it has episodes.
+    rowPosters: Object.fromEntries(
+      libraryRows.map((r) => [
+        r.id,
+        input.shows
+          .filter((s) => s.catalog === r.id && s.state === 'listed' && s.show.poster)
+          .map((s) => s.show.poster as string)
+          .filter((u) => !u.includes(sitePaths.posterPlaceholder))
+          .slice(0, 5),
+      ]),
+    ),
     ...(input.guide ? { guide: input.guide } : {}),
   };
   files.set(sitePaths.landing, renderLandingHtml(landing, 'en'));
