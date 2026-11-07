@@ -208,7 +208,8 @@ export async function probeStreams(
     const todo = shows
       .filter((s) => s.source === 'kan' && due(state[s.seriesId]?.at, state[s.seriesId]?.plays, now))
       .sort((a, b) => (b.latestAirDate ?? '').localeCompare(a.latestAirDate ?? ''))
-      .slice(0, Math.max(0, Math.floor(budget / 3)));
+      // At most half the reads (three per title), so Reshet's qualities are measured in the same call.
+      .slice(0, Math.max(0, Math.floor(budget / 6)));
     await pool(todo, 3, async (s) => {
       const eps = s.show.seasons.flatMap((x) => x.episodes).filter((e) => e.streams[0]);
       const newest = [...eps].sort((a, b) => (b.airDate ?? '').localeCompare(a.airDate ?? ''))[0];
