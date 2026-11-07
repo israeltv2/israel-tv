@@ -5,13 +5,13 @@
 
 import { type GuideFile, sitePaths } from '@israel-tv/core';
 import { style } from './assets.ts';
+import { html, raw } from './html.ts';
 import { channelGuide, fillChip, plain, rowHref } from './library-html.ts';
 import { CATALOG_MARK, catalogAppName, catalogName } from './names.ts';
 import {
   absolute,
   bdi,
   DOCS_URL,
-  esc,
   externalLinks,
   footer,
   head,
@@ -80,7 +80,8 @@ const WHERE: Record<string, Record<Lang, { israel: string; abroad: string; helpe
 
 const LANDING_CSS = style('landing.css');
 
-const t = (lang: Lang, en: string, he: string) => (lang === 'he' ? he : en);
+/** Our own copy in the page's language. It may carry markup (links, emphasis): authored here, never from data. */
+const t = (lang: Lang, en: string, he: string) => raw(lang === 'he' ? he : en);
 
 /** The landing page in English (`/`) or Hebrew (`/he/`). */
 export function renderLandingHtml(input: LandingInput, lang: Lang = 'en'): string {
@@ -99,17 +100,23 @@ export function renderLandingHtml(input: LandingInput, lang: Lang = 'en'): strin
   const liveCount = input.live.length;
   const helperChannels = input.live.filter((c) => c.helper);
   const hasMako = input.catalogs.some((c) => c.source === 'mako');
-  const rowNames = input.catalogs.map((c) => `<span class="he-label">${bdi(catalogAppName(c.id))}</span>`);
-  const home = he ? '/he/' : '/';
-  const title = t(
-    lang,
-    'Israel TV: Israeli TV shows and live channels in Stremio and Nuvio',
-    'Israel TV: תוכניות ישראליות ושידורים חיים ב-Stremio וב-Nuvio',
+  const rowNames = input.catalogs.map(
+    (c) => html`<span class="he-label">${bdi(catalogAppName(c.id))}</span>`,
   );
-  const description = t(
-    lang,
-    `Watch Keshet 12, Reshet 13, Kan and ${liveCount || 'Israeli'} live channels in Stremio and Nuvio: ${num(totalShows)} shows and ${num(totalEpisodes)} episodes, free, no account. One-click install.`,
-    `קשת 12, רשת 13, כאן ו-${liveCount || ''} ערוצים בשידור חי ב-Stremio וב-Nuvio: ${num(totalShows, lang)} תוכניות ו-${num(totalEpisodes, lang)} פרקים, בחינם ובלי הרשמה. התקנה בלחיצה.`,
+  const home = he ? '/he/' : '/';
+  const title = String(
+    t(
+      lang,
+      'Israel TV: Israeli TV shows and live channels in Stremio and Nuvio',
+      'Israel TV: תוכניות ישראליות ושידורים חיים ב-Stremio וב-Nuvio',
+    ),
+  );
+  const description = String(
+    t(
+      lang,
+      `Watch Keshet 12, Reshet 13, Kan and ${liveCount || 'Israeli'} live channels in Stremio and Nuvio: ${num(totalShows)} shows and ${num(totalEpisodes)} episodes, free, no account. One-click install.`,
+      `קשת 12, רשת 13, כאן ו-${liveCount || ''} ערוצים בשידור חי ב-Stremio וב-Nuvio: ${num(totalShows, lang)} תוכניות ו-${num(totalEpisodes, lang)} פרקים, בחינם ובלי הרשמה. התקנה בלחיצה.`,
+    ),
   );
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -129,43 +136,37 @@ export function renderLandingHtml(input: LandingInput, lang: Lang = 'en'): strin
   };
 
   const statusChip = input.status
-    ? `<a class="status-chip ${input.status.level}" href="/status"><i aria-hidden="true"></i>${esc(
-        he ? HE_STATUS[input.status.level] : input.status.title,
-      )} · ${t(lang, 'Status page', 'דף המצב')}</a>`
-    : `<a class="status-chip" href="/status"><i aria-hidden="true"></i>${t(lang, 'Status page', 'דף המצב')}</a>`;
+    ? html`<a class="status-chip ${input.status.level}" href="/status"><i aria-hidden="true"></i>${he ? HE_STATUS[input.status.level] : input.status.title} · ${t(lang, 'Status page', 'דף המצב')}</a>`
+    : html`<a class="status-chip" href="/status"><i aria-hidden="true"></i>${t(lang, 'Status page', 'דף המצב')}</a>`;
 
   // One card per row, every card built the same way: a header (logo tile, name), the counts or the first-fill line,
   // where it plays, and a fan of posters. The parts line up across cards (subgrid), whatever is in them.
-  const rowCards = shows
-    .map((c) => {
-      const where = WHERE[c.source]?.[lang];
-      const mark = CATALOG_MARK[c.id];
-      const posters = (input.rowPosters?.[c.id] ?? []).slice(0, 5);
-      const counts =
-        c.filling && c.shows === 0
-          ? fillChip(c.filling, lang)
-          : `<span><strong>${num(c.shows, lang)}</strong> ${t(lang, 'shows', 'תוכניות')}</span><span><strong>${num(c.episodes, lang)}</strong> ${t(lang, 'episodes', 'פרקים')}</span>${c.filling ? fillChip(c.filling, lang) : ''}`;
-      return `<article class="card row">
-<header class="row-head">${logoTile(mark, 52)}<div class="row-name"><h3><a href="${rowHref(c.id)}"><bdi lang="he" dir="rtl">${esc(catalogAppName(c.id))}</bdi></a></h3>${he ? '' : `<span class="en">${esc(catalogName(c.id, 'en'))}</span>`}</div></header>
+  const rowCards = shows.map((c) => {
+    const where = WHERE[c.source]?.[lang];
+    const mark = CATALOG_MARK[c.id];
+    const posters = (input.rowPosters?.[c.id] ?? []).slice(0, 5);
+    const counts =
+      c.filling && c.shows === 0
+        ? fillChip(c.filling, lang)
+        : html`<span><strong>${num(c.shows, lang)}</strong> ${t(lang, 'shows', 'תוכניות')}</span><span><strong>${num(c.episodes, lang)}</strong> ${t(lang, 'episodes', 'פרקים')}</span>${c.filling ? fillChip(c.filling, lang) : ''}`;
+    return html`<article class="card row">
+<header class="row-head">${logoTile(mark, 52)}<div class="row-name"><h3><a href="${rowHref(c.id)}"><bdi lang="he" dir="rtl">${catalogAppName(c.id)}</bdi></a></h3>${he ? '' : html`<span class="en">${catalogName(c.id, 'en')}</span>`}</div></header>
 <div class="counts">${counts}</div>
 ${
   where
-    ? `<dl><dt>${t(lang, 'In Israel', 'בישראל')}</dt><dd${where.helper ? ' class="home"' : ''}>${esc(where.israel)}</dd><dt>${t(lang, 'Abroad', 'בחו״ל')}</dt><dd${where.helper ? ' class="home"' : ''}>${esc(where.abroad)}</dd></dl>`
-    : '<dl></dl>'
+    ? html`<dl><dt>${t(lang, 'In Israel', 'בישראל')}</dt><dd${where.helper ? raw(' class="home"') : ''}>${where.israel}</dd><dt>${t(lang, 'Abroad', 'בחו״ל')}</dt><dd${where.helper ? raw(' class="home"') : ''}>${where.abroad}</dd></dl>`
+    : raw('<dl></dl>')
 }
-<div class="posters" aria-hidden="true">${posters.map((u) => `<img src="${esc(sized(u, 160))}" alt="" width="80" height="120" loading="lazy" decoding="async">`).join('')}</div>
+<div class="posters" aria-hidden="true">${posters.map((u) => html`<img src="${sized(u, 160)}" alt="" width="80" height="120" loading="lazy" decoding="async">`)}</div>
 </article>`;
-    })
-    .join('');
+  });
 
-  const channels = input.live
-    .map(
-      (c) =>
-        `<li><a href="/live/#${esc(c.id)}">${logoTile(c.logo ? { logo: c.id } : undefined, 40)}<span class="nm">${bdi(c.name)}${
-          c.helper ? `<span class="tag">${t(lang, 'home helper', 'עוזר ביתי')}</span>` : ''
-        }</span></a></li>`,
-    )
-    .join('');
+  const channels = input.live.map(
+    (c) =>
+      html`<li><a href="/live/#${c.id}">${logoTile(c.logo ? { logo: c.id } : undefined, 40)}<span class="nm">${bdi(c.name)}${
+        c.helper ? html`<span class="tag">${t(lang, 'home helper', 'עוזר ביתי')}</span>` : ''
+      }</span></a></li>`,
+  );
 
   const faq: [string, string][] = he
     ? [
@@ -235,48 +236,40 @@ ${
       ];
 
   const nav = siteNav(lang, 'home', [
-    { href: '#install', label: t(lang, 'Install', 'התקנה'), optional: true },
+    { href: '#install', label: String(t(lang, 'Install', 'התקנה')), optional: true },
   ]);
 
   // The header's wall: three lanes of posters drifting past (decoration: hidden from screen readers).
   const wall = input.wall ?? [];
   const lanes =
     wall.length >= 6
-      ? [0, 1, 2]
-          .map((k) => {
-            const lane = wall.filter((_, i) => i % 3 === k);
-            const imgs = lane
-              .map(
-                (w) =>
-                  `<img src="${esc(sized(w.poster, 220))}" alt="" width="150" height="225" decoding="async" fetchpriority="low">`,
-              )
-              .join('');
-            return `<div class="lane"><div class="drift">${imgs}</div><div class="drift">${imgs}</div></div>`;
-          })
-          .join('')
+      ? [0, 1, 2].map((k) => {
+          const lane = wall.filter((_, i) => i % 3 === k);
+          const imgs = lane.map(
+            (w) =>
+              html`<img src="${sized(w.poster, 220)}" alt="" width="150" height="225" decoding="async" fetchpriority="low">`,
+          );
+          return html`<div class="lane"><div class="drift">${imgs}</div><div class="drift">${imgs}</div></div>`;
+        })
       : '';
   // "On the air now": each live channel with a guide, as a lower third (the script keeps it current).
   const onAir = input.live
     .map((c) => ({ c, rows: channelGuide(input.guide, c.id) }))
     .filter((x) => x.rows.length > 0);
   const ticker = () =>
-    onAir
-      .map(
-        ({ c, rows }) =>
-          `<a class="tk" href="/live/#${esc(c.id)}">${logoTile(c.logo ? { logo: c.id } : undefined, 28)}<b dir="auto">${esc(plain(c.name))}</b><span class="g" data-guide="1">${rows
-            .map(
-              (r, i) =>
-                `<span data-s="${r[0]}" data-e="${r[1]}"${i > 0 ? ' hidden' : ''} dir="auto">${esc(plain(r[2]))}</span>`,
-            )
-            .join('')}</span></a>`,
-      )
-      .join('');
+    onAir.map(
+      ({ c, rows }) =>
+        html`<a class="tk" href="/live/#${c.id}">${logoTile(c.logo ? { logo: c.id } : undefined, 28)}<b dir="auto">${plain(c.name)}</b><span class="g" data-guide="1">${rows.map(
+          (r, i) =>
+            html`<span data-s="${r[0]}" data-e="${r[1]}"${i > 0 ? ' hidden' : ''} dir="auto">${plain(r[2])}</span>`,
+        )}</span></a>`,
+    );
   const lower = onAir.length
-    ? `<div class="lower"><span class="label">${t(lang, 'On air', 'בשידור')}</span><div class="tick" role="region" aria-label="${t(lang, 'On the air now', 'משודר עכשיו')}"><div class="drift">${ticker()}</div></div></div>`
+    ? html`<div class="lower"><span class="label">${t(lang, 'On air', 'בשידור')}</span><div class="tick" role="region" aria-label="${t(lang, 'On the air now', 'משודר עכשיו')}"><div class="drift">${ticker()}</div></div></div>`
     : '';
 
   return externalLinks(
-    `${head(
+    html`${head(
       {
         lang,
         title,
@@ -289,7 +282,7 @@ ${
     )}<body>
 ${topBar(lang, nav, { over: true, home })}
 <main id="main">
-<div class="hero">${lanes ? `<div class="wall" aria-hidden="true">${lanes}</div>` : ''}<div class="wrap hero-copy">
+<div class="hero">${lanes ? html`<div class="wall" aria-hidden="true">${lanes}</div>` : ''}<div class="wrap hero-copy">
 <span class="kicker">${t(lang, 'A free addon for Stremio and Nuvio', 'תוסף חינמי ל-Stremio ול-Nuvio')}</span>
 <h1>${t(lang, 'Israeli TV, in the app you already use', 'טלוויזיה ישראלית, באפליקציה שכבר יש לכם')}</h1>
 <p class="lead">${t(
@@ -298,15 +291,15 @@ ${topBar(lang, nav, { over: true, home })}
       `קשת 12, רשת 13, כאן${liveCount ? ` ו-${liveCount} ערוצים בשידור חי` : ''}. בחינם ובלי הרשמה.`,
     )}</p>
 <div class="actions">
-<a class="btn btn-primary" href="${esc(stremio)}" data-stremio>${ICONS.play}${t(lang, 'Install in Stremio', 'התקנה ב-Stremio')}</a>
+<a class="btn btn-primary" href="${stremio}" data-stremio>${ICONS.play}${t(lang, 'Install in Stremio', 'התקנה ב-Stremio')}</a>
 <button class="btn btn-ghost" type="button" data-copy="manifest-url" data-done="${t(lang, 'Copied', 'הועתק')}">${ICONS.copy}<span>${t(lang, 'Copy the link', 'העתקת הקישור')}</span></button>
 <a class="btn btn-ghost" href="/library/">${t(lang, 'Browse the library', 'לספרייה')}</a>
 </div>
-<div class="link-box"><span class="small">${t(lang, 'Or paste this link into your app’s addon search (Nuvio too):', 'או הדביקו את הקישור הזה בחיפוש התוספים של האפליקציה (גם ב-Nuvio):')}</span><code id="manifest-url" data-origin>${esc(manifestUrl)}</code></div>
+<div class="link-box"><span class="small">${t(lang, 'Or paste this link into your app’s addon search (Nuvio too):', 'או הדביקו את הקישור הזה בחיפוש התוספים של האפליקציה (גם ב-Nuvio):')}</span><code id="manifest-url" data-origin>${manifestUrl}</code></div>
 <ul class="stats" aria-label="${t(lang, 'In the catalog now', 'בקטלוג עכשיו')}">
 <li><strong>${num(totalShows, lang)}</strong><span>${t(lang, 'shows', 'תוכניות')}</span></li>
 <li><strong>${num(totalEpisodes, lang)}</strong><span>${t(lang, 'episodes', 'פרקים')}</span></li>
-${liveCount ? `<li><strong>${num(liveCount, lang)}</strong><span>${t(lang, 'live channels', 'ערוצים בשידור חי')}</span></li>` : ''}
+${liveCount ? html`<li><strong>${num(liveCount, lang)}</strong><span>${t(lang, 'live channels', 'ערוצים בשידור חי')}</span></li>` : ''}
 </ul>
 ${statusChip}
 </div>${lower}</div>
@@ -321,7 +314,7 @@ ${statusChip}
 <div class="rows-grid n${shows.length % 3}">${rowCards}</div>
 ${
   liveCount
-    ? `<h3 style="margin-top:32px">${t(lang, 'Live channels', 'ערוצים בשידור חי')}</h3>
+    ? html`<h3 style="margin-top:32px">${t(lang, 'Live channels', 'ערוצים בשידור חי')}</h3>
 <p class="section-lead">${t(
         lang,
         `With what is on now and next. Apps with a TV-guide screen also get the full programme guide.${helperChannels.length ? ' Channels marked “home helper” play only through your own home helper.' : ''}`,
@@ -340,8 +333,8 @@ ${
 <div class="card"><h3>Stremio</h3><ol class="steps">
 <li><span>${t(
       lang,
-      `Press <a href="${esc(stremio)}" data-stremio>Install in Stremio</a> on this page, on a computer or phone that has Stremio. No Stremio app here? Use <a href="${esc(stremioWeb)}" data-stremio-web>Stremio’s website</a>.`,
-      `לחצו על <a href="${esc(stremio)}" data-stremio>התקנה ב-Stremio</a> בדף הזה, במחשב או בטלפון שמותקן בהם Stremio. אין כאן את האפליקציה? השתמשו ב<a href="${esc(stremioWeb)}" data-stremio-web>אתר של Stremio</a>.`,
+      `Press <a href="${stremio}" data-stremio>Install in Stremio</a> on this page, on a computer or phone that has Stremio. No Stremio app here? Use <a href="${stremioWeb}" data-stremio-web>Stremio’s website</a>.`,
+      `לחצו על <a href="${stremio}" data-stremio>התקנה ב-Stremio</a> בדף הזה, במחשב או בטלפון שמותקן בהם Stremio. אין כאן את האפליקציה? השתמשו ב<a href="${stremioWeb}" data-stremio-web>אתר של Stremio</a>.`,
     )}</span></li>
 <li><span>${t(lang, 'Or: open <strong>Addons</strong> in Stremio, paste the link into the search box and choose <strong>Install</strong>.', 'או: פתחו ב-Stremio את <strong>Addons</strong>, הדביקו את הקישור בתיבת החיפוש ובחרו <strong>Install</strong>.')}</span></li>
 <li><span>${t(lang, 'Signed in to Stremio? It then appears in all your Stremio apps, the TV too.', 'מחוברים לחשבון Stremio? התוסף יופיע בכל האפליקציות שלכם, גם בטלוויזיה.')}</span></li>
@@ -361,7 +354,7 @@ ${
 
 ${
   hasMako || helperChannels.length
-    ? `<section id="helper" aria-labelledby="helper-h"><div class="wrap">
+    ? html`<section id="helper" aria-labelledby="helper-h"><div class="wrap">
 <h2 id="helper-h">${t(lang, 'Keshet 12 and the home helper', 'קשת 12 והעוזר הביתי')}</h2>
 <div class="grid two"><div>
 <p>${t(
@@ -411,7 +404,7 @@ ${
 
 <section id="faq" class="faq" aria-labelledby="faq-h"><div class="wrap">
 <h2 id="faq-h">${t(lang, 'Questions', 'שאלות')}</h2>
-${faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><div class="body"><p>${a}</p></div></details>`).join('')}
+${faq.map(([q, a]) => html`<details><summary>${q}</summary><div class="body"><p>${raw(a)}</p></div></details>`)}
 </div></section>
 
 <section class="alt" aria-labelledby="oss-h"><div class="wrap">

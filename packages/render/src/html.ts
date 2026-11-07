@@ -35,3 +35,7 @@ export function html(strings: TemplateStringsArray, ...values: Child[]): Html {
 
 /** Markup from a trusted source (our own styles, scripts, JSON-LD), put in as it is. */
 export const raw = (s: string) => new Html(s);
+
+/** Items with a separator between them (", " between names). */
+export const join = (items: readonly Child[], separator: Child): Child[] =>
+  items.flatMap((x, i) => (i ? [separator, x] : [x]));

@@ -5,11 +5,11 @@
 
 import { type Health, type StatusCatalog, type StatusFile, sitePaths } from '@israel-tv/core';
 import { style } from './assets.ts';
+import { type Child, type Html, html, join, raw } from './html.ts';
 import { fillChip } from './library-html.ts';
 import { CATALOG_MARK, catalogAppName, catalogName, sourceName } from './names.ts';
 import {
   bdi,
-  esc,
   externalLinks,
   footer,
   head,
@@ -174,7 +174,7 @@ const DAY_WORD: Record<string, string> = {
   none: 'no refresh',
 };
 
-function historyBar(days: string[], values: (Health | null)[] | undefined): string {
+function historyBar(days: string[], values: (Health | null)[] | undefined): Child {
   if (!values?.length) return '';
   const count = (h: Health | null) => values.filter((v) => v === h).length;
   const label = `Last ${values.length} days: ${count('ok')} good, ${count('warn')} with problems, ${count('error')} failed, ${count(null)} without a refresh`;
@@ -182,89 +182,84 @@ function historyBar(days: string[], values: (Health | null)[] | undefined): stri
     new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(
       Date.parse(`${d}T12:00:00Z`),
     );
-  return `<div class="hist-wrap"><div class="hist" role="img" aria-label="${esc(label)}">${values
-    .map(
-      (v, i) =>
-        `<span class="d ${v ?? 'none'}" title="${esc(`${dayLabel(days[i] ?? '')}: ${DAY_WORD[v ?? 'none']}`)}"></span>`,
-    )
-    .join(
-      '',
-    )}</div><div class="hist-legend small muted"><span>${values.length} days ago</span><span>${count('ok')} of ${values.length - count(null)} days fine</span><span>Today</span></div></div>`;
+  return html`<div class="hist-wrap"><div class="hist" role="img" aria-label="${label}">${values.map(
+    (v, i) =>
+      html`<span class="d ${v ?? 'none'}" title="${`${dayLabel(days[i] ?? '')}: ${DAY_WORD[v ?? 'none']}`}"></span>`,
+  )}</div><div class="hist-legend small muted"><span>${values.length} days ago</span><span>${count('ok')} of ${values.length - count(null)} days fine</span><span>Today</span></div></div>`;
 }
 
 /** Source notes shown on a row's card as well as in the details. */
 const VIEWER_NOTE = /bot check|no longer offered/i;
 
-function card(c: StatusCatalog, status: StatusFile, logos: boolean): string {
+function card(c: StatusCatalog, status: StatusFile, logos: boolean): Html {
   const s = status.sources.find((x) => x.source === c.source);
   const st = rowState(c, s, status);
   const live = c.source === 'live';
   // The live row has no single channel: the site's own icon, in the same tile.
   const tile = live
-    ? `<span class="logo-tile" style="--s:44px"><img src="/${sitePaths.faviconSvg}" alt="" width="44" height="44"></span>`
+    ? html`<span class="logo-tile" style="--s:44px"><img src="/${sitePaths.faviconSvg}" alt="" width="44" height="44"></span>`
     : logos
       ? logoTile(CATALOG_MARK[c.id], 44)
       : '';
   const sched = status.schedule;
-  const facts: string[] = [];
+  const facts: Html[] = [];
   if (live) {
     const ch = status.live?.channels ?? [];
-    facts.push(`<li><span>Channels</span><strong>${num(ch.length || c.shows)}</strong></li>`);
-    if (status.live) facts.push(`<li><span>Last checked</span>${when(status.live.at)}</li>`);
+    facts.push(html`<li><span>Channels</span><strong>${num(ch.length || c.shows)}</strong></li>`);
+    if (status.live) facts.push(html`<li><span>Last checked</span>${when(status.live.at)}</li>`);
   } else {
     facts.push(
       c.filling && c.shows === 0
-        ? `<li class="wide">${fillChip(c.filling, 'en')}</li>`
-        : `<li><span>Shows</span><strong>${num(c.shows)}</strong></li><li><span>Episodes</span><strong>${num(c.episodes)}</strong></li>`,
+        ? html`<li class="wide">${fillChip(c.filling, 'en')}</li>`
+        : html`<li><span>Shows</span><strong>${num(c.shows)}</strong></li><li><span>Episodes</span><strong>${num(c.episodes)}</strong></li>`,
     );
     const last = s?.lastFullRun;
     if (last)
       facts.push(
-        `<li><span>${c.source === 'kan' ? 'Last read' : 'Last full refresh'}</span>${
+        html`<li><span>${c.source === 'kan' ? 'Last read' : 'Last full refresh'}</span>${
           last.status === 'running' && c.source !== 'kan' ? 'running now' : when(last.at)
         }</li>`,
       );
-    if (s?.lastAiringRun) facts.push(`<li><span>New episodes checked</span>${when(s.lastAiringRun.at)}</li>`);
+    if (s?.lastAiringRun)
+      facts.push(html`<li><span>New episodes checked</span>${when(s.lastAiringRun.at)}</li>`);
   }
   // Notes a viewer can use as they are (plain words, no ids): Kan's bot check, episodes Kan no longer offers.
   const said = (s?.notes ?? []).filter((n) => VIEWER_NOTE.test(n) && !/iltv_/.test(n));
-  let next = '';
+  let next: Child = '';
   if (c.source === 'kan') next = 'A few pages at a time, all day long.';
   else if (sched?.nextFullRun)
-    next = `${live ? 'Next check' : 'Next full refresh'} <time datetime="${esc(sched.nextFullRun)}" data-daily data-future>${`at ${esc(sched.fullRunTime ?? israelTime(sched.nextFullRun))} Israel time`}</time>${
+    next = html`${live ? 'Next check' : 'Next full refresh'} <time datetime="${sched.nextFullRun}" data-daily data-future>${`at ${sched.fullRunTime ?? israelTime(sched.nextFullRun)} Israel time`}</time>${
       !live && sched.airingChecksPerDay
         ? `; shows on the air are checked for new episodes about ${sched.airingChecksPerDay >= 24 ? 'every hour, more often in the evening' : `${sched.airingChecksPerDay} times a day`}.`
         : '.'
     }`;
-  return `<article class="card row-card" aria-labelledby="row-${esc(c.id)}">
+  return html`<article class="card row-card" aria-labelledby="row-${c.id}">
 <div class="row-head">${tile}
-<div class="row-title"><h3 id="row-${esc(c.id)}">${esc(catalogName(c.id, 'en'))}</h3><span class="muted small"><bdi lang="he" dir="rtl">${esc(catalogAppName(c.id))}</bdi></span></div>
-<span class="pill ${st.level}">${esc(st.label)}</span></div>
-<p class="row-line">${esc(st.line)}</p>
-<ul class="facts">${facts.join('')}</ul>
-${next ? `<p class="small muted next">${next}</p>` : ''}
-${said.length ? `<ul class="small muted said">${said.map((n) => `<li>${esc(n.replace(/^./, (x) => x.toUpperCase()))}.</li>`).join('')}</ul>` : ''}
+<div class="row-title"><h3 id="row-${c.id}">${catalogName(c.id, 'en')}</h3><span class="muted small"><bdi lang="he" dir="rtl">${catalogAppName(c.id)}</bdi></span></div>
+<span class="pill ${st.level}">${st.label}</span></div>
+<p class="row-line">${st.line}</p>
+<ul class="facts">${facts}</ul>
+${next ? html`<p class="small muted next">${next}</p>` : ''}
+${said.length ? html`<ul class="small muted said">${said.map((n) => html`<li>${n.replace(/^./, (x) => x.toUpperCase())}.</li>`)}</ul>` : ''}
 ${historyBar(status.history?.days ?? [], status.history?.sources[c.source])}
 </article>`;
 }
 
-function liveGrid(status: StatusFile, logos: boolean): string {
+function liveGrid(status: StatusFile, logos: boolean): Child {
   const live = status.live;
   if (!live?.channels.length) return '';
   const word = { up: 'Playing', down: 'Not playing', unchecked: 'Not checked' } as const;
   const cls = { up: 'ok', down: 'error', unchecked: 'info' } as const;
-  return `<section aria-labelledby="live-h" class="live"><div class="wrap">
+  return html`<section aria-labelledby="live-h" class="live"><div class="wrap">
 <h2 id="live-h">Live channels</h2>
 <p class="muted">Every live stream is played once a day. Last check: ${when(live.at)}${
     live.abroad ? ', from outside Israel' : ''
   }. Channels marked <strong>home helper</strong> play only through your own <a href="/#helper">home helper</a>.</p>
-<ul class="channels">${live.channels
-    .map(
-      (ch) => `<li class="ch">${logoTile(logos ? { logo: ch.id } : undefined, 40)}
-<span class="ch-name">${bdi(ch.name)}${ch.helper ? '<span class="tag">home helper</span>' : ''}${ch.israelOnly ? '<span class="tag">Israel only</span>' : ''}</span>
+<ul class="channels">${live.channels.map(
+    (ch) => html`<li class="ch">${logoTile(logos ? { logo: ch.id } : undefined, 40)}
+<span class="ch-name">${bdi(ch.name)}${ch.helper ? raw('<span class="tag">home helper</span>') : ''}${ch.israelOnly ? raw('<span class="tag">Israel only</span>') : ''}</span>
 <span class="pill ${cls[ch.state]}">${word[ch.state]}</span></li>`,
-    )
-    .join('')}</ul></div></section>`;
+  )}</ul></div></section>`;
 }
 
 const WARNING_WORDS: Record<string, string> = {
@@ -276,31 +271,29 @@ const WARNING_WORDS: Record<string, string> = {
 const warningWord = (code: string) =>
   WARNING_WORDS[code] ?? code.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
-function detailsBlock(summary: string, body: string, open = false): string {
-  return `<details${open ? ' open' : ''}><summary>${summary}</summary><div class="body">${body}</div></details>`;
+function detailsBlock(summary: Child, body: Child, open = false): Html {
+  return html`<details${open ? raw(' open') : ''}><summary>${summary}</summary><div class="body">${body}</div></details>`;
 }
 
-function contributorDetails(status: StatusFile): string {
-  const parts: string[] = [];
-  const name = (src: string) => esc(sourceName(src));
+function contributorDetails(status: StatusFile): Html[] {
+  const parts: Html[] = [];
+  const name = (src: string) => sourceName(src);
   if (status.publish || status.tmdb)
     parts.push(
       detailsBlock(
         'Publishing and matching',
-        `<ul>${status.publish ? `<li>${esc(status.publish)}</li>` : ''}${status.tmdb ? `<li>${esc(status.tmdb)}</li>` : ''}</ul>`,
+        html`<ul>${status.publish ? html`<li>${status.publish}</li>` : ''}${status.tmdb ? html`<li>${status.tmdb}</li>` : ''}</ul>`,
         true,
       ),
     );
   parts.push(
     detailsBlock(
-      `Shows that could not be refreshed <span class="count">${status.failingShows.length}</span>`,
+      html`Shows that could not be refreshed <span class="count">${status.failingShows.length}</span>`,
       status.failingShows.length
-        ? `<p class="small muted">Their last good episodes are still in the catalog.</p><div class="table-scroll"><table><thead><tr><th>Show</th><th>Problem</th><th>Last good read</th></tr></thead><tbody>${status.failingShows
-            .map(
-              (f) => `<tr><td>${bdi(f.title)}</td><td>${esc(f.error)}</td><td>${when(f.lastOkAt)}</td></tr>`,
-            )
-            .join('')}</tbody></table></div>`
-        : '<p class="muted">None: every show was read in its last refresh.</p>',
+        ? html`<p class="small muted">Their last good episodes are still in the catalog.</p><div class="table-scroll"><table><thead><tr><th>Show</th><th>Problem</th><th>Last good read</th></tr></thead><tbody>${status.failingShows.map(
+            (f) => html`<tr><td>${bdi(f.title)}</td><td>${f.error}</td><td>${when(f.lastOkAt)}</td></tr>`,
+          )}</tbody></table></div>`
+        : raw('<p class="muted">None: every show was read in its last refresh.</p>'),
     ),
   );
   const notes = status.sources.filter((s) => s.notes.length || s.lastFullRun?.error);
@@ -308,17 +301,13 @@ function contributorDetails(status: StatusFile): string {
     parts.push(
       detailsBlock(
         'Notes from the last runs',
-        notes
-          .map(
-            (s) =>
-              `<h3>${name(s.source)}</h3><ul>${[
-                ...(s.lastFullRun?.error ? [`Last run: ${s.lastFullRun.error}`] : []),
-                ...s.notes,
-              ]
-                .map((n) => `<li><bdi dir="auto">${esc(n)}</bdi></li>`)
-                .join('')}</ul>`,
-          )
-          .join(''),
+        notes.map(
+          (s) =>
+            html`<h3>${name(s.source)}</h3><ul>${[
+              ...(s.lastFullRun?.error ? [`Last run: ${s.lastFullRun.error}`] : []),
+              ...s.notes,
+            ].map((n) => html`<li><bdi dir="auto">${n}</bdi></li>`)}</ul>`,
+        ),
       ),
     );
   const blocked = status.sources.filter(
@@ -328,27 +317,23 @@ function contributorDetails(status: StatusFile): string {
     parts.push(
       detailsBlock(
         'Refused by a site’s bot protection',
-        blocked
-          .map(
-            (s) =>
-              `<h3>${name(s.source)}</h3><p>${s.blocked?.pending.length ? `Still waiting (${s.blocked.pending.length}): ${s.blocked.pending.map(bdi).join(', ')}` : 'Nothing waiting.'}${
-                s.blocked?.nextAt ? ` Next try ${when(s.blocked.nextAt, 'en', { future: true })}.` : ''
-              }</p>${s.blocked?.recovered.length ? `<p class="small muted">Read on a retry: ${s.blocked.recovered.map(bdi).join(', ')}</p>` : ''}`,
-          )
-          .join(''),
+        blocked.map(
+          (s) =>
+            html`<h3>${name(s.source)}</h3><p>${s.blocked?.pending.length ? html`Still waiting (${s.blocked.pending.length}): ${join(s.blocked.pending.map(bdi), ', ')}` : 'Nothing waiting.'}${
+              s.blocked?.nextAt ? html` Next try ${when(s.blocked.nextAt, 'en', { future: true })}.` : ''
+            }</p>${s.blocked?.recovered.length ? html`<p class="small muted">Read on a retry: ${join(s.blocked.recovered.map(bdi), ', ')}</p>` : ''}`,
+        ),
       ),
     );
   const empty = status.sources.filter((s) => s.emptyShows?.length);
   if (empty.length)
     parts.push(
       detailsBlock(
-        `Listed by a channel with nothing to watch <span class="count">${empty.reduce((n, s) => n + (s.emptyShows?.length ?? 0), 0)}</span>`,
-        `<p class="small muted">The channel’s site lists these, but has no episodes to play; they are left out of the catalog until it does.</p>${empty
-          .map(
-            (s) =>
-              `<h3>${name(s.source)}</h3><ul class="names" lang="he" dir="rtl">${(s.emptyShows ?? []).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`,
-          )
-          .join('')}`,
+        html`Listed by a channel with nothing to watch <span class="count">${empty.reduce((n, s) => n + (s.emptyShows?.length ?? 0), 0)}</span>`,
+        html`<p class="small muted">The channel’s site lists these, but has no episodes to play; they are left out of the catalog until it does.</p>${empty.map(
+          (s) =>
+            html`<h3>${name(s.source)}</h3><ul class="names" lang="he" dir="rtl">${(s.emptyShows ?? []).map((t) => html`<li>${t}</li>`)}</ul>`,
+        )}`,
       ),
     );
   const a = status.audit;
@@ -356,40 +341,37 @@ function contributorDetails(status: StatusFile): string {
     detailsBlock(
       'Catalog check',
       a
-        ? `<p>${num(a.metas)} shows checked ${when(a.at)}: ${a.problems.length ? `${a.problems.length} kind${a.problems.length === 1 ? '' : 's'} of problem.` : 'no problems.'}</p>${
+        ? html`<p>${num(a.metas)} shows checked ${when(a.at)}: ${a.problems.length ? `${a.problems.length} kind${a.problems.length === 1 ? '' : 's'} of problem.` : 'no problems.'}</p>${
             a.problems.length
-              ? `<div class="table-scroll"><table><thead><tr><th>Check</th><th>Count</th><th>Examples</th></tr></thead><tbody>${a.problems
-                  .map(
-                    (p) =>
-                      `<tr><td>${esc(p.check)}</td><td>${num(p.count)}</td><td>${p.examples.map((x) => `<code>${esc(x)}</code>`).join(' ')}</td></tr>`,
-                  )
-                  .join('')}</tbody></table></div>`
+              ? html`<div class="table-scroll"><table><thead><tr><th>Check</th><th>Count</th><th>Examples</th></tr></thead><tbody>${a.problems.map(
+                  (p) =>
+                    html`<tr><td>${p.check}</td><td>${num(p.count)}</td><td>${join(
+                      p.examples.map((x) => html`<code>${x}</code>`),
+                      ' ',
+                    )}</td></tr>`,
+                )}</tbody></table></div>`
               : ''
           }`
-        : '<p class="muted">Not run yet.</p>',
+        : raw('<p class="muted">Not run yet.</p>'),
     ),
   );
   const groups = new Map<string, StatusFile['warnings']>();
   for (const w of status.warnings) groups.set(w.code, [...(groups.get(w.code) ?? []), w]);
   parts.push(
     detailsBlock(
-      `Recent warnings <span class="count">${status.warnings.length}</span>`,
+      html`Recent warnings <span class="count">${status.warnings.length}</span>`,
       status.warnings.length
-        ? [...groups]
-            .map(
-              ([code, ws]) =>
-                `<details class="inner"><summary>${esc(warningWord(code))} <span class="count">${ws.length}</span></summary><div class="body"><ul class="warn-list">${ws
-                  .map(
-                    (w) =>
-                      `<li><span class="small muted">${when(w.at)}${w.id ? ` · <code>${esc(w.id)}</code>` : ''}</span><br><bdi dir="auto">${esc(w.message)}</bdi></li>`,
-                  )
-                  .join('')}</ul></div></details>`,
-            )
-            .join('')
-        : '<p class="muted">None.</p>',
+        ? [...groups].map(
+            ([code, ws]) =>
+              html`<details class="inner"><summary>${warningWord(code)} <span class="count">${ws.length}</span></summary><div class="body"><ul class="warn-list">${ws.map(
+                (w) =>
+                  html`<li><span class="small muted">${when(w.at)}${w.id ? html` · <code>${w.id}</code>` : ''}</span><br><bdi dir="auto">${w.message}</bdi></li>`,
+              )}</ul></div></details>`,
+          )
+        : raw('<p class="muted">None.</p>'),
     ),
   );
-  return parts.join('');
+  return parts;
 }
 
 const STATUS_CSS = style('status.css');
@@ -415,14 +397,14 @@ function rowsOf(status: StatusFile): StatusCatalog[] {
 }
 
 /** The public status page. */
-export function renderStatusHtml(raw: StatusFile, opts: PublicTextOptions = {}): string {
-  const status = publicStatus(raw, opts);
+export function renderStatusHtml(file: StatusFile, opts: PublicTextOptions = {}): string {
+  const status = publicStatus(file, opts);
   const o = overall(status);
   // The channel tiles are published with the live row.
   const logos = !!status.live;
   const rows = rowsOf(status);
   return externalLinks(
-    `${head(
+    html`${head(
       {
         lang: 'en',
         title: 'Israel TV status: is everything working?',
@@ -434,14 +416,14 @@ export function renderStatusHtml(raw: StatusFile, opts: PublicTextOptions = {}):
 ${topBar('en', siteNav('en', 'status', [{ href: '/#install', label: 'Install', optional: true }]))}
 <main id="main">
 <div class="wrap hero-status">
-<div class="overall ${o.level}" role="status"><div class="dot">${LEVEL_ICON[o.level]}</div>
-<div><h1>${esc(o.title)}</h1><p>${esc(o.detail)}</p></div></div>
+<div class="overall ${o.level}" role="status"><div class="dot">${raw(LEVEL_ICON[o.level])}</div>
+<div><h1>${o.title}</h1><p>${o.detail}</p></div></div>
 <p class="updated">Updated ${when(status.generatedAt)}. Something not playing? <a href="https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml">Tell us</a>.</p>
 </div>
 <section class="rows" aria-labelledby="rows-h"><div class="wrap">
 <h2 id="rows-h">Channels</h2>
-<div class="grid two three">${rows.map((c) => card(c, status, logos)).join('')}</div>
-${status.history ? `<div class="legend" aria-hidden="true"><span><i style="background:var(--ok)"></i>All good</span><span><i style="background:var(--warn)"></i>Some problems</span><span><i style="background:var(--error)"></i>Failed</span><span><i style="background:var(--none)"></i>No refresh</span><span>One bar per day</span></div>` : ''}
+<div class="grid two three">${rows.map((c) => card(c, status, logos))}</div>
+${status.history ? html`<div class="legend" aria-hidden="true"><span><i style="background:var(--ok)"></i>All good</span><span><i style="background:var(--warn)"></i>Some problems</span><span><i style="background:var(--error)"></i>Failed</span><span><i style="background:var(--none)"></i>No refresh</span><span>One bar per day</span></div>` : ''}
 </div></section>
 ${liveGrid(status, logos)}
 <section aria-labelledby="details-h"><div class="wrap">

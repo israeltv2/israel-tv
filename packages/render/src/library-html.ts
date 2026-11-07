@@ -13,10 +13,10 @@ import {
   sitePaths,
 } from '@israel-tv/core';
 import { script, style } from './assets.ts';
+import { type Child, type Html, html, raw } from './html.ts';
 import { CATALOG_MARK } from './names.ts';
 import {
   absolute,
-  esc,
   externalLinks,
   footer,
   head,
@@ -84,13 +84,13 @@ const LIVE_PAGES: Record<string, string> = {
 };
 
 /** A row's first fill, as a short line with a progress bar. */
-export function fillChip(f: { inCatalog: number; known: number }, lang: 'he' | 'en'): string {
+export function fillChip(f: { inCatalog: number; known: number }, lang: 'he' | 'en'): Html {
   const pct = f.known ? Math.min(100, Math.round((f.inCatalog / f.known) * 100)) : 0;
   const text =
     lang === 'he'
       ? `נטען לראשונה: ${num(f.inCatalog, 'he')} מתוך ${num(f.known, 'he')}`
       : `First load: ${num(f.inCatalog)} of ${num(f.known)}`;
-  return `<span class="chip-fill"><span>${text}</span><span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${f.known}" aria-valuenow="${f.inCatalog}" aria-label="${text}"><i style="width:${pct}%"></i></span></span>`;
+  return html`<span class="chip-fill"><span>${text}</span><span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${f.known}" aria-valuenow="${f.inCatalog}" aria-label="${text}"><i style="width:${pct}%"></i></span></span>`;
 }
 
 /** Where each source plays, in a sentence. */
@@ -118,15 +118,18 @@ const vtName = (id: string) => `p-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 export function tile(
   m: MetaPreview,
   opts: { morph?: boolean; eager?: boolean; first?: boolean; width?: number } = {},
-): string {
+): Html {
   const name = plain(m.name);
   const w = opts.width ?? 342;
+  const loading = opts.first ? raw(' fetchpriority="high"') : opts.eager ? '' : raw(' loading="lazy"');
   const img = m.poster
-    ? `<img class="poster" src="${esc(sized(m.poster, w))}" alt="" width="${w}" height="${Math.round(w * 1.5)}"${opts.first ? ' fetchpriority="high"' : opts.eager ? '' : ' loading="lazy"'} decoding="async"${opts.morph ? ` style="view-transition-name:${vtName(m.id)}"` : ''}>`
-    : `<span class="poster blank" aria-hidden="true">${esc(name.slice(0, 1))}</span>`;
+    ? html`<img class="poster" src="${sized(m.poster, w)}" alt="" width="${w}" height="${Math.round(w * 1.5)}"${loading} decoding="async"${
+        opts.morph ? html` style="view-transition-name:${vtName(m.id)}"` : ''
+      }>`
+    : html`<span class="poster blank" aria-hidden="true">${name.slice(0, 1)}</span>`;
   const genres = (m.genres ?? []).map(plain).join('|');
-  return `<a class="tile" href="${showHref(m.id)}"${genres ? ` data-g="${esc(genres)}"` : ''}>${img}<span class="t" dir="auto">${esc(name)}</span>${
-    m.releaseInfo ? `<span class="y">${esc(m.releaseInfo)}</span>` : ''
+  return html`<a class="tile" href="${showHref(m.id)}"${genres ? html` data-g="${genres}"` : ''}>${img}<span class="t" dir="auto">${name}</span>${
+    m.releaseInfo ? html`<span class="y">${m.releaseInfo}</span>` : ''
   }</a>`;
 }
 
@@ -159,14 +162,12 @@ const clock = (ms: number) => clockFmt.format(ms);
  * A channel's guide as a list the page's script keeps current: every programme carries its start and end; the
  * script hides the ones that ended, marks the one on the air (with a progress bar) and shows `shown` at a time.
  */
-export function guideList(rows: GuideRow[], shown = 2): string {
+export function guideList(rows: GuideRow[], shown = 2): Child {
   if (rows.length === 0) return '';
-  return `<ol class="guide" data-guide="${shown}">${rows
-    .map(
-      (r, i) =>
-        `<li data-s="${r[0]}" data-e="${r[1]}"${i >= shown ? ' hidden' : ''}><span class="at">${clock(r[0])}</span><span class="pg" dir="auto">${esc(plain(r[2]))}</span></li>`,
-    )
-    .join('')}</ol>`;
+  return html`<ol class="guide" data-guide="${shown}">${rows.map(
+    (r, i) =>
+      html`<li data-s="${r[0]}" data-e="${r[1]}"${i >= shown ? raw(' hidden') : ''}><span class="at">${clock(r[0])}</span><span class="pg" dir="auto">${plain(r[2])}</span></li>`,
+  )}</ol>`;
 }
 
 const LIBRARY_CSS = style('library.css');
@@ -185,28 +186,27 @@ interface PageOpts {
 }
 
 /** A library page: Hebrew, right to left, the site's header and footer. */
-function page(o: PageOpts, body: string): string {
-  return externalLinks(page0(o, body), 'he');
-}
-
-function page0(o: PageOpts, body: string): string {
-  return `${head(
-    {
-      lang: 'he',
-      title: o.title,
-      description: o.description,
-      path: o.path,
-      ...(o.jsonLd ? { jsonLd: o.jsonLd } : {}),
-      ...(o.image ? { image: o.image } : {}),
-      ...(o.ogType ? { ogType: o.ogType } : {}),
-    },
-    LIBRARY_CSS + (o.css ?? ''),
-  )}<body>
+function page(o: PageOpts, body: Html): string {
+  return externalLinks(
+    html`${head(
+      {
+        lang: 'he',
+        title: o.title,
+        description: o.description,
+        path: o.path,
+        ...(o.jsonLd ? { jsonLd: o.jsonLd } : {}),
+        ...(o.image ? { image: o.image } : {}),
+        ...(o.ogType ? { ogType: o.ogType } : {}),
+      },
+      LIBRARY_CSS + (o.css ?? ''),
+    )}<body>
 ${topBar('he', siteNav('he', o.section), { over: o.over ?? false })}
 <main id="main">${body}</main>
-${footer('he')}${o.script ? `<script>${o.script}</script>` : ''}
+${footer('he')}${o.script ? html`<script>${raw(o.script)}</script>` : ''}
 </body></html>
-`;
+`,
+    'he',
+  );
 }
 
 const rowName = (id: string) => CATALOGS.find((c) => c.id === id)?.name ?? id;
@@ -216,16 +216,17 @@ const episodesOf = (m: Meta) => (m.videos ?? []).length;
 
 const channelLogo = (c: LibraryChannel, size = 56) => logoTile(c.logo ? { logo: c.id } : undefined, size);
 
-function channelCard(c: LibraryChannel, input: LibraryInput, heading: 'h2' | 'h3', full: boolean): string {
+function channelCard(c: LibraryChannel, input: LibraryInput, heading: 'h2' | 'h3', full: boolean): Html {
   const rows = channelGuide(input.guide, c.id);
   const site = LIVE_PAGES[c.id];
-  return `<article class="chan" id="${esc(c.id)}">${channelLogo(c)}
-<${heading} dir="auto">${esc(plain(c.name))}${c.helper ? '<span class="tag">עוזר ביתי</span>' : ''}</${heading}>
-<div>${rows.length ? `<span class="on-air small">בשידור</span>${guideList(rows)}` : '<span class="small muted">אין לוח שידורים לערוץ הזה</span>'}</div>
+  const h = raw(heading);
+  return html`<article class="chan" id="${c.id}">${channelLogo(c)}
+<${h} dir="auto">${plain(c.name)}${c.helper ? raw('<span class="tag">עוזר ביתי</span>') : ''}</${h}>
+<div>${rows.length ? html`<span class="on-air small">בשידור</span>${guideList(rows)}` : raw('<span class="small muted">אין לוח שידורים לערוץ הזה</span>')}</div>
 ${
   full
-    ? `<div class="acts"><a class="btn btn-primary" href="${esc(stremioDetail('tv', c.id))}">${ICONS.play}צפייה ב-Stremio</a>${
-        site ? `<a class="btn btn-plain" href="${esc(site)}" rel="noopener">${ICONS.out}באתר הערוץ</a>` : ''
+    ? html`<div class="acts"><a class="btn btn-primary" href="${stremioDetail('tv', c.id)}">${ICONS.play}צפייה ב-Stremio</a>${
+        site ? html`<a class="btn btn-plain" href="${site}" rel="noopener">${ICONS.out}באתר הערוץ</a>` : ''
       }</div>`
     : ''
 }</article>`;
@@ -237,19 +238,15 @@ function libraryHome(input: LibraryInput): string {
   const shelves = input.rows
     .filter((r) => r.shows.length > 0)
     .map(
-      (r) => `<section class="shelf" aria-labelledby="h-${rowSlug(r.id)}"><div class="wrap">
-<div class="shelf-head"><h2 id="h-${rowSlug(r.id)}">${esc(rowName(r.id))}</h2><span class="count">${countShows(r.shows.length)}</span><a class="all" href="${rowHref(r.id)}">לכל התוכניות</a></div>
-<div class="strip">${r.shows
-        .slice(0, STRIP)
-        .map((s) => tile(s.meta, { width: 220 }))
-        .join('')}</div>
+      (r) => html`<section class="shelf" aria-labelledby="h-${rowSlug(r.id)}"><div class="wrap">
+<div class="shelf-head"><h2 id="h-${rowSlug(r.id)}">${rowName(r.id)}</h2><span class="count">${countShows(r.shows.length)}</span><a class="all" href="${rowHref(r.id)}">לכל התוכניות</a></div>
+<div class="strip">${r.shows.slice(0, STRIP).map((s) => tile(s.meta, { width: 220 }))}</div>
 </div></section>`,
-    )
-    .join('');
+    );
   const live = input.live.length
-    ? `<section class="shelf" aria-labelledby="h-live"><div class="wrap">
+    ? html`<section class="shelf" aria-labelledby="h-live"><div class="wrap">
 <div class="shelf-head"><h2 id="h-live">שידור חי</h2><span class="count">${num(input.live.length, 'he')} ערוצים</span><a class="all" href="/live/">לוח השידורים</a></div>
-<div class="strip live">${input.live.map((c) => channelCard(c, input, 'h3', false)).join('')}</div>
+<div class="strip live">${input.live.map((c) => channelCard(c, input, 'h3', false))}</div>
 </div></section>`
     : '';
   return page(
@@ -271,7 +268,7 @@ function libraryHome(input: LibraryInput): string {
         })),
       },
     },
-    `<div class="wrap page-head"><h1>הספרייה</h1>
+    html`<div class="wrap page-head"><h1>הספרייה</h1>
 <p class="lead">${countShows(total)} ו-${countEpisodes(episodes)} מקשת 12, רשת 13 וכאן. בחרו תוכנית ופתחו אותה באפליקציה.</p>
 <form class="searchbox" action="/search/" method="get" role="search"><input type="search" name="q" placeholder="חיפוש תוכנית" aria-label="חיפוש תוכנית"><button class="btn btn-primary" type="submit">${ICONS.search}חיפוש</button></form>
 </div>${live}${shelves}`,
@@ -313,22 +310,20 @@ function rowPage(r: LibraryRow): string {
         })),
       },
     },
-    `<div class="wrap page-head">
-<nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li>${esc(name)}</li></ol></nav>
-<h1 class="row-title">${mark ? logoTile(mark, 64) : ''}<span>${esc(name)}</span></h1>
-<p class="lead">${countShows(r.shows.length)} ו-${countEpisodes(episodes)}. ${esc(WHERE[r.source] ?? '')}</p>
-${r.filling ? `<p>${fillChip(r.filling, 'he')}</p>` : ''}
+    html`<div class="wrap page-head">
+<nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li>${name}</li></ol></nav>
+<h1 class="row-title">${mark ? logoTile(mark, 64) : ''}<span>${name}</span></h1>
+<p class="lead">${countShows(r.shows.length)} ו-${countEpisodes(episodes)}. ${WHERE[r.source] ?? ''}</p>
+${r.filling ? html`<p>${fillChip(r.filling, 'he')}</p>` : ''}
 ${
   genres.length
-    ? `<nav class="filters" aria-label="סינון לפי סוגה" hidden><a class="chip" href="${rowHref(r.id)}" data-g="" aria-current="true">הכול</a>${genres
-        .map(
-          (g) =>
-            `<a class="chip" href="${rowHref(r.id)}?g=${encodeURIComponent(g)}" data-g="${esc(g)}">${esc(g)}</a>`,
-        )
-        .join('')}</nav>`
+    ? html`<nav class="filters" aria-label="סינון לפי סוגה" hidden><a class="chip" href="${rowHref(r.id)}" data-g="" aria-current="true">הכול</a>${genres.map(
+        (g) =>
+          html`<a class="chip" href="${rowHref(r.id)}?g=${encodeURIComponent(g)}" data-g="${g}">${g}</a>`,
+      )}</nav>`
     : ''
 }
-<div class="tiles">${r.shows.map((s, i) => tile(s.meta, { morph: true, eager: i < 6, first: i === 0 })).join('')}</div>
+<div class="tiles">${r.shows.map((s, i) => tile(s.meta, { morph: true, eager: i < 6, first: i === 0 }))}</div>
 </div>`,
   );
 }
@@ -347,16 +342,16 @@ const dateFmt = new Intl.DateTimeFormat('he-IL', {
   timeZone: 'UTC',
 });
 
-function episodeItem(m: Meta, v: NonNullable<Meta['videos']>[number], named: boolean): string {
+function episodeItem(m: Meta, v: NonNullable<Meta['videos']>[number], named: boolean): Html {
   const title = plain(v.title);
   const shown = named ? title.split(' · ').slice(1).join(' · ') || title : title;
   const still = v.thumbnail
-    ? `<img class="still" src="${esc(sized(v.thumbnail, 400))}" alt="" width="200" height="113" loading="lazy" decoding="async">`
-    : `<span class="still blank" aria-hidden="true">${v.episode ?? ''}</span>`;
+    ? html`<img class="still" src="${sized(v.thumbnail, 400)}" alt="" width="200" height="113" loading="lazy" decoding="async">`
+    : html`<span class="still blank" aria-hidden="true">${v.episode ?? ''}</span>`;
   const date = v.released ? dateFmt.format(Date.parse(v.released)) : '';
-  return `<li class="ep">${still}<h3><a href="${esc(stremioDetail('series', m.id, v.id))}" dir="auto">${esc(shown)}</a></h3>
-<span class="meta">פרק ${num(v.episode ?? 0, 'he')}${date ? ` · <time datetime="${esc(v.released ?? '')}" data-abs>${esc(date)}</time>` : ''}</span>${
-    v.overview ? `<p dir="auto">${esc(plain(v.overview))}</p>` : ''
+  return html`<li class="ep">${still}<h3><a href="${stremioDetail('series', m.id, v.id)}" dir="auto">${shown}</a></h3>
+<span class="meta">פרק ${num(v.episode ?? 0, 'he')}${date ? html` · <time datetime="${v.released ?? ''}" data-abs>${date}</time>` : ''}</span>${
+    v.overview ? html`<p dir="auto">${plain(v.overview)}</p>` : ''
   }</li>`;
 }
 
@@ -388,21 +383,18 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
       .map(plain)
       .map((g) => ({ text: g, href: `${rowHref(row.id)}?g=${encodeURIComponent(g)}` })),
   ].filter((f) => !!f.text);
-  const list = seasons
-    .slice(0, SEASONS_IN_FULL)
-    .map(([n, vs], i) => {
-      const named = n > 100;
-      const long = vs.length > 40;
-      const sorted = [...vs].sort((a, b) => (long ? -1 : 1) * ((a.episode ?? 0) - (b.episode ?? 0)));
-      const shown = sorted.slice(0, EPISODES_PER_SEASON);
-      return `<details class="season"${i === 0 ? ' open' : ''}><summary><span dir="auto">${esc(seasonName(n, vs))}</span><span class="count">${countEpisodes(vs.length)}</span></summary>
-<ol class="eps">${shown.map((v) => episodeItem(m, v, named)).join('')}</ol>${
-        vs.length > shown.length
-          ? `<p class="more">ועוד ${countEpisodes(vs.length - shown.length)} באפליקציה.</p>`
-          : ''
-      }</details>`;
-    })
-    .join('');
+  const list = seasons.slice(0, SEASONS_IN_FULL).map(([n, vs], i) => {
+    const named = n > 100;
+    const long = vs.length > 40;
+    const sorted = [...vs].sort((a, b) => (long ? -1 : 1) * ((a.episode ?? 0) - (b.episode ?? 0)));
+    const shown = sorted.slice(0, EPISODES_PER_SEASON);
+    return html`<details class="season"${i === 0 ? raw(' open') : ''}><summary><span dir="auto">${seasonName(n, vs)}</span><span class="count">${countEpisodes(vs.length)}</span></summary>
+<ol class="eps">${shown.map((v) => episodeItem(m, v, named))}</ol>${
+      vs.length > shown.length
+        ? html`<p class="more">ועוד ${countEpisodes(vs.length - shown.length)} באפליקציה.</p>`
+        : ''
+    }</details>`;
+  });
   const older = seasons.slice(SEASONS_IN_FULL);
   const poster = m.poster ? sized(m.poster, 520) : undefined;
   // Our own artwork is served from this site: share cards and structured data need its full address.
@@ -464,29 +456,31 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
       jsonLd,
       ...(posterUrl ? { image: posterUrl } : {}),
     },
-    `<header class="show-hero">${m.background ? `<img class="bg" src="${esc(sized(m.background, 1280))}" alt="" fetchpriority="low" decoding="async">` : ''}<div class="wrap">
-${poster ? `<img class="poster" src="${esc(poster)}" alt="" width="260" height="390" style="view-transition-name:${vtName(m.id)}">` : '<span></span>'}
+    html`<header class="show-hero">${m.background ? html`<img class="bg" src="${sized(m.background, 1280)}" alt="" fetchpriority="low" decoding="async">` : ''}<div class="wrap">
+${poster ? html`<img class="poster" src="${poster}" alt="" width="260" height="390" style="view-transition-name:${vtName(m.id)}">` : raw('<span></span>')}
 <div>
-<nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li><a href="${rowHref(row.id)}">${esc(rowName(row.id))}</a></li></ol></nav>
-<h1 dir="auto">${esc(name)}</h1>
-<ul class="facts">${facts.map((f) => `<li dir="auto">${f.href ? `<a href="${esc(f.href)}">${esc(f.text)}</a>` : esc(f.text)}</li>`).join('')}</ul>
-${description ? `<p class="desc" dir="auto">${esc(description)}</p>` : ''}
-<div class="acts"><a class="btn btn-primary" href="${esc(stremioDetail('series', m.id))}">${ICONS.play}צפייה ב-Stremio</a>${
+<nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li><a href="${rowHref(row.id)}">${rowName(row.id)}</a></li></ol></nav>
+<h1 dir="auto">${name}</h1>
+<ul class="facts">${facts.map((f) => html`<li dir="auto">${f.href ? html`<a href="${f.href}">${f.text}</a>` : f.text}</li>`)}</ul>
+${description ? html`<p class="desc" dir="auto">${description}</p>` : ''}
+<div class="acts"><a class="btn btn-primary" href="${stremioDetail('series', m.id)}">${ICONS.play}צפייה ב-Stremio</a>${
       site
-        ? `<a class="btn btn-ghost" href="${esc(site)}" rel="noopener">${ICONS.out}לצפייה באתר של ${esc(broadcaster ?? 'הערוץ')}</a>`
+        ? html`<a class="btn btn-ghost" href="${site}" rel="noopener">${ICONS.out}לצפייה באתר של ${broadcaster ?? 'הערוץ'}</a>`
         : ''
     }</div>
 <p class="small">${
-      s.source === 'mako' ? `הפרקים של קשת 12 מתנגנים דרך <a href="${HELPER_DOC}">העוזר הביתי</a> שלכם. ` : ''
-    }הכפתור פותח את התוכנית ב-Stremio, אם Israel TV מותקן שם (<a href="/he/#install">איך מתקינים</a>). ב-Nuvio, אחרי ההתקנה, חפשו "<bdi>${esc(name)}</bdi>".</p>
+      s.source === 'mako'
+        ? html`הפרקים של קשת 12 מתנגנים דרך <a href="${HELPER_DOC}">העוזר הביתי</a> שלכם. `
+        : ''
+    }הכפתור פותח את התוכנית ב-Stremio, אם Israel TV מותקן שם (<a href="/he/#install">איך מתקינים</a>). ב-Nuvio, אחרי ההתקנה, חפשו "<bdi>${name}</bdi>".</p>
 </div></div></header>
 <section class="seasons" aria-labelledby="eps-h"><div class="wrap">
 <h2 id="eps-h">פרקים</h2>
 ${list}${
   older.length
-    ? `<p class="muted">עונות קודמות, באפליקציה:</p><ul class="older">${older
-        .map(([n, vs]) => `<li dir="auto">${esc(seasonName(n, vs))}: ${countEpisodes(vs.length)}</li>`)
-        .join('')}</ul>`
+    ? html`<p class="muted">עונות קודמות, באפליקציה:</p><ul class="older">${older.map(
+        ([n, vs]) => html`<li dir="auto">${seasonName(n, vs)}: ${countEpisodes(vs.length)}</li>`,
+      )}</ul>`
     : ''
 }
 </div></section>`,
@@ -519,10 +513,10 @@ function livePage(input: LibraryInput): string {
         })),
       },
     },
-    `<div class="wrap page-head"><h1>שידור חי</h1>
+    html`<div class="wrap page-head"><h1>שידור חי</h1>
 <p class="lead">${num(input.live.length, 'he')} ערוצים ומה משודר בהם עכשיו, לפי שעון ישראל. ערוצים שמסומנים "עוזר ביתי" מתנגנים רק דרך <a href="${HELPER_DOC}">העוזר הביתי</a>.</p>
 </div>
-<section style="padding-top:24px"><div class="wrap"><div class="channels-grid">${input.live.map((c) => channelCard(c, input, 'h2', true)).join('')}</div></div></section>`,
+<section style="padding-top:24px"><div class="wrap"><div class="channels-grid">${input.live.map((c) => channelCard(c, input, 'h2', true))}</div></div></section>`,
   );
 }
 
@@ -538,7 +532,7 @@ function searchPage(): string {
       section: 'search',
       script: SEARCH_SCRIPT,
     },
-    `<div class="wrap page-head"><h1>חיפוש</h1>
+    html`<div class="wrap page-head"><h1>חיפוש</h1>
 <form class="searchbox" action="/search/" method="get" role="search" onsubmit="return false"><input id="q" type="search" name="q" placeholder="שם התוכנית או הערוץ" aria-label="שם התוכנית או הערוץ" autocomplete="off"></form>
 <p class="results-info" id="info" role="status" aria-live="polite"></p>
 <noscript><p class="note">החיפוש עובד רק עם JavaScript. אפשר לדפדף ב<a href="/library/">ספרייה</a>.</p></noscript>
