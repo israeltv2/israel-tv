@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.6.1](https://github.com/israeltv2/israel-tv/compare/v0.6.0...v0.6.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **kan:** order the queue by unlock cost — trusted shows first, then one-request verdicts, then evidence pages ([#133](https://github.com/israeltv2/israel-tv/issues/133)) ([31019e1](https://github.com/israeltv2/israel-tv/commit/31019e14d8c5c7ac5274d176afb1f57ce1d5477c))
+
 ## [0.6.0](https://github.com/israeltv2/israel-tv/compare/v0.5.0...v0.6.0) (2026-11-07)
 
 
