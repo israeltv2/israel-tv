@@ -254,6 +254,8 @@ test('featured-video titles lose the "watch now" boilerplate', async () => {
     'הסטנדאפ של קובי מימון',
   );
   expect(cleanVodTitle('השוטרים הנוקמים - עמוד הסרט | 12+')).toBe('השוטרים הנוקמים');
+  expect(cleanVodTitle('נוכלת הטינדר | לצפייה ישירה')).toBe('נוכלת הטינדר');
+  expect(cleanVodTitle('אבא. סיפור - יהונתן גפן |')).toBe('אבא. סיפור - יהונתן גפן');
   expect(cleanVodTitle('רק בישראל - ספיישל עצמאות לצפייה ישירה | 12+')).toBe('רק בישראל - ספיישל עצמאות');
   expect(cleanVodTitle('המהדורה המרכזית כ.סמויות 05.11.26 לצפייה ישירה | 12+')).toBe(
     'המהדורה המרכזית כ.סמויות 05.11.26',
