@@ -1,7 +1,7 @@
 // Ingest runs: full (whole index), airing (shows with a recent episode, current season only) and single show.
 // Rules: a failed or thin result never replaces the last good data; it is recorded and shown on /status.
 import { assignNumbers, cleanShow, daysAgo, type ScrapedShow } from '@israel-tv/core';
-import type { Store } from '@israel-tv/store';
+import { STOPPED_FOR_RESTART, type Store } from '@israel-tv/store';
 import type { ShowEntry, SourceAdapter } from './sources.ts';
 
 export interface RunOptions {
@@ -12,6 +12,11 @@ export interface RunOptions {
   log?: (line: string) => void;
   /** The clock (tests). */
   now?: number;
+  /**
+   * Aborted when the service is stopping (a restart): the run finishes the show it is reading, then ends as
+   * `stopped` (not a failure) without starting another.
+   */
+  signal?: AbortSignal;
 }
 
 export interface RunSummary {
@@ -23,7 +28,8 @@ export interface RunSummary {
   blocked?: BlockedShow[];
   /** Shows that failed for any other reason. */
   otherFailures?: number;
-  status: 'ok' | 'partial' | 'failed';
+  /** `stopped`: cut short because the service was stopping (see RunOptions.signal); not a failure. */
+  status: 'ok' | 'partial' | 'failed' | 'stopped';
   showsOk: number;
   showsFailed: number;
   newEpisodes: number;
@@ -227,7 +233,14 @@ async function runShows(
   const blocked: BlockedShow[] = [];
   let otherFailures = 0;
   const list = opts.limit ? entries.slice(0, opts.limit) : entries;
+  let halted = false;
   for (const [i, entry] of list.entries()) {
+    // A safe point: the show before this one is saved, this one not started.
+    if (opts.signal?.aborted) {
+      halted = true;
+      log(`${kind} ${adapter.source}: stopping for a restart after ${i} of ${list.length} shows`);
+      break;
+    }
     try {
       const r = await ingestShow(store, adapter, entry, currentSeasonOnly, runId);
       showsOk++;
@@ -265,9 +278,11 @@ async function runShows(
   // Blocked shows wait for a retry (deferBlocked), so they do not count against the run. Only a wall (stopped after
   // blocks in a row) does: partial when something was read, failed when nothing was.
   const showsFailed = otherFailures + (stoppedEarly ? blocked.length : 0);
-  const status = runStatus(showsOk, showsFailed);
+  const status = halted ? 'stopped' : runStatus(showsOk, showsFailed);
+  if (halted) errors.unshift(`${STOPPED_FOR_RESTART} after ${showsOk + showsFailed} of ${list.length} shows`);
   // A complete full read knows every listed show without episodes; /status lists them (see buildStatus).
-  if (kind === 'full' && !opts.limit && !stoppedEarly) store.setState(emptyShowsKey(adapter.source), empty);
+  if (kind === 'full' && !opts.limit && !stoppedEarly && !halted)
+    store.setState(emptyShowsKey(adapter.source), empty);
   recordBlocks(store, adapter, blocked.length);
   const summary: RunSummary = {
     runId,
@@ -326,6 +341,9 @@ export async function runFull(store: Store, adapter: SourceAdapter, opts: RunOpt
     return fail(`index lists ${entries.length} shows, previously ${previouslyListed}; kept last good data`);
   }
   const summary = await runShows(store, adapter, 'full', entries, opts, false, runId, t0);
+  // A run stopped for a restart read only part of the list: it decides nothing about what is listed or retried
+  // (the next full run does; the daemon starts one at once when the last one was stopped).
+  if (summary.status === 'stopped') return summary;
   if (!opts.limit && summary.status !== 'failed') {
     const ids = entries.map((e) => store.findSeriesId(adapter.source, e.key)).filter((x): x is string => !!x);
     store.syncListed(adapter.source, ids);
@@ -418,6 +436,8 @@ export async function runBlockedRetry(
   const t0 = Date.now();
   const runId = store.startRun('show', `${adapter.source}:retry`);
   const summary = await runShows(store, adapter, 'show', state.pending, opts, false, runId, t0);
+  // Stopped for a restart: shows not reached are not recovered. The retry stays due; the next start schedules it.
+  if (summary.status === 'stopped') return state;
   // A show that now fails for another reason is no longer a block: it shows on /status as a failing show.
   const pending = summary.blocked ?? [];
   const still = new Set(pending.map((b) => b.key));

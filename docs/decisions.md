@@ -1865,3 +1865,50 @@ below.
   it lists before their episodes arrive.
 - Row cards share rows (CSS subgrid): header, counts, where it plays, posters line up across a row of cards. Five
   cards are laid out as two wide and three narrow, four as two by two.
+
+## Round 10, ingest correctness: numbering, Kan retries, bot checks, titles (2026-11-07)
+
+Measured on a copy of the live database and the runs/warnings of the three days before.
+
+- **Printed episode numbers win; seasons numbered against them moved once.** "source-renumbered" (31 warnings in the
+  last Reshet full run, 15 of them on שבוע סוף) was real: viewers saw "פרק 14" as S2E1. Causes: (1) Reshet's
+  Kaltura `EpisodeNumber` was preferred over the title's "פרק N", and it is often a placeholder (every episode 1) or
+  a list position (טלוויזיה מהעתיד 2: the special is 1, "פרק 1" is 2), so a season was numbered in list order;
+  (2) Kan's crawl reads a show over several slices, and an episode without a printed number read before its printed
+  siblings took their number (מלכת השכונה: "מה לא עובד?" took 2, "פרק 2" became 5); (3) Kan re-published an
+  episode under a new page, and the withdrawn page kept its number (השופטים). Fixes: the Reshet reader prefers the
+  title's number and drops a number two episodes of one season claim (חוזרים לפספוסים: a title's 3 next to
+  another episode's Kaltura 3); Kan holds an unnumbered episode back until its show's other pages are read when the
+  show prints numbers (a show's very first episode cannot know yet). The stored numbers were moved by two recorded
+  one-time migrations (`kan-printed-numbers-2026-11-07` at start-up, `reshet-printed-numbers-2026-11-07` after the
+  first full Reshet read with the fixed reader): backup first, one transaction, a `.moves.json` parity list next to
+  the backup and the report in `numbering:migrations:<id>`. Per season (never year seasons, never one whose printed
+  numbers run against the air dates — the rules number those by date): printed numbers are taken; other episodes
+  keep theirs unless a printed one claims it, then go after the season's highest. The owner accepted the one-time
+  watch-progress move. Dry run on the live copy: RESHET_DRY_RUN; Kan 7 episodes in 3 shows (זמן אמת, השופטים,
+  מלכת השכונה). Not moved, on purpose: seasons where Kaltura's numbers are the only evidence and run against the
+  upload dates (e.g. הישרדות 7). Their "air dates" are bulk upload dates (2015-11-0x, 2017-03-28, 2021-01-10,
+  2023-03-30/04-03), so neither order is provable, and Kaltura's numbers were measured reversed in some seasons
+  (משחקי השף 4: 1 is the announcement, 2 the final): the rules' date order stays.
+- **Kan retries converge.** "N Kan shows wait to retry an episode page" kept ~150 slices "partial" in three days:
+  3 shows waited on pages charged by an older reader ("no video player config"), and retries queued behind the
+  whole backlog, so they were never tried again. A due retry now goes first (one page settles it), tries are 6 hours
+  apart (3 tries), and a show waiting for a retry is a note on the slice and on `/status`, not a partial slice;
+  only pages that fail in the slice itself make it partial. Pages given up on are counted on `/status`.
+- **Reshet "Failed query: insert into episodes" (אזור בחירה and 36 more) and "neither a VodPlaylist grid nor a
+  program" (חצות ועוד יותר, שעה חופשית):** both from the first full run (2026-11-06 05:06Z and 05:41Z), before
+  "dedupe repeated episodes" (an entry listed twice inserted twice; test "an episode listed twice by the source is
+  stored once") and "shows without VOD are empty, not failed". None since; re-read today: אזור בחירה reads with 0
+  warnings, שעה חופשית is in the catalog, חצות ועוד יותר is noted as a link to the site's front page.
+- **Reshet's 14 "its page lists no videos" are empty.** Read again 2026-11-07: every page has empty `Base` and
+  `PaginationArray` grids, no Kaltura id anywhere in the page data. Not a geo or access profile: listings read
+  from abroad include Israel-only entries (2,407 Reshet episodes are labelled Israel-only), so the site does not
+  filter its lists by viewer country.
+- **Mako's Radware bot check (`/radware/i` for 4 shows in 3 days)** delays a show and never fails a run: see
+  docs/operations.md "bot protection". Measured from abroad at production pace: 0 blocks in 60 show pages (with
+  and without a kept session); a forced block (script user agent) is a 302 to `validate.perfdrive.com` and a 200
+  block page; a fresh request 0–5 s later passed (2 of 2). The fetcher used to recognise the block page only after
+  its retries, so a block was never retried.
+- **Site text in a title** (iltv_mako_654: "… | סרט דוקומנטרי לצפייה ישירה. makoTV"): Mako's page title carries a
+  search-engine line and the site's name. Removed at the source and by the title cleaner in general; over all
+  38,857 stored episode titles nothing the catalog audit calls site text is left.

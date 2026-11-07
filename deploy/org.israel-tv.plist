@@ -10,6 +10,8 @@
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.israel-tv.plist
   Restart (after an update, or a change to the config or .env):
     launchctl kickstart -k gui/$(id -u)/org.israel-tv
+  A stop lets the work in progress reach a safe point (up to 60 s) and records it as stopped for restart, not failed;
+  ExitTimeOut gives it that time (launchd's default is 20 s, then it kills the process). See docs/operations.md.
   A LaunchAgent (not a daemon) runs in your login session, which Chrome needs for Kan. It runs only while you are
   logged in: after a restart (an update, a power cut) log in, or turn on automatic login (System Settings → Users &
   Groups; not available with FileVault).
@@ -30,6 +32,7 @@
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
     <key>ThrottleInterval</key><integer>10</integer>
+    <key>ExitTimeOut</key><integer>90</integer>
     <key>StandardOutPath</key><string>/path/to/israel-tv/data/launchd.log</string>
     <key>StandardErrorPath</key><string>/path/to/israel-tv/data/launchd.log</string>
 </dict>

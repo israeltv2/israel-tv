@@ -28,6 +28,8 @@ ExecStart=/usr/bin/node apps/ingest/src/cli.ts start
 # Kan episodes on a server without a screen (needs the xvfb package): prefix ExecStart's command with /usr/bin/xvfb-run -a
 Restart=always
 RestartSec=10
+# A stop lets the work in progress reach a safe point (up to 60 s) before it exits (docs/operations.md).
+TimeoutStopSec=90
 
 [Install]
 WantedBy=multi-user.target

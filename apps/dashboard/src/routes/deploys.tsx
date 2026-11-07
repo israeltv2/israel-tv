@@ -1,15 +1,12 @@
 import { useState } from 'react';
 import { ActionButton } from '#components/actions.tsx';
 import { Ago, CopyCommand, Empty, LoadError, PageHeader, SourceTag, Title, When } from '#components/bits.tsx';
-import { HealthPill } from '#components/health.tsx';
+import { HealthPill, runHealth, runLabel } from '#components/health.tsx';
 import { Poster } from '#components/poster.tsx';
 import { Card, CardBody, CardHeader } from '#components/ui/card.tsx';
 import { Skeleton } from '#components/ui/skeleton.tsx';
 import { useApi } from '#lib/api.ts';
 import { duration, num } from '#lib/format.ts';
-
-const runState = (s: string) =>
-  s === 'ok' ? 'ok' : s === 'running' ? 'unknown' : s === 'partial' ? 'warn' : 'error';
 
 function RefreshShow() {
   const [id, setId] = useState('');
@@ -73,7 +70,7 @@ export function Deploys() {
           <CardBody className="space-y-2">
             {d.lastPublish ? (
               <>
-                <HealthPill state={runState(d.lastPublish.status)} label={d.lastPublish.status} />
+                <HealthPill state={runHealth(d.lastPublish.status)} label={runLabel(d.lastPublish.status)} />
                 <div className="text-sm">
                   <When iso={d.lastPublish.at} /> · <Ago iso={d.lastPublish.at} className="text-muted" />
                 </div>
@@ -136,14 +133,14 @@ export function Deploys() {
                     <span
                       className="-start-[21px] absolute top-1.5 size-2.5 rounded-full border-2 border-surface"
                       style={{
-                        background: `var(--${runState(p.status) === 'unknown' ? 'unknown' : runState(p.status)})`,
+                        background: `var(--${runHealth(p.status)})`,
                       }}
                       aria-hidden
                     />
                     <div className="flex flex-wrap items-center gap-x-2 text-sm">
                       <When iso={p.at} />
                       <span className="text-muted text-xs">
-                        {p.status}
+                        {runLabel(p.status)}
                         {p.seconds !== undefined ? ` · ${duration(p.seconds)}` : ''}
                       </span>
                     </div>

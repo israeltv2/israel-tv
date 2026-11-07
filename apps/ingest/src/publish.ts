@@ -90,8 +90,9 @@ export function buildStatus(
     const read = READS[source];
     const shows = all.filter((s) => s.source === source && s.state === 'listed');
     const episodes = shows.reduce((n, s) => n + episodeCount(s.show), 0);
-    const last = store.lastRun(read.kind, source);
-    const airing = store.lastRun('airing', source);
+    // A run stopped for a restart is neither good nor bad: health is judged on the last run that ended by itself.
+    const last = store.lastRun(read.kind, source, { settled: true });
+    const airing = store.lastRun('airing', source, { settled: true });
     const notes: string[] = [];
     let health: Health = 'ok';
     const lastGood =
@@ -102,7 +103,7 @@ export function buildStatus(
           : undefined;
     if (!last) {
       health = 'warn';
-      const limited = store.lastRun(read.kind, `${source}:limited`);
+      const limited = store.lastRun(read.kind, `${source}:limited`, { settled: true });
       notes.push(
         limited
           ? 'only a limited test run (--limit) so far; the full run follows at schedule.fullRun'
@@ -243,12 +244,14 @@ export function buildStatus(
         : {}),
     });
   }
-  const lastMatch = store.lastRun('match', 'tmdb');
+  const lastMatch = store.lastRun('match', 'tmdb', { settled: true });
   const matchNote =
     lastMatch?.status === 'failed'
       ? `last TMDB matching failed (${lastMatch.startedAt}): ${lastMatch.error ?? ''}`
       : undefined;
-  const lastPublish = store.lastRun('publish', 'cloudflare') ?? store.lastRun('publish', 'local');
+  const lastPublish =
+    store.lastRun('publish', 'cloudflare', { settled: true }) ??
+    store.lastRun('publish', 'local', { settled: true });
   const lastGoodPublish = store.lastGoodRun('publish', 'cloudflare') ?? store.lastGoodRun('publish', 'local');
   const publishNote =
     lastPublish?.status === 'failed'
@@ -995,7 +998,9 @@ export async function publishSite(
     log(`publish failed: writing ${config.publisher.dir}: ${(err as Error).message}`);
     return false;
   }
-  const retry = store.lastRun('publish', kind)?.status === 'failed';
+  // A deploy that failed, or that a restart cut short, is retried.
+  const lastStatus = store.lastRun('publish', kind)?.status;
+  const retry = lastStatus === 'failed' || lastStatus === 'stopped';
   // A new version of the data Worker (its router or config) is deployed even when no data changed.
   const originKnown = publicBase(config, store) !== undefined;
   const worker =

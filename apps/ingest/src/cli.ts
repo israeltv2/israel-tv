@@ -1,6 +1,7 @@
 // israel-tv command line. Run `node apps/ingest/src/cli.ts help`.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import {
   apiWorkerName,
@@ -22,7 +23,7 @@ import {
   registerSecretNames,
   stopSignal,
 } from '@israel-tv/runtime';
-import { Store } from '@israel-tv/store';
+import { STOPPED_FOR_RESTART, Store } from '@israel-tv/store';
 import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
 import { crawlKan, kanCrawlOptions } from './kan.ts';
 import { checkLive } from './live.ts';
@@ -69,6 +70,7 @@ const HELP = `israel-tv <command>
   check-proxy                        Check that the geo proxy works and exits in Israel
   match                              Look up TMDB/IMDb ids for shows (needs tmdb in the config)
   status                             Recent runs and warnings
+  idle [--wait SECONDS]              Exit 0 when no run is in progress, 3 when one is (--wait: until one ends)
   paths                              Where the config, the secrets file and the data are on this computer
   urls                               The links to install in your app (as other devices on this network see them)
   events [--play P] [--kind K] [--errors] [--since 2h] [--show S] [--limit N]
@@ -101,6 +103,7 @@ function parseCli(argv: string[]) {
       errors: { type: 'boolean' },
       since: { type: 'string' },
       show: { type: 'string' },
+      wait: { type: 'string' },
     },
   });
 }
@@ -126,6 +129,7 @@ async function main(argv: string[]): Promise<number> {
   const { config } = loadConfig(process.env, {
     needSecrets: ![
       'status',
+      'idle',
       'serve',
       'events',
       'usage',
@@ -305,6 +309,14 @@ async function main(argv: string[]): Promise<number> {
           initialRun: !values['no-initial-run'],
         });
         await stopSignal(logger.log);
+        // A stop (a restart) lets the work in progress reach a safe point and records it as stopped, not failed
+        // (docs/operations.md "Restarting safely"). A second Ctrl-C or stop does not wait.
+        await Promise.race([
+          daemon.shutdown(),
+          stopSignal(logger.log).then(() =>
+            store.stopOpenRuns(`${STOPPED_FOR_RESTART} (stopped again before a safe point)`),
+          ),
+        ]);
         // Relay sessions still open are written before the database closes.
         daemon.sessions.flush(true);
         events.close();
@@ -369,6 +381,25 @@ async function main(argv: string[]): Promise<number> {
         for (const w of store.recentWarnings(10))
           console.log(`warning ${w.seriesId ?? ''} ${w.code}: ${w.message}`);
         return 0;
+      }
+      case 'idle': {
+        // For deploy scripts: wait for a quiet moment before restarting (optional: a stop is safe at any time).
+        const wait = values.wait === undefined ? 0 : Number(values.wait);
+        if (!Number.isFinite(wait) || wait < 0) throw new UserError('--wait takes a number of seconds');
+        const until = Date.now() + wait * 1000;
+        for (;;) {
+          const open = store.openRuns();
+          if (open.length === 0) {
+            console.log('idle: no run in progress');
+            return 0;
+          }
+          if (Date.now() >= until) {
+            for (const r of open)
+              console.log(`busy: ${r.kind} ${r.scope} since ${r.startedAt} (pid ${r.pid})`);
+            return 3;
+          }
+          await sleep(Math.min(5000, Math.max(0, until - Date.now())));
+        }
       }
       case 'events':
         return printEvents(config, values);
