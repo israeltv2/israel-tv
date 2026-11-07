@@ -362,6 +362,8 @@ export function footer(lang: Lang, extra = ''): string {
  * (Reshet's Cloudinary, Kan's own sites); other images are used as they are.
  */
 export function sized(url: string, width: number): string {
+  // Our own copies (art/…) are on this site: a same-site address works before the public address is known.
+  if (url.startsWith(`${ORIGIN_TOKEN}/`)) return url.slice(ORIGIN_TOKEN.length);
   if (/^https:\/\/media\d*\.reshet\.tv\/image\/upload\//.test(url) && !/\/upload\/[a-z]_/.test(url))
     return url.replace('/image/upload/', `/image/upload/w_${width},c_limit,f_auto,q_auto/`);
   if (/^https:\/\/(?:www\.)?kan(?:kids)?\.org\.il\/media\//.test(url)) {

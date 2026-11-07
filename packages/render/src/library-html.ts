@@ -106,16 +106,19 @@ export function tile(
 }
 
 /**
- * A channel's programmes for the guide's first day and a half (it is refreshed daily). Cut by the guide's own start,
+ * A channel's programmes for a day and a half from the guide's start (it is refreshed daily). Cut by the guide's own start,
  * never by the moment of rendering: a page changes only when the guide does, and the page's script shows what is on.
  */
 export const GUIDE_WINDOW_MS = 36 * 3_600_000;
+const GUIDE_STEP_MS = 12 * 3_600_000;
 export function channelGuide(guide: GuideFile | undefined, id: string): GuideRow[] {
   const firsts = Object.values(guide ?? {})
     .map((rows) => rows[0]?.[0])
     .filter((x): x is number => typeof x === 'number');
   if (!firsts.length) return [];
-  const from = Math.min(...firsts);
+  // The guide file drops programmes a few hours after they end, so its first start moves on every refresh: the
+  // window starts at the 12-hour mark before it instead, and the pages change only twice a day.
+  const from = Math.floor(Math.min(...firsts) / GUIDE_STEP_MS) * GUIDE_STEP_MS;
   return (guide?.[id] ?? []).filter((r) => r[1] > from && r[0] < from + GUIDE_WINDOW_MS);
 }
 
@@ -184,7 +187,7 @@ const LIBRARY_CSS = `
 .guide li{display:grid;grid-template-columns:3.2em 1fr;gap:8px;color:var(--muted)}
 .guide li.now{color:var(--fg)}
 .guide li.now .pg{font-weight:600}
-.guide li.now::after{content:"";grid-column:1/-1;height:3px;border-radius:3px;background:linear-gradient(to left,var(--surface-2) calc((1 - var(--p,0))*100%),var(--on-air) 0)}
+.guide li.now::after{content:"";grid-column:1/-1;height:3px;border-radius:3px;background:linear-gradient(to left,var(--on-air) calc(var(--p,0)*100%),var(--surface-2) 0)}
 [dir=ltr] .guide li.now::after{background:linear-gradient(to right,var(--on-air) calc(var(--p,0)*100%),var(--surface-2) 0)}
 .guide .at{font-variant-numeric:tabular-nums}
 .guide.empty{display:none}
@@ -437,7 +440,7 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
   const seasons = [...bySeason].sort((a, b) => lastDate(b[1]).localeCompare(lastDate(a[1])) || b[0] - a[0]);
   const total = episodesOf(m);
   const broadcaster = BROADCASTER[s.source];
-  const site = m.links?.find((l) => l.category === 'Website')?.url;
+  const site = m.links?.find((l) => l.category === 'Website' && /^https?:\/\//.test(l.url))?.url;
   const years = m.releaseInfo;
   const facts = [
     rowName(row.id),
@@ -464,6 +467,8 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
     .join('');
   const older = seasons.slice(SEASONS_IN_FULL);
   const poster = m.poster ? sized(m.poster, 520) : undefined;
+  // Our own artwork is served from this site: share cards and structured data need its full address.
+  const posterUrl = poster?.startsWith('/') ? absolute(poster) : poster;
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -473,7 +478,7 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
         url: absolute(showHref(m.id)),
         inLanguage: 'he',
         ...(description ? { description } : {}),
-        ...(poster ? { image: poster } : {}),
+        ...(posterUrl ? { image: posterUrl } : {}),
         ...(m.genres?.length ? { genre: m.genres.map(plain) } : {}),
         ...(years ? { startDate: years.slice(0, 4) } : {}),
         ...(m.lastAirDate && m.status === 'Ended' ? { endDate: m.lastAirDate } : {}),
@@ -519,7 +524,7 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
       over: true,
       ogType: 'video.tv_show',
       jsonLd,
-      ...(poster ? { image: poster } : {}),
+      ...(posterUrl ? { image: posterUrl } : {}),
     },
     `<header class="show-hero">${m.background ? `<img class="bg" src="${esc(sized(m.background, 1280))}" alt="" fetchpriority="low" decoding="async">` : ''}<div class="wrap">
 ${poster ? `<img class="poster" src="${esc(poster)}" alt="" width="260" height="390" style="view-transition-name:${vtName(m.id)}">` : '<span></span>'}

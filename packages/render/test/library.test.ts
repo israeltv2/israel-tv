@@ -203,3 +203,55 @@ test('sized: the broadcasters’ image services resize; other images are left as
 test('plain drops the direction marks the apps need', () => {
   expect(plain('‫כאן 11‬')).toBe('כאן 11');
 });
+
+test('the guide window moves in 12-hour steps, not with every refresh that drops an old programme', () => {
+  const later: GuideFile = { iltv_live_kan11: (guide.iltv_live_kan11 ?? []).slice(1) };
+  expect(channelGuide(later, 'iltv_live_kan11').map((r) => r[2])).toEqual(['סדרה <טובה>']);
+  // Same window start: a programme 30 hours after the first is still in both.
+  const g: GuideFile = {
+    a: [
+      [T0, T0 + H, 'x'],
+      [T0 + 30 * H, T0 + 31 * H, 'y'],
+    ],
+  };
+  const g2: GuideFile = {
+    a: [
+      [T0 + 2 * H, T0 + 3 * H, 'z'],
+      [T0 + 30 * H, T0 + 31 * H, 'y'],
+    ],
+  };
+  expect(channelGuide(g, 'a').at(-1)?.[2]).toBe('y');
+  expect(channelGuide(g2, 'a').at(-1)?.[2]).toBe('y');
+});
+
+test('our own artwork is a same-site path in pages, and a full address in share cards', () => {
+  expect(sized('{{israel-tv-origin}}/art/iltv_kan_1-poster.jpg', 300)).toBe('/art/iltv_kan_1-poster.jpg');
+  const files = renderLibrary({
+    rows: [
+      {
+        id: 'iltv_kan11',
+        source: 'kan',
+        shows: [
+          {
+            source: 'kan',
+            meta: {
+              id: 'iltv_kan_1',
+              type: 'series',
+              name: 'x',
+              poster: '{{israel-tv-origin}}/art/iltv_kan_1-poster.jpg',
+              links: [{ name: 'Source', category: 'Website', url: 'javascript:alert(1)' }],
+              videos: [],
+            },
+          },
+        ],
+      },
+    ],
+    live: [],
+  });
+  const html = String(files.get(sitePaths.showPage('iltv_kan_1')));
+  expect(html).toContain('src="/art/iltv_kan_1-poster.jpg"');
+  expect(html).toContain(
+    '<meta property="og:image" content="{{israel-tv-origin}}/art/iltv_kan_1-poster.jpg">',
+  );
+  expect(html).not.toContain('javascript:');
+});
