@@ -81,7 +81,7 @@ test('a challenge stops the slice and backs off', async () => {
   const store = Store.open(':memory:');
   const l = loader(routes, new Set(['https://www.kan.org.il/lobby/kan11/']));
   const r = await crawlKan(store, opts(l, 5));
-  expect(r.note).toMatch(/stopped: .*challenge/);
+  expect(r.note).toMatch(/stopped: .*bot check.*next try after/);
   const again = await crawlKan(store, opts(l, 5));
   expect(again).toMatchObject({ pages: 0 });
   expect(again.note).toMatch(/backing off/);
@@ -607,7 +607,7 @@ test('show names stored before cleaning are cleaned in place', async () => {
   expect(store.getShow(row.seriesId)?.title).toBe(row.title);
 });
 
-test('episode pages: newly published first, then shows with the fewest episodes, the archive last', async () => {
+test('episode pages: newly published first, then shows with the fewest episodes, the archive on ties', async () => {
   const { episodeQueue } = await import('../src/kan.ts');
   const store = Store.open(':memory:');
   const show = (catalog: string, pending: number, fresh = 0) => ({
@@ -643,10 +643,9 @@ test('episode pages: newly published first, then shows with the fewest episodes,
     'https://www.kan.org.il/content/archive1/vod/p-4/': show('iltv_kanarchive', 40),
   };
   const order = episodeQueue(store, shows, Date.now(), () => 0).map(([k]) => k.split('/').at(-2));
-  expect(order).toEqual(['p-3', 'p-2', 'p-1']);
-  // Only once nothing else waits does the archive get its turn.
-  const onlyArchive = { 'https://www.kan.org.il/content/archive1/vod/p-4/': show('iltv_kanarchive', 40) };
-  expect(episodeQueue(store, onlyArchive, Date.now(), () => 0)).toHaveLength(1);
+  // The archive show with nothing yet comes before a show that already has episodes, after one in another row
+  // with nothing either (it only loses ties): rows fill side by side instead of the archive waiting for days.
+  expect(order).toEqual(['p-3', 'p-2', 'p-4', 'p-1']);
 });
 
 test('a row still filling is counted: shows in the catalog of those its lobbies list', async () => {
@@ -742,4 +741,58 @@ test('a Kan guide page that is refused never stops the crawl', async () => {
   const r = await crawlKan(store, { ...opts(l, 6), guide: true });
   expect(r.failed).toBeUndefined();
   expect(r.pages).toBe(6);
+});
+
+test('episode pages Kan took down or that hold no video are skipped at once, counted, and never retried', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const special: Record<string, string> = {};
+  const l = {
+    ...base,
+    async load(url: string) {
+      const r = await base.load(url);
+      const m = /\/p-1006421\/s1\/(\d+)\/$/.exec(url);
+      if (!m) return r;
+      // The show's first two episode pages: one taken down (rights ended), one an article with no video.
+      if (Object.keys(special).length < 2 && !special[url])
+        special[url] =
+          Object.keys(special).length === 0 ? 'episode-447786-rights-expired' : 'episode-128487-no-video';
+      const name = special[url];
+      return name ? { status: 200, html: fx(name), challenged: false } : r;
+    },
+  };
+  for (let i = 0; i < 40 && kanEpisodes(store).length < 7; i++) await crawlKan(store, opts(l, 10));
+  expect(kanEpisodes(store)).toHaveLength(7);
+  type S = {
+    shows: Record<string, { removed?: string[]; notVideo?: string[]; retry?: object; failed: string[] }>;
+  };
+  const s = store.getState<S>('kan:crawl')?.shows['https://www.kan.org.il/content/kan/kan-11/p-1006421/'];
+  const [removed, article] = Object.keys(special);
+  expect(s?.removed).toEqual([removed]);
+  expect(s?.notVideo).toEqual([article]);
+  expect(s?.failed).toEqual([]);
+  expect(Object.keys(s?.retry ?? {})).toEqual([]);
+  // No warning blames the layout.
+  const { kanSkippedPages } = await import('../src/kan.ts');
+  expect(kanSkippedPages(store)).toEqual({ removed: 1, notVideo: 1 });
+});
+
+test('a bot check that answers 200 is still a bot check: the slice backs off and nothing is charged', async () => {
+  const store = Store.open(':memory:');
+  const base = loader(routes);
+  const l = {
+    ...base,
+    async load(url: string) {
+      const r = await base.load(url);
+      return /\/s1\/\d+\/$/.test(url)
+        ? { status: 200, html: fx('challenge-turnstile'), challenged: false }
+        : r;
+    },
+  };
+  let r = await crawlKan(store, opts(l, 10));
+  for (let i = 0; i < 5 && !r.failed; i++) r = await crawlKan(store, opts(l, 10));
+  expect(r.note).toMatch(/bot check/);
+  type S = { shows: Record<string, { retry?: object; failed: string[] }> };
+  const shows = Object.values(store.getState<S>('kan:crawl')?.shows ?? {});
+  expect(shows.every((s) => !s.retry || Object.keys(s.retry).length === 0)).toBe(true);
 });

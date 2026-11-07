@@ -26,5 +26,7 @@ catalog:
   drizzle-orm: 1.0.0-rc.5
   jpeg-js: 0.4.4
   hono: 4.13.16
+  # Kan's browser (packages/kan): Playwright without the automation giveaways (docs/decisions.md "Kan's bot check").
+  patchright-core: 1.64.3
   playwright-core: 1.65.0
   zod: 4.6.7

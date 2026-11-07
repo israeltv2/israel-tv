@@ -1,15 +1,17 @@
 # @israel-tv/kan — reads Kan (kan.org.il, kankids.org.il) pages through a real browser
 
-Kan's pages sit behind a Cloudflare challenge that only a real browser passes, and video URLs appear only in
-an episode page's player config. This package holds the browser adapter that loads one page per fresh browser
-context, and the parsers for lobby, show and episode pages. The crawl schedule itself lives in
+Kan's pages sit behind a Cloudflare bot check that only a real browser passes, and video URLs appear only in
+an episode page's player config. This package holds the browser adapter (patchright, one persistent profile; see
+docs/decisions.md "Kan's bot check"), and the parsers for lobby, show and episode pages. The crawl schedule itself lives in
 `apps/ingest` (`src/kan.ts`).
 
 ## Responsibility
 
-- Loading a page in installed Chrome/Edge or a configured Chromium (`playwright-core`), with images, fonts and
-  media blocked, optionally through the geo proxy.
-- Detecting a challenge page instead of content (`isChallenge`), so a block is reported, not parsed as empty.
+- Loading a page in installed Chrome/Edge or a configured Chromium (`patchright-core`, Playwright without the
+  automation giveaways), in a persistent profile, with fonts and media (and unwanted images) blocked, optionally
+  through the geo proxy.
+- Detecting a challenge page instead of content (`isChallenge`), so a block is reported, not parsed as empty;
+  telling an episode page's kind apart (`classifyEpisodePage`: a video, the bot check, removed, not a video).
 - Parsing lobby → show pages → episode pages into links, posters and the episode's HLS URL.
 
 ## Must not
@@ -22,13 +24,15 @@ context, and the parsers for lobby, show and episode pages. The crawl schedule i
 
 ## Inputs and outputs
 
-- `createChromeLoader(browserConfig, proxy?)` — a `PageLoader` that loads one page per fresh browser context.
+- `createChromeLoader(browserConfig, proxy?, { profileDir? })` — a `PageLoader` over one persistent browser profile
+  (a throwaway one without `profileDir`).
 - `browserCandidates(executablePath?)`, `BrowserCandidate` — browsers to try: the configured path, else Chrome, Edge, a Linux Chromium.
 - `PageLoader`, `LoadedPage`, `LoadOptions`, `CapturedImage` — loader types.
 - `KAN_ORIGIN`, `isChallenge(html)` — the site origin and block detection.
 - `parseLobby(html, origin, channelPath)`, `parseLobbyPosters(html)` — show links and posters from a lobby.
 - `parseShowPage(html, showPath)` → `KanShowPage` — title, description, image and `KanEpisodeLink`s.
 - `parseEpisodePage(html, origin?)` → `KanEpisode` — one episode, with its stream URL.
+- `classifyEpisodePage(html, origin?, url?)` → `EpisodePageKind` — the page's kind, with the episode when it is one.
 
 ## Run and test it alone
 
