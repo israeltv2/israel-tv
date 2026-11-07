@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.7.2](https://github.com/israeltv2/israel-tv/compare/v0.7.1...v0.7.2) (2026-11-07)
+
+
+### Bug Fixes
+
+* **site:** polish — nothing clipped, every navigation a real link, icons and arrows right in Hebrew ([#141](https://github.com/israeltv2/israel-tv/issues/141)) ([d42b5f8](https://github.com/israeltv2/israel-tv/commit/d42b5f8ed173e42d63d180ce74c140c89587ecb7))
+
 ## [0.7.1](https://github.com/israeltv2/israel-tv/compare/v0.7.0...v0.7.1) (2026-11-07)
 
 
