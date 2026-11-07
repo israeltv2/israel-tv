@@ -429,7 +429,7 @@ ${
 </ol></div>
 <div class="card"><h3>Nuvio</h3><ol class="steps">
 <li><span>${t(lang, 'Copy the link above.', 'העתיקו את הקישור שלמעלה.')}</span></li>
-<li><span>${t(lang, 'In Nuvio open <strong>Settings → Addons → Add addon</strong>.', 'ב-Nuvio פתחו <strong>Settings ← Addons ← Add addon</strong>.')}</span></li>
+<li><span>${t(lang, 'In Nuvio open <strong>Settings → Addons → Add addon</strong>.', 'ב-Nuvio פתחו <strong dir="ltr">Settings → Addons → Add addon</strong>.')}</span></li>
 <li><span>${t(lang, 'Paste the link and add it. The new rows appear on the home screen.', 'הדביקו את הקישור והוסיפו. השורות החדשות יופיעו במסך הבית.')}</span></li>
 </ol></div>
 </div>

@@ -102,6 +102,30 @@ describe('the library pages', () => {
     expect([...files.keys()].some((p) => p.startsWith('library/kan'))).toBe(false);
   });
 
+  test('everything that navigates is a real link: the channel and genre chips, the genre filters, whole episode rows', () => {
+    const showPage = page(sitePaths.showPage('iltv_mako_1'));
+    // The channel chip links to its row; no navigation hangs on a script.
+    expect(showPage).toMatch(/<ul class="facts"><li dir="auto"><a href="\/library\/keshet12\/">/);
+    expect(showPage).not.toMatch(/onclick=|href="#"|href="javascript:/);
+    // Each episode title's link covers its whole row (still included).
+    expect(showPage).toContain('.ep h3 a::after{content:"";position:absolute;inset:0');
+    const two = input(Date.parse('2026-11-07T09:00:00Z'));
+    two.shows.push(show('iltv_mako_2', 'iltv_keshet12', 'mako', 2, { genres: ['ריאליטי'] }));
+    const row = String(renderSite(two).get(sitePaths.libraryRow('keshet12')));
+    expect(row).not.toContain('<button class="chip"');
+    expect(row).toMatch(/<a class="chip" href="\/library\/keshet12\/\?g=[^"]+" data-g=/);
+  });
+
+  test('icons and arrows read right to left: chevrons drawn with physical borders, directional icons mirrored', () => {
+    const html = page(sitePaths.showPage('iltv_mako_1'));
+    // A mirrored character ("‹") would draw the other way in Hebrew; the separator is drawn and rotated per direction.
+    expect(html).not.toContain('content:"‹"');
+    expect(html).toContain('[dir=rtl] .crumbs li+li::before{transform:rotate(135deg)}');
+    // The disclosure arrow uses physical borders, so the RTL rotation is not applied on top of a flipped shape.
+    expect(html).toMatch(/details>summary::before\{content:"";width:8px;height:8px;border-right:2px/);
+    expect(html).toContain('[dir=rtl] .flip{transform:scaleX(-1)}');
+  });
+
   test('pages are Hebrew, right to left, with the show’s own title, description and canonical address', () => {
     const html = page(sitePaths.showPage('iltv_mako_1'));
     expect(html).toContain('<html lang="he" dir="rtl">');
