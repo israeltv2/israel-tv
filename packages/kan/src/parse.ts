@@ -11,6 +11,8 @@ const decodeEntities = (s: string) =>
     .replace(/&#39;|&#x27;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(Number.parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
     .replace(/&amp;/g, '&');
 
 const stripTags = (s: string) =>
@@ -24,10 +26,18 @@ function meta(html: string, property: string): string | undefined {
   return v ? stripTags(v) : undefined;
 }
 
-/** True when the HTML is a Cloudflare challenge page rather than content. */
+/**
+ * True when the HTML is Cloudflare's bot check (the "רק רגע…" interstitial or its Turnstile checkbox, "ביצוע אימות
+ * אבטחה") rather than content. Kan's normal pages also load one `/cdn-cgi/challenge-platform/…` script (bot
+ * scoring), so that path alone is not a challenge; the challenge's own options object and widget are.
+ */
 export function isChallenge(html: string): boolean {
   return (
-    /<title>\s*(רק רגע|Just a moment)/i.test(html) || /cf-chl|challenge-platform/.test(html.slice(0, 20_000))
+    /<title>\s*(רק רגע|Just a moment|Attention Required)/i.test(html) ||
+    /window\._cf_chl_opt|cf-turnstile|challenges\.cloudflare\.com\/turnstile|id="challenge-(?:form|stage|running)"/.test(
+      html,
+    ) ||
+    /cf-chl/.test(html.slice(0, 20_000))
   );
 }
 
@@ -158,6 +168,90 @@ export interface KanEpisode {
   published?: string;
   /** The player config's `subtitles`, as Kan gives it, when not empty (its shape is not known yet: measured). */
   subtitles?: unknown;
+}
+
+/**
+ * What an episode page turned out to be. Only `episode` has a video; the others are told apart so each is handled
+ * on its own terms (measured 2026-11-07 on the pages that had been reported as "no player config"):
+ * - `challenge`: Cloudflare's bot check came back instead of the page (retry later; never the page's fault);
+ * - `removed`: Kan took the video down when its broadcast rights ended ("בשל הסכמי זכויות שידור, … כבר לא זמין
+ *   לצפייה", a `rights-expired` overlay where the player was);
+ * - `not-video`: an article or promo page linked among the episodes, with no video at all (an empty contentUrl);
+ * - `unknown`: none of these — possibly a layout change (retried, then given up, visibly).
+ */
+export type EpisodePageKind =
+  | { kind: 'episode'; episode: KanEpisode }
+  | { kind: 'challenge' }
+  | { kind: 'removed' }
+  | { kind: 'not-video' }
+  | { kind: 'unknown' };
+
+export function classifyEpisodePage(
+  html: string,
+  origin: string = KAN_ORIGIN,
+  url?: string,
+): EpisodePageKind {
+  if (isChallenge(html)) return { kind: 'challenge' };
+  if (/class="rights-expired[" ]/.test(html)) return { kind: 'removed' };
+  const episode = parseEpisodePage(html, origin) ?? (url ? parseVideoObject(html, url) : undefined);
+  if (episode) return { kind: 'episode', episode };
+  const video = videoObject(html);
+  if (video && !video.contentUrl) return { kind: 'not-video' };
+  return { kind: 'unknown' };
+}
+
+/** The page's schema.org VideoObject (Kan describes every episode page with one), if any. */
+function videoObject(
+  html: string,
+):
+  | { name?: string; description?: string; contentUrl?: string; thumbnailUrl?: string; uploadDate?: string }
+  | undefined {
+  for (const m of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+    let v: unknown;
+    try {
+      v = JSON.parse(m[1] ?? '');
+    } catch {
+      continue;
+    }
+    if (v && typeof v === 'object' && (v as { '@type'?: unknown })['@type'] === 'VideoObject') {
+      const o = v as Record<string, unknown>;
+      const str = (k: string) =>
+        typeof o[k] === 'string' && o[k] ? decodeEntities(o[k] as string).trim() : undefined;
+      const out: Record<string, string> = {};
+      for (const k of ['name', 'description', 'contentUrl', 'thumbnailUrl', 'uploadDate']) {
+        const s = str(k);
+        if (s) out[k] = s;
+      }
+      return out;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * An episode from the page's VideoObject when the page has no player config but still names a Redge HLS URL (a
+ * player that failed to render, or a new player): the same stream the player would play. Its id is the page id.
+ */
+function parseVideoObject(html: string, url: string): KanEpisode | undefined {
+  const v = videoObject(html);
+  const id = /\/(\d+)\/?$/.exec(new URL(url).pathname)?.[1];
+  if (!v?.contentUrl || !id || !/^https:\/\/[^/]+\.cdn-redge\.media\/.+\.m3u8/.test(v.contentUrl))
+    return undefined;
+  // "<series> | <episode title>" (the page's title form).
+  const parts = (v.name ?? '').split(' | ');
+  const title = (parts.length > 1 ? parts.slice(1).join(' | ') : (parts[0] ?? '')).trim();
+  const season = /\/s(\d+)\/\d+\/?$/.exec(new URL(url).pathname)?.[1];
+  const published = /"(?:datePublished|uploadDate)"\s*:\s*"(\d{4}-\d{2}-\d{2})/.exec(html)?.[1];
+  return {
+    id,
+    title,
+    hls: v.contentUrl,
+    ...(season ? { seasonNumber: Number(season) } : {}),
+    ...(parts.length > 1 && parts[0] ? { seriesName: parts[0].trim() } : {}),
+    ...(v.thumbnailUrl ? { poster: v.thumbnailUrl } : {}),
+    ...(v.description ? { description: v.description } : {}),
+    ...(published ? { published } : {}),
+  };
 }
 
 const hasValue = (v: unknown) =>

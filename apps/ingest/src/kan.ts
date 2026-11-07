@@ -24,12 +24,13 @@ import {
   zonedDay,
 } from '@israel-tv/core';
 import {
+  classifyEpisodePage,
   cleanKanTitle,
   createChromeLoader,
+  type KanEpisode,
   type LoadedPage,
   type LoadOptions,
   type PageLoader,
-  parseEpisodePage,
   parseLobby,
   parseLobbyPosters,
   parseShowPage,
@@ -81,7 +82,7 @@ export const KAN_LOBBIES: KanLobby[] = [
   },
 ];
 
-/** Rows whose episodes are read only when no other Kan show has pages waiting (a large back catalogue). */
+/** Rows with a large back catalogue: their show pages come after the others' in a slice, and they lose ties. */
 export const KAN_LATER = new Set(['iltv_kanarchive']);
 
 interface ShowState {
@@ -97,6 +98,10 @@ interface ShowState {
   failed: string[];
   /** Episode pages that are trailers, not episodes; kept so they never re-enter the queue. */
   skipped?: string[];
+  /** Episode pages whose video Kan took down (broadcast rights ended); counted on /status, never queued again. */
+  removed?: string[];
+  /** Pages linked among the episodes that hold no video (articles, promos); likewise. */
+  notVideo?: string[];
   /** Last time a re-read of the show page found new episode links (not set by the first read). */
   lastNewAt?: string;
   /** Episode pages found as new on a re-read (newly published), as opposed to the first fill's backlog. */
@@ -141,6 +146,8 @@ interface CrawlState {
 const GUIDE_EVERY_MS = 12 * HOUR_MS;
 
 const STATE_KEY = 'kan:crawl';
+/** How a Cloudflare bot check is reported: Kan's site asked us to prove we are a person; we wait and try later. */
+const BOT_CHECK = "blocked by Kan's bot check (Cloudflare)";
 /** Browser errors that mean the connection is down (proxy, network, browser), not that one page is broken. */
 const CONNECTION_DOWN =
   /ERR_PROXY|ERR_TUNNEL|ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE|ERR_SOCKS|Target (page, context or browser )?closed|browser has been closed/i;
@@ -211,7 +218,7 @@ export function kanEpisodeKey(e: { id: string }): string {
 }
 
 /** Kan VOD is geo-blocked outside Israel per title, nearly always (measured): labelled Israel-only. */
-export function toEpisode(e: ReturnType<typeof parseEpisodePage> & object): ScrapedEpisode {
+export function toEpisode(e: KanEpisode): ScrapedEpisode {
   return {
     key: kanEpisodeKey(e),
     title: e.title,
@@ -301,6 +308,23 @@ export async function crawlKan(
   const origin = (url: string) => new URL(url).origin;
   const warn = (seriesId: string | null | undefined, message: string) =>
     store.addWarnings(runId, seriesId ?? null, [{ code: 'source-note', message }]);
+  /** Show images Kan refused in this slice, by reason: one line per reason at the end, not one per show. */
+  const refusedArt = new Map<string, string[]>();
+  const refuseArt = (key: string, why: string) => refusedArt.set(why, [...(refusedArt.get(why) ?? []), key]);
+  const reportArt = () => {
+    for (const [why, keys] of refusedArt) {
+      const what = why === 'bot check' ? "refused by Kan's bot check (Cloudflare)" : `refused (${why})`;
+      const sample = keys
+        .slice(0, 3)
+        .map((k) => new URL(k).pathname)
+        .join(', ');
+      warn(
+        null,
+        `Kan: ${keys.length} show ${keys.length === 1 ? 'image' : 'images'} ${what}; tried again within ${ART_RETRY_MS / 3_600_000} hours (e.g. ${sample})`,
+      );
+    }
+    refusedArt.clear();
+  };
   /** A server error: the first on a site may be that page's problem; two in a row mean the site is down. */
   const serverError = (url: string, message: string): never => {
     const site = origin(url);
@@ -341,7 +365,7 @@ export async function crawlKan(
     }
     // Challenges and proxy refusals: the slice stops and backs off, and no page is charged for them.
     if (r.challenged || r.status === 403 || r.status === 407) {
-      const why = r.challenged ? 'Cloudflare challenge did not clear' : `HTTP ${r.status}`;
+      const why = r.challenged ? BOT_CHECK : `HTTP ${r.status}`;
       throw new KanLoadError(`${url}: ${why}`, 'outage');
     }
     if (r.status === 429 || r.status >= 500) return serverError(url, `${url}: HTTP ${r.status}`);
@@ -456,7 +480,7 @@ export async function crawlKan(
             show.lobbyPoster = new URL(poster, l.origin).toString();
             show.image = show.lobbyPoster;
             const img = captured.get(show.lobbyPoster);
-            if (img && opts.artworkDir && saveArtwork(show, key, img, opts.artworkDir, warn)) artSaved++;
+            if (img && opts.artworkDir && saveArtwork(show, key, img, opts.artworkDir, refuseArt)) artSaved++;
           }
         }
       }
@@ -506,17 +530,16 @@ export async function crawlKan(
     const showBudget = waiting ? Math.ceil(opts.pagesPerRun / 2) : opts.pagesPerRun;
     // Refresh requests first, made due now; then everything else in order.
     const prio = new Set((opts.priority ?? []).filter((k) => state.shows[k]));
-    const order = [...prio, ...Object.keys(state.shows).filter((k) => !prio.has(k))];
-    // The archive's show pages wait, like its episodes, until the other rows have nothing left to read.
-    const othersWaiting = Object.values(state.shows).some(
-      (x) => !KAN_LATER.has(x.catalog) && x.pending.length > 0,
-    );
+    // The archive's show pages come after the other rows' due ones (they are read once, then weekly), but they
+    // never wait for the other rows' whole backlog: that starved the archive row for days (0 of 171 shows).
+    const rest = Object.keys(state.shows).filter((k) => !prio.has(k));
+    const later = (k: string) => KAN_LATER.has(state.shows[k]?.catalog ?? '');
+    const order = [...prio, ...rest.filter((k) => !later(k)), ...rest.filter(later)];
     for (const key of order) {
       const s = state.shows[key];
       if (!s) continue;
       if (pages >= showBudget && !prio.has(key)) break;
       if (!prio.has(key) && !showDue(s, now, opts.airingWindowDays)) continue;
-      if (!prio.has(key) && othersWaiting && KAN_LATER.has(s.catalog)) continue;
       const id = store.findSeriesId('kan', key);
       const firstRead = !s.checkedAt;
       const path = new URL(key).pathname;
@@ -552,7 +575,8 @@ export async function crawlKan(
         continue;
       }
       s.checkedAt = new Date().toISOString();
-      if (opts.artworkDir && lastImage && saveArtwork(s, key, lastImage, opts.artworkDir, warn)) artSaved++;
+      if (opts.artworkDir && lastImage && saveArtwork(s, key, lastImage, opts.artworkDir, refuseArt))
+        artSaved++;
       readShows.push(key);
       attemptedShows.push(key);
       if (page.title) s.title = page.title;
@@ -562,7 +586,13 @@ export async function crawlKan(
       const known = new Set(
         id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes.map((e) => e.key)) ?? []) : [],
       );
-      const seenBefore = new Set([...s.pending, ...s.failed, ...(s.skipped ?? [])]);
+      const seenBefore = new Set([
+        ...s.pending,
+        ...s.failed,
+        ...(s.skipped ?? []),
+        ...(s.removed ?? []),
+        ...(s.notVideo ?? []),
+      ]);
       const dated = new Set(
         id
           ? (store
@@ -577,7 +607,12 @@ export async function crawlKan(
       if (s.undated.length === 0) delete s.undated;
       // Pages given up on (after several tries) stay given up: they never re-enter the ordered queue, where
       // they would hold back newer episodes and, if they ever loaded, be numbered after them.
-      const gaveUp = new Set([...s.failed, ...(s.skipped ?? [])]);
+      const gaveUp = new Set([
+        ...s.failed,
+        ...(s.skipped ?? []),
+        ...(s.removed ?? []),
+        ...(s.notVideo ?? []),
+      ]);
       s.pending = page.episodes
         .map((e) => `${s.origin}${e.path}`)
         .filter((u) => !known.has(kanEpisodeKey({ id: String(/(\d+)\/$/.exec(u)?.[1]) })) && !gaveUp.has(u));
@@ -631,9 +666,9 @@ export async function crawlKan(
             warn(seriesId, `Kan episode ${url}: ${message} (${outcome})`);
             return goOn;
           };
-          let e: ReturnType<typeof parseEpisodePage>;
+          let page: ReturnType<typeof classifyEpisodePage>;
           try {
-            e = parseEpisodePage(await load(url, 'episode'), origin(url));
+            page = classifyEpisodePage(await load(url, 'episode'), origin(url), url);
           } catch (err) {
             const message = (err as Error).message;
             const charged = { goOn: false };
@@ -642,10 +677,23 @@ export async function crawlKan(
             if (!charged.goOn) break; // the show waits for this page
             continue;
           }
-          if (!e) {
-            if (!chargeEpisode('no video player config on the page (layout changed?)')) break;
+          // The bot check is never the page's fault (the loader normally reports it; this catches a variant).
+          if (page.kind === 'challenge') throw new KanLoadError(`${url}: ${BOT_CHECK}`, 'outage');
+          // Taken down by Kan (rights ended) or not a video at all: nothing to wait for or retry. Kept, counted
+          // on /status, never queued again.
+          if (page.kind === 'removed' || page.kind === 'not-video') {
+            delete s.retry?.[url];
+            const list = page.kind === 'removed' ? 'removed' : 'notVideo';
+            s[list] = [...new Set([...(s[list] ?? []), url])];
+            if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
+            s.pending.shift();
             continue;
           }
+          if (page.kind === 'unknown') {
+            if (!chargeEpisode('the page has no video player and no sign why (layout changed?)')) break;
+            continue;
+          }
+          const e = page.episode;
           if (e.subtitles !== undefined) noteSubtitles(url, e.subtitles);
           // A trailer is not an episode: remembered, so its page never re-enters the queue as "new".
           if (isTrailer(e.title)) {
@@ -674,7 +722,8 @@ export async function crawlKan(
       while (s.undated?.length && pages < opts.pagesPerRun) {
         const url = s.undated.shift() as string;
         try {
-          const e = parseEpisodePage(await load(url, 'episode'), origin(url));
+          const r = classifyEpisodePage(await load(url, 'episode'), origin(url), url);
+          const e = r.kind === 'episode' ? r.episode : undefined;
           if (e?.published) dates.set(kanEpisodeKey(e), e.published);
           if (e?.subtitles !== undefined) noteSubtitles(url, e.subtitles);
         } catch (err) {
@@ -732,6 +781,7 @@ export async function crawlKan(
       error: note,
     });
   } finally {
+    reportArt();
     store.setState(STATE_KEY, state);
     if (!opts.loader) await loader?.close();
   }
@@ -787,7 +837,7 @@ export function stillFilling(p: KanRowProgress | undefined): boolean {
 /**
  * The order shows get their episode pages read in: newly published episodes first (an airing show stays current);
  * then shows with the fewest episodes so far, so the first fill makes every show watchable before it completes any
- * long back catalogue (Tehran waited behind shows with 100 pages); the archive row last. Ties keep the lobby order.
+ * long back catalogue (Tehran waited behind shows with 100 pages); the archive row breaks ties. Ties keep the lobby order.
  */
 export function episodeQueue(
   store: Pick<Store, 'findSeriesId' | 'getShow'>,
@@ -803,7 +853,7 @@ export function episodeQueue(
   const rank = new Map(
     ready.map(([key, s], i) => [
       key,
-      [KAN_LATER.has(s.catalog) ? 1 : 0, s.fresh?.length ? 0 : 1, have(key), i] as const,
+      [s.fresh?.length ? 0 : 1, have(key), KAN_LATER.has(s.catalog) ? 1 : 0, i] as const,
     ]),
   );
   const cmp = (a: string, b: string) => {
@@ -812,10 +862,9 @@ export function episodeQueue(
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return (x[i] ?? 0) - (y[i] ?? 0);
     return 0;
   };
-  const later = ready.filter(([, s]) => KAN_LATER.has(s.catalog));
-  const first = ready.filter(([, s]) => !KAN_LATER.has(s.catalog));
-  // The archive waits until nothing else has pages to read.
-  return (first.length > 0 ? first : later).sort(([a], [b]) => cmp(a, b));
+  // Every row fills side by side: a show with fewer episodes comes first whatever its row (the archive only breaks
+  // ties), so each archive show gets watchable early instead of after the other rows' whole backlog.
+  return ready.sort(([a], [b]) => cmp(a, b));
 }
 
 function saveEpisodes(store: Store, key: string, s: ShowState, batch: BatchItem[], runId: number): number {
@@ -924,11 +973,11 @@ function saveArtwork(
   key: string,
   image: NonNullable<LoadedPage['image']>,
   dir: string,
-  warn: (seriesId: string | null | undefined, message: string) => void,
+  refused: (key: string, why: string) => void,
 ): boolean {
   s.artTriedAt = new Date().toISOString();
   if (!image.jpeg || image.jpeg.length < 1000) {
-    warn(null, `Kan ${key}: could not copy its image (${image.error ?? `HTTP ${image.status}`})`);
+    refused(key, image.challenged ? 'bot check' : (image.error ?? `HTTP ${image.status}`));
     return false;
   }
   mkdirSync(dir, { recursive: true });
@@ -945,6 +994,15 @@ export function kanArtwork(store: Store, dir: string): Map<string, string> {
     if (s.art && existsSync(join(dir, s.art.file))) out.set(key, join(dir, s.art.file));
   }
   return out;
+}
+
+/** Episode pages skipped because Kan took the video down (rights ended) or the page holds no video. */
+export function kanSkippedPages(store: Pick<Store, 'getState'>): { removed: number; notVideo: number } {
+  const shows = Object.values(store.getState<CrawlState>(STATE_KEY)?.shows ?? {});
+  return {
+    removed: shows.reduce((n, s) => n + (s.removed?.length ?? 0), 0),
+    notVideo: shows.reduce((n, s) => n + (s.notVideo?.length ?? 0), 0),
+  };
 }
 
 /** The Kan crawl's progress, for the dashboard: episode pages still to read, shows known, back-off. */

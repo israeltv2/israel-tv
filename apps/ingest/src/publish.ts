@@ -27,7 +27,14 @@ import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { auditSite } from './catalog-audit.ts';
 import { guideFile } from './epg.ts';
-import { KAN_LATER, kanArtwork, kanArtworkDir, kanRowProgress, stillFilling } from './kan.ts';
+import {
+  KAN_LATER,
+  kanArtwork,
+  kanArtworkDir,
+  kanRowProgress,
+  kanSkippedPages,
+  stillFilling,
+} from './kan.ts';
 import { LIVE_CHECK_KEY, type LiveCheck, liveRender } from './live.ts';
 import { checkNumbering } from './numbering-guard.ts';
 import { localPoster, measurePosters, posterDir, reachableAbroad, remotePoster } from './posters.ts';
@@ -142,6 +149,16 @@ export function buildStatus(
           `first fill of ${catalog} (${name}) in progress: ${p.inCatalog} of ${p.known} shows in the catalog, ${p.backlog} episode pages to read`,
         );
       }
+      // Pages Kan lists as episodes with nothing to play: expected, explained, not a warning.
+      const skipped = kanSkippedPages(store);
+      if (skipped.removed > 0)
+        notes.push(
+          `${skipped.removed} Kan episodes are no longer offered by Kan (their broadcast rights ended), so they are not in the catalog`,
+        );
+      if (skipped.notVideo > 0)
+        notes.push(
+          `${skipped.notVideo} pages Kan lists among episodes are articles or promos without video (skipped)`,
+        );
     }
     // Listed by the site with nothing to watch: a count here, the titles in `emptyShows` (an expandable list).
     const empty = store.getState<string[]>(emptyShowsKey(source)) ?? [];

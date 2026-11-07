@@ -23,6 +23,8 @@ export interface CapturedImage {
   status: number;
   jpeg?: Uint8Array;
   error?: string;
+  /** Refused by Cloudflare's bot check (`cf-mitigated: challenge`), not missing. */
+  challenged?: boolean;
 }
 
 export interface LoadOptions {
@@ -199,6 +201,7 @@ function loaderFor(browser: Browser): PageLoader {
             answer = (await response) ?? answer;
           }
           const answered = answer?.status() ?? 0;
+          const challenged = answer?.headers()['cf-mitigated'] === 'challenge';
           let got: { status: number; b64?: string; error?: string } = { status: answered };
           if (answer && answered === 200) {
             const body = await answer.body();
@@ -214,6 +217,7 @@ function loaderFor(browser: Browser): PageLoader {
             status: got.status,
             ...(got.b64 ? { jpeg: Buffer.from(got.b64, 'base64') } : {}),
             ...(got.error ? { error: got.error } : {}),
+            ...(challenged ? { challenged: true } : {}),
           };
         };
         const image = src ? await capture(src) : undefined;
