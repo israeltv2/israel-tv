@@ -1,5 +1,5 @@
 // The small files search engines and browsers ask for: robots.txt, sitemap.xml and the web app manifest. Only the
-// pages (landing in two languages, status) are for indexing; the addon's JSON and data paths are not.
+// pages (landing in two languages, status, the library) are for indexing; the addon's JSON and data paths are not.
 import { sitePaths } from '@israel-tv/core';
 import { absolute, BRAND } from './page.ts';
 
@@ -15,7 +15,8 @@ Sitemap: ${absolute(sitePaths.sitemap)}
 `;
 }
 
-export function sitemapXml(): string {
+/** The sitemap: the home page in both languages, the status page and, given, the library's pages. */
+export function sitemapXml(library: string[] = []): string {
   const page = (path: string, alternates: boolean, priority: string) =>
     `<url><loc>${absolute(path)}</loc>${
       alternates
@@ -27,6 +28,7 @@ export function sitemapXml(): string {
 ${page('', true, '1.0')}
 ${page('he/', true, '0.9')}
 ${page('status', false, '0.5')}
+${library.map((p) => page(p, false, p.startsWith('show/') ? '0.6' : '0.8')).join('\n')}
 </urlset>
 `;
 }
@@ -39,8 +41,8 @@ export function webManifest(): string {
     start_url: '/',
     scope: '/',
     display: 'browser',
-    background_color: BRAND.navy,
-    theme_color: BRAND.navy,
+    background_color: BRAND.night,
+    theme_color: BRAND.night,
     icons: [
       { src: `/${sitePaths.icon192}`, sizes: '192x192', type: 'image/png' },
       { src: `/${sitePaths.icon512}`, sizes: '512x512', type: 'image/png' },

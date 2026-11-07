@@ -1,4 +1,4 @@
-// The public pages' icons, share image and header picture (made from the branding by `pnpm images:site` into
+// The public pages' icons, share image, header picture and fonts (made from the branding by `pnpm images:site` into
 // assets/site). An operator's own copy of a file in `<branding.dir>/site/` replaces the bundled one.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,6 +16,7 @@ export const SITE_IMAGES = [
   sitePaths.iconMaskable,
   sitePaths.shareImage,
   sitePaths.heroImage,
+  ...sitePaths.fonts,
 ] as const;
 
 export function siteImages(brandingDir?: string): Map<string, Uint8Array> {

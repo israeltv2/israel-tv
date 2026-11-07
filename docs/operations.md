@@ -92,6 +92,30 @@ deploy reported; otherwise (the local publisher, or the very first deploy) the s
 was asked on. To look at the pages without a database: `pnpm shots:site` (screenshots at phone and desktop width,
 light and dark, into `site-screens/`) or `pnpm shots:site --serve` (http://127.0.0.1:7790/).
 
+### The library on the website
+
+The website also has the catalog itself, in Hebrew, rendered with everything else at publish time
+(`packages/render/src/library-html.ts`):
+
+| Address              | What it shows                                                                                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/library/`          | Every row as a strip of posters, the live channels with what is on now, and a search box.                                                                                  |
+| `/library/<row>/`    | A row's shows (`keshet12`, `reshet13`, `kan11`, `kankids`, `kanarchive`), newest first, with a genre filter.                                                               |
+| `/show/<series id>/` | One show: poster, picture, description, genres, years, its seasons and episodes (60 per season, the newest of a long one), "Watch in Stremio", the broadcaster's own page. |
+| `/live/`             | Every live channel with now and next from the programme guide, "Watch in Stremio" and the channel's own live page where known.                                             |
+| `/search/`           | Search over `search.json`, in the browser.                                                                                                                                 |
+
+The pages are plain static files (about 1,100 next to the catalog's ~3,700; the free plan allows 20,000). Show and row
+pages change only when their show does, and the live guide is written in whole (its first 36 hours) rather than cut
+at the moment of publishing, so a quiet run uploads none of them; the page's script hides what has ended and shows
+what is on. Images stay where the broadcasters host them, asked for at the size shown where their image service
+can resize (Reshet, Kan). `sitemap.xml` lists every row, show and the live page. Nothing plays on the website
+(see decisions.md, "Round 9").
+
+To see a design change on real data: copy a published site folder (the publisher's `publisher.dir`) and run
+`pnpm preview:site <that folder>`: it renders the landing, library and status pages from its JSON files into a
+copy next to it and serves it on http://localhost:8788/. Nothing is published.
+
 ## Usage dashboard and events
 
 The dashboard `http://<this computer's address>:7702/dash/` is for the owner only: it answers on the local network

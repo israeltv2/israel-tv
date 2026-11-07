@@ -41,6 +41,7 @@ import {
   videoId,
 } from '@israel-tv/core';
 import { renderLandingHtml } from './landing-html.ts';
+import { type LibraryRow, libraryUrls, plain, renderLibrary } from './library-html.ts';
 import { publicStatus } from './public-text.ts';
 import { robotsTxt, sitemapXml, webManifest } from './site-meta.ts';
 import { overall, renderStatusHtml } from './status-html.ts';
@@ -412,9 +413,12 @@ export function renderSite(input: RenderInput): SiteFiles {
   const shared = new Set([...counts].filter(([, n]) => n > 1).map(([k]) => k));
 
   // Meta and streams for every show ever published (delisted ones too, so watch history still opens).
+  const metas = new Map<string, Meta>();
   for (const s of input.shows) {
     if (!hasVideos(s)) continue;
-    files.set(sitePaths.meta('series', s.seriesId), json({ meta: metaFor(s, now) }));
+    const meta = metaFor(s, now);
+    metas.set(s.seriesId, meta);
+    files.set(sitePaths.meta('series', s.seriesId), json({ meta }));
     for (const [season, streams] of seasonStreamFiles(s, input.probes)) {
       files.set(sitePaths.seasonStreams(s.seriesId, season), json(streams));
     }
@@ -548,6 +552,24 @@ export function renderSite(input: RenderInput): SiteFiles {
   // The status and the pages carry the rows as published: these counts are what the apps show.
   const origins = input.publicUrl ? { origins: [input.publicUrl] } : {};
   const status = publicStatus({ ...input.status, catalogs: publishedCatalogs(input, listed) }, origins);
+  // The library pages: each show's page says what the app's show page says, without the app-only note.
+  const libraryRows: LibraryRow[] = (status.catalogs ?? [])
+    .filter((c) => c.source !== 'live')
+    .map((c) => ({
+      id: c.id,
+      source: c.source,
+      ...(c.filling ? { filling: c.filling } : {}),
+      shows: listed
+        .filter((s) => s.catalog === c.id && metas.has(s.seriesId))
+        .map((s) => {
+          const meta = metas.get(s.seriesId) as Meta;
+          const description = cleanDescription(s.show.description);
+          return {
+            source: s.show.source,
+            meta: { ...meta, description: description ? plain(description) : '' },
+          };
+        }),
+    }));
   const landing = {
     name: manifest.name,
     description: manifest.description,
@@ -560,11 +582,20 @@ export function renderSite(input: RenderInput): SiteFiles {
     })),
     status: overall(status),
     ...(input.publicUrl ? { publicUrl: input.publicUrl } : {}),
+    wall: posterWall(libraryRows),
+    rowPosters: Object.fromEntries(libraryRows.map((r) => [r.id, posterWall([r], 5).map((w) => w.poster)])),
+    ...(input.guide ? { guide: input.guide } : {}),
   };
   files.set(sitePaths.landing, renderLandingHtml(landing, 'en'));
   files.set(sitePaths.landingHe, renderLandingHtml(landing, 'he'));
+  const library = renderLibrary({
+    rows: libraryRows,
+    live: landing.live,
+    ...(input.guide ? { guide: input.guide } : {}),
+  });
+  for (const [path, html] of library) files.set(path, html);
   files.set(sitePaths.robots, robotsTxt());
-  files.set(sitePaths.sitemap, sitemapXml());
+  files.set(sitePaths.sitemap, sitemapXml(libraryUrls(library.keys())));
   files.set(sitePaths.webManifest, webManifest());
   files.set(sitePaths.search, json(search));
   files.set(sitePaths.extIds, json(extIds));
@@ -575,6 +606,20 @@ export function renderSite(input: RenderInput): SiteFiles {
   if (input.freshness) files.set(sitePaths.freshness, json(input.freshness));
   if (input.live.length > 0) files.set(sitePaths.epg, json(input.guide ?? {}));
   return files;
+}
+
+/** Posters for the landing page's moving wall: the newest shows of every row, taking turns, with real artwork. */
+function posterWall(rows: LibraryRow[], n = 36): { name: string; poster: string }[] {
+  const lists = rows.map((r) =>
+    r.shows.filter((s) => s.meta.poster && !s.meta.poster.includes(sitePaths.posterPlaceholder)),
+  );
+  const out: { name: string; poster: string }[] = [];
+  for (let i = 0; out.length < n && lists.some((l) => l.length > i); i++)
+    for (const l of lists) {
+      const s = l[i];
+      if (s && out.length < n) out.push({ name: plain(s.meta.name), poster: s.meta.poster as string });
+    }
+  return out;
 }
 
 /**

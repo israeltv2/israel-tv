@@ -22,6 +22,21 @@ export const sitePaths = {
   iconMaskable: 'icon-maskable-512.png',
   shareImage: 'og.jpg',
   heroImage: 'hero.jpg',
+  /** The pages' own type (two families with Hebrew, SIL OFL; assets/site/fonts). */
+  fonts: [
+    'fonts/plex-he-400.woff2',
+    'fonts/plex-latin-400.woff2',
+    'fonts/plex-he-600.woff2',
+    'fonts/plex-latin-600.woff2',
+    'fonts/karantina-he-700.woff2',
+    'fonts/karantina-latin-700.woff2',
+  ],
+  /** The library pages (Hebrew): every row, one page per row, one page per show, the live channels, search. */
+  library: 'library/index.html',
+  libraryRow: (slug: string) => `library/${slug}/index.html`,
+  showPage: (seriesId: string) => `show/${seriesId}/index.html`,
+  livePage: 'live/index.html',
+  searchPage: 'search/index.html',
   catalog: (type: string, id: string, skip = 0) =>
     // Later pages are stored as skip-N (not skip=N: some static hosts redirect '=' to '%3D'); the addon
     // app maps Stremio's `/skip=N.json` URL onto them.
