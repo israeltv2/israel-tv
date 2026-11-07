@@ -1,6 +1,6 @@
 {
   "name": "israel-tv",
-  "version": "0.7.8",
+  "version": "0.7.9",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.15.0",
