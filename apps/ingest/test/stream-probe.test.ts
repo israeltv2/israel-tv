@@ -180,3 +180,48 @@ test('probes ask only public https addresses, also after a redirect', async () =
     new Response(null, { status: 302, headers: { location: 'https://10.0.0.2:7702/admin' } });
   expect(await probeHls('https://cdn.test/m.m3u8', intoLan)).toMatchObject({ result: 'failed', status: 400 });
 });
+
+test("Kan titles take at most half of a call's reads; Reshet qualities get the rest", async () => {
+  const store = Store.open(':memory:');
+  const kan = (n: number): ScrapedShow => ({
+    source: 'kan',
+    key: `k${n}`,
+    title: `כאן ${n}`,
+    catalog: 'iltv_kan11',
+    seasons: [
+      {
+        key: '1',
+        title: 'עונה 1',
+        episodes: [
+          {
+            key: `kan:${n}`,
+            title: 'פרק 1',
+            streams: [{ url: 'https://cdn.test/shut/m.m3u8', kind: 'direct' }],
+          },
+        ],
+      },
+    ],
+  });
+  const reshet: ScrapedShow = {
+    source: 'reshet',
+    key: 'r',
+    title: 'ר',
+    catalog: 'iltv_reshet13',
+    seasons: [
+      {
+        key: '1',
+        title: 'עונה 1',
+        episodes: [
+          { key: 'e', title: 'פרק 1', streams: [{ url: 'https://cdn.test/r/m.m3u8', kind: 'direct' }] },
+        ],
+      },
+    ],
+  };
+  for (const s of [...Array.from({ length: 20 }, (_, i) => kan(i)), reshet]) {
+    const id = store.seriesIdFor(s.source, s.key);
+    store.saveShow(id, s, assignNumbers(s, store.assignments(id)).added, '2026-11-05', true);
+  }
+  const f = cdn({ '/shut/m.m3u8': [403], '/r/m.m3u8': [200, MASTER] });
+  const config = ConfigSchema.parse({ geo: { type: 'http-proxy', urls: ['https://proxy.test:89'] } });
+  expect(await probeStreams(store, config, { fetch: f, budget: 30 })).toEqual({ kan: 5, quality: 1 });
+});
