@@ -1459,3 +1459,14 @@ the CloudFront fallback; the health line hid failures blamed on one title (they 
 an empty older season page could borrow the show's featured video (only the show's own page uses it now); failures
 without a play id linked to an empty trace; two quadratic or repeated computations; and the fixture proxy names
 looked like a real provider's (now neutral placeholders).
+
+**Supervisor's polish of the live dashboard (2026-11-07).** Memory is shown as in use = total − available (macOS:
+free + inactive + speculative + purgeable pages from `vm_stat`; Linux: `MemAvailable`), amber at 85 %, red at 95 %:
+counting the file cache as used read "96 %" on a healthy Mac. The page's hidden screen-reader tables (a table ignores
+`sr-only`'s 1 px box) made pages taller than the layout, so the sidebar stopped short; they are wrapped now. "Minutes
+watched" says that only relayed plays can be timed instead of showing 0. Kan shows its last slice and live channels
+their last check instead of "last airing check: never". "One title only" became "Single title refused". The failure
+rate also shows the count since the running version was deployed (`sinceRelease`, kept across restarts of the same
+revision), so a fix shows at once instead of after a week. A Kan show with the placeholder poster had its image copy
+refused (HTTP 403) once and waited a day; failed Kan image copies are now retried every 6 hours (31 shows lacked
+their own copy), as slices rotate across proxy exits.

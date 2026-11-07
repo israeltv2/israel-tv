@@ -483,6 +483,15 @@ export class Daemon {
   /** When the service started. */
   readonly startedAt = new Date().toISOString();
 
+  /** The running revision and when it first started here (a restart of the same revision keeps the date). */
+  get release(): { revision: string; at: string } {
+    const kept = this.store.getState<{ revision: string; at: string }>('release:current');
+    if (kept?.revision === REVISION) return kept;
+    const now = { revision: REVISION, at: this.startedAt };
+    this.store.setState('release:current', now);
+    return now;
+  }
+
   status() {
     const notes = [
       ...(this.config.publisher.type === 'cloudflare' && analyticsOff(this.store)

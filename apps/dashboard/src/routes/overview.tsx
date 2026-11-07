@@ -10,7 +10,7 @@ import { Card, CardBody, CardHeader } from '#components/ui/card.tsx';
 import { Meter } from '#components/ui/progress.tsx';
 import { Skeleton } from '#components/ui/skeleton.tsx';
 import { useApi } from '#lib/api.ts';
-import { compact, num, pct } from '#lib/format.ts';
+import { compact, num, pct, when } from '#lib/format.ts';
 
 const DayLines = lazy(() => import('#components/charts.tsx').then((m) => ({ default: m.DayLines })));
 
@@ -64,21 +64,39 @@ export function Overview() {
         <Kpi
           label="Minutes watched"
           icon={<Timer className="size-4" />}
-          value={num(home.d7.minutesWatched)}
-          sub="7 days · relayed plays only"
+          value={home.d7.minutesWatched ? num(home.d7.minutesWatched) : '—'}
+          sub={
+            home.d7.minutesWatched
+              ? '7 days · relayed plays (direct plays cannot be timed)'
+              : 'only plays relayed through the proxy can be timed; none in 7 days'
+          }
         >
-          <Sparkline
-            values={home.perDay.map((d) => d.minutes)}
-            label="minutes watched per day"
-            color="var(--kan)"
-          />
+          {home.d7.minutesWatched ? (
+            <Sparkline
+              values={home.perDay.map((d) => d.minutes)}
+              label="minutes watched per day"
+              color="var(--kan)"
+            />
+          ) : null}
         </Kpi>
         <Kpi
           label="Failure rate"
           icon={<Gauge className="size-4" />}
           value={attempts ? pct(o.failureRate7d, o.failureRate7d < 0.1 ? 1 : 0) : '—'}
           sub={
-            attempts ? `${num(home.d7.failures)} of ${num(attempts)} plays · 7 days` : 'no plays in 7 days'
+            <>
+              {attempts
+                ? `${num(home.d7.failures)} of ${num(attempts)} plays · 7 days`
+                : 'no plays in 7 days'}
+              {o.sinceRelease ? (
+                <span className="block">
+                  since this version ({when(o.sinceRelease.at)}):{' '}
+                  {o.sinceRelease.plays + o.sinceRelease.failures
+                    ? `${num(o.sinceRelease.failures)} of ${num(o.sinceRelease.plays + o.sinceRelease.failures)}`
+                    : 'no plays yet'}
+                </span>
+              ) : null}
+            </>
           }
           {...(o.failureRate7d > 0.1 && attempts >= 5 ? { tone: 'var(--error)' } : {})}
         >

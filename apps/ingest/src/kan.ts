@@ -159,10 +159,16 @@ export interface KanCrawlOptions {
   artworkDir?: string;
 }
 
+/**
+ * A failed artwork copy is tried again after this long. Kan's CDN sometimes refuses one proxy exit (HTTP 403) and
+ * slices rotate across exits, so a few tries a day get most copies without reading the lobbies every slice.
+ */
+export const ART_RETRY_MS = 6 * 3_600_000;
+
 export function showDue(s: ShowState, now: number, windowDays: number): boolean {
   if (!s.checkedAt) return !s.failedAt || now - Date.parse(s.failedAt) > 7 * DAY_MS;
-  // A show whose current image has no saved copy is read again for it (at most once a day).
-  if (s.image && s.art?.from !== s.image && (!s.artTriedAt || now - Date.parse(s.artTriedAt) > DAY_MS))
+  // A show whose current image has no saved copy is read again for it (at most every ART_RETRY_MS).
+  if (s.image && s.art?.from !== s.image && (!s.artTriedAt || now - Date.parse(s.artTriedAt) > ART_RETRY_MS))
     return true;
   const age = now - Date.parse(s.checkedAt);
   const airing = s.lastNewAt !== undefined && now - Date.parse(s.lastNewAt) < windowDays * DAY_MS;
@@ -355,7 +361,7 @@ export async function crawlKan(
     const artDue = (poster: string, s: ShowState | undefined) =>
       !!opts.artworkDir &&
       s?.art?.from !== poster &&
-      (!s?.artTriedAt || now - Date.parse(s.artTriedAt) > DAY_MS);
+      (!s?.artTriedAt || now - Date.parse(s.artTriedAt) > ART_RETRY_MS);
     const missingArt = Object.values(state.shows).some((s) => s.lobbyPoster && artDue(s.lobbyPoster, s));
     if (!state.lobbiesAt || !state.lobbyPosters || missingArt || now - Date.parse(state.lobbiesAt) > DAY_MS) {
       const byUrl = new Map<string, string>();
@@ -427,7 +433,7 @@ export async function crawlKan(
       if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size) {
         state.lobbiesAt = new Date(now).toISOString();
         state.lobbyPosters = true;
-        // Shows whose poster could not be copied this time (or is no longer on a lobby) wait a day, so a missing
+        // Shows whose poster could not be copied this time (or is no longer on a lobby) wait ART_RETRY_MS, so a missing
         // copy never makes every slice read the lobbies.
         for (const show of Object.values(state.shows))
           if (show.lobbyPoster && artDue(show.lobbyPoster, show))

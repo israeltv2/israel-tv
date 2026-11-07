@@ -63,9 +63,20 @@ function SourceCard({ s }: { s: Source }) {
               <span className="font-normal text-muted text-xs"> / {s.cadenceHours} h</span>
             ) : null}
           </Stat>
-          <Stat label="Last airing check">
-            <Ago iso={s.lastAiringRun} />
-          </Stat>
+          {s.source === 'kan' ? (
+            <Stat label="Last slice">
+              <Ago iso={s.runs[0]?.at} />
+              <span className="font-normal text-muted text-xs"> · read in slices</span>
+            </Stat>
+          ) : s.source === 'live' ? (
+            <Stat label="Channels checked">
+              <Ago iso={s.lastFullRun} />
+            </Stat>
+          ) : (
+            <Stat label="Last airing check">
+              <Ago iso={s.lastAiringRun} />
+            </Stat>
+          )}
         </dl>
         {s.cadenceHours && s.lastGoodAt ? (
           <div>

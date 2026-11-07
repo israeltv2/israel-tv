@@ -1,6 +1,7 @@
 // The owner's admin API (`/api/v1/*`, see packages/admin-contract): the numbers the dashboard shows, each answer
 // built here from the usage events, the catalog database, the live sessions and the published files. Read-only
 // except two safe actions (refresh one show, run the canary). Mounted behind the admin gate (daemon.ts).
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statfsSync, statSync } from 'node:fs';
 import { arch, freemem, platform, totalmem } from 'node:os';
 import { join } from 'node:path';
@@ -35,6 +36,8 @@ export interface Daemon {
   readonly sessions: import('@israel-tv/resolver').PlaySessions;
   readonly revision: string;
   readonly startedAt: string;
+  /** The running version and when it was first started (its deploy). */
+  readonly release: { revision: string; at: string };
   readonly geo: { proxies: string[]; lastError?: string; lastErrorAt?: string };
   readonly exits: ReadonlyMap<
     string,
@@ -55,6 +58,23 @@ export interface Daemon {
 }
 
 const DAY_MS = 86_400_000;
+
+/** Memory programs can still get without swapping, in MB (see SystemSchema.memoryMB). */
+function availableMemoryMB(): number {
+  try {
+    if (platform() === 'darwin') {
+      const out = execFileSync('vm_stat', { encoding: 'utf8', timeout: 2000 });
+      const page = Number(/page size of (\d+) bytes/.exec(out)?.[1] ?? 4096);
+      const pages = (k: string) => Number(new RegExp(`Pages ${k}:\\s+(\\d+)`).exec(out)?.[1] ?? 0);
+      return mb((pages('free') + pages('inactive') + pages('speculative') + pages('purgeable')) * page);
+    }
+    if (platform() === 'linux') {
+      const kb = /MemAvailable:\s+(\d+) kB/.exec(readFileSync('/proc/meminfo', 'utf8'))?.[1];
+      if (kb) return mb(Number(kb) * 1024);
+    }
+  } catch {}
+  return mb(freemem());
+}
 const mb = (bytes: number) => Math.round((bytes / 1_048_576) * 100) / 100;
 
 function percentile(sorted: number[], p: number): number | undefined {
@@ -248,6 +268,17 @@ export function overview(d: Daemon, now = Date.now()): Overview {
       };
     }),
     ...(lastPublish ? { lastPublishAt: lastPublish.finishedAt ?? lastPublish.startedAt } : {}),
+    sinceRelease: (() => {
+      const since = d.release.at;
+      const ok = [
+        ...d.events.events({ kind: 'play_start', since, limit: 5000, viewersOnly: true }),
+        ...d.events
+          .events({ kind: 'relay_session', since, limit: 5000, viewersOnly: true })
+          .filter((e) => e.outcome === 'ok'),
+      ].length;
+      const failed = d.events.events({ kind: 'failure', since, limit: 5000, viewersOnly: true }).length;
+      return { revision: d.release.revision, at: since, plays: ok, failures: failed };
+    })(),
     ...(quota && quota.day === new Date(now).toISOString().slice(0, 10)
       ? {
           quota: {
@@ -608,6 +639,7 @@ export function system(d: Daemon, revision: string, now = Date.now()): System {
     memoryMB: {
       process: mb(process.memoryUsage().rss),
       freeSystem: mb(freemem()),
+      availableSystem: availableMemoryMB(),
       totalSystem: mb(totalmem()),
     },
     ...(disk ? { diskFreeMB: disk.free, diskTotalMB: disk.total } : {}),

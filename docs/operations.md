@@ -78,7 +78,8 @@ catalog row the addon shows as stale, shows that fail to read, a failed publish 
 The sections:
 
 - **Overview** — plays today and over 7 days with a 30-day sparkline, viewers (home, and the public addon per day),
-  minutes relayed, the failure rate with its counts, catalog freshness per source and the last publish, today's
+  minutes relayed (only relayed plays can be timed), the failure rate with its counts (also since the running
+  version was deployed), catalog freshness per source and the last publish, today's
   Cloudflare requests against the free plan; plays per day (home and public), the most watched shows with posters.
 - **Sources** — a card per source: shows, episodes, last good read against its rhythm (with a bar to the point where
   the addon calls the row stale), the last airing check, the playback canary of the last runs as a strip (green: plays;
@@ -99,7 +100,7 @@ The sections:
 - **Catalog & deploys** — shows and episodes per source, the last publishes, the two Workers' versions with their
   rollback commands to copy (shown, never run from the page), the publisher's own catalog check, the shows failing to
   read, and a form that reads one show again now.
-- **System** — uptime, version and revision, memory and disk with gauges, database sizes and growth, the last backup
+- **System** — uptime, version and revision, memory in use (the file cache counts as available) and disk with gauges, database sizes and growth, the last backup
   and its restore check, Cloudflare's free-plan use today (requests and Analytics Engine writes, per Worker), usage
   events per day.
 

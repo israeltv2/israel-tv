@@ -16,11 +16,17 @@ function Gauge({
   used,
   total,
   unit,
+  warnAt,
+  errorAt,
+  note,
 }: {
   label: string;
   used: number;
   total: number;
   unit: (n: number) => string;
+  warnAt?: number;
+  errorAt?: number;
+  note?: string;
 }) {
   return (
     <div>
@@ -30,7 +36,13 @@ function Gauge({
           {unit(used)} of {unit(total)} · {pct(used / total)}
         </span>
       </div>
-      <Meter value={used / total} label={label} />
+      <Meter
+        value={used / total}
+        label={label}
+        {...(warnAt ? { warnAt } : {})}
+        {...(errorAt ? { errorAt } : {})}
+      />
+      {note ? <p className="mt-1 text-muted text-xs">{note}</p> : null}
     </div>
   );
 }
@@ -85,10 +97,13 @@ export function SystemPage() {
               <Gauge label="Disk used" used={s.diskTotalMB - s.diskFreeMB} total={s.diskTotalMB} unit={mb} />
             ) : null}
             <Gauge
-              label="Memory used (whole machine)"
-              used={s.memoryMB.totalSystem - s.memoryMB.freeSystem}
+              label="Memory in use (whole machine)"
+              used={s.memoryMB.totalSystem - s.memoryMB.availableSystem}
               total={s.memoryMB.totalSystem}
               unit={mb}
+              warnAt={0.85}
+              errorAt={0.95}
+              note={`${mb(s.memoryMB.availableSystem)} available without swapping (file cache counts as available)`}
             />
           </CardBody>
         </Card>
