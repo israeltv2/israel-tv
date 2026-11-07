@@ -1592,6 +1592,31 @@ A black-box user-journey audit (from Cyprus, outside Israel) and a research pass
 - `stremioAddonsConfig`: config `addon.stremioAddonsConfig` puts stremio-addons.net's signature in the manifest once
   it is issued (the owner pastes it).
 
+## Source triage: Reshet's "empty" shows and numbering notes (2026-11-07)
+
+- **Reshet shows "with nothing to watch" (45): 30 had episodes.** All 45 pages were read again. 29 are older-template
+  pages whose Kaltura record has no seasons left (their season pages answer HTTP 500), but the record names the
+  show's own site page (`seriesHp`, e.g. `/vod/hostages/`), and that page still lists the episodes as posts, with
+  Kaltura videos that all exist (420 of 420 checked). One more (`/shows/free-hour/`) is listed straight to such a
+  page. The earlier hand check ("empty `Base` and `PaginationArray` grids") was right for the pages it looked at,
+  wrong as a rule. These shows are now read from that page: a post is a full episode when it links to Reshet's
+  VOD item (`/allshows/series/<id>/season/<n>/<item>/`) or sits under the show's own `episodes` section; clips,
+  recipes and articles link elsewhere and stay out. Grids link to full lists (`…/season-04/episodes/`), which are
+  read with their further pages (at most 40 pages per show; the longest, a daily show, has 26), in airing checks
+  too (a season read replaces the stored one). Season numbers are the site's ("season-04" stays season 4).
+- **Still empty, and why (15):** 14 pages list no videos at all (`post_count` 0: mostly foreign formats); one
+  ("חצות ועוד יותר") links to the site's front page. Each says so in plain words on `/status`.
+- **Reshet's Kaltura `EpisodeNumber` can be a placeholder.** In some seasons most episodes carry the same number
+  (135 of 138 say 1 in one "המקור" season); it gave hundreds of "now פרק 1 at the source" warnings and numbered
+  two seasons out of order at first fill (שבוע סוף 2, הטוב מכולם 2: their numbers stay, as all published numbers do).
+  A number shared within a season is ignored; the title's own "פרק N" is used.
+- **"מתוך פרק 1" is not an episode number.** Kan's songs collection titles songs "… - מתוך פרק 1" (from episode 1);
+  two of them collided as episode 1. That phrase is no longer read as the item's number.
+- **Expected numbering notes.** "source-renumbered … kept SxEy" stays for an episode whose printed number another
+  episode already holds (it was numbered on, once, with "episode-number-taken"): published numbers never move. A
+  warning is stored once per distinct text, so an unchanged note does not repeat.
+  ||||||| 9044d02
+
 ## Kan's bot check (2026-11-07)
 
 Kan's pages and images sit behind Cloudflare. Measured from outside Israel through the Israeli proxy exits:

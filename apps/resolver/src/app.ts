@@ -209,6 +209,9 @@ export function createResolverApp(deps: ResolverDeps) {
       const ch = channels.find((x) => x.id === liveChannelOf(id));
       if (ch) {
         info = { showId: ch.id, source: 'live' };
+        // Neither a Mako ticket nor a geo limit (Channel 13, Channel 14): its direct streams from the public addon
+        // play anywhere, so nothing is needed here.
+        directPlays ||= !ch.mako?.length && !ch.geo;
         if (mako) streams.push(...mako.streams(origin, play(), { channel: ch }));
         if (ch.geo && relay) {
           for (const l of ch.direct) {

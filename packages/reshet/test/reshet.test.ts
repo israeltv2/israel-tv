@@ -9,7 +9,9 @@ import {
   parseAllShows,
   parseSeasonPage,
   parseShowPage,
+  parseShowSitePage,
   playManifestUrl,
+  siteSeasons,
 } from '../src/parse.ts';
 
 const html = (name: string) => readFileSync(new URL(`./fixtures/${name}.html`, import.meta.url), 'utf8');
@@ -152,8 +154,8 @@ test('a show page without VOD (empty article grid) reads as no seasons, not an e
   expect(parseShowPage(html('show-empty-show-time'))).toMatchObject({ template: 'no-vod', seasons: [] });
 });
 
-test('a promotional page with no video on it is a show without VOD', () => {
-  expect(parseShowPage(html('show-promo-free-hour'))).toMatchObject({
+test('a show page without a VOD list is no-vod to parseShowPage (fetchShow then reads its posts, below)', () => {
+  expect(parseShowPage(html('show-free-hour'))).toMatchObject({
     template: 'no-vod',
     seasons: [],
     note: expect.stringMatching(/no episode list/),
@@ -331,4 +333,122 @@ test('a show with an empty page description takes its Kaltura blurb, and its 16x
   const p = parseShowPage(html('show-friday'));
   expect(p.description).toBe('תוכנית חדשות ואקטואליה המשודרת בימי שישי בערוץ 13');
   expect(p.background).toMatch(/\/Service\.svc\/GetImage\/.*\/width\/1280\/height\/720$/);
+});
+
+// ---- shows read from their own site page (2026-11-07: 30 of the 45 shows listed "with nothing to watch") --------
+
+test('an older-template show whose Kaltura record is empty points to its own site page', () => {
+  expect(parseShowPage(html('show-hostages'))).toMatchObject({
+    template: 'program',
+    seriesId: '464',
+    seasons: [],
+    sitePage: '/vod/hostages/',
+  });
+});
+
+test('fetchShow reads such a show from its site page: every full episode, numbered by its title', async () => {
+  const f = pages({ '/all-shows/hostages/': 'show-hostages', '/vod/hostages/': 'page-hostages' });
+  const show = await fetchShow(f, { key: '/all-shows/hostages/', title: 'בני ערובה' }, { kaltura });
+  expect(f.urls.map((u) => new URL(u).pathname)).toEqual(['/all-shows/hostages/', '/vod/hostages/']);
+  expect(show.notes).toBeUndefined();
+  expect(show.seasons.map((s) => [s.key, s.title, s.episodes.length])).toEqual([
+    ['/all-shows/hostages/|s1', 'עונה 1', 11],
+  ]);
+  const tenth = show.seasons[0]?.episodes.find((e) => e.key === '1_w9mlcqc2');
+  expect(tenth).toMatchObject({
+    numberHint: 10,
+    airDate: '2013-10-05',
+    durationSec: 2576,
+    availableAbroad: false,
+  });
+  expect(tenth?.streams[0]?.url).toBe(playManifestUrl('1_w9mlcqc2'));
+  const r = assignNumbers(show, { seasons: [], episodes: [] });
+  expect(r.warnings).toEqual([]);
+  expect(r.episodes.find((e) => e.key === '1_w9mlcqc2')).toMatchObject({ season: 1, episode: 10 });
+  // The behind-the-scenes special (no number) comes after the ten episodes.
+  expect(r.episodes.find((e) => e.key === '1_5ce2z3dw')).toMatchObject({ season: 1, episode: 11 });
+});
+
+test('a site page with grids: full-episode grids by season, clips and articles left out', () => {
+  const p = parseShowSitePage(html('page-password'), {
+    show: '/shows/password/',
+    page: '/shows/password/',
+    seriesId: '551',
+  });
+  expect(siteSeasons(p.episodes).map((s) => [s.title, s.episodes.length])).toEqual([
+    ['עונה 1', 5],
+    ['עונה 2', 14],
+  ]);
+  // Oldest first within a season.
+  expect(siteSeasons(p.episodes)[1]?.episodes.at(-1)).toMatchObject({ numberHint: 14, title: 'משה דץ' });
+  // Another show's VOD id is not this show's.
+  const other = parseShowSitePage(html('page-password'), {
+    show: '/shows/password/',
+    page: '/',
+    seriesId: '1',
+  });
+  expect(other.episodes).toEqual([]);
+});
+
+test('episodes that are items under the show\'s own "episodes" section (Kan kids reruns)', () => {
+  const p = parseShowSitePage(html('page-parpar-nechmad'), {
+    show: '/kan-kids/parpar-nechmad/',
+    page: '/kan-kids/parpar-nechmad/',
+  });
+  expect(p.episodes.length).toBe(20);
+  expect(p.episodes.every((e) => e.season === 1)).toBe(true);
+  expect(p.episodes[0]?.episode).toMatchObject({ numberHint: 30, title: 'שבי הקוסם' });
+  // The same items are not this page's under another show's address.
+  expect(
+    parseShowSitePage(html('page-parpar-nechmad'), { show: '/kan-kids/shakshuka/', page: '/' }).episodes,
+  ).toEqual([]);
+});
+
+test('a full-episode list the page links to is read with its further pages, in an airing check too', async () => {
+  const routes = {
+    '/entertainment/the-x-factor-israel/': 'page-x-factor',
+    '/entertainment/the-x-factor-israel/season-04/episodes/': 'page-x-factor-episodes',
+    '/entertainment/the-x-factor-israel/season-04/episodes/page/2/': 'page-x-factor-episodes-2',
+  };
+  const entry = { key: '/entertainment/the-x-factor-israel/', title: 'The X Factor ישראל' };
+  const f = pages(routes);
+  const show = await fetchShow(f, entry, { kaltura });
+  expect(f.urls.map((u) => new URL(u).pathname)).toEqual(Object.keys(routes));
+  // "season-04" in the list's address; the clips, articles and Eurovision songs on the page are not episodes.
+  expect(show.seasons.map((s) => [s.title, s.episodes.length])).toEqual([['עונה 4', 35]]);
+  expect(show.seasons[0]?.episodes.at(-1)).toMatchObject({ numberHint: 35, title: 'הגמר הגדול יוצא לדרך!' });
+  // An airing check reads the whole list too: a season read replaces the stored one, so a first page would drop 3.
+  const airing = await fetchShow(pages(routes), entry, { kaltura, currentSeasonOnly: true });
+  expect(airing.seasons[0]?.episodes.length).toBe(35);
+});
+
+test('a show listed straight to its site page (no VOD record) is read from it', async () => {
+  const show = await fetchShow(
+    pages({ '/shows/free-hour/': 'show-free-hour' }),
+    { key: '/shows/free-hour/', title: 'שעה חופשית' },
+    { kaltura },
+  );
+  expect(show.seasons.map((s) => [s.title, s.episodes.length])).toEqual([['עונה 1', 12]]);
+  expect(show.notes).toBeUndefined();
+});
+
+test('nothing to watch is said plainly: an empty video list, a link to the front page', async () => {
+  const read = async (key: string, name: string) =>
+    fetchShow(pages({ [key]: name }), { key, title: 'x' }, { kaltura });
+  expect(await read('/all-shows/show-time/', 'show-empty-show-time')).toMatchObject({
+    seasons: [],
+    notes: ['its page lists no videos'],
+  });
+  // The site's front page has other shows' new episodes on it: none of them is this show's.
+  expect(await read('/', 'front-page')).toMatchObject({
+    seasons: [],
+    notes: ["listed with a link to the site's front page, not a page of its own"],
+  });
+});
+
+test("a Kaltura EpisodeNumber shared by a season's episodes is a placeholder: the title's number is used", () => {
+  // הטוב מכולם season 2 (2026-11-07): all seven episodes say EpisodeNumber 1; their titles say פרק 1–7.
+  const eps = parseSeasonPage(html('the-best-season-2'));
+  expect(eps.map((e) => e.numberHint)).toEqual([7, 3, 6, 4, 5, 1, 2]);
+  expect(eps[0]?.title).toBe('חבורת היח"צנים');
 });

@@ -6,8 +6,12 @@ import {
   parseAllShows,
   parseSeasonPage,
   parseShowPage,
+  parseShowSitePage,
   RESHET_ORIGIN,
   type ReshetIndexEntry,
+  type ShowSitePage,
+  type SiteEpisode,
+  siteSeasons,
   untitledSeasonsByYear,
 } from './parse.ts';
 
@@ -37,14 +41,92 @@ export interface ReshetOptions {
   kaltura?: (body: unknown) => Promise<unknown>;
 }
 
+/** Most pages read from one show's site lists (a daily show's list runs to 26, 2026-11-07). */
+export const SITE_PAGE_LIMIT = 40;
+
+/**
+ * A show's episodes from its own site page and the full-episode lists it links to, with their further pages. Always
+ * all of them, airing check or not: a season read replaces the stored one, so a partial list would drop episodes.
+ */
+async function readSitePages(
+  f: Fetcher,
+  show: string,
+  opts: { first?: string; seriesId?: string | undefined },
+): Promise<{ seasons: ParsedSeason[]; notes: string[]; nothing?: string }> {
+  const notes: string[] = [];
+  const found: SiteEpisode[] = [];
+  let seriesId = opts.seriesId;
+  let reads = 0;
+  const visit = async (path: string, html?: string) => {
+    reads++;
+    const p = parseShowSitePage(html ?? (await page(f, path)), { show, page: path, seriesId });
+    seriesId ??= p.seriesId;
+    found.push(...p.episodes);
+    return p;
+  };
+  /** A list page that is gone is noted; the rest is still read. */
+  const tryVisit = async (path: string) => {
+    try {
+      return await visit(path);
+    } catch (err) {
+      if (!(err instanceof PageMissing)) throw err;
+      notes.push(`${path} is linked but gone (404)`);
+      return undefined;
+    }
+  };
+  let first: ShowSitePage;
+  try {
+    first = await visit(show, opts.first);
+  } catch (err) {
+    if (!(err instanceof PageMissing)) throw err;
+    return { seasons: [], notes, nothing: `its show page ${show} is gone (404)` };
+  }
+  if (first.front)
+    return {
+      seasons: [],
+      notes,
+      nothing: "listed with a link to the site's front page, not a page of its own",
+    };
+  if (first.mixed) notes.push(`${show} links to several shows' videos; none were taken`);
+  const more = [...first.morePages];
+  for (const list of first.lists) {
+    if (list === show) continue;
+    const p = await tryVisit(list);
+    if (p) more.push(...p.morePages);
+  }
+  for (const [i, path] of more.entries()) {
+    if (reads >= SITE_PAGE_LIMIT) {
+      notes.push(`read the first ${reads} of its ${reads + more.length - i} list pages (the limit per show)`);
+      break;
+    }
+    await tryVisit(path);
+  }
+  const seen = new Set<string>();
+  const unique = found.filter((e) => !seen.has(e.episode.key) && seen.add(e.episode.key));
+  return { seasons: siteSeasons(unique), notes };
+}
+
 export async function fetchShow(
   f: Fetcher,
   entry: ReshetIndexEntry,
   opts: ReshetOptions = {},
 ): Promise<ScrapedShow> {
-  const parsed = parseShowPage(await page(f, entry.key));
+  const html = await page(f, entry.key);
+  const parsed = parseShowPage(html);
   const seasons: { s: ParsedSeason; episodes: ScrapedEpisode[] }[] = [];
-  const notes: string[] = parsed.note ? [parsed.note] : [];
+  const notes: string[] = [];
+  // No VOD record (or none left): the show's own site page may still list its episodes.
+  const sitePage = parsed.template === 'no-vod' ? entry.key : parsed.sitePage;
+  if (sitePage) {
+    const site = await readSitePages(f, sitePage, {
+      ...(sitePage === entry.key ? { first: html } : {}),
+      seriesId: parsed.seriesId,
+    });
+    if (site.seasons.length > 0) parsed.seasons = site.seasons;
+    // Nothing found: the page's own reason ("lists no videos") unless the site read knows better.
+    else notes.push(site.nothing ?? parsed.note ?? `its page ${sitePage} lists no full episodes`);
+    notes.push(...site.notes);
+  } else if (parsed.note) notes.push(parsed.note);
   for (const s of parsed.seasons) {
     let episodes = s.episodes;
     if (!episodes && !opts.currentSeasonOnly && parsed.seriesId && s.position !== undefined) {

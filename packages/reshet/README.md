@@ -8,6 +8,8 @@ storage in `apps/ingest`.
 ## Responsibility
 
 - The all-shows page → show entries; a show page plus each season page → `ScrapedShow`.
+- A show with no VOD record (or an empty one) → its own site page of posts and the full-episode lists it links
+  to (`parseShowSitePage`); clips and articles are left out. A show with nothing there is noted with the reason.
 - A season Reshet lists but whose page is gone (404) becomes a note on the show, not a failed show.
 - Each episode's direct HLS URL (Kaltura `playManifest`).
 - The "blocked outside Israel" label from Kaltura access-control profiles, checked once per profile; if Kaltura
@@ -29,7 +31,8 @@ storage in `apps/ingest`.
 - `fetchShow(fetcher, entry, { currentSeasonOnly?, profiles?, kaltura? })` → `ScrapedShow` — one show.
 - `blockedEntries(entryIds, profiles, post?)` → entry id → blocked here; `kalturaPost`; `ISRAEL_ONLY_PROFILES`.
 - `playManifestUrl(entryId)` — an episode's HLS URL.
-- `nextData`, `parseAllShows`, `parseShowPage`, `parseSeasonPage`, `fromOld` — the pure parsers behind the above.
+- `nextData`, `parseAllShows`, `parseShowPage`, `parseSeasonPage`, `parseShowSitePage`, `siteSeasons`, `fromOld` —
+  the pure parsers behind the above.
 
 ## Run and test it alone
 
@@ -37,8 +40,8 @@ storage in `apps/ingest`.
 pnpm --filter @israel-tv/reshet test
 pnpm --filter @israel-tv/reshet typecheck
 ```
-Tests parse recorded pages in `test/fixtures/` (`all-shows.html`, `show-*.html`,
-`kitchen-nightmares-season-2.html`): `test/reshet.test.ts` serves them by path through a fixture `Fetcher`
+Tests parse recorded pages in `test/fixtures/` (`all-shows.html`, `show-*.html`, season pages, `page-*.html` site
+pages, `front-page.html`): `test/reshet.test.ts` serves them by path through a fixture `Fetcher`
 (unknown paths answer 404) and replaces Kaltura with a stub `kaltura` function, so tests never contact the
 network. To add or refresh a fixture, save the raw HTML of `https://13tv.co.il/<path>` (View source → save, or
 `curl -sL https://13tv.co.il/<path> -o test/fixtures/<name>.html`; retry once on a 403) — not a browser's saved or

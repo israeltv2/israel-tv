@@ -41,6 +41,13 @@ test('parseEpisodeHint reads Mako extraInfo and titles', () => {
   expect(parseEpisodeHint(undefined)).toBeUndefined();
 });
 
+test('parseEpisodeHint: "מתוך פרק 1" (a song from episode 1) is not this item\'s number', () => {
+  // Kan's "הסדרתיים - כל השירים", 2026-11-07: two songs "מתוך פרק 1" collided as episode 1.
+  expect(parseEpisodeHint('שנה לפנתיאון - מתוך פרק 1')).toBeUndefined();
+  expect(parseEpisodeHint('הילדה החדשה- מתוך פרק 1')).toBeUndefined();
+  expect(parseEpisodeHint('פרק 3 - שיר מתוך פרק 1')).toBe(3);
+});
+
 test('mixed numbered and named seasons: named take the lowest free numbers, in list order (Masterchef shape)', () => {
   const r = assignNumbers(
     show([
