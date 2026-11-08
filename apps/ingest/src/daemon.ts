@@ -707,6 +707,9 @@ export class Daemon {
 }
 
 const ADMIN_COOKIE = 'iltv_admin';
+// A year, renewed on every page the owner opens: a saved address keeps working as long as it is used now and then.
+const adminCookie = (token: string) =>
+  `${ADMIN_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`;
 
 /** The host part of an Origin header; undefined for `null` or anything that is not a URL. */
 function hostOf(origin: string): string | undefined {
@@ -776,10 +779,13 @@ export function adminApp(d: Daemon, token: string) {
     if (query) {
       const url = new URL(c.req.url);
       url.searchParams.delete('token');
-      c.header('set-cookie', `${ADMIN_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`);
+      c.header('set-cookie', adminCookie(token));
       return c.redirect(`${url.pathname}${url.search}`, 303);
     }
     await next();
+    // A page opened with the cookie renews it, so the dashboard never logs its owner out while in use.
+    if (cookie && !bearer && c.req.method === 'GET' && !c.req.path.startsWith(ADMIN_API))
+      c.res.headers.append('set-cookie', adminCookie(token));
   });
   app.get('/', (c) => c.redirect('/dash/'));
   mountAdminApi(app, d, token);

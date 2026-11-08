@@ -314,6 +314,8 @@ test('admin refuses cross-site requests from web pages, and anyone without the t
     env,
   );
   expect(withCookie.status).toBe(200);
+  // Opening a page with the cookie renews it for another year.
+  expect(withCookie.headers.get('set-cookie')).toMatch(/^iltv_admin=the-admin-token; .*Max-Age=31536000/);
   expect(await withCookie.text()).toContain('Public addon (all users, anonymous)');
   const status = await app.request('/status', { headers: auth }, env);
   const rebound = await app.request('/status', { headers: { ...auth, host: 'evil.example:7702' } }, env);
