@@ -2017,3 +2017,16 @@ Measured on a copy of the live database and the runs/warnings of the three days 
   Kan. The read's 1,105 "source-renumbered" notes were logged before the migration resolved them: the 4,559 Reshet
   and Kan numbering warnings older than the migration were deleted (still in the migration's backup), and a
   migration now clears the warnings of the shows it moves.
+
+## Show names and Reshet's expired episodes (2026-11-08)
+
+- **Show names** carried page-title tails (54 of 1,275: "| תוכניות מלאות", "– פרקים מלאים לצפייה", "| באדיבות כאן
+  חינוכית"). `cleanShowTitle` removes a separator followed only by a kind of item (programmes, episodes, reports,
+  films) with "full", "to watch" and "live" words, and "| באדיבות …"; a real subtitle after a pipe stays. It runs at
+  the source boundary and when a show is read from the store, so stored names are clean without a migration.
+- **Reshet streams that answered 404 abroad without the Israel-only label** were not geo-blocked: their Kaltura
+  entries are past their schedule window (`endDate` passed; the playback check says `SCHEDULED_RESTRICTED`; 404 in
+  Israel too). Measured over all 13,747 Reshet episodes: 462 (26 shows entirely), on all three access profiles. Such
+  an episode is marked `unavailable`: kept, so its number stays reserved and returns the same if Reshet reopens it,
+  but left out of the catalog, as Kan's episodes whose rights ended are; a show with nothing offered is listed on
+  /status with the other shows that have nothing to watch.

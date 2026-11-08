@@ -390,6 +390,31 @@ test('a show whose only stored episode is a trailer is not listed (and has no pa
   expect(read(files, 'search.json')).toEqual([]);
 });
 
+test('episodes the source no longer offers are left out; the others keep their ids; none left = not listed', () => {
+  const s = show('iltv_mako_7', '2026-10-01');
+  const mark = (keys: string[]): RenderShow => ({
+    ...s,
+    show: {
+      ...s.show,
+      seasons: s.show.seasons.map((x) => ({
+        ...x,
+        episodes: x.episodes.map((e) => (keys.includes(e.key) ? { ...e, unavailable: true as const } : e)),
+      })),
+    },
+  });
+  const files = renderSite({ ...base, shows: [mark(['iltv_mako_7-b'])] });
+  const meta = read(files, 'meta/series/iltv_mako_7.json').meta;
+  expect(meta.videos.map((v: { id: string }) => v.id).sort()).toEqual([
+    'iltv_mako_7:101:1',
+    'iltv_mako_7:2:2',
+  ]);
+  // Its stream is not published; the number stays taken (2:2 is still 2:2).
+  expect(read(files, 'streams/iltv_mako_7/2.json')?.['1']).toBeUndefined();
+  const none = renderSite({ ...base, shows: [mark(['iltv_mako_7-a', 'iltv_mako_7-b', 'iltv_mako_7-c'])] });
+  expect(none.has('meta/series/iltv_mako_7.json')).toBe(false);
+  expect(read(none, 'search.json')).toEqual([]);
+});
+
 test('Kaltura episode stills stored unsized are published at 640×360', () => {
   const s = yearShow(['2026-10-01']);
   const still = 'https://images.frp1.ott.kaltura.com/Service.svc/GetImage/p/5031/entry_id/abc/version/10';

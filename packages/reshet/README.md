@@ -14,8 +14,9 @@ storage in `apps/ingest`.
 - Each episode's direct HLS URL (Kaltura `playManifest`).
 - The "blocked outside Israel" label from Kaltura access-control profiles, checked once per profile; if Kaltura
   fails, the show is still read and the failure noted.
-- An episode whose Kaltura entry is gone, or outside its schedule window (it then plays nowhere, Israel included),
-  keeps its place and number but offers no stream; the show carries a note saying how many.
+- An episode whose Kaltura entry is gone keeps its place and number but offers no stream; the show carries a note.
+- An episode outside its Kaltura schedule window (it plays nowhere, Israel included) is marked `unavailable`: its
+  number stays reserved, the catalog leaves it out, and it comes back with the same number when Reshet offers it again.
 
 ## Must not
 
@@ -31,7 +32,7 @@ storage in `apps/ingest`.
 - `RESHET_ORIGIN`, `RESHET_CATALOG` (`iltv_reshet13`), `KALTURA_PARTNER` — the site, its row, the Kaltura partner.
 - `fetchIndex(fetcher)` → `ReshetIndexEntry[]` — every show on the all-shows page.
 - `fetchShow(fetcher, entry, { currentSeasonOnly?, profiles?, kaltura? })` → `ScrapedShow` — one show.
-- `blockedEntries(entryIds, profiles, post?, now?)` → entry id → `{ blocked, expired }` (blocked outside Israel; outside its Kaltura schedule window, so it plays nowhere); `kalturaPost`; `ISRAEL_ONLY_PROFILES`.
+- `blockedEntries(entryIds, profiles, post?, now?)` → entry id → `{ blocked, expired }` (blocked outside Israel; outside its Kaltura schedule window); `kalturaPost`; `ISRAEL_ONLY_PROFILES`.
 - `playManifestUrl(entryId)` — an episode's HLS URL.
 - `nextData`, `parseAllShows`, `parseShowPage`, `parseSeasonPage`, `parseShowSitePage`, `siteSeasons`, `fromOld` —
   the pure parsers behind the above.

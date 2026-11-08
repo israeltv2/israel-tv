@@ -116,7 +116,10 @@ export interface StatusFile {
     notes: string[];
     /** Titles the site lists with nothing to watch (from the last complete full read), kept out of the catalog. */
     emptyShows?: string[];
-    /** Pages the site lists among episodes that are not played: rights ended, or not a video (Kan). */
+    /**
+     * Episodes the site lists that are not in the catalog: rights ended or not a video (Kan), past their availability
+     * window (Reshet; `notVideo` 0).
+     */
     skipped?: { noLongerOffered: number; notVideo: number };
     /** The site's bot check today: page loads it stopped, of all (Kan). */
     botCheck?: { challenged: number; pages: number };

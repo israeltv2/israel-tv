@@ -80,6 +80,9 @@ export function dedupeEpisodes(show: ScrapedShow): ScrapedShow {
 }
 
 export const episodeCount = (s: ScrapedShow) => s.seasons.reduce((n, x) => n + x.episodes.length, 0);
+/** Episodes the source still offers (the catalog's; `unavailable` ones keep their numbers but are left out). */
+export const offeredCount = (s: ScrapedShow) =>
+  s.seasons.reduce((n, x) => n + x.episodes.filter((e) => !e.unavailable).length, 0);
 
 /**
  * A partial (current-season-only) scrape keeps the previous episodes of seasons it did not fetch, and of
@@ -112,6 +115,8 @@ export type IngestResult =
   | {
       kind: 'saved';
       seriesId: string;
+      /** Episodes the source still offers: none means the show is not in the catalog (listed as empty). */
+      offered: number;
       newEpisodes: number /** Seasons this read returned episodes for. */;
       fetched: string[];
     }
@@ -217,7 +222,7 @@ export async function ingestShow(
     latestAirDate(show),
     prev !== undefined,
   );
-  return { kind: 'saved', seriesId, newEpisodes, fetched: [...fetched] };
+  return { kind: 'saved', seriesId, offered: offeredCount(show), newEpisodes, fetched: [...fetched] };
 }
 
 async function runShows(
@@ -257,6 +262,8 @@ async function runShows(
         empty.push(entry.title);
         continue;
       }
+      // Kept (its numbers stay reserved) but nothing in it is offered any more: not in the catalog, said so.
+      if (r.offered === 0) empty.push(entry.title);
       newEpisodes += r.newEpisodes;
       fetchedSeasons[r.seriesId] = r.fetched;
       if (r.newEpisodes > 0) log(`[${i + 1}/${list.length}] ${entry.title}: +${r.newEpisodes} episodes`);

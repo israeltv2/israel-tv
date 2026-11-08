@@ -23,6 +23,11 @@ export const ScrapedEpisode = z.strictObject({
   durationSec: z.number().int().positive().optional(),
   /** Where the source says the episode is watchable, if it says. */
   availableAbroad: z.boolean().optional(),
+  /**
+   * The source no longer offers it (past its availability window): kept, so its number stays reserved and comes
+   * back the same if the source offers it again, but left out of the published catalog.
+   */
+  unavailable: z.literal(true).optional(),
   streams: z.array(ScrapedStream).default([]),
   /** Source data the resolver needs at play time (e.g. Mako vcmid/channelId). */
   play: z.record(z.string(), z.string()).optional(),
