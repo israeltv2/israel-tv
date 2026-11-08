@@ -2467,6 +2467,44 @@ for (const a of copy.querySelectorAll('a')) a.tabIndex = -1;
 tick.appendChild(copy);
 tick.classList.add('on');
 }
+const ease = 'cubic-bezier(0.23, 1, 0.32, 1)';
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches && root.animate) {
+const shut = (det) =>
+det.querySelector(':scope > summary').offsetHeight + det.offsetHeight - det.clientHeight;
+d.addEventListener('click', (e) => {
+const summary = e.target.closest?.('details > summary');
+if (!summary || e.defaultPrevented || e.button) return;
+const det = summary.parentElement;
+e.preventDefault();
+const from = det.getBoundingClientRect().height;
+det.motion?.cancel();
+const opening = !det.open || det.dataset.closing === '1';
+det.open = true;
+const to = opening ? det.offsetHeight : shut(det);
+det.dataset.closing = opening ? '' : '1';
+det.style.overflow = 'clip';
+const body = [...det.children].filter((c) => c !== summary);
+const shown = body.map((c) => (det.fades?.length ? +getComputedStyle(c).opacity : opening ? 0 : 1));
+for (const f of det.fades ?? []) f.cancel();
+det.fades = body.map((c, i) =>
+c.animate({ opacity: [shown[i], opening ? 1 : 0] }, { duration: 200, fill: 'forwards' }),
+);
+const motion = det.animate(
+{ height: [`${from}px`, `${to}px`] },
+{ duration: 300, easing: ease, fill: 'forwards' },
+);
+det.motion = motion;
+motion.onfinish = () => {
+motion.cancel();
+det.motion = null;
+det.style.overflow = '';
+det.dataset.closing = '';
+if (!opening) det.open = false;
+for (const f of det.fades) f.cancel();
+det.fades = [];
+};
+});
+}
 const air = () => {
 const now = Date.now();
 for (const guide of d.querySelectorAll('[data-guide]')) {
@@ -2864,6 +2902,44 @@ copy.setAttribute('aria-hidden', 'true');
 for (const a of copy.querySelectorAll('a')) a.tabIndex = -1;
 tick.appendChild(copy);
 tick.classList.add('on');
+}
+const ease = 'cubic-bezier(0.23, 1, 0.32, 1)';
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches && root.animate) {
+const shut = (det) =>
+det.querySelector(':scope > summary').offsetHeight + det.offsetHeight - det.clientHeight;
+d.addEventListener('click', (e) => {
+const summary = e.target.closest?.('details > summary');
+if (!summary || e.defaultPrevented || e.button) return;
+const det = summary.parentElement;
+e.preventDefault();
+const from = det.getBoundingClientRect().height;
+det.motion?.cancel();
+const opening = !det.open || det.dataset.closing === '1';
+det.open = true;
+const to = opening ? det.offsetHeight : shut(det);
+det.dataset.closing = opening ? '' : '1';
+det.style.overflow = 'clip';
+const body = [...det.children].filter((c) => c !== summary);
+const shown = body.map((c) => (det.fades?.length ? +getComputedStyle(c).opacity : opening ? 0 : 1));
+for (const f of det.fades ?? []) f.cancel();
+det.fades = body.map((c, i) =>
+c.animate({ opacity: [shown[i], opening ? 1 : 0] }, { duration: 200, fill: 'forwards' }),
+);
+const motion = det.animate(
+{ height: [`${from}px`, `${to}px`] },
+{ duration: 300, easing: ease, fill: 'forwards' },
+);
+det.motion = motion;
+motion.onfinish = () => {
+motion.cancel();
+det.motion = null;
+det.style.overflow = '';
+det.dataset.closing = '';
+if (!opening) det.open = false;
+for (const f of det.fades) f.cancel();
+det.fades = [];
+};
+});
 }
 const air = () => {
 const now = Date.now();

@@ -2216,6 +2216,7 @@ renumbering: 331 "season-number-taken", 477 source notes, 1 "tmdb-duplicate".
   gone, חצות ועוד יותר's link to the front page, Kan pages without a player (gave up / still trying), Reshet's expired
   episodes; and a few per-show notes (a Kaltura timeout, a gone Keshet season, a trailer-only show) that the show's
   next complete read keeps or removes.
+
 ## The full programme guide on the website (2026-11-08)
 
 The owner asked for a full TV guide (לוח שידורים) to browse and search what is coming up, and to see from a show when
