@@ -132,6 +132,21 @@ export async function ingestShow(
 ): Promise<IngestResult> {
   const knownId = store.findSeriesId(adapter.source, entry.key);
   const prev = knownId ? store.getShow(knownId) : undefined;
+  const showKey = `${adapter.source}:${entry.key}`;
+  /**
+   * The source's notes on this show, as this read gives them. A complete read (not an airing check, which reads
+   * only the current season) replaces the show's earlier notes, so one the source no longer warrants goes away
+   * (a show that got episodes, an old name, a timeout that passed).
+   */
+  const notes = (seriesId: string | null, list: { message: string; params: Record<string, unknown> }[]) => {
+    if (!currentSeasonOnly || !prev)
+      store.clearNotes({ show: showKey, seriesId: knownId ?? null, title: entry.title });
+    store.addWarnings(
+      runId,
+      seriesId,
+      list.map((n) => ({ code: 'source-note', message: n.message, params: { ...n.params, show: showKey } })),
+    );
+  };
   let scraped: ScrapedShow;
   try {
     scraped = await adapter.fetchShow(entry, {
@@ -146,9 +161,8 @@ export async function ingestShow(
     }
     // Listed by the source but its page is gone, and we never had it: nothing to publish or keep.
     if ((err as { status?: number }).status === 404) {
-      store.addWarnings(runId, null, [
+      notes(null, [
         {
-          code: 'source-note',
           message: `${entry.title}: listed, but its page is gone (404)`,
           params: { title: entry.title, note: 'page-gone' },
         },
@@ -184,9 +198,8 @@ export async function ingestShow(
     episodeCount(raw) > 0 &&
     (!prev || episodeCount(cleanShow(prev.show)) === 0)
   ) {
-    store.addWarnings(runId, knownId ?? null, [
+    notes(knownId ?? null, [
       {
-        code: 'source-note',
         message: `${entry.title}: only a trailer so far (not in the catalog until an episode)`,
         params: { title: entry.title, note: 'trailer-only' },
       },
@@ -195,12 +208,10 @@ export async function ingestShow(
   }
   if (!prev && episodeCount(show) === 0) {
     // Listed by the source but with nothing to watch: not in the catalog, and always said so.
-    const notes = scraped.notes?.length ? scraped.notes : ['listed, but its page has no episodes'];
-    store.addWarnings(
-      runId,
+    const said = scraped.notes?.length ? scraped.notes : ['listed, but its page has no episodes'];
+    notes(
       null,
-      notes.map((message) => ({
-        code: 'source-note',
+      said.map((message) => ({
         message: `${entry.title}: ${message}`,
         params: scraped.notes?.length
           ? { title: entry.title, detail: message }
@@ -222,17 +233,13 @@ export async function ingestShow(
     throw new Error(thin);
   }
   const seriesId = knownId ?? store.seriesIdFor(adapter.source, entry.key);
-  if (scraped.notes?.length) {
-    store.addWarnings(
-      runId,
-      seriesId,
-      scraped.notes.map((message) => ({
-        code: 'source-note',
-        message: `${entry.title}: ${message}`,
-        params: { title: entry.title, detail: message },
-      })),
-    );
-  }
+  notes(
+    seriesId,
+    (scraped.notes ?? []).map((message) => ({
+      message: `${entry.title}: ${message}`,
+      params: { title: entry.title, detail: message },
+    })),
+  );
   const numbering = assignNumbers(show, store.assignments(seriesId));
   if (numbering.warnings.length) store.addWarnings(runId, seriesId, numbering.warnings);
   // A show's first save is not "new episodes": only later additions move it up the newest-first order.

@@ -134,3 +134,54 @@ test("matching keeps each matched show's details (in Hebrew); dropped with the m
   await matchShows(store, 'k', { get: async () => ({ results: [] }), delayMs: 0, recheckDays: -1 });
   expect(store.getState('tmdb:details')).toEqual({});
 });
+
+test('two of our shows with one name: the TMDB match goes to the one whose years fit (לאהוב את אנה)', async () => {
+  const { nearerShow } = await import('../src/tmdb.ts');
+  expect(nearerShow(2008, 2008, 2018)).toBe('a');
+  expect(nearerShow(2008, 2018, 2008)).toBe('b');
+  expect(nearerShow(2008, 2009, 2008)).toBeUndefined();
+  expect(nearerShow(undefined, 2008, 2018)).toBeUndefined();
+
+  const store = Store.open(':memory:');
+  const save = (source: 'mako' | 'reshet', key: string, airDate: string) => {
+    const id = store.seriesIdFor(source, key);
+    store.saveShow(
+      id,
+      {
+        source,
+        key,
+        title: 'לאהוב את אנה',
+        catalog: source === 'mako' ? 'iltv_keshet12' : 'iltv_reshet13',
+        seasons: [
+          { key: 's', title: 'עונה 1', episodes: [{ key: `${key}e`, title: 'e', airDate, streams: [] }] },
+        ],
+      },
+      {
+        seasons: [{ key: 's', number: 1, kind: 'numbered' }],
+        episodes: [{ key: `${key}e`, season: 1, episode: 1 }],
+      },
+      undefined,
+    );
+    return id;
+  };
+  const keshet = save('mako', '/to-love-anna', '2018-11-11');
+  const get = async (url: string) => {
+    if (url.includes('/external_ids')) return { imdb_id: 'tt2314713' };
+    if (url.includes('/tv/105361?')) return { name: 'לאהוב את אנה', original_name: 'לאהוב את אנה' };
+    return { results: [{ ...r(105361, 'לאהוב את אנה'), first_air_date: '2008-07-01' }] };
+  };
+  await matchShows(store, 'k', { get, delayMs: 0 });
+  expect(store.getShow(keshet)?.tmdbId).toBe(105361); // alone, it is taken
+  // Reshet's 2008 drama is read: it is the show TMDB means; Keshet's 2018 show loses the match, nobody is warned.
+  const reshet = save('reshet', '/all-shows/loving-anna/', '2008-07-01');
+  await matchShows(store, 'k', { get, delayMs: 0 });
+  expect(store.getShow(reshet)?.tmdbId).toBe(105361);
+  expect(store.getShow(keshet)?.tmdbId).toBeNull();
+  expect(store.recentWarnings(10).filter((w) => w.code === 'tmdb-duplicate')).toEqual([]);
+  // Keshet's show looked up again later: the years say it is not this one; still no warning.
+  store.forgetTmdbCheck(keshet);
+  await matchShows(store, 'k', { get, delayMs: 0 });
+  expect(store.getShow(keshet)?.tmdbId).toBeNull();
+  expect(store.getShow(reshet)?.tmdbId).toBe(105361);
+  expect(store.recentWarnings(10).filter((w) => w.code === 'tmdb-duplicate')).toEqual([]);
+});

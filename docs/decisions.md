@@ -2185,3 +2185,35 @@ posters are 420×600 JPEGs of 150–260 KB, which their CDN does not resize (`im
   but 19% of a sample of 172 had none, and a missing still would be a broken image and a console error. Show
   backdrops (Keshet 12's are 1920×1080, 300–400 KB) are the apps' full-screen backgrounds, so they stay; on the pages
   they load last.
+
+## Nothing stale on /status (2026-11-08)
+
+The owner asked for nothing left on `/status` either. Measured on a copy of the live database after the
+renumbering: 331 "season-number-taken", 477 source notes, 1 "tmdb-duplicate".
+
+- **"season-number-taken" (331, all from the first Reshet run, 2026-11-06, 192 shows) was a first-sight artefact.**
+  Reshet lists every season twice, once empty (`|s2` with the episodes, `|עונה 2` without); before seasons were
+  numbered only once they have episodes, the empty copy "wanted" its number and found it taken. Checked one by one:
+  every warned season is that empty copy, has no number, and its number is held by the season of the same title,
+  so every season is numbered right. The rules no longer number empty seasons, so the warning cannot recur.
+- **Source notes now last only as long as the source says them** (`Store.clearNotes`). A complete read of a show
+  (not an airing check, which reads one season) replaces its notes: each note carries the show's key, and notes
+  recorded before that are matched by the show's name. A Kan page's note is replaced by its next try and goes once
+  the page is read, or settled (taken down, not a video, a trailer). Before, a note stayed for 60 days whatever
+  happened, with the name the show had then ("שקשוקה | באדיבות כאן חינוכית").
+- **TMDB: two shows of one name are told apart by their years.** לאהוב את אנה is Reshet's 2008 drama (iltv_reshet_237;
+  TMDB 105361, first aired 2008-07-01, Channel 10) and Keshet's 2018 reality show (iltv_mako_135), which held the
+  match. When a second show matches a TMDB id another holds, the one whose first episode year is nearer TMDB's first
+  air year has it (`nearerShow`; more than a year nearer, else the warning stays: the years do not tell), and the
+  other is simply not matched.
+- **One-time clean-up `stale-warnings-2026-11-08`** (start-up, backup first, report in
+  `numbering:migrations:stale-warnings-2026-11-08`), each warning removed only where it is shown stale: the 331 above;
+  245 "Kan …: could not copy its image (HTTP 403)" (an older reader's message, per show; refusals are reported per
+  slice now, and all 241 of those shows have their artwork copied on the live catalog); 178 "listed, but … no
+  episodes" for shows we now have with episodes (under their name or their name before the clean-up of names); 16
+  show notes a later read replaced ("no episode list … (only Base, PaginationArray)" → "its page lists no videos");
+  10 Kan page notes (a later try, or a page since read or settled); the tmdb-duplicate (the show looked up again).
+  Left, because the source still says them: Reshet pages that list no videos (14), two Keshet entries whose page is
+  gone, חצות ועוד יותר's link to the front page, Kan pages without a player (gave up / still trying), Reshet's expired
+  episodes; and a few per-show notes (a Kaltura timeout, a gone Keshet season, a trailer-only show) that the show's
+  next complete read keeps or removes.
