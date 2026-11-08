@@ -3,6 +3,18 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.9.0](https://github.com/israeltv2/israel-tv/compare/v0.8.2...v0.9.0) (2026-11-08)
+
+
+### Features
+
+* **publish:** tell search engines about new and changed pages with IndexNow ([#166](https://github.com/israeltv2/israel-tv/issues/166)) ([06793e9](https://github.com/israeltv2/israel-tv/commit/06793e949a57268c51dfe1913e817641c666822f))
+
+
+### Bug Fixes
+
+* show names without page-title boilerplate; expired Reshet episodes offer no failing stream ([#167](https://github.com/israeltv2/israel-tv/issues/167)) ([5c21eaf](https://github.com/israeltv2/israel-tv/commit/5c21eaf60f4af417602ac0be308534312e44cc6d))
+
 ## [0.8.2](https://github.com/israeltv2/israel-tv/compare/v0.8.1...v0.8.2) (2026-11-08)
 
 
