@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.13.0](https://github.com/israeltv2/israel-tv/compare/v0.12.1...v0.13.0) (2026-11-08)
+
+
+### Features
+
+* **site:** full TV guide with search, programme to show links, next airings and i24NEWS schedules ([#181](https://github.com/israeltv2/israel-tv/issues/181)) ([43f04f9](https://github.com/israeltv2/israel-tv/commit/43f04f9a705e2661bce4ac81e884756c40c65233))
+
 ## [0.12.1](https://github.com/israeltv2/israel-tv/compare/v0.12.0...v0.12.1) (2026-11-08)
 
 
