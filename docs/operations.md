@@ -152,7 +152,7 @@ copy next to it and serves it on http://localhost:8788/. Nothing is published.
 The dashboard `http://<this computer's address>:7702/dash/` is for the owner only: it answers on the local network
 only, and also needs the admin token (`ISRAEL_TV_ADMIN_TOKEN` in `.env`; without it, one is generated on first start).
 `pnpm israel-tv admin-url` prints the link with the token; open it once in a browser and the token moves into a
-cookie (kept 30 days). Anyone without it gets a plain 404. It works on a phone (a tab bar at the bottom) and on a
+cookie (kept a year and renewed on every visit, so a bookmarked `/dash/` keeps working). Anyone without it gets a plain 404. It works on a phone (a tab bar at the bottom) and on a
 desktop (a sidebar), follows the system's light or dark setting (or the switch in the top corner, remembered on that
 device), shows every time in the configured time zone (`schedule.timezone`, Israel by default; the UTC time is in
 each time's tooltip) and keeps Hebrew titles in their own direction.
