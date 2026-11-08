@@ -316,6 +316,20 @@ describe('the status page in Hebrew', () => {
     expect(overall(failing, 'he').title).toBe('העדכונים של קשת 12, רשת 13 וכאן נעצרו');
   });
 
+  test("the catalog check's gaps in Hebrew too", () => {
+    const audit = {
+      at: '2026-11-07T06:48:29Z',
+      metas: 10,
+      problems: [],
+      gaps: [{ source: 'reshet', shows: 10, noGenre: 3, noDescription: 2, noYear: 1 }],
+    };
+    const page = renderStatusHtml({ ...SITE_STATUS, audit }, {}, 'he');
+    expect(page).toContain('<h3>פרטים על תוכניות שהמקורות לא נותנים</h3>');
+    expect(page).toContain('<th>בלי ז׳אנרים</th>');
+    expect(page).toContain('<td>רשת 13</td>');
+    expect(renderStatusHtml({ ...SITE_STATUS, audit })).toContain('<th>No genres</th>');
+  });
+
   test('both pages are in the sitemap, each with the other as its alternate', () => {
     const map = sitemapXml();
     expect(map).toContain(

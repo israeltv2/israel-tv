@@ -2066,7 +2066,6 @@ line on 143 Mako and 27 Kan. Filled only from what the sources (and TMDB, for ma
   description.
 - **Visible:** the catalog check on `/status` (and the dashboard's) counts per source the shows still without
   genres, a description or a year line.
-||||||| parent of e74950f (feat(site): status page in Hebrew at /he/status)
 
 ## The status page in Hebrew (2026-11-08)
 

@@ -610,9 +610,17 @@ function contributorDetails(status: StatusFile, lang: Lang): Html[] {
               : ''
           }${
             a.gaps?.length
-              ? html`<h3>Show details the sources do not give</h3><p class="small muted">Shows published without genres, a description or a year line. They are filled only from the channel’s own pages and, for shows matched to TMDB, from TMDB; never made up.</p><div class="table-scroll"><table><thead><tr><th>Source</th><th>Shows</th><th>No genres</th><th>No description</th><th>No year</th></tr></thead><tbody>${a.gaps.map(
+              ? html`${
+                  he
+                    ? html`<h3>פרטים על תוכניות שהמקורות לא נותנים</h3><p class="small muted">תוכניות שפורסמו בלי ז׳אנרים, בלי תיאור או בלי שנים. הפרטים האלה נלקחים רק מהאתר של הערוץ, ובתוכניות שהותאמו ל-TMDB גם משם. שום דבר לא ממציאים.</p>`
+                    : html`<h3>Show details the sources do not give</h3><p class="small muted">Shows published without genres, a description or a year line. They are filled only from the channel’s own pages and, for shows matched to TMDB, from TMDB; never made up.</p>`
+                }<div class="table-scroll"><table><thead><tr>${(
+                  he
+                    ? ['מקור', 'תוכניות', 'בלי ז׳אנרים', 'בלי תיאור', 'בלי שנים']
+                    : ['Source', 'Shows', 'No genres', 'No description', 'No year']
+                ).map((h) => html`<th>${h}</th>`)}</tr></thead><tbody>${a.gaps.map(
                   (g) =>
-                    html`<tr><td>${name(g.source)}</td><td>${num(g.shows)}</td><td>${num(g.noGenre)}</td><td>${num(g.noDescription)}</td><td>${num(g.noYear)}</td></tr>`,
+                    html`<tr><td>${name(g.source)}</td><td>${num(g.shows, lang)}</td><td>${num(g.noGenre, lang)}</td><td>${num(g.noDescription, lang)}</td><td>${num(g.noYear, lang)}</td></tr>`,
                 )}</tbody></table></div>`
               : ''
           }`
