@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.14.1](https://github.com/israeltv2/israel-tv/compare/v0.14.0...v0.14.1) (2026-11-08)
+
+
+### Bug Fixes
+
+* **kan:** read every show's full episode list; Nuvio link opens the show ([#187](https://github.com/israeltv2/israel-tv/issues/187)) ([f1ae51e](https://github.com/israeltv2/israel-tv/commit/f1ae51ed64c1685baadf9a29c9a159a11b800a70))
+
 ## [0.14.0](https://github.com/israeltv2/israel-tv/compare/v0.13.1...v0.14.0) (2026-11-08)
 
 
