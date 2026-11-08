@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 const IMAGE_TYPES: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
+  webp: 'image/webp',
   ico: 'image/x-icon',
   svg: 'image/svg+xml',
   woff2: 'font/woff2',
@@ -18,7 +19,7 @@ export function localAddonApp(dir: string) {
   const images = new Hono();
   // Images (the addon's logo and background, channel logos, the pages' icons) are served as they are.
   images.get(
-    '/:path{(logos/[a-z0-9_]+\\.png|art/[a-z0-9_]+(-poster)?\\.jpg|art/placeholder-poster\\.jpg|logo\\.png|background\\.jpg|favicon\\.ico|icon\\.svg|apple-touch-icon\\.png|icon-[a-z0-9-]+\\.png|og\\.jpg|hero\\.jpg|fonts/[a-z0-9-]+\\.woff2)}',
+    '/:path{(logos/[a-z0-9_]+\\.(?:png|webp)|art/[a-z0-9_]+(-poster)?\\.jpg|art/placeholder-poster\\.jpg|logo\\.png|background\\.jpg|favicon\\.ico|icon\\.svg|apple-touch-icon\\.png|icon-[a-z0-9-]+\\.png|og\\.jpg|hero\\.jpg|fonts/[a-z0-9-]+\\.woff2)}',
     async (c) => {
       const p = normalize(join(root, c.req.param('path')));
       if (!inside(p)) return c.notFound();

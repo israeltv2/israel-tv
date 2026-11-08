@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path';
 import { localAddonApp } from '../apps/ingest/src/local-server.ts';
 import { siteImages } from '../apps/ingest/src/site-images.ts';
+import { channelLogoSite } from '../apps/resolver/src/branding.ts';
 import { CATALOGS } from '../packages/core/src/catalogs.ts';
 import { sitePaths } from '../packages/core/src/site.ts';
 import {
@@ -94,6 +95,7 @@ const files = new Map([
   [sitePaths.landing, renderLandingHtml(landing, 'en')],
   [sitePaths.landingHe, renderLandingHtml(landing, 'he')],
   [sitePaths.statusPage, renderStatusHtml(status)],
+  [sitePaths.statusPageHe, renderStatusHtml(status, {}, 'he')],
   ...renderLibrary({ rows, live, guide }),
 ]);
 files.set(sitePaths.sitemap, sitemapXml(libraryUrls(files.keys())));
@@ -104,6 +106,11 @@ for (const [p, html] of files) {
 for (const [p, bytes] of siteImages()) {
   mkdirSync(dirname(join(out, p)), { recursive: true });
   writeFileSync(join(out, p), bytes);
+}
+// The pages' small channel logos, in case the published folder predates them.
+for (const c of live) {
+  const webp = channelLogoSite(c.id);
+  if (webp) writeFileSync(join(out, sitePaths.channelLogoSite(c.id)), webp);
 }
 console.log(`${files.size} pages written to ${out}; serving on ${origin}`);
 await listen(localAddonApp(out).fetch, '127.0.0.1', port, 'port');

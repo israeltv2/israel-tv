@@ -1,6 +1,6 @@
 // Series posters: every series row is shaped "poster", every poster we publish is portrait, and no poster address
 // is one that is refused outside Israel.
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { assignNumbers, ConfigSchema, type ScrapedShow } from '@israel-tv/core';
@@ -8,6 +8,7 @@ import { Store } from '@israel-tv/store';
 import jpeg from 'jpeg-js';
 import { expect, test } from 'vitest';
 import {
+  compactPoster,
   imageSize,
   isPortrait,
   measurePosters,
@@ -15,6 +16,7 @@ import {
   POSTER_W,
   portraitPoster,
   reachableAbroad,
+  remotePoster,
 } from '../src/posters.ts';
 import { renderFromStore } from '../src/publish.ts';
 
@@ -61,6 +63,46 @@ test('remote posters are measured once; only those reachable abroad are fetched'
   expect(await measurePosters(store, dir, urls, { fetch: fake })).toBe(0);
   expect(fetched).toEqual(['https://img.example/tall.jpg', 'https://img.example/wide.jpg']);
   expect(reachableAbroad('https://www.kan.org.il/x.jpg')).toBe(false);
+});
+
+/** A heavy portrait JPEG, as Keshet 12 serves some: fine grain at the highest quality. */
+function heavy(w: number, h: number): Uint8Array {
+  const data = new Uint8Array(w * h * 4);
+  let seed = 7;
+  for (let i = 0; i < w * h; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const n = (seed >> 16) % 24;
+    data.set([((i % w) * 255) / w + n, (Math.floor(i / w) * 255) / h + n, 120 + n, 255], i * 4);
+  }
+  return jpeg.encode({ width: w, height: h, data }, 100).data;
+}
+
+test('a heavy portrait poster is published as our lighter copy; a light one keeps its address', async () => {
+  const store = Store.open(':memory:');
+  const dir = mkdtempSync(join(tmpdir(), 'posters-'));
+  const big = heavy(420, 630);
+  expect(big.length).toBeGreaterThan(100 * 1024);
+  const light = compactPoster(big);
+  expect(light && imageSize(light)).toEqual({ w: POSTER_W, h: POSTER_H });
+  expect(light?.length).toBeLessThan(big.length * 0.6);
+  const fake = (async (u: string) =>
+    new Response(u.includes('heavy') ? big : photo(420, 600))) as unknown as typeof fetch;
+  const urls = ['https://img.example/heavy.jpg', 'https://img.example/light.jpg'];
+  // Measured before lighter copies existed (no `v`): checked once more, then never again.
+  store.setState('posters:v1', {
+    'https://img.example/heavy.jpg': { w: 420, h: 630, at: '2026-11-01T00:00:00Z' },
+  });
+  expect(await measurePosters(store, dir, urls, { fetch: fake })).toBe(2);
+  expect(await measurePosters(store, dir, urls, { fetch: fake })).toBe(0);
+  const p = remotePoster(store, dir, 'https://img.example/heavy.jpg');
+  expect('file' in p && imageSize(readFileSync(p.file))).toEqual({ w: POSTER_W, h: POSTER_H });
+  expect(remotePoster(store, dir, 'https://img.example/light.jpg')).toEqual({
+    url: 'https://img.example/light.jpg',
+  });
+  // A host that resizes on request keeps its address, however heavy.
+  const reshet = 'https://media3.reshet.tv/image/upload/v1/heavy.jpg';
+  await measurePosters(store, dir, [reshet], { fetch: fake });
+  expect(remotePoster(store, dir, reshet)).toEqual({ url: reshet });
 });
 
 function show(source: ScrapedShow['source'], key: string, catalog: string, poster?: string): ScrapedShow {

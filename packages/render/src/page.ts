@@ -249,7 +249,7 @@ export function logoTile(
   if (!mark) return html`<span class="logo-tile" style="${style}" aria-hidden="true"></span>`;
   if ('text' in mark)
     return html`<span class="logo-tile" style="${style}" aria-hidden="true"><span class="lt-over">${mark.over}</span><span class="lt-text">${mark.text}</span></span>`;
-  return html`<span class="logo-tile" style="${style}"><img src="/${sitePaths.channelLogo(mark.logo)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async"></span>`;
+  return html`<span class="logo-tile" style="${style}"><img src="/${sitePaths.channelLogoSite(mark.logo)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async"></span>`;
 }
 
 /** The small "opens another site" arrow after a text link (mirrored in right-to-left text). */

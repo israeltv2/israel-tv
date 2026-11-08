@@ -2,6 +2,8 @@
 // cropped or letter-boxed. Every poster's real shape is measured: a portrait image is used as it is, any other is
 // turned into a portrait one here (the image fitted on a blurred, darkened fill of itself) and served from our site.
 // A poster that is refused outside Israel (Kan's own site) is never published: our copy, or a placeholder until then.
+// A portrait poster that is needlessly heavy (Keshet 12's are often 200+ KB at 420×600) on a host that cannot resize
+// on request is served as our own lighter copy, at most POSTER_W wide (the same picture, ~50 KB).
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -18,7 +20,19 @@ const RETRY_FAILED_MS = 24 * 3600_000;
 const MAX_BYTES = 8 * 1024 * 1024;
 
 export type Size = { w: number; h: number };
-type Measured = { w: number; h: number; at: string; file?: string } | { error: string; at: string };
+/**
+ * `file`: our version of it (a portrait one, or a lighter copy). `v`: 2 once a portrait poster has also been checked
+ * for weight (posters measured before that are fetched once more).
+ */
+type Measured =
+  | { w: number; h: number; at: string; file?: string; v?: number }
+  | { error: string; at: string };
+/** A portrait JPEG heavier than this is worth a lighter copy... */
+const COMPACT_FROM_BYTES = 100 * 1024;
+/** ...when the copy is at most this share of it. */
+const COMPACT_GAIN = 0.6;
+/** Hosts that resize on request (the site asks them for its size): their posters stay theirs. */
+const RESIZES = /^https:\/\/media\d*\.reshet\.tv\/image\/upload\//;
 type PosterState = Record<string, Measured>;
 
 export function posterDir(config: Config): string {
@@ -160,6 +174,26 @@ export function portraitPoster(source: Uint8Array): Uint8Array {
 }
 
 /**
+ * A lighter copy of a portrait JPEG: at most POSTER_W wide, re-encoded. Undefined when it would not be much lighter,
+ * or the image is not a JPEG we can read (PNG posters stay as they are).
+ */
+export function compactPoster(source: Uint8Array): Uint8Array | undefined {
+  if (source[0] !== 0xff || source[1] !== 0xd8) return undefined;
+  let src: Pixels;
+  try {
+    src = jpeg.decode(source, { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 256 }) as Pixels;
+  } catch {
+    return undefined;
+  }
+  const scale = Math.min(1, POSTER_W / src.width);
+  const w = Math.round(src.width * scale);
+  const h = Math.round(src.height * scale);
+  const img = scale < 1 ? resample(src, 0, 0, src.width, src.height, w, h) : src;
+  const out = jpeg.encode({ width: w, height: h, data: img.data }, 80).data;
+  return out.length <= source.length * COMPACT_GAIN ? out : undefined;
+}
+
+/**
  * A local image as a portrait poster: `same` when it is one already, else a portrait version (kept next to the
  * data); undefined when it cannot be read.
  */
@@ -183,20 +217,23 @@ export function localPoster(file: string, dir: string): 'same' | Uint8Array | un
 
 /**
  * What to publish for a remote poster: its address when portrait (or not measured yet: failed fetches are retried),
- * our portrait version of it when it is not, and nothing (the placeholder) when neither can be published.
+ * our lighter copy when it has one, our portrait version of it when it is not portrait, and nothing (the placeholder)
+ * when neither can be published.
  */
 export type RemotePoster = { url: string } | { file: string } | { none: true };
 
 export function remotePoster(store: Store, dir: string, url: string): RemotePoster {
   if (!reachableAbroad(url) || isStockImage(url)) return { none: true };
   const m = store.getState<PosterState>(STATE_KEY)?.[url];
+  if (m && 'w' in m && m.file && existsSync(join(dir, m.file))) return { file: join(dir, m.file) };
   if (!m || !('w' in m) || isPortrait(m)) return { url };
-  return m.file && existsSync(join(dir, m.file)) ? { file: join(dir, m.file) } : { none: true };
+  return { none: true };
 }
 
 /**
  * Measures every remote poster not measured yet (and failed ones again after a day): fetched once each, a few
- * at a time; a poster that is not portrait gets its portrait version made now. Returns how many were measured.
+ * at a time; a poster that is not portrait gets its portrait version made now, a heavy portrait one its lighter copy.
+ * Returns how many were measured.
  */
 export async function measurePosters(
   store: Store,
@@ -210,7 +247,8 @@ export async function measurePosters(
   const due = [...new Set(urls)].filter((u) => {
     if (!reachableAbroad(u) || isStockImage(u)) return false;
     const m = state[u];
-    return !m || ('error' in m && now - Date.parse(m.at) > RETRY_FAILED_MS);
+    if (m && 'w' in m) return isPortrait(m) && !m.v && !RESIZES.test(u);
+    return !m || now - Date.parse(m.at) > RETRY_FAILED_MS;
   });
   const at = new Date(now).toISOString();
   let next = 0;
@@ -224,7 +262,15 @@ export async function measurePosters(
         const size = imageSize(body);
         if (!size) throw new Error('not an image we can read');
         let file: string | undefined;
-        if (!isPortrait(size)) {
+        if (isPortrait(size)) {
+          const light =
+            body.length > COMPACT_FROM_BYTES && !RESIZES.test(u) ? compactPoster(body) : undefined;
+          if (light) {
+            file = `remote-${hash(u)}.jpg`;
+            mkdirSync(dir, { recursive: true, mode: 0o700 });
+            writeFileSync(join(dir, file), light);
+          }
+        } else {
           try {
             const poster = portraitPoster(body);
             file = `remote-${hash(u)}.jpg`;
@@ -234,7 +280,7 @@ export async function measurePosters(
             opts.warn?.(`poster ${u}: ${size.w}x${size.h}, no portrait version (${(e as Error).message})`);
           }
         }
-        state[u] = { ...size, at, ...(file ? { file } : {}) };
+        state[u] = { ...size, at, v: 2, ...(file ? { file } : {}) };
       } catch (e) {
         state[u] = { error: (e as Error).message, at };
         opts.warn?.(`poster ${u}: ${(e as Error).message}`);

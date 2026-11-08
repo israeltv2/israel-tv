@@ -12,6 +12,12 @@ export function channelLogo(id: string): Uint8Array | undefined {
   return /^[a-z0-9_]+$/.test(id) && existsSync(p) ? readFileSync(p) : undefined;
 }
 
+/** Its small copy for the website's logo tiles (128 px WebP, made by `pnpm images:site`), when there is one. */
+export function channelLogoSite(id: string): Uint8Array | undefined {
+  const p = join(LOGOS, 'site', `${id}.webp`);
+  return /^[a-z0-9_]+$/.test(id) && existsSync(p) ? readFileSync(p) : undefined;
+}
+
 export type BrandImage = 'logo' | 'resolver-logo' | 'background' | 'poster-placeholder';
 
 /** The image's bytes and content type, from `dir` first, else bundled. */

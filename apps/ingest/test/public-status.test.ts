@@ -174,8 +174,11 @@ describe('nothing private reaches status.json, /status or /he/status', () => {
       ],
     };
     expect(JSON.stringify(publicStatus(status))).not.toMatch(leak);
-    expect(renderStatusHtml(status)).not.toMatch(leak);
-    expect(renderStatusHtml(status, {}, 'he')).not.toMatch(leak);
+    // The page's own stylesheet and script are ours, not status text ("user-select" is not a user name).
+    const content = (page: string) =>
+      page.replace(/<style>[\s\S]*?<\/style>|<script>[\s\S]*?<\/script>/g, '');
+    expect(content(renderStatusHtml(status))).not.toMatch(leak);
+    expect(content(renderStatusHtml(status, {}, 'he'))).not.toMatch(leak);
   });
 
   test('public addresses stay (origin and path only), and so do ids, keys and times', () => {
