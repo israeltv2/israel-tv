@@ -121,6 +121,8 @@ interface ShowState {
   removed?: string[];
   /** Pages linked among the episodes that hold no video (articles, promos); likewise. */
   notVideo?: string[];
+  /** Episode pages that play from YouTube: nothing we can play; counted on /status, never queued again. */
+  youtube?: string[];
   /** Last time a re-read of the show page found new episode links (not set by the first read). */
   lastNewAt?: string;
   /** Episode pages found as new on a re-read (newly published), as opposed to the first fill's backlog. */
@@ -1007,9 +1009,14 @@ export async function crawlKan(
       // Addresses kept by earlier reads, in one spelling (pageUrl), so a given-up page is recognised however Kan
       // spells it now.
       const seenBefore = new Set(
-        [...s.pending, ...s.failed, ...(s.skipped ?? []), ...(s.removed ?? []), ...(s.notVideo ?? [])].map(
-          pageUrl,
-        ),
+        [
+          ...s.pending,
+          ...s.failed,
+          ...(s.skipped ?? []),
+          ...(s.removed ?? []),
+          ...(s.notVideo ?? []),
+          ...(s.youtube ?? []),
+        ].map(pageUrl),
       );
       const dated = new Set(
         id
@@ -1031,7 +1038,13 @@ export async function crawlKan(
       // Pages given up on (after several tries) stay given up: they never re-enter the ordered queue, where
       // they would hold back newer episodes and, if they ever loaded, be numbered after them.
       const gaveUp = new Set(
-        [...s.failed, ...(s.skipped ?? []), ...(s.removed ?? []), ...(s.notVideo ?? [])].map(pageUrl),
+        [
+          ...s.failed,
+          ...(s.skipped ?? []),
+          ...(s.removed ?? []),
+          ...(s.notVideo ?? []),
+          ...(s.youtube ?? []),
+        ].map(pageUrl),
       );
       // …and by page id, when Kan's app spells a given-up page's address another way (`s2/123/` for `123/`).
       const gaveUpIds = new Set([...gaveUp].map((u) => pageIdOf(s, u)).filter((x) => x !== undefined));
@@ -1174,9 +1187,10 @@ export async function crawlKan(
           if (page.kind === 'challenge') throw new KanLoadError(`${url}: ${BOT_CHECK}`, 'outage');
           // Taken down by Kan (rights ended) or not a video at all: nothing to wait for or retry. Kept, counted
           // on /status, never queued again.
-          if (page.kind === 'removed' || page.kind === 'not-video') {
+          if (page.kind === 'removed' || page.kind === 'not-video' || page.kind === 'youtube') {
             delete s.retry?.[url];
-            const list = page.kind === 'removed' ? 'removed' : 'notVideo';
+            const list =
+              page.kind === 'removed' ? 'removed' : page.kind === 'youtube' ? 'youtube' : 'notVideo';
             s[list] = [...new Set([...(s[list] ?? []), url])];
             if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
             s.pending.shift();
@@ -1766,7 +1780,8 @@ export function kanFullLists(store: Pick<Store, 'getState'>): {
     waiting: shows.filter((s) => s.lists !== FULL_LISTS).length,
     toRead: shows.filter((s) => s.refill).reduce((n, s) => n + s.pending.length, 0),
     pagesOnly: shows.filter((s) => s.pagesOnly).length,
-    noPage: shows.reduce((n, s) => n + (s.noPage ?? 0), 0),
+    // Items the app lists without a web page, and pages that play from YouTube: the same thing to a viewer.
+    noPage: shows.reduce((n, s) => n + (s.noPage ?? 0) + (s.youtube?.length ?? 0), 0),
   };
 }
 

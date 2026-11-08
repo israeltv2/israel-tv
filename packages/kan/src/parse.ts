@@ -240,6 +240,8 @@ export interface KanEpisode {
  * - `removed`: Kan took the video down when its broadcast rights ended ("בשל הסכמי זכויות שידור, … כבר לא זמין
  *   לצפייה", a `rights-expired` overlay where the player was);
  * - `not-video`: an article or promo page linked among the episodes, with no video at all (an empty contentUrl);
+ * - `youtube`: the page plays the episode from YouTube (a `youtube-embed-player`), nothing we can play (measured
+ *   2026-11-08 on older כאן ספיישלים pages the full lists found);
  * - `unknown`: none of these — possibly a layout change (retried, then given up, visibly).
  */
 export type EpisodePageKind =
@@ -247,6 +249,7 @@ export type EpisodePageKind =
   | { kind: 'challenge' }
   | { kind: 'removed' }
   | { kind: 'not-video' }
+  | { kind: 'youtube' }
   | { kind: 'unknown' };
 
 export function classifyEpisodePage(
@@ -258,6 +261,8 @@ export function classifyEpisodePage(
   if (/class="rights-expired[" ]/.test(html)) return { kind: 'removed' };
   const episode = parseEpisodePage(html, origin) ?? (url ? parseVideoObject(html, url) : undefined);
   if (episode) return { kind: 'episode', episode };
+  if (/class="youtube-embed-player"[^>]*data-video-src="https:\/\/www\.youtube\.com\//.test(html))
+    return { kind: 'youtube' };
   const video = videoObject(html);
   if (video && !video.contentUrl) return { kind: 'not-video' };
   return { kind: 'unknown' };

@@ -133,8 +133,8 @@ export function noteText(note: StatusNote, english: string | undefined, lang: La
     case 'kan-no-web-page': {
       const c = n(p, 'count');
       return he
-        ? `${c === 1 ? 'פריט אחד' : `${num(c, 'he')} פריטים`} ברשימות של כאן ${c === 1 ? 'מנוגן' : 'מנוגנים'} מיוטיוב ואין ${c === 1 ? 'לו' : 'להם'} דף באתר, ולכן ${c === 1 ? 'הוא לא' : 'הם לא'} בקטלוג.`
-        : `${enCount(c, 'item', 'items')} in Kan’s lists ${c === 1 ? 'plays' : 'play'} from YouTube with no web page, so ${c === 1 ? 'it is' : 'they are'} not in the catalog.`;
+        ? `${c === 1 ? 'פרק אחד של כאן מנוגן' : `${num(c, 'he')} פרקים של כאן מנוגנים`} רק מיוטיוב, ולכן ${c === 1 ? 'הוא לא' : 'הם לא'} בקטלוג.`
+        : `${enCount(c, 'Kan episode plays', 'Kan episodes play')} only from YouTube, so ${c === 1 ? 'it is' : 'they are'} not in the catalog.`;
     }
     case 'kan-gave-up': {
       const c = n(p, 'count');

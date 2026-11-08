@@ -2294,8 +2294,9 @@ it airs next.
   first such show, every move in the log, in the database and in `before-kan-full-lists-2026-11-08.moves.json`, and the
   guard's history re-taken for the moved episodes only (`sanctionMoves`), so any other move still stops a publish.
 - **Visible on `/status`:** the backfill's progress (`kan-full-lists`), shows Kan's app does not list, read from their
-  pages only (`kan-pages-only`: a long one's older episodes may be missing), and YouTube-only items
-  (`kan-no-web-page`).
+  pages only (`kan-pages-only`: a long one's older episodes may be missing), and YouTube-only episodes
+  (`kan-no-web-page`: app items with no web page, and episode pages that embed a YouTube player, which the first live
+  slices met among older כאן ספיישלים pages and are now told apart at once instead of retried as "unknown").
 
 Not changed: extras Kan's app files under season 0 stay in season 1, where their pages' players put them (moving
 them to a specials season would move numbers viewers have); a show page's "טען עוד" is not followed (the app list
