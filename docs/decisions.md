@@ -1838,7 +1838,9 @@ with stills), the live channels with now/next, and search (details in operations
 - **Images stay where they are hosted**, sized on request where the host can (Reshet's Cloudinary `w_…`, Kan's
   `width=`): a 1.2 MB Reshet poster comes down as ~30 KB. Mako's are used as they are.
 - **Links out, not in:** "Watch in Stremio" opens the show (or episode, or channel) with a `stremio:///detail/…`
-  link; Nuvio has no such link, so the page says to add the addon and search the title; "Watch on the broadcaster's
+  link; "Watch in Nuvio" opens the show with Nuvio's own `nuvio://meta?type=series&id=…` (since 2026-11-08: Nuvio reads
+  `stremio://` only as an addon install, so the Stremio link merely opened it; it has no link for an episode or a live
+  channel); "Watch on the broadcaster's
   site" uses the show's own page from the source, and for live channels only pages known to be the channel's.
 
 **No playback on the website** (supervisor decision). Reasons:
