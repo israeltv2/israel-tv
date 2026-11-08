@@ -30,7 +30,7 @@ export interface GuidePageInput {
 }
 
 /** Channel names in English (the apps show the Hebrew ones). */
-const CHANNEL_EN: Record<string, string> = {
+export const CHANNEL_EN: Record<string, string> = {
   iltv_live_kan11: 'Kan 11',
   iltv_live_keshet12: 'Keshet 12',
   iltv_live_reshet13: 'Reshet 13',
@@ -40,6 +40,11 @@ const CHANNEL_EN: Record<string, string> = {
   iltv_live_makan33: 'Makan 33',
   iltv_live_knesset: 'Knesset Channel',
   iltv_live_ch10: 'Calcala 10',
+  iltv_live_ynet: 'ynet',
+  iltv_live_i24he: 'i24NEWS Hebrew',
+  iltv_live_i24en: 'i24NEWS English',
+  iltv_live_i24fr: 'i24NEWS French',
+  iltv_live_i24ar: 'i24NEWS Arabic',
   iltv_live_ch9: 'Channel 9',
   iltv_live_r13comedy: 'Reshet 13 Comedy',
   iltv_live_r13nofesh: 'Reshet 13 Vacation',
