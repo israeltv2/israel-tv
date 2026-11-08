@@ -253,5 +253,11 @@ export const LIBRARY: LibraryInput = {
       [NOW - H, NOW + H, 'חדשות הערב'],
       [NOW + H, NOW + 2 * H, 'סרט תעודה'],
     ],
+    // A show in the catalog under its episode and rerun parts, then a programme that is not one; a day later, again.
+    iltv_live_reshet13: [
+      [NOW - H / 2, NOW + H / 2, 'הישרדות - עונה 8 - ש.ח'],
+      [NOW + H / 2, NOW + 2 * H, 'חדשות - המהדורה המרכזית'],
+      [NOW + 24 * H, NOW + 25 * H, 'הישרדות - עונה 8'],
+    ],
   },
 };

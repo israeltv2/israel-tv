@@ -717,6 +717,173 @@ guide.classList.toggle('empty', !shown);
 air();
 setInterval(air, 30000);
 })();</script>
+<script>window.iltvMatch = (() => {
+const FINALS = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' };
+const PREFIXES = 'הובלמשכ';
+const normalize = (s) =>
+s
+.normalize('NFKD')
+.replace(/[֑-ׇ]/g, '')
+.replace(/[ךםןףץ]/g, (c) => FINALS[c])
+.toLowerCase()
+.replace(/[׳״'"`]/g, '')
+.replace(/[^\p{L}\p{N}]+/gu, ' ')
+.trim();
+/** A word without its one-letter prefix ("השף" → "שף"), or '' when it has none or too little would be left. */
+const unprefixed = (w) => {
+const n = w[0] === 'ו' && w.length > 3 && PREFIXES.includes(w[1]) ? 2 : 1;
+return w.length - n >= 2 && PREFIXES.includes(w[0]) ? w.slice(n) : '';
+};
+/** 1: every query word starts a title word; 2: only through a prefix letter; 0: no match. */
+const score = (key, words) => {
+const titleWords = key.split(' ');
+const bare = titleWords.map(unprefixed).filter(Boolean);
+let best = 1;
+for (const w of words) {
+if (titleWords.some((k) => k.startsWith(w))) continue;
+const w2 = unprefixed(w);
+if (bare.some((k) => k.startsWith(w)) || (w2 && titleWords.some((k) => k.startsWith(w2)))) {
+best = 2;
+continue;
+}
+return 0;
+}
+return best;
+};
+/** Text without the direction marks the apps need. */
+const plain = (s) => s.replace(/[‎‏‪-‮⁦-⁩]/g, '');
+return { normalize, score, plain };
+})();
+(() => {
+const d = document;
+const block = d.getElementById('airs');
+const tiles = d.querySelectorAll('a.tile[href^="/show/"]');
+const soon = d.getElementById('soon');
+if (!block && !tiles.length && !soon) return;
+const TZ = 'Asia/Jerusalem';
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+timeZone: TZ,
+year: 'numeric',
+month: '2-digit',
+day: '2-digit',
+});
+const clockFmt = new Intl.DateTimeFormat('en-GB', {
+timeZone: TZ,
+hour: '2-digit',
+minute: '2-digit',
+hourCycle: 'h23',
+});
+const hourOf = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: 'numeric', hourCycle: 'h23' });
+const weekday = new Intl.DateTimeFormat('he-IL', { timeZone: TZ, weekday: 'long' });
+const clock = (ms) => clockFmt.format(ms);
+/** "היום", "הערב", "מחר", "יום שלישי": the day of a moment, as said in Israel. */
+const dayWord = (ms, now) => {
+const days = Math.round((Date.parse(dayKey.format(ms)) - Date.parse(dayKey.format(now))) / 864e5);
+if (days === 0) return +hourOf.format(ms) >= 17 ? 'הערב' : 'היום';
+if (days === 1) return 'מחר';
+return weekday.format(ms);
+};
+const el = (tag, cls, text) => {
+const e = d.createElement(tag);
+if (cls) e.className = cls;
+if (text !== undefined) e.textContent = text;
+return e;
+};
+fetch('/airings.json')
+.then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+.then((data) => {
+const now = Date.now();
+const rows = data.r
+.map(([c, s, e, title, show]) => ({ ch: data.ch[c], s: s * 6e4, e: e * 6e4, title, show }))
+.filter((r) => r.e > now);
+const byShow = new Map();
+for (const r of rows) if (r.show) byShow.set(r.show, [...(byShow.get(r.show) || []), r]);
+const when = (r) => (r.s <= now ? 'עכשיו' : `${dayWord(r.s, now)} ${clock(r.s)}`);
+if (block) {
+const list = (byShow.get(block.dataset.show) || []).slice(0, 3);
+if (list.length) {
+const ul = block.querySelector('ul');
+for (const r of list) {
+const li = el('li', r.s <= now ? 'now' : '');
+const w = el(
+'span',
+r.s <= now ? 'when on-air' : 'when',
+r.s <= now ? 'עכשיו בשידור' : dayWord(r.s, now),
+);
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const extra = el('span', 'pt', r.title);
+extra.dir = 'auto';
+const range = el(
+'span',
+'until',
+r.s <= now ? `עד ${clock(r.e)}` : `${clock(r.s)}–${clock(r.e)}`,
+);
+if (r.s > now) range.dir = 'ltr';
+li.append(w, range, ch, extra);
+ul.append(li);
+}
+block.hidden = false;
+}
+}
+for (const a of tiles) {
+const id = a.getAttribute('href').split('/')[2];
+const next = (byShow.get(id) || [])[0];
+if (!next || next.s - now > 2 * 864e5) continue;
+const line = el('span', next.s <= now ? 'air on' : 'air', `${when(next)} · ${next.ch[1]}`);
+a.append(line);
+}
+if (soon) {
+const { normalize, score } = window.iltvMatch;
+const input = d.getElementById('q');
+const list = soon.querySelector('.soon-list');
+const more = soon.querySelector('.soon-more');
+const keyed = rows.map((r) => [normalize(r.title), r]);
+const run = () => {
+const q = normalize(input.value);
+if (!q) {
+soon.hidden = true;
+return;
+}
+const words = q.split(' ');
+const hits = keyed.filter(([k]) => score(k, words)).map(([, r]) => r);
+soon.hidden = hits.length === 0;
+list.replaceChildren();
+let day = '';
+let ol = null;
+for (const r of hits.slice(0, 30)) {
+const w = r.s <= now ? 'עכשיו' : dayWord(r.s, now);
+const label = w === 'הערב' ? 'היום' : w;
+if (label !== day) {
+day = label;
+list.append(el('h3', '', label));
+ol = el('ol', 'airs-list');
+list.append(ol);
+}
+const li = el('li', r.s <= now ? 'now' : '');
+li.append(el('span', 'when', r.s <= now ? `עד ${clock(r.e)}` : clock(r.s)));
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const t = el('span', 'pt', r.title);
+t.dir = 'auto';
+li.append(ch, t);
+if (r.show) {
+const go = el('a', 'go', 'צפייה בפרקים קודמים');
+go.href = `/show/${r.show}/`;
+li.append(go);
+}
+ol.append(li);
+}
+more.href = `/live/guide/?q=${encodeURIComponent(input.value)}`;
+};
+input.addEventListener('input', run);
+run();
+}
+})
+.catch(() => {});
+})();</script>
 
 // row
 <script>try {
@@ -884,6 +1051,173 @@ filters.removeAttribute('hidden');
 const genre = new URLSearchParams(location.search).get('g') || '';
 if ([...chips].some((c) => c.dataset.g === genre)) pick(genre);
 }
+})();
+window.iltvMatch = (() => {
+const FINALS = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' };
+const PREFIXES = 'הובלמשכ';
+const normalize = (s) =>
+s
+.normalize('NFKD')
+.replace(/[֑-ׇ]/g, '')
+.replace(/[ךםןףץ]/g, (c) => FINALS[c])
+.toLowerCase()
+.replace(/[׳״'"`]/g, '')
+.replace(/[^\p{L}\p{N}]+/gu, ' ')
+.trim();
+/** A word without its one-letter prefix ("השף" → "שף"), or '' when it has none or too little would be left. */
+const unprefixed = (w) => {
+const n = w[0] === 'ו' && w.length > 3 && PREFIXES.includes(w[1]) ? 2 : 1;
+return w.length - n >= 2 && PREFIXES.includes(w[0]) ? w.slice(n) : '';
+};
+/** 1: every query word starts a title word; 2: only through a prefix letter; 0: no match. */
+const score = (key, words) => {
+const titleWords = key.split(' ');
+const bare = titleWords.map(unprefixed).filter(Boolean);
+let best = 1;
+for (const w of words) {
+if (titleWords.some((k) => k.startsWith(w))) continue;
+const w2 = unprefixed(w);
+if (bare.some((k) => k.startsWith(w)) || (w2 && titleWords.some((k) => k.startsWith(w2)))) {
+best = 2;
+continue;
+}
+return 0;
+}
+return best;
+};
+/** Text without the direction marks the apps need. */
+const plain = (s) => s.replace(/[‎‏‪-‮⁦-⁩]/g, '');
+return { normalize, score, plain };
+})();
+(() => {
+const d = document;
+const block = d.getElementById('airs');
+const tiles = d.querySelectorAll('a.tile[href^="/show/"]');
+const soon = d.getElementById('soon');
+if (!block && !tiles.length && !soon) return;
+const TZ = 'Asia/Jerusalem';
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+timeZone: TZ,
+year: 'numeric',
+month: '2-digit',
+day: '2-digit',
+});
+const clockFmt = new Intl.DateTimeFormat('en-GB', {
+timeZone: TZ,
+hour: '2-digit',
+minute: '2-digit',
+hourCycle: 'h23',
+});
+const hourOf = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: 'numeric', hourCycle: 'h23' });
+const weekday = new Intl.DateTimeFormat('he-IL', { timeZone: TZ, weekday: 'long' });
+const clock = (ms) => clockFmt.format(ms);
+/** "היום", "הערב", "מחר", "יום שלישי": the day of a moment, as said in Israel. */
+const dayWord = (ms, now) => {
+const days = Math.round((Date.parse(dayKey.format(ms)) - Date.parse(dayKey.format(now))) / 864e5);
+if (days === 0) return +hourOf.format(ms) >= 17 ? 'הערב' : 'היום';
+if (days === 1) return 'מחר';
+return weekday.format(ms);
+};
+const el = (tag, cls, text) => {
+const e = d.createElement(tag);
+if (cls) e.className = cls;
+if (text !== undefined) e.textContent = text;
+return e;
+};
+fetch('/airings.json')
+.then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+.then((data) => {
+const now = Date.now();
+const rows = data.r
+.map(([c, s, e, title, show]) => ({ ch: data.ch[c], s: s * 6e4, e: e * 6e4, title, show }))
+.filter((r) => r.e > now);
+const byShow = new Map();
+for (const r of rows) if (r.show) byShow.set(r.show, [...(byShow.get(r.show) || []), r]);
+const when = (r) => (r.s <= now ? 'עכשיו' : `${dayWord(r.s, now)} ${clock(r.s)}`);
+if (block) {
+const list = (byShow.get(block.dataset.show) || []).slice(0, 3);
+if (list.length) {
+const ul = block.querySelector('ul');
+for (const r of list) {
+const li = el('li', r.s <= now ? 'now' : '');
+const w = el(
+'span',
+r.s <= now ? 'when on-air' : 'when',
+r.s <= now ? 'עכשיו בשידור' : dayWord(r.s, now),
+);
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const extra = el('span', 'pt', r.title);
+extra.dir = 'auto';
+const range = el(
+'span',
+'until',
+r.s <= now ? `עד ${clock(r.e)}` : `${clock(r.s)}–${clock(r.e)}`,
+);
+if (r.s > now) range.dir = 'ltr';
+li.append(w, range, ch, extra);
+ul.append(li);
+}
+block.hidden = false;
+}
+}
+for (const a of tiles) {
+const id = a.getAttribute('href').split('/')[2];
+const next = (byShow.get(id) || [])[0];
+if (!next || next.s - now > 2 * 864e5) continue;
+const line = el('span', next.s <= now ? 'air on' : 'air', `${when(next)} · ${next.ch[1]}`);
+a.append(line);
+}
+if (soon) {
+const { normalize, score } = window.iltvMatch;
+const input = d.getElementById('q');
+const list = soon.querySelector('.soon-list');
+const more = soon.querySelector('.soon-more');
+const keyed = rows.map((r) => [normalize(r.title), r]);
+const run = () => {
+const q = normalize(input.value);
+if (!q) {
+soon.hidden = true;
+return;
+}
+const words = q.split(' ');
+const hits = keyed.filter(([k]) => score(k, words)).map(([, r]) => r);
+soon.hidden = hits.length === 0;
+list.replaceChildren();
+let day = '';
+let ol = null;
+for (const r of hits.slice(0, 30)) {
+const w = r.s <= now ? 'עכשיו' : dayWord(r.s, now);
+const label = w === 'הערב' ? 'היום' : w;
+if (label !== day) {
+day = label;
+list.append(el('h3', '', label));
+ol = el('ol', 'airs-list');
+list.append(ol);
+}
+const li = el('li', r.s <= now ? 'now' : '');
+li.append(el('span', 'when', r.s <= now ? `עד ${clock(r.e)}` : clock(r.s)));
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const t = el('span', 'pt', r.title);
+t.dir = 'auto';
+li.append(ch, t);
+if (r.show) {
+const go = el('a', 'go', 'צפייה בפרקים קודמים');
+go.href = `/show/${r.show}/`;
+li.append(go);
+}
+ol.append(li);
+}
+more.href = `/live/guide/?q=${encodeURIComponent(input.value)}`;
+};
+input.addEventListener('input', run);
+run();
+}
+})
+.catch(() => {});
 })();</script>
 
 // show
@@ -1029,6 +1363,173 @@ guide.classList.toggle('empty', !shown);
 air();
 setInterval(air, 30000);
 })();</script>
+<script>window.iltvMatch = (() => {
+const FINALS = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' };
+const PREFIXES = 'הובלמשכ';
+const normalize = (s) =>
+s
+.normalize('NFKD')
+.replace(/[֑-ׇ]/g, '')
+.replace(/[ךםןףץ]/g, (c) => FINALS[c])
+.toLowerCase()
+.replace(/[׳״'"`]/g, '')
+.replace(/[^\p{L}\p{N}]+/gu, ' ')
+.trim();
+/** A word without its one-letter prefix ("השף" → "שף"), or '' when it has none or too little would be left. */
+const unprefixed = (w) => {
+const n = w[0] === 'ו' && w.length > 3 && PREFIXES.includes(w[1]) ? 2 : 1;
+return w.length - n >= 2 && PREFIXES.includes(w[0]) ? w.slice(n) : '';
+};
+/** 1: every query word starts a title word; 2: only through a prefix letter; 0: no match. */
+const score = (key, words) => {
+const titleWords = key.split(' ');
+const bare = titleWords.map(unprefixed).filter(Boolean);
+let best = 1;
+for (const w of words) {
+if (titleWords.some((k) => k.startsWith(w))) continue;
+const w2 = unprefixed(w);
+if (bare.some((k) => k.startsWith(w)) || (w2 && titleWords.some((k) => k.startsWith(w2)))) {
+best = 2;
+continue;
+}
+return 0;
+}
+return best;
+};
+/** Text without the direction marks the apps need. */
+const plain = (s) => s.replace(/[‎‏‪-‮⁦-⁩]/g, '');
+return { normalize, score, plain };
+})();
+(() => {
+const d = document;
+const block = d.getElementById('airs');
+const tiles = d.querySelectorAll('a.tile[href^="/show/"]');
+const soon = d.getElementById('soon');
+if (!block && !tiles.length && !soon) return;
+const TZ = 'Asia/Jerusalem';
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+timeZone: TZ,
+year: 'numeric',
+month: '2-digit',
+day: '2-digit',
+});
+const clockFmt = new Intl.DateTimeFormat('en-GB', {
+timeZone: TZ,
+hour: '2-digit',
+minute: '2-digit',
+hourCycle: 'h23',
+});
+const hourOf = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: 'numeric', hourCycle: 'h23' });
+const weekday = new Intl.DateTimeFormat('he-IL', { timeZone: TZ, weekday: 'long' });
+const clock = (ms) => clockFmt.format(ms);
+/** "היום", "הערב", "מחר", "יום שלישי": the day of a moment, as said in Israel. */
+const dayWord = (ms, now) => {
+const days = Math.round((Date.parse(dayKey.format(ms)) - Date.parse(dayKey.format(now))) / 864e5);
+if (days === 0) return +hourOf.format(ms) >= 17 ? 'הערב' : 'היום';
+if (days === 1) return 'מחר';
+return weekday.format(ms);
+};
+const el = (tag, cls, text) => {
+const e = d.createElement(tag);
+if (cls) e.className = cls;
+if (text !== undefined) e.textContent = text;
+return e;
+};
+fetch('/airings.json')
+.then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+.then((data) => {
+const now = Date.now();
+const rows = data.r
+.map(([c, s, e, title, show]) => ({ ch: data.ch[c], s: s * 6e4, e: e * 6e4, title, show }))
+.filter((r) => r.e > now);
+const byShow = new Map();
+for (const r of rows) if (r.show) byShow.set(r.show, [...(byShow.get(r.show) || []), r]);
+const when = (r) => (r.s <= now ? 'עכשיו' : `${dayWord(r.s, now)} ${clock(r.s)}`);
+if (block) {
+const list = (byShow.get(block.dataset.show) || []).slice(0, 3);
+if (list.length) {
+const ul = block.querySelector('ul');
+for (const r of list) {
+const li = el('li', r.s <= now ? 'now' : '');
+const w = el(
+'span',
+r.s <= now ? 'when on-air' : 'when',
+r.s <= now ? 'עכשיו בשידור' : dayWord(r.s, now),
+);
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const extra = el('span', 'pt', r.title);
+extra.dir = 'auto';
+const range = el(
+'span',
+'until',
+r.s <= now ? `עד ${clock(r.e)}` : `${clock(r.s)}–${clock(r.e)}`,
+);
+if (r.s > now) range.dir = 'ltr';
+li.append(w, range, ch, extra);
+ul.append(li);
+}
+block.hidden = false;
+}
+}
+for (const a of tiles) {
+const id = a.getAttribute('href').split('/')[2];
+const next = (byShow.get(id) || [])[0];
+if (!next || next.s - now > 2 * 864e5) continue;
+const line = el('span', next.s <= now ? 'air on' : 'air', `${when(next)} · ${next.ch[1]}`);
+a.append(line);
+}
+if (soon) {
+const { normalize, score } = window.iltvMatch;
+const input = d.getElementById('q');
+const list = soon.querySelector('.soon-list');
+const more = soon.querySelector('.soon-more');
+const keyed = rows.map((r) => [normalize(r.title), r]);
+const run = () => {
+const q = normalize(input.value);
+if (!q) {
+soon.hidden = true;
+return;
+}
+const words = q.split(' ');
+const hits = keyed.filter(([k]) => score(k, words)).map(([, r]) => r);
+soon.hidden = hits.length === 0;
+list.replaceChildren();
+let day = '';
+let ol = null;
+for (const r of hits.slice(0, 30)) {
+const w = r.s <= now ? 'עכשיו' : dayWord(r.s, now);
+const label = w === 'הערב' ? 'היום' : w;
+if (label !== day) {
+day = label;
+list.append(el('h3', '', label));
+ol = el('ol', 'airs-list');
+list.append(ol);
+}
+const li = el('li', r.s <= now ? 'now' : '');
+li.append(el('span', 'when', r.s <= now ? `עד ${clock(r.e)}` : clock(r.s)));
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const t = el('span', 'pt', r.title);
+t.dir = 'auto';
+li.append(ch, t);
+if (r.show) {
+const go = el('a', 'go', 'צפייה בפרקים קודמים');
+go.href = `/show/${r.show}/`;
+li.append(go);
+}
+ol.append(li);
+}
+more.href = `/live/guide/?q=${encodeURIComponent(input.value)}`;
+};
+input.addEventListener('input', run);
+run();
+}
+})
+.catch(() => {});
+})();</script>
 
 // show-empty
 <script>try {
@@ -1172,6 +1673,173 @@ guide.classList.toggle('empty', !shown);
 };
 air();
 setInterval(air, 30000);
+})();</script>
+<script>window.iltvMatch = (() => {
+const FINALS = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' };
+const PREFIXES = 'הובלמשכ';
+const normalize = (s) =>
+s
+.normalize('NFKD')
+.replace(/[֑-ׇ]/g, '')
+.replace(/[ךםןףץ]/g, (c) => FINALS[c])
+.toLowerCase()
+.replace(/[׳״'"`]/g, '')
+.replace(/[^\p{L}\p{N}]+/gu, ' ')
+.trim();
+/** A word without its one-letter prefix ("השף" → "שף"), or '' when it has none or too little would be left. */
+const unprefixed = (w) => {
+const n = w[0] === 'ו' && w.length > 3 && PREFIXES.includes(w[1]) ? 2 : 1;
+return w.length - n >= 2 && PREFIXES.includes(w[0]) ? w.slice(n) : '';
+};
+/** 1: every query word starts a title word; 2: only through a prefix letter; 0: no match. */
+const score = (key, words) => {
+const titleWords = key.split(' ');
+const bare = titleWords.map(unprefixed).filter(Boolean);
+let best = 1;
+for (const w of words) {
+if (titleWords.some((k) => k.startsWith(w))) continue;
+const w2 = unprefixed(w);
+if (bare.some((k) => k.startsWith(w)) || (w2 && titleWords.some((k) => k.startsWith(w2)))) {
+best = 2;
+continue;
+}
+return 0;
+}
+return best;
+};
+/** Text without the direction marks the apps need. */
+const plain = (s) => s.replace(/[‎‏‪-‮⁦-⁩]/g, '');
+return { normalize, score, plain };
+})();
+(() => {
+const d = document;
+const block = d.getElementById('airs');
+const tiles = d.querySelectorAll('a.tile[href^="/show/"]');
+const soon = d.getElementById('soon');
+if (!block && !tiles.length && !soon) return;
+const TZ = 'Asia/Jerusalem';
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+timeZone: TZ,
+year: 'numeric',
+month: '2-digit',
+day: '2-digit',
+});
+const clockFmt = new Intl.DateTimeFormat('en-GB', {
+timeZone: TZ,
+hour: '2-digit',
+minute: '2-digit',
+hourCycle: 'h23',
+});
+const hourOf = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: 'numeric', hourCycle: 'h23' });
+const weekday = new Intl.DateTimeFormat('he-IL', { timeZone: TZ, weekday: 'long' });
+const clock = (ms) => clockFmt.format(ms);
+/** "היום", "הערב", "מחר", "יום שלישי": the day of a moment, as said in Israel. */
+const dayWord = (ms, now) => {
+const days = Math.round((Date.parse(dayKey.format(ms)) - Date.parse(dayKey.format(now))) / 864e5);
+if (days === 0) return +hourOf.format(ms) >= 17 ? 'הערב' : 'היום';
+if (days === 1) return 'מחר';
+return weekday.format(ms);
+};
+const el = (tag, cls, text) => {
+const e = d.createElement(tag);
+if (cls) e.className = cls;
+if (text !== undefined) e.textContent = text;
+return e;
+};
+fetch('/airings.json')
+.then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+.then((data) => {
+const now = Date.now();
+const rows = data.r
+.map(([c, s, e, title, show]) => ({ ch: data.ch[c], s: s * 6e4, e: e * 6e4, title, show }))
+.filter((r) => r.e > now);
+const byShow = new Map();
+for (const r of rows) if (r.show) byShow.set(r.show, [...(byShow.get(r.show) || []), r]);
+const when = (r) => (r.s <= now ? 'עכשיו' : `${dayWord(r.s, now)} ${clock(r.s)}`);
+if (block) {
+const list = (byShow.get(block.dataset.show) || []).slice(0, 3);
+if (list.length) {
+const ul = block.querySelector('ul');
+for (const r of list) {
+const li = el('li', r.s <= now ? 'now' : '');
+const w = el(
+'span',
+r.s <= now ? 'when on-air' : 'when',
+r.s <= now ? 'עכשיו בשידור' : dayWord(r.s, now),
+);
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const extra = el('span', 'pt', r.title);
+extra.dir = 'auto';
+const range = el(
+'span',
+'until',
+r.s <= now ? `עד ${clock(r.e)}` : `${clock(r.s)}–${clock(r.e)}`,
+);
+if (r.s > now) range.dir = 'ltr';
+li.append(w, range, ch, extra);
+ul.append(li);
+}
+block.hidden = false;
+}
+}
+for (const a of tiles) {
+const id = a.getAttribute('href').split('/')[2];
+const next = (byShow.get(id) || [])[0];
+if (!next || next.s - now > 2 * 864e5) continue;
+const line = el('span', next.s <= now ? 'air on' : 'air', `${when(next)} · ${next.ch[1]}`);
+a.append(line);
+}
+if (soon) {
+const { normalize, score } = window.iltvMatch;
+const input = d.getElementById('q');
+const list = soon.querySelector('.soon-list');
+const more = soon.querySelector('.soon-more');
+const keyed = rows.map((r) => [normalize(r.title), r]);
+const run = () => {
+const q = normalize(input.value);
+if (!q) {
+soon.hidden = true;
+return;
+}
+const words = q.split(' ');
+const hits = keyed.filter(([k]) => score(k, words)).map(([, r]) => r);
+soon.hidden = hits.length === 0;
+list.replaceChildren();
+let day = '';
+let ol = null;
+for (const r of hits.slice(0, 30)) {
+const w = r.s <= now ? 'עכשיו' : dayWord(r.s, now);
+const label = w === 'הערב' ? 'היום' : w;
+if (label !== day) {
+day = label;
+list.append(el('h3', '', label));
+ol = el('ol', 'airs-list');
+list.append(ol);
+}
+const li = el('li', r.s <= now ? 'now' : '');
+li.append(el('span', 'when', r.s <= now ? `עד ${clock(r.e)}` : clock(r.s)));
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const t = el('span', 'pt', r.title);
+t.dir = 'auto';
+li.append(ch, t);
+if (r.show) {
+const go = el('a', 'go', 'צפייה בפרקים קודמים');
+go.href = `/show/${r.show}/`;
+li.append(go);
+}
+ol.append(li);
+}
+more.href = `/live/guide/?q=${encodeURIComponent(input.value)}`;
+};
+input.addEventListener('input', run);
+run();
+}
+})
+.catch(() => {});
 })();</script>
 
 // live
@@ -1461,7 +2129,7 @@ guide.classList.toggle('empty', !shown);
 air();
 setInterval(air, 30000);
 })();</script>
-<script>(() => {
+<script>window.iltvMatch = (() => {
 const FINALS = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' };
 const PREFIXES = 'הובלמשכ';
 const normalize = (s) =>
@@ -1494,7 +2162,12 @@ return 0;
 }
 return best;
 };
+/** Text without the direction marks the apps need. */
 const plain = (s) => s.replace(/[‎‏‪-‮⁦-⁩]/g, '');
+return { normalize, score, plain };
+})();
+(() => {
+const { normalize, score, plain } = window.iltvMatch;
 const sized = (u) =>
 /^https:\/\/media\d*\.reshet\.tv\/image\/upload\//.test(u) && !/\/upload\/[a-z]_/.test(u)
 ? u.replace('/image/upload/', '/image/upload/w_220,c_limit,f_auto,q_auto/')
@@ -1577,6 +2250,1008 @@ info.textContent = 'החיפוש לא נטען. נסו לרענן את הדף.';
 );
 input.focus();
 run();
+})();
+(() => {
+const d = document;
+const block = d.getElementById('airs');
+const tiles = d.querySelectorAll('a.tile[href^="/show/"]');
+const soon = d.getElementById('soon');
+if (!block && !tiles.length && !soon) return;
+const TZ = 'Asia/Jerusalem';
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+timeZone: TZ,
+year: 'numeric',
+month: '2-digit',
+day: '2-digit',
+});
+const clockFmt = new Intl.DateTimeFormat('en-GB', {
+timeZone: TZ,
+hour: '2-digit',
+minute: '2-digit',
+hourCycle: 'h23',
+});
+const hourOf = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: 'numeric', hourCycle: 'h23' });
+const weekday = new Intl.DateTimeFormat('he-IL', { timeZone: TZ, weekday: 'long' });
+const clock = (ms) => clockFmt.format(ms);
+/** "היום", "הערב", "מחר", "יום שלישי": the day of a moment, as said in Israel. */
+const dayWord = (ms, now) => {
+const days = Math.round((Date.parse(dayKey.format(ms)) - Date.parse(dayKey.format(now))) / 864e5);
+if (days === 0) return +hourOf.format(ms) >= 17 ? 'הערב' : 'היום';
+if (days === 1) return 'מחר';
+return weekday.format(ms);
+};
+const el = (tag, cls, text) => {
+const e = d.createElement(tag);
+if (cls) e.className = cls;
+if (text !== undefined) e.textContent = text;
+return e;
+};
+fetch('/airings.json')
+.then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+.then((data) => {
+const now = Date.now();
+const rows = data.r
+.map(([c, s, e, title, show]) => ({ ch: data.ch[c], s: s * 6e4, e: e * 6e4, title, show }))
+.filter((r) => r.e > now);
+const byShow = new Map();
+for (const r of rows) if (r.show) byShow.set(r.show, [...(byShow.get(r.show) || []), r]);
+const when = (r) => (r.s <= now ? 'עכשיו' : `${dayWord(r.s, now)} ${clock(r.s)}`);
+if (block) {
+const list = (byShow.get(block.dataset.show) || []).slice(0, 3);
+if (list.length) {
+const ul = block.querySelector('ul');
+for (const r of list) {
+const li = el('li', r.s <= now ? 'now' : '');
+const w = el(
+'span',
+r.s <= now ? 'when on-air' : 'when',
+r.s <= now ? 'עכשיו בשידור' : dayWord(r.s, now),
+);
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const extra = el('span', 'pt', r.title);
+extra.dir = 'auto';
+const range = el(
+'span',
+'until',
+r.s <= now ? `עד ${clock(r.e)}` : `${clock(r.s)}–${clock(r.e)}`,
+);
+if (r.s > now) range.dir = 'ltr';
+li.append(w, range, ch, extra);
+ul.append(li);
+}
+block.hidden = false;
+}
+}
+for (const a of tiles) {
+const id = a.getAttribute('href').split('/')[2];
+const next = (byShow.get(id) || [])[0];
+if (!next || next.s - now > 2 * 864e5) continue;
+const line = el('span', next.s <= now ? 'air on' : 'air', `${when(next)} · ${next.ch[1]}`);
+a.append(line);
+}
+if (soon) {
+const { normalize, score } = window.iltvMatch;
+const input = d.getElementById('q');
+const list = soon.querySelector('.soon-list');
+const more = soon.querySelector('.soon-more');
+const keyed = rows.map((r) => [normalize(r.title), r]);
+const run = () => {
+const q = normalize(input.value);
+if (!q) {
+soon.hidden = true;
+return;
+}
+const words = q.split(' ');
+const hits = keyed.filter(([k]) => score(k, words)).map(([, r]) => r);
+soon.hidden = hits.length === 0;
+list.replaceChildren();
+let day = '';
+let ol = null;
+for (const r of hits.slice(0, 30)) {
+const w = r.s <= now ? 'עכשיו' : dayWord(r.s, now);
+const label = w === 'הערב' ? 'היום' : w;
+if (label !== day) {
+day = label;
+list.append(el('h3', '', label));
+ol = el('ol', 'airs-list');
+list.append(ol);
+}
+const li = el('li', r.s <= now ? 'now' : '');
+li.append(el('span', 'when', r.s <= now ? `עד ${clock(r.e)}` : clock(r.s)));
+const ch = el('a', 'ch', r.ch[1]);
+ch.href = `/live/#${r.ch[0]}`;
+ch.dir = 'auto';
+const t = el('span', 'pt', r.title);
+t.dir = 'auto';
+li.append(ch, t);
+if (r.show) {
+const go = el('a', 'go', 'צפייה בפרקים קודמים');
+go.href = `/show/${r.show}/`;
+li.append(go);
+}
+ol.append(li);
+}
+more.href = `/live/guide/?q=${encodeURIComponent(input.value)}`;
+};
+input.addEventListener('input', run);
+run();
+}
+})
+.catch(() => {});
+})();</script>
+
+// guide
+<script>try {
+const theme = localStorage.getItem('iltv-theme');
+if (theme) document.documentElement.dataset.theme = theme;
+} catch {}</script>
+<script>(() => {
+const d = document;
+const root = d.documentElement;
+const lang = root.lang || 'en';
+d.getElementById('theme')?.addEventListener('click', () => {
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
+const apply = () => {
+root.dataset.theme = next;
+};
+if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+d.startViewTransition(apply);
+else apply();
+try {
+localStorage.setItem('iltv-theme', next);
+} catch {}
+});
+const relative = window.Intl?.RelativeTimeFormat
+? new Intl.RelativeTimeFormat(lang, { numeric: 'auto' })
+: null;
+const full = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short' });
+const UNITS = [
+[60, 'second', 1],
+[3600, 'minute', 60],
+[86400, 'hour', 3600],
+[2592000, 'day', 86400],
+[Number.POSITIVE_INFINITY, 'month', 2592000],
+];
+const ago = (t) => {
+const s = (t - Date.now()) / 1000;
+const unit = UNITS.find(([limit]) => Math.abs(s) < limit);
+return relative.format(Math.round(s / unit[2]), unit[1]).replace(/\s*\(\d+\)$/, '');
+};
+for (const el of d.querySelectorAll('time[datetime]')) {
+if (el.hasAttribute('data-abs')) continue;
+let t = Date.parse(el.getAttribute('datetime'));
+if (Number.isNaN(t)) continue;
+if (el.hasAttribute('data-daily')) while (t < Date.now()) t += 864e5;
+if (el.hasAttribute('data-future') && t < Date.now()) {
+el.textContent = lang === 'he' ? 'בקרוב' : 'soon';
+continue;
+}
+el.title = full.format(t);
+if (relative) el.textContent = ago(t);
+}
+for (const btn of d.querySelectorAll('[data-copy]')) {
+btn.addEventListener('click', () => {
+const source = d.getElementById(btn.dataset.copy);
+const label = btn.querySelector('span');
+const done = () => {
+const before = btn.dataset.label || label.textContent;
+btn.dataset.label = before;
+label.textContent = btn.dataset.done;
+setTimeout(() => {
+label.textContent = before;
+}, 1800);
+};
+if (navigator.clipboard) navigator.clipboard.writeText(source.textContent.trim()).then(done, () => {});
+else {
+const range = d.createRange();
+range.selectNodeContents(source);
+getSelection().removeAllRanges();
+getSelection().addRange(range);
+}
+});
+}
+const manifest = `${location.origin}/manifest.json`;
+for (const a of d.querySelectorAll('[data-stremio]'))
+if (!a.getAttribute('href').startsWith('stremio://')) a.href = `stremio://${location.host}/manifest.json`;
+for (const a of d.querySelectorAll('[data-stremio-web]'))
+if (!a.href.includes('?addon='))
+a.href = `https://web.stremio.com/#/addons?addon=${encodeURIComponent(manifest)}`;
+for (const el of d.querySelectorAll('[data-origin]'))
+if (el.textContent.startsWith('{{') || !/^https?:/.test(el.textContent)) el.textContent = manifest;
+for (const tick of d.querySelectorAll('.tick')) {
+const copy = tick.firstElementChild.cloneNode(true);
+copy.setAttribute('aria-hidden', 'true');
+for (const a of copy.querySelectorAll('a')) a.tabIndex = -1;
+tick.appendChild(copy);
+tick.classList.add('on');
+}
+const ease = 'cubic-bezier(0.23, 1, 0.32, 1)';
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches && root.animate) {
+const shut = (det) =>
+det.querySelector(':scope > summary').offsetHeight + det.offsetHeight - det.clientHeight;
+d.addEventListener('click', (e) => {
+const summary = e.target.closest?.('details > summary');
+if (!summary || e.defaultPrevented || e.button) return;
+const det = summary.parentElement;
+e.preventDefault();
+const from = det.getBoundingClientRect().height;
+det.motion?.cancel();
+const opening = !det.open || det.dataset.closing === '1';
+det.open = true;
+const to = opening ? det.offsetHeight : shut(det);
+det.dataset.closing = opening ? '' : '1';
+det.style.overflow = 'clip';
+const body = [...det.children].filter((c) => c !== summary);
+const shown = body.map((c) => (det.fades?.length ? +getComputedStyle(c).opacity : opening ? 0 : 1));
+for (const f of det.fades ?? []) f.cancel();
+det.fades = body.map((c, i) =>
+c.animate({ opacity: [shown[i], opening ? 1 : 0] }, { duration: 200, fill: 'forwards' }),
+);
+const motion = det.animate(
+{ height: [`${from}px`, `${to}px`] },
+{ duration: 300, easing: ease, fill: 'forwards' },
+);
+det.motion = motion;
+motion.onfinish = () => {
+motion.cancel();
+det.motion = null;
+det.style.overflow = '';
+det.dataset.closing = '';
+if (!opening) det.open = false;
+for (const f of det.fades) f.cancel();
+det.fades = [];
+};
+});
+}
+const air = () => {
+const now = Date.now();
+for (const guide of d.querySelectorAll('[data-guide]')) {
+let shown = 0;
+for (const item of guide.querySelectorAll('[data-s]')) {
+const start = +item.dataset.s;
+const end = +item.dataset.e;
+const ended = end <= now;
+const on = !ended && start <= now;
+item.hidden = ended || shown >= (+guide.dataset.guide || 2);
+item.classList.toggle('now', on);
+if (!item.hidden) shown++;
+if (on) item.style.setProperty('--p', Math.min(1, (now - start) / (end - start)).toFixed(3));
+}
+guide.classList.toggle('empty', !shown);
+}
+};
+air();
+setInterval(air, 30000);
+})();</script>
+<script>window.iltvMatch = (() => {
+const FINALS = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' };
+const PREFIXES = 'הובלמשכ';
+const normalize = (s) =>
+s
+.normalize('NFKD')
+.replace(/[֑-ׇ]/g, '')
+.replace(/[ךםןףץ]/g, (c) => FINALS[c])
+.toLowerCase()
+.replace(/[׳״'"`]/g, '')
+.replace(/[^\p{L}\p{N}]+/gu, ' ')
+.trim();
+/** A word without its one-letter prefix ("השף" → "שף"), or '' when it has none or too little would be left. */
+const unprefixed = (w) => {
+const n = w[0] === 'ו' && w.length > 3 && PREFIXES.includes(w[1]) ? 2 : 1;
+return w.length - n >= 2 && PREFIXES.includes(w[0]) ? w.slice(n) : '';
+};
+/** 1: every query word starts a title word; 2: only through a prefix letter; 0: no match. */
+const score = (key, words) => {
+const titleWords = key.split(' ');
+const bare = titleWords.map(unprefixed).filter(Boolean);
+let best = 1;
+for (const w of words) {
+if (titleWords.some((k) => k.startsWith(w))) continue;
+const w2 = unprefixed(w);
+if (bare.some((k) => k.startsWith(w)) || (w2 && titleWords.some((k) => k.startsWith(w2)))) {
+best = 2;
+continue;
+}
+return 0;
+}
+return best;
+};
+/** Text without the direction marks the apps need. */
+const plain = (s) => s.replace(/[‎‏‪-‮⁦-⁩]/g, '');
+return { normalize, score, plain };
+})();
+(() => {
+const d = document;
+const wrap = d.querySelector('.guide-wrap');
+if (!wrap) return;
+const he = wrap.dataset.lang === 'he';
+const days = [...d.querySelectorAll('.gday')];
+const tabs = [...d.querySelectorAll('.gdays a')];
+const input = d.getElementById('gq');
+const info = d.getElementById('ginfo');
+const results = d.getElementById('gresults');
+const phone = matchMedia('(max-width: 899px)');
+const SHOWN = 6;
+const TZ = 'Asia/Jerusalem';
+const clock = new Intl.DateTimeFormat('en-GB', {
+timeZone: TZ,
+hour: '2-digit',
+minute: '2-digit',
+hourCycle: 'h23',
+});
+const longDay = new Intl.DateTimeFormat(he ? 'he-IL' : 'en-GB', {
+weekday: 'long',
+day: 'numeric',
+month: 'long',
+timeZone: TZ,
+});
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+timeZone: TZ,
+year: 'numeric',
+month: '2-digit',
+day: '2-digit',
+});
+const W = he
+? {
+today: 'היום',
+tomorrow: 'מחר',
+more: (n) => `עוד ${n} תוכניות`,
+less: 'פחות',
+found: (n) => (n === 1 ? 'נמצאה תוכנית אחת' : `נמצאו ${n} שידורים`),
+none: 'אין שידור קרוב בשם הזה. נסו מילה אחרת מהשם.',
+now: 'עכשיו',
+go: 'צפייה בפרקים קודמים',
+until: 'עד',
+}
+: {
+today: 'Today',
+tomorrow: 'Tomorrow',
+more: (n) => `${n} more`,
+less: 'Fewer',
+found: (n) => (n === 1 ? 'One airing found' : `${n} airings found`),
+none: 'Nothing coming up by that name. Try another word from the title.',
+now: 'Now',
+go: 'Watch earlier episodes',
+until: 'until',
+};
+let active = null;
+const select = (day, scroll) => {
+active = day;
+for (const s of days) s.hidden = s !== day;
+for (const a of tabs) {
+const on = a.dataset.day === day.id.slice(2);
+if (on) a.setAttribute('aria-current', 'true');
+else a.removeAttribute('aria-current');
+}
+tick();
+if (scroll) toNow();
+};
+/** Mark what ended and what is on; on phones keep each channel to its next few. */
+const tick = () => {
+const now = Date.now();
+for (const day of days) {
+const line = day.querySelector('.nowline');
+const from = +day.dataset.from;
+const to = +day.dataset.to;
+const today = from <= now && now < to;
+line.hidden = !today;
+if (today) line.style.setProperty('--s', ((now - from) / 6e4).toFixed(1));
+for (const ch of day.querySelectorAll('.gch')) {
+let upcoming = 0;
+for (const li of ch.querySelectorAll('li[data-s]')) {
+const s = +li.dataset.s;
+const e = +li.dataset.e;
+const past = e <= now;
+li.classList.toggle('past', past);
+li.classList.toggle('now', !past && s <= now);
+li.classList.toggle('cut', !past && upcoming++ >= SHOWN);
+}
+let btn = ch.querySelector('.gmore');
+const cut = ch.querySelectorAll('li.cut').length;
+if (cut && !btn) {
+btn = d.createElement('button');
+btn.type = 'button';
+btn.className = 'gmore btn btn-plain';
+btn.addEventListener('click', () => {
+ch.classList.toggle('open');
+label(ch, btn);
+});
+ch.append(btn);
+}
+if (btn) {
+btn.hidden = !cut;
+label(ch, btn);
+}
+}
+}
+};
+const label = (ch, btn) => {
+btn.textContent = ch.classList.contains('open') ? W.less : W.more(ch.querySelectorAll('li.cut').length);
+btn.setAttribute('aria-expanded', String(ch.classList.contains('open')));
+};
+/** On wide screens, bring the present moment (or the day's start) into view. */
+const toNow = () => {
+if (phone.matches || !active) return;
+const scroller = active.querySelector('.gscroll');
+const line = active.querySelector('.nowline');
+if (!scroller || line.hidden) return;
+const ppm = parseFloat(getComputedStyle(active.querySelector('.ggrid')).getPropertyValue('--ppm')) || 4;
+const x = Math.max(0, +line.style.getPropertyValue('--s') * ppm - 90);
+scroller.scrollLeft = he ? -x : x;
+};
+const now = Date.now();
+const todayKey = dayKey.format(now);
+const tomorrowKey = dayKey.format(now + 864e5);
+for (const s of days) {
+if (+s.dataset.to <= now) {
+s.remove();
+tabs.find((a) => a.dataset.day === s.id.slice(2))?.remove();
+}
+}
+days.splice(0, days.length, ...d.querySelectorAll('.gday'));
+tabs.splice(0, tabs.length, ...d.querySelectorAll('.gdays a'));
+for (const a of tabs) {
+const s = d.getElementById(`d-${a.dataset.day}`);
+const from = +s.dataset.from;
+const to = +s.dataset.to;
+if (from <= now && now < to) a.textContent = W.today;
+else if (dayKey.format(from + 6 * 36e5) === tomorrowKey && dayKey.format(now) === todayKey)
+a.textContent = W.tomorrow;
+a.addEventListener('click', (ev) => {
+ev.preventDefault();
+select(s, true);
+history.replaceState(null, '', `#${s.id}`);
+});
+}
+for (const s of days) s.querySelector('.gday-h').classList.add('sr');
+const hash = decodeURIComponent(location.hash.slice(1));
+const first =
+days.find((s) => s.id === `d-${hash}` || s.id === hash) ||
+days.find((s) => +s.dataset.to > now) ||
+days[0];
+if (first) select(first, true);
+if (active && /^iltv_live_/.test(hash)) {
+const row = active.querySelector(`.gch[data-ch="${CSS.escape(hash)}"]`);
+if (row) requestAnimationFrame(() => row.scrollIntoView({ block: 'start' }));
+}
+setInterval(tick, 30000);
+phone.addEventListener?.('change', () => toNow());
+const { normalize, score, plain } = window.iltvMatch;
+const index = [];
+for (const s of days)
+for (const ch of s.querySelectorAll('.gch'))
+for (const li of ch.querySelectorAll('li[data-s]')) {
+const t = li.querySelector('.pt');
+index.push({
+s: +li.dataset.s,
+e: +li.dataset.e,
+title: plain(t.textContent),
+key: normalize(t.textContent),
+href: t.getAttribute('href'),
+ch: ch.getAttribute('aria-label'),
+chId: ch.dataset.ch,
+});
+}
+const seen = new Set();
+const programmes = index.filter((p) => {
+const k = `${p.chId}|${p.s}`;
+if (seen.has(k)) return false;
+seen.add(k);
+return true;
+});
+const el = (tag, cls, text) => {
+const e = d.createElement(tag);
+if (cls) e.className = cls;
+if (text !== undefined) e.textContent = text;
+return e;
+};
+const search = () => {
+const q = normalize(input.value);
+history.replaceState(
+null,
+'',
+q ? `?q=${encodeURIComponent(input.value)}${location.hash}` : location.pathname + location.hash,
+);
+const nav = d.querySelector('.gdays');
+if (!q) {
+results.hidden = true;
+results.replaceChildren();
+info.textContent = '';
+nav.hidden = false;
+if (active) for (const s of days) s.hidden = s !== active;
+return;
+}
+const at = Date.now();
+const words = q.split(' ');
+const hits = programmes.filter((p) => p.e > at && score(p.key, words)).sort((a, b) => a.s - b.s);
+info.textContent = hits.length ? W.found(hits.length) : W.none;
+nav.hidden = true;
+for (const s of days) s.hidden = true;
+results.hidden = false;
+results.replaceChildren();
+let day = '';
+let ol = null;
+for (const p of hits.slice(0, 150)) {
+const k = dayKey.format(p.s);
+if (k !== day) {
+day = k;
+const name = k === todayKey ? W.today : k === tomorrowKey ? W.tomorrow : longDay.format(p.s);
+results.append(el('h2', 'gres-day', name));
+ol = el('ol', 'airs-list');
+results.append(ol);
+}
+const on = p.s <= at;
+const li = el('li', on ? 'now' : '');
+li.append(
+el(
+'span',
+on ? 'when on-air' : 'when',
+on ? `${W.now} · ${W.until} ${clock.format(p.e)}` : clock.format(p.s),
+),
+);
+const ch = el('a', 'ch', p.ch);
+ch.href = `#${p.chId}`;
+ch.addEventListener('click', (ev) => {
+ev.preventDefault();
+input.value = '';
+search();
+const target = days.find((s) => +s.dataset.from <= p.s && p.s < +s.dataset.to);
+if (target) select(target, false);
+target?.querySelector(`.gch[data-ch="${CSS.escape(p.chId)}"]`)?.scrollIntoView({ block: 'start' });
+});
+ch.dir = 'auto';
+const t = el('span', 'pt', p.title);
+t.dir = 'auto';
+li.append(ch, t);
+if (p.href) {
+const go = el('a', 'go', W.go);
+go.href = p.href;
+li.append(go);
+}
+ol.append(li);
+}
+};
+input.addEventListener('input', search);
+input.value = new URLSearchParams(location.search).get('q') || '';
+if (input.value) search();
+})();</script>
+
+// guide-en
+<script>try {
+const theme = localStorage.getItem('iltv-theme');
+if (theme) document.documentElement.dataset.theme = theme;
+} catch {}</script>
+<script>(() => {
+const d = document;
+const root = d.documentElement;
+const lang = root.lang || 'en';
+d.getElementById('theme')?.addEventListener('click', () => {
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
+const apply = () => {
+root.dataset.theme = next;
+};
+if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+d.startViewTransition(apply);
+else apply();
+try {
+localStorage.setItem('iltv-theme', next);
+} catch {}
+});
+const relative = window.Intl?.RelativeTimeFormat
+? new Intl.RelativeTimeFormat(lang, { numeric: 'auto' })
+: null;
+const full = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short' });
+const UNITS = [
+[60, 'second', 1],
+[3600, 'minute', 60],
+[86400, 'hour', 3600],
+[2592000, 'day', 86400],
+[Number.POSITIVE_INFINITY, 'month', 2592000],
+];
+const ago = (t) => {
+const s = (t - Date.now()) / 1000;
+const unit = UNITS.find(([limit]) => Math.abs(s) < limit);
+return relative.format(Math.round(s / unit[2]), unit[1]).replace(/\s*\(\d+\)$/, '');
+};
+for (const el of d.querySelectorAll('time[datetime]')) {
+if (el.hasAttribute('data-abs')) continue;
+let t = Date.parse(el.getAttribute('datetime'));
+if (Number.isNaN(t)) continue;
+if (el.hasAttribute('data-daily')) while (t < Date.now()) t += 864e5;
+if (el.hasAttribute('data-future') && t < Date.now()) {
+el.textContent = lang === 'he' ? 'בקרוב' : 'soon';
+continue;
+}
+el.title = full.format(t);
+if (relative) el.textContent = ago(t);
+}
+for (const btn of d.querySelectorAll('[data-copy]')) {
+btn.addEventListener('click', () => {
+const source = d.getElementById(btn.dataset.copy);
+const label = btn.querySelector('span');
+const done = () => {
+const before = btn.dataset.label || label.textContent;
+btn.dataset.label = before;
+label.textContent = btn.dataset.done;
+setTimeout(() => {
+label.textContent = before;
+}, 1800);
+};
+if (navigator.clipboard) navigator.clipboard.writeText(source.textContent.trim()).then(done, () => {});
+else {
+const range = d.createRange();
+range.selectNodeContents(source);
+getSelection().removeAllRanges();
+getSelection().addRange(range);
+}
+});
+}
+const manifest = `${location.origin}/manifest.json`;
+for (const a of d.querySelectorAll('[data-stremio]'))
+if (!a.getAttribute('href').startsWith('stremio://')) a.href = `stremio://${location.host}/manifest.json`;
+for (const a of d.querySelectorAll('[data-stremio-web]'))
+if (!a.href.includes('?addon='))
+a.href = `https://web.stremio.com/#/addons?addon=${encodeURIComponent(manifest)}`;
+for (const el of d.querySelectorAll('[data-origin]'))
+if (el.textContent.startsWith('{{') || !/^https?:/.test(el.textContent)) el.textContent = manifest;
+for (const tick of d.querySelectorAll('.tick')) {
+const copy = tick.firstElementChild.cloneNode(true);
+copy.setAttribute('aria-hidden', 'true');
+for (const a of copy.querySelectorAll('a')) a.tabIndex = -1;
+tick.appendChild(copy);
+tick.classList.add('on');
+}
+const ease = 'cubic-bezier(0.23, 1, 0.32, 1)';
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches && root.animate) {
+const shut = (det) =>
+det.querySelector(':scope > summary').offsetHeight + det.offsetHeight - det.clientHeight;
+d.addEventListener('click', (e) => {
+const summary = e.target.closest?.('details > summary');
+if (!summary || e.defaultPrevented || e.button) return;
+const det = summary.parentElement;
+e.preventDefault();
+const from = det.getBoundingClientRect().height;
+det.motion?.cancel();
+const opening = !det.open || det.dataset.closing === '1';
+det.open = true;
+const to = opening ? det.offsetHeight : shut(det);
+det.dataset.closing = opening ? '' : '1';
+det.style.overflow = 'clip';
+const body = [...det.children].filter((c) => c !== summary);
+const shown = body.map((c) => (det.fades?.length ? +getComputedStyle(c).opacity : opening ? 0 : 1));
+for (const f of det.fades ?? []) f.cancel();
+det.fades = body.map((c, i) =>
+c.animate({ opacity: [shown[i], opening ? 1 : 0] }, { duration: 200, fill: 'forwards' }),
+);
+const motion = det.animate(
+{ height: [`${from}px`, `${to}px`] },
+{ duration: 300, easing: ease, fill: 'forwards' },
+);
+det.motion = motion;
+motion.onfinish = () => {
+motion.cancel();
+det.motion = null;
+det.style.overflow = '';
+det.dataset.closing = '';
+if (!opening) det.open = false;
+for (const f of det.fades) f.cancel();
+det.fades = [];
+};
+});
+}
+const air = () => {
+const now = Date.now();
+for (const guide of d.querySelectorAll('[data-guide]')) {
+let shown = 0;
+for (const item of guide.querySelectorAll('[data-s]')) {
+const start = +item.dataset.s;
+const end = +item.dataset.e;
+const ended = end <= now;
+const on = !ended && start <= now;
+item.hidden = ended || shown >= (+guide.dataset.guide || 2);
+item.classList.toggle('now', on);
+if (!item.hidden) shown++;
+if (on) item.style.setProperty('--p', Math.min(1, (now - start) / (end - start)).toFixed(3));
+}
+guide.classList.toggle('empty', !shown);
+}
+};
+air();
+setInterval(air, 30000);
+})();</script>
+<script>window.iltvMatch = (() => {
+const FINALS = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' };
+const PREFIXES = 'הובלמשכ';
+const normalize = (s) =>
+s
+.normalize('NFKD')
+.replace(/[֑-ׇ]/g, '')
+.replace(/[ךםןףץ]/g, (c) => FINALS[c])
+.toLowerCase()
+.replace(/[׳״'"`]/g, '')
+.replace(/[^\p{L}\p{N}]+/gu, ' ')
+.trim();
+/** A word without its one-letter prefix ("השף" → "שף"), or '' when it has none or too little would be left. */
+const unprefixed = (w) => {
+const n = w[0] === 'ו' && w.length > 3 && PREFIXES.includes(w[1]) ? 2 : 1;
+return w.length - n >= 2 && PREFIXES.includes(w[0]) ? w.slice(n) : '';
+};
+/** 1: every query word starts a title word; 2: only through a prefix letter; 0: no match. */
+const score = (key, words) => {
+const titleWords = key.split(' ');
+const bare = titleWords.map(unprefixed).filter(Boolean);
+let best = 1;
+for (const w of words) {
+if (titleWords.some((k) => k.startsWith(w))) continue;
+const w2 = unprefixed(w);
+if (bare.some((k) => k.startsWith(w)) || (w2 && titleWords.some((k) => k.startsWith(w2)))) {
+best = 2;
+continue;
+}
+return 0;
+}
+return best;
+};
+/** Text without the direction marks the apps need. */
+const plain = (s) => s.replace(/[‎‏‪-‮⁦-⁩]/g, '');
+return { normalize, score, plain };
+})();
+(() => {
+const d = document;
+const wrap = d.querySelector('.guide-wrap');
+if (!wrap) return;
+const he = wrap.dataset.lang === 'he';
+const days = [...d.querySelectorAll('.gday')];
+const tabs = [...d.querySelectorAll('.gdays a')];
+const input = d.getElementById('gq');
+const info = d.getElementById('ginfo');
+const results = d.getElementById('gresults');
+const phone = matchMedia('(max-width: 899px)');
+const SHOWN = 6;
+const TZ = 'Asia/Jerusalem';
+const clock = new Intl.DateTimeFormat('en-GB', {
+timeZone: TZ,
+hour: '2-digit',
+minute: '2-digit',
+hourCycle: 'h23',
+});
+const longDay = new Intl.DateTimeFormat(he ? 'he-IL' : 'en-GB', {
+weekday: 'long',
+day: 'numeric',
+month: 'long',
+timeZone: TZ,
+});
+const dayKey = new Intl.DateTimeFormat('en-CA', {
+timeZone: TZ,
+year: 'numeric',
+month: '2-digit',
+day: '2-digit',
+});
+const W = he
+? {
+today: 'היום',
+tomorrow: 'מחר',
+more: (n) => `עוד ${n} תוכניות`,
+less: 'פחות',
+found: (n) => (n === 1 ? 'נמצאה תוכנית אחת' : `נמצאו ${n} שידורים`),
+none: 'אין שידור קרוב בשם הזה. נסו מילה אחרת מהשם.',
+now: 'עכשיו',
+go: 'צפייה בפרקים קודמים',
+until: 'עד',
+}
+: {
+today: 'Today',
+tomorrow: 'Tomorrow',
+more: (n) => `${n} more`,
+less: 'Fewer',
+found: (n) => (n === 1 ? 'One airing found' : `${n} airings found`),
+none: 'Nothing coming up by that name. Try another word from the title.',
+now: 'Now',
+go: 'Watch earlier episodes',
+until: 'until',
+};
+let active = null;
+const select = (day, scroll) => {
+active = day;
+for (const s of days) s.hidden = s !== day;
+for (const a of tabs) {
+const on = a.dataset.day === day.id.slice(2);
+if (on) a.setAttribute('aria-current', 'true');
+else a.removeAttribute('aria-current');
+}
+tick();
+if (scroll) toNow();
+};
+/** Mark what ended and what is on; on phones keep each channel to its next few. */
+const tick = () => {
+const now = Date.now();
+for (const day of days) {
+const line = day.querySelector('.nowline');
+const from = +day.dataset.from;
+const to = +day.dataset.to;
+const today = from <= now && now < to;
+line.hidden = !today;
+if (today) line.style.setProperty('--s', ((now - from) / 6e4).toFixed(1));
+for (const ch of day.querySelectorAll('.gch')) {
+let upcoming = 0;
+for (const li of ch.querySelectorAll('li[data-s]')) {
+const s = +li.dataset.s;
+const e = +li.dataset.e;
+const past = e <= now;
+li.classList.toggle('past', past);
+li.classList.toggle('now', !past && s <= now);
+li.classList.toggle('cut', !past && upcoming++ >= SHOWN);
+}
+let btn = ch.querySelector('.gmore');
+const cut = ch.querySelectorAll('li.cut').length;
+if (cut && !btn) {
+btn = d.createElement('button');
+btn.type = 'button';
+btn.className = 'gmore btn btn-plain';
+btn.addEventListener('click', () => {
+ch.classList.toggle('open');
+label(ch, btn);
+});
+ch.append(btn);
+}
+if (btn) {
+btn.hidden = !cut;
+label(ch, btn);
+}
+}
+}
+};
+const label = (ch, btn) => {
+btn.textContent = ch.classList.contains('open') ? W.less : W.more(ch.querySelectorAll('li.cut').length);
+btn.setAttribute('aria-expanded', String(ch.classList.contains('open')));
+};
+/** On wide screens, bring the present moment (or the day's start) into view. */
+const toNow = () => {
+if (phone.matches || !active) return;
+const scroller = active.querySelector('.gscroll');
+const line = active.querySelector('.nowline');
+if (!scroller || line.hidden) return;
+const ppm = parseFloat(getComputedStyle(active.querySelector('.ggrid')).getPropertyValue('--ppm')) || 4;
+const x = Math.max(0, +line.style.getPropertyValue('--s') * ppm - 90);
+scroller.scrollLeft = he ? -x : x;
+};
+const now = Date.now();
+const todayKey = dayKey.format(now);
+const tomorrowKey = dayKey.format(now + 864e5);
+for (const s of days) {
+if (+s.dataset.to <= now) {
+s.remove();
+tabs.find((a) => a.dataset.day === s.id.slice(2))?.remove();
+}
+}
+days.splice(0, days.length, ...d.querySelectorAll('.gday'));
+tabs.splice(0, tabs.length, ...d.querySelectorAll('.gdays a'));
+for (const a of tabs) {
+const s = d.getElementById(`d-${a.dataset.day}`);
+const from = +s.dataset.from;
+const to = +s.dataset.to;
+if (from <= now && now < to) a.textContent = W.today;
+else if (dayKey.format(from + 6 * 36e5) === tomorrowKey && dayKey.format(now) === todayKey)
+a.textContent = W.tomorrow;
+a.addEventListener('click', (ev) => {
+ev.preventDefault();
+select(s, true);
+history.replaceState(null, '', `#${s.id}`);
+});
+}
+for (const s of days) s.querySelector('.gday-h').classList.add('sr');
+const hash = decodeURIComponent(location.hash.slice(1));
+const first =
+days.find((s) => s.id === `d-${hash}` || s.id === hash) ||
+days.find((s) => +s.dataset.to > now) ||
+days[0];
+if (first) select(first, true);
+if (active && /^iltv_live_/.test(hash)) {
+const row = active.querySelector(`.gch[data-ch="${CSS.escape(hash)}"]`);
+if (row) requestAnimationFrame(() => row.scrollIntoView({ block: 'start' }));
+}
+setInterval(tick, 30000);
+phone.addEventListener?.('change', () => toNow());
+const { normalize, score, plain } = window.iltvMatch;
+const index = [];
+for (const s of days)
+for (const ch of s.querySelectorAll('.gch'))
+for (const li of ch.querySelectorAll('li[data-s]')) {
+const t = li.querySelector('.pt');
+index.push({
+s: +li.dataset.s,
+e: +li.dataset.e,
+title: plain(t.textContent),
+key: normalize(t.textContent),
+href: t.getAttribute('href'),
+ch: ch.getAttribute('aria-label'),
+chId: ch.dataset.ch,
+});
+}
+const seen = new Set();
+const programmes = index.filter((p) => {
+const k = `${p.chId}|${p.s}`;
+if (seen.has(k)) return false;
+seen.add(k);
+return true;
+});
+const el = (tag, cls, text) => {
+const e = d.createElement(tag);
+if (cls) e.className = cls;
+if (text !== undefined) e.textContent = text;
+return e;
+};
+const search = () => {
+const q = normalize(input.value);
+history.replaceState(
+null,
+'',
+q ? `?q=${encodeURIComponent(input.value)}${location.hash}` : location.pathname + location.hash,
+);
+const nav = d.querySelector('.gdays');
+if (!q) {
+results.hidden = true;
+results.replaceChildren();
+info.textContent = '';
+nav.hidden = false;
+if (active) for (const s of days) s.hidden = s !== active;
+return;
+}
+const at = Date.now();
+const words = q.split(' ');
+const hits = programmes.filter((p) => p.e > at && score(p.key, words)).sort((a, b) => a.s - b.s);
+info.textContent = hits.length ? W.found(hits.length) : W.none;
+nav.hidden = true;
+for (const s of days) s.hidden = true;
+results.hidden = false;
+results.replaceChildren();
+let day = '';
+let ol = null;
+for (const p of hits.slice(0, 150)) {
+const k = dayKey.format(p.s);
+if (k !== day) {
+day = k;
+const name = k === todayKey ? W.today : k === tomorrowKey ? W.tomorrow : longDay.format(p.s);
+results.append(el('h2', 'gres-day', name));
+ol = el('ol', 'airs-list');
+results.append(ol);
+}
+const on = p.s <= at;
+const li = el('li', on ? 'now' : '');
+li.append(
+el(
+'span',
+on ? 'when on-air' : 'when',
+on ? `${W.now} · ${W.until} ${clock.format(p.e)}` : clock.format(p.s),
+),
+);
+const ch = el('a', 'ch', p.ch);
+ch.href = `#${p.chId}`;
+ch.addEventListener('click', (ev) => {
+ev.preventDefault();
+input.value = '';
+search();
+const target = days.find((s) => +s.dataset.from <= p.s && p.s < +s.dataset.to);
+if (target) select(target, false);
+target?.querySelector(`.gch[data-ch="${CSS.escape(p.chId)}"]`)?.scrollIntoView({ block: 'start' });
+});
+ch.dir = 'auto';
+const t = el('span', 'pt', p.title);
+t.dir = 'auto';
+li.append(ch, t);
+if (p.href) {
+const go = el('a', 'go', W.go);
+go.href = p.href;
+li.append(go);
+}
+ol.append(li);
+}
+};
+input.addEventListener('input', search);
+input.value = new URLSearchParams(location.search).get('q') || '';
+if (input.value) search();
 })();</script>
 
 // sitemap

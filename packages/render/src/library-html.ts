@@ -64,6 +64,10 @@ export const rowSlug = (catalogId: string) => catalogId.replace(/^iltv_/, '');
 export const rowHref = (catalogId: string) => `/library/${rowSlug(catalogId)}/`;
 export const showHref = (seriesId: string) => `/show/${seriesId}/`;
 
+/** The full programme guide's address in each language (guide-html.ts). */
+export const GUIDE_PATH = { he: 'live/guide/', en: 'en/live/guide/' } as const;
+export const guideHref = (lang: 'he' | 'en') => `/${GUIDE_PATH[lang]}`;
+
 /** Text without the direction marks the apps need (`rtl()`): a page sets direction itself. */
 export const plain = (s: string | undefined) => (s ?? '').replace(/[‎‏‪-‮⁦-⁩]/g, '').trim();
 
@@ -225,7 +229,7 @@ function channelCard(c: LibraryChannel, input: LibraryInput, heading: 'h2' | 'h3
   const h = raw(heading);
   return html`<article class="chan" id="${c.id}">${channelLogo(c)}
 <${h} dir="auto">${plain(c.name)}${c.helper ? raw('<span class="tag">עוזר ביתי</span>') : ''}</${h}>
-<div>${rows.length ? html`<span class="on-air small">בשידור</span>${guideList(rows)}` : raw('<span class="small muted">אין לוח שידורים לערוץ הזה</span>')}</div>
+<div>${rows.length ? html`<span class="on-air small">בשידור</span>${guideList(rows)}<a class="small full-guide" href="${guideHref('he')}#${c.id}">לוח השידורים המלא</a>` : raw('<span class="small muted">אין לוח שידורים לערוץ הזה</span>')}</div>
 ${
   full
     ? html`<div class="acts"><a class="btn btn-primary" href="${stremioDetail('tv', c.id)}">${ICONS.play}צפייה ב-Stremio</a>${
@@ -253,7 +257,7 @@ function libraryHome(input: LibraryInput): string {
     );
   const live = input.live.length
     ? html`<section class="shelf" aria-labelledby="h-live"><div class="wrap">
-<div class="shelf-head"><h2 id="h-live">שידור חי</h2><span class="count">${num(input.live.length, 'he')} ערוצים</span><a class="all" href="/live/">לוח השידורים</a></div>
+<div class="shelf-head"><h2 id="h-live">שידור חי</h2><span class="count">${num(input.live.length, 'he')} ערוצים</span><a class="all" href="${guideHref('he')}">לוח השידורים</a></div>
 <div class="strip live">${input.live.map((c) => channelCard(c, input, 'h3', false))}</div>
 </div></section>`
     : '';
@@ -263,6 +267,7 @@ function libraryHome(input: LibraryInput): string {
       description: `${countShows(total)} ו-${countEpisodes(episodes)} מקשת 12, רשת 13 וכאן, וערוצים בשידור חי. צפייה ב-Stremio וב-Nuvio, בחינם.`,
       path: 'library/',
       section: 'library',
+      ...(hasGuide(input) ? { script: AIRINGS_SCRIPT } : {}),
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'CollectionPage',
@@ -285,8 +290,16 @@ function libraryHome(input: LibraryInput): string {
 
 /** The genre filter's script: show only the tiles of the chosen genre (all of them without the script). */
 const FILTER_SCRIPT = script('genre-filter.js');
+/** "On the air next" from airings.json (client/airings.js), on pages with show tiles, show pages and search. */
+const AIRINGS_SCRIPT = `${script('match.js')}\n${script('airings.js')}`;
+/** Whether the site has a programme guide (and so airings.json). */
+const hasGuide = (input: LibraryInput) => Object.values(input.guide ?? {}).some((rows) => rows.length > 0);
+const withScript = (...list: (string | false)[]) => {
+  const js = list.filter(Boolean).join('\n');
+  return js ? { script: js } : {};
+};
 
-function rowPage(r: LibraryRow): string {
+function rowPage(r: LibraryRow, airings: boolean): string {
   const name = rowName(r.id);
   const counts = new Map<string, number>();
   for (const s of r.shows)
@@ -304,7 +317,7 @@ function rowPage(r: LibraryRow): string {
       description: `${countShows(r.shows.length)} ו-${countEpisodes(episodes)} של ${name}. לצפייה ב-Stremio וב-Nuvio, בחינם.`,
       path: rowHref(r.id).slice(1),
       section: 'library',
-      ...(genres.length ? { script: FILTER_SCRIPT } : {}),
+      ...withScript(genres.length > 0 && FILTER_SCRIPT, airings && AIRINGS_SCRIPT),
       jsonLd: {
         '@context': 'https://schema.org',
         '@type': 'ItemList',
@@ -363,7 +376,7 @@ function episodeItem(m: Meta, v: NonNullable<Meta['videos']>[number], named: boo
   }</li>`;
 }
 
-function showPage(s: LibraryShow, row: LibraryRow): string {
+function showPage(s: LibraryShow, row: LibraryRow, airings: boolean): string {
   const m = s.meta;
   const name = plain(m.name);
   const description = plain(m.description);
@@ -462,6 +475,7 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
       over: true,
       ogType: 'video.tv_show',
       jsonLd,
+      ...withScript(airings && AIRINGS_SCRIPT),
       ...(posterUrl ? { image: posterUrl } : {}),
     },
     html`<header class="show-hero">${m.background ? html`<img class="bg" src="${sized(m.background, 1280)}" alt="" fetchpriority="low" decoding="async">` : ''}<div class="wrap">
@@ -481,7 +495,12 @@ ${description ? html`<p class="desc" dir="auto">${description}</p>` : ''}
         ? html`הפרקים של קשת 12 מתנגנים דרך <a href="${HELPER_DOC}">העוזר הביתי</a> שלכם. `
         : ''
     }הכפתור פותח את התוכנית ב-Stremio, אם Israel TV מותקן שם (<a href="/he/#install">איך מתקינים</a>). ב-Nuvio, אחרי ההתקנה, חפשו "<bdi>${name}</bdi>".</p>
-</div></div></header>
+</div></div></header>${
+      airings
+        ? html`
+<section class="airs" id="airs" data-show="${m.id}" aria-labelledby="airs-h" hidden><div class="wrap"><h2 id="airs-h">בשידור הבא</h2><ul></ul><p class="small"><a href="${guideHref('he')}">ללוח השידורים המלא</a></p></div></section>`
+        : ''
+    }
 <section class="seasons" aria-labelledby="eps-h"><div class="wrap">
 <h2 id="eps-h">פרקים</h2>
 ${list}${
@@ -522,30 +541,40 @@ function livePage(input: LibraryInput): string {
       },
     },
     html`<div class="wrap page-head"><h1>שידור חי</h1>
-<p class="lead">${num(input.live.length, 'he')} ערוצים ומה משודר בהם עכשיו, לפי שעון ישראל. ערוצים שמסומנים "עוזר ביתי" מתנגנים רק דרך <a href="${HELPER_DOC}">העוזר הביתי</a>.</p>
+<p class="lead">${num(input.live.length, 'he')} ערוצים ומה משודר בהם עכשיו, לפי שעון ישראל. ערוצים שמסומנים "עוזר ביתי" מתנגנים רק דרך <a href="${HELPER_DOC}">העוזר הביתי</a>.</p>${
+      hasGuide(input)
+        ? html`
+<p class="guide-link"><a class="btn btn-primary" href="${guideHref('he')}">${ICONS.search}לוח השידורים המלא וחיפוש תוכניות</a></p>`
+        : ''
+    }
 </div>
 <section style="padding-top:24px"><div class="wrap"><div class="channels-grid">${input.live.map((c) => channelCard(c, input, 'h2', true))}</div></div></section>`,
   );
 }
 
 /** Search over search.json, in the browser (the same matching rules as the apps' search, simplified). */
-const SEARCH_SCRIPT = script('search.js');
+const SEARCH_SCRIPT = `${script('match.js')}\n${script('search.js')}`;
 
-function searchPage(): string {
+function searchPage(airings: boolean): string {
   return page(
     {
       title: 'חיפוש תוכנית | Israel TV',
       description: 'חיפוש בכל התוכניות והערוצים של Israel TV: קשת 12, רשת 13, כאן ושידור חי.',
       path: 'search/',
       section: 'search',
-      script: SEARCH_SCRIPT,
+      ...withScript(SEARCH_SCRIPT, airings && script('airings.js')),
     },
     html`<div class="wrap page-head"><h1>חיפוש</h1>
 <form class="searchbox" action="/search/" method="get" role="search" onsubmit="return false"><input id="q" type="search" name="q" placeholder="שם התוכנית או הערוץ" aria-label="שם התוכנית או הערוץ" autocomplete="off"></form>
 <p class="results-info" id="info" role="status" aria-live="polite"></p>
 <noscript><p class="note">החיפוש עובד רק עם JavaScript. אפשר לדפדף ב<a href="/library/">ספרייה</a>.</p></noscript>
 <div class="tiles" id="results"></div>
-<p class="empty-hint" id="empty" hidden>אפשר גם לדפדף ב<a href="/library/">ספרייה</a>, או לראות <a href="/live/">מה משודר עכשיו</a>.</p>
+<p class="empty-hint" id="empty" hidden>אפשר גם לדפדף ב<a href="/library/">ספרייה</a>, או לראות <a href="/live/">מה משודר עכשיו</a>.</p>${
+      airings
+        ? html`
+<section class="soon" id="soon" aria-labelledby="soon-h" hidden><h2 id="soon-h">בשידור בקרוב</h2><div class="soon-list"></div><p class="guide-link"><a class="soon-more" href="${guideHref('he')}">חיפוש בלוח השידורים המלא</a></p></section>`
+        : ''
+    }
 </div>`,
   );
 }
@@ -572,14 +601,15 @@ function notFoundPage(): string {
 /** Every library page, by site path. */
 export function renderLibrary(input: LibraryInput): Map<string, string> {
   const files = new Map<string, string>();
+  const airings = hasGuide(input);
   files.set(sitePaths.library, libraryHome(input));
   for (const r of input.rows) {
     if (r.shows.length === 0) continue;
-    files.set(sitePaths.libraryRow(rowSlug(r.id)), rowPage(r));
-    for (const s of r.shows) files.set(sitePaths.showPage(s.meta.id), showPage(s, r));
+    files.set(sitePaths.libraryRow(rowSlug(r.id)), rowPage(r, airings));
+    for (const s of r.shows) files.set(sitePaths.showPage(s.meta.id), showPage(s, r, airings));
   }
   if (input.live.length) files.set(sitePaths.livePage, livePage(input));
-  files.set(sitePaths.searchPage, searchPage());
+  files.set(sitePaths.searchPage, searchPage(airings));
   files.set(sitePaths.notFound, notFoundPage());
   return files;
 }

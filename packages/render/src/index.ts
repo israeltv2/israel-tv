@@ -1,3 +1,4 @@
+export * from './guide-html.ts';
 export * from './landing-html.ts';
 export * from './library-html.ts';
 export * from './public-text.ts';

@@ -2140,7 +2140,6 @@ one-off specials (a page with one featured video) now take the video's own still
 not for an entry Kaltura no longer has. Both fill on the next read. The 8 Kan items without one (5 opening clips,
 "פתיח", and 3 episodes whose pages carry no image) keep the numbered tile: the show's backdrop in its place would
 look like a still of that episode, and the website draws the same numbered tile.
-||||||| parent of 9886ee8 (feat(site): accordions open and close with motion, lighter posters and logos)
 
 ## Site motion and page weight (2026-11-08)
 
@@ -2217,3 +2216,41 @@ renumbering: 331 "season-number-taken", 477 source notes, 1 "tmdb-duplicate".
   gone, חצות ועוד יותר's link to the front page, Kan pages without a player (gave up / still trying), Reshet's expired
   episodes; and a few per-show notes (a Kaltura timeout, a gone Keshet season, a trailer-only show) that the show's
   next complete read keeps or removes.
+
+## The full programme guide on the website (2026-11-08)
+
+The owner asked for a full TV guide (לוח שידורים) to browse and search what is coming up, and to see from a show when
+it airs next.
+
+- **Addresses:** `/live/guide/` in Hebrew, beside `/live/` whose channel cards link to it (each card to its channel's
+  row: `/live/guide/#<channel id>`); `/en/live/guide/` in English. The library is Hebrew only, so the guide's Hebrew
+  page sits in the library's tree and the English one under an `/en/` prefix; each names the other (`hreflang`, the
+  language switch, the sitemap).
+- **A broadcast day, 05:00 to 05:00 Israel time,** per tab: the late-night programmes belong to the evening before,
+  as in the broadcasters' own guides. The page holds every day of `epg.json` (Kan's two, the others' three or four);
+  its script drops the days that ended and names today and tomorrow. Without the script every day is listed.
+- **One markup, two layouts:** on wide screens a time grid (4 px a minute, the channels in a sticky column, time
+  running right to left in Hebrew), scrolled to a line at the present moment; a programme that started before the
+  visible part keeps its time and title in view. Below 900 px each channel is a card listing what is on now and the
+  next six, with a button for the rest. The switch is CSS only.
+- **Rendered like the live page:** from the guide's own times, never the moment of rendering (a test renders at two
+  times and compares), so the page changes only when the guide does. That is still several times a day, so IndexNow
+  sends the two guide pages at most once a day each, like `/status`.
+- **Search** over every programme still to come, with the site's Hebrew matching (no vowel points or final letters,
+  a prefix letter optional; `client/match.js`, now shared with the search page), results by day with channel and
+  time. The search page also lists "בשידור בקרוב" under the shows.
+- **Programme → show, conservatively** (core `guide-match.ts`): only within the rows of the channel's own broadcaster
+  (Channel 14's "חמש" is not Reshet 13's), on the whole title, the title before its episode or season part ("בוש -
+  עונה 7 - פרק 6", "קופה ראשית-עונה חדשה-פרק 8", reruns "- ש.ח"), or that without a trailing season number; never
+  when two shows share the title. A wrong link sends a viewer to the wrong show; a missing one only leaves text. On
+  the live guide of 2026-11-08: 104 of 263 distinct titles linked, all checked by eye, none wrong.
+- **"On the air next" is read in the browser** from `airings.json` (channels, and per programme its channel, start
+  and end in minutes, title and show: ~34 KB, 8 KB compressed): a show page's next three airings, a line under a
+  library tile of a show airing in the next two days ("הערב 21:00 · קשת 12"). Written into the pages instead, every
+  show on the air would change (and be uploaded, and sent to IndexNow) whenever its next airing did. Nothing shows
+  until the file has answered.
+- **In the apps,** a show's meta starts with "בשידור הבא: יום ראשון 8.11 בשעה 21:00 · רשת 13", written at every
+  publish (about every 30 minutes). Absolute day and time, never "today" or "now": the file is cached by apps and read
+  later. Only the show's own meta carries it; catalog rows do not (every row page would change with every airing).
+  Meta files are data, not pages, so IndexNow is not involved. Stremio's own guide grid already had the programmes
+  (`epgProvider`, `metasDetailed`); nothing there changed, and programmes are still never a channel's `videos`.

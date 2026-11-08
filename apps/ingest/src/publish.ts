@@ -651,7 +651,7 @@ function groupBy<T>(list: T[], key: (x: T) => string): Map<string, T[]> {
 
 /** The addon's data, not pages: kept out of search results (robots.txt asks the same). */
 const NOINDEX = [
-  ...['status', 'search', 'epg', 'ext-ids', 'registry', 'freshness', 'resolver-contract'].map(
+  ...['status', 'search', 'epg', 'airings', 'ext-ids', 'registry', 'freshness', 'resolver-contract'].map(
     (f) => `/${f}.json`,
   ),
   ...['meta', 'play', 'catalog'].map((d) => `/${d}/*`),

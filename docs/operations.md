@@ -106,8 +106,8 @@ light and dark, into `site-screens/`) or `pnpm shots:site --serve` (http://127.0
 
 **IndexNow.** After a publish that went through (Cloudflare publisher, `indexNow.enabled`), the pages it added,
 changed or removed are sent to `api.indexnow.org` in one request (up to 10,000 addresses each): the very first time,
-or after a new address or key, every page of the sitemap; `/status` at most once a day (it changes with nearly every
-publish); search, the 404 page and the JSON files never. A publish that changed no page sends nothing. The key file
+or after a new address or key, every page of the sitemap; `/status` and the programme guide (`/live/guide/`,
+`/en/live/guide/`) at most once a day each (they change with nearly every publish); search, the 404 page and the JSON files never. A publish that changed no page sends nothing. The key file
 `/<key>.txt` is published with the site. The log has `indexnow: api.indexnow.org answered 202 for N URLs`; a failure
 is only an `indexnow warning:` line and a note on the admin `/status` (the publish stays good), and its addresses go
 with the next submission.
@@ -117,18 +117,25 @@ with the next submission.
 The website also has the catalog itself, in Hebrew, rendered with everything else at publish time
 (`packages/render/src/library-html.ts`):
 
-| Address              | What it shows                                                                                                                                                              |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/library/`          | Every row as a strip of posters, the live channels with what is on now, and a search box.                                                                                  |
-| `/library/<row>/`    | A row's shows (`keshet12`, `reshet13`, `kan11`, `kankids`, `kanarchive`), newest first, with a genre filter.                                                               |
-| `/show/<series id>/` | One show: poster, picture, description, genres, years, its seasons and episodes (60 per season, the newest of a long one), "Watch in Stremio", the broadcaster's own page. |
-| `/live/`             | Every live channel with now and next from the programme guide, "Watch in Stremio" and the channel's own live page where known.                                             |
-| `/search/`           | Search over `search.json`, in the browser.                                                                                                                                 |
+| Address              | What it shows                                                                                                                                                                                                                                                        |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/library/`          | Every row as a strip of posters, the live channels with what is on now, and a search box.                                                                                                                                                                            |
+| `/library/<row>/`    | A row's shows (`keshet12`, `reshet13`, `kan11`, `kankids`, `kanarchive`), newest first, with a genre filter.                                                                                                                                                         |
+| `/show/<series id>/` | One show: poster, picture, description, genres, years, its seasons and episodes (60 per season, the newest of a long one), "Watch in Stremio", the broadcaster's own page.                                                                                           |
+| `/live/`             | Every live channel with now and next from the programme guide, "Watch in Stremio" and the channel's own live page where known.                                                                                                                                       |
+| `/live/guide/`       | The full programme guide (also in English at `/en/live/guide/`): a broadcast day (05:00–05:00 Israel time) per tab, a time grid on wide screens and a list per channel on phones, search over the programmes; a programme that is a show in the catalog links to it. |
+| `/search/`           | Search over `search.json`, in the browser.                                                                                                                                                                                                                           |
 
 The pages are plain static files (about 1,100 next to the catalog's ~3,700; the free plan allows 20,000). Show and row
 pages change only when their show does, and the live guide is written in whole (its first 36 hours) rather than cut
 at the moment of publishing, so a quiet run uploads none of them; the page's script hides what has ended and shows
-what is on. Images stay where the broadcasters host them, asked for at the size shown where their image service
+what is on. "On the air next" (a show page's next airings, a line under a library tile of a show airing in the next two
+days, "בשידור בקרוב" on the search page) is read in the browser from `airings.json` (the guide in short, with each
+programme's show), so those pages do not change when the guide does. A programme is linked to a show only within its
+own broadcaster's rows, on the whole title or the title before its episode or season part ("בוש - עונה 7 - פרק 6"),
+and never when two shows share that title (core `guide-match.ts`). In the apps, a show's own page starts with its next
+airing ("בשידור הבא: יום ראשון 8.11 בשעה 21:00 · רשת 13"), written at every publish in absolute terms; catalog rows
+do not carry it. Images stay where the broadcasters host them, asked for at the size shown where their image service
 can resize (Reshet, Kan). A portrait poster over 100 KB on a host that cannot resize (Keshet 12's are often 200+ KB) is
 published as our own lighter copy (`art/<id>-poster.jpg`, at most 400 px wide, used by the apps too); channel logos
 on the pages are 128 px WebP copies of the 512 px PNGs the apps get (`assets/logos/site`, made by
@@ -309,12 +316,15 @@ carry `x-israel-tv-probe: canary`, so its plays never count as usage or failures
 
 `epg.json` (published) holds each channel's programmes from 6 hours ago to 3 days ahead, from the broadcasters' own
 schedule pages: Keshet 12 (mako.co.il) and Reshet 13 (13tv.co.il) through the scrapers, Channel 14 (c14.co.il
-wp-json) and the Knesset (knesset.tv) directly, every 6 hours (Knesset 12) after an airing check; Kan 11, Kan
+wp-json) and the Knesset (knesset.tv) directly, every 6 hours (Knesset 12) after an airing check; the four i24NEWS
+channels from i24's own schedule API (one request per language every 12 hours: a weekly template, day 0 Monday, times
+in UTC, laid over the days around now the way its site does); Kan 11, Kan
 Educational and Makan 33 through the Kan browser, one guide page per crawl slice (each channel, today and tomorrow,
 twice a day). A failed read keeps the last good guide and says why on the dashboard (kv `epg:guide`). The addon puts
 "עכשיו … · אחר כך …" first in every live tile's description at request time and answers Stremio's guide pages
-(`/catalog/tv/iltv_live/date=YYYY-MM-DD.json` → `metasDetailed`). Not covered: i24 (an undated weekly template its own
-site no longer shows), Channel 10 (bot checkpoint), Channel 24, ynet and the 24/7 loop channels (no schedule).
+(`/catalog/tv/iltv_live/date=YYYY-MM-DD.json` → `metasDetailed`). Not covered: Channel 10 (bot checkpoint), Channel
+24, ynet, Channel 9 and the 24/7 loop channels (no schedule published); the website's guide lists them by name as
+channels without a guide.
 
 ### Kan's first fill
 

@@ -7,11 +7,14 @@ import { localAddonApp } from '../apps/ingest/src/local-server.ts';
 import { siteImages } from '../apps/ingest/src/site-images.ts';
 import { channelLogoSite } from '../apps/resolver/src/branding.ts';
 import { CATALOGS } from '../packages/core/src/catalogs.ts';
+import { guideMatcher } from '../packages/core/src/guide-match.ts';
 import { sitePaths } from '../packages/core/src/site.ts';
 import {
+  airingsFile,
   libraryUrls,
   overall,
   plain,
+  renderGuidePage,
   renderLandingHtml,
   renderLibrary,
   renderStatusHtml,
@@ -98,7 +101,17 @@ const files = new Map([
   [sitePaths.statusPageHe, renderStatusHtml(status, {}, 'he')],
   ...renderLibrary({ rows, live, guide }),
 ]);
-files.set(sitePaths.sitemap, sitemapXml(libraryUrls(files.keys())));
+// The programme guide: programmes matched to the shows listed in the rows.
+const showFor = guideMatcher(
+  rows.flatMap((r) => r.shows.map((s) => ({ id: s.meta.id, catalog: r.id, title: plain(s.meta.name) }))),
+);
+if (guide && live.length) {
+  const guideInput = { live, guide, showFor };
+  files.set(sitePaths.guidePage, renderGuidePage(guideInput, 'he'));
+  files.set(sitePaths.guidePageEn, renderGuidePage(guideInput, 'en'));
+  files.set(sitePaths.airings, JSON.stringify(airingsFile(guideInput)));
+}
+files.set(sitePaths.sitemap, sitemapXml(libraryUrls(files.keys()), { guide: !!guide }));
 for (const [p, html] of files) {
   mkdirSync(dirname(join(out, p)), { recursive: true });
   writeFileSync(join(out, p), fix(html));

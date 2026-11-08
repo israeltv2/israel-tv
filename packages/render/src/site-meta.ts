@@ -15,8 +15,11 @@ Sitemap: ${absolute(sitePaths.sitemap)}
 `;
 }
 
-/** The sitemap: the home and status pages in both languages (each with its other language), and the library's pages. */
-export function sitemapXml(library: string[] = []): string {
+/**
+ * The sitemap: the home and status pages in both languages (each with its other language), the library's pages, and
+ * the programme guide in both languages when there is one.
+ */
+export function sitemapXml(library: string[] = [], opts: { guide?: boolean } = {}): string {
   const page = (path: string, priority: string, pair?: { en: string; he: string }) =>
     `<url><loc>${absolute(path)}</loc>${
       pair
@@ -25,13 +28,14 @@ export function sitemapXml(library: string[] = []): string {
     }<priority>${priority}</priority></url>`;
   const home = { en: '', he: 'he/' };
   const status = { en: 'status', he: 'he/status' };
+  const guide = { en: 'en/live/guide/', he: 'live/guide/' };
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${page('', '1.0', home)}
 ${page('he/', '0.9', home)}
 ${page('status', '0.5', status)}
 ${page('he/status', '0.5', status)}
-${library.map((p) => page(p, p.startsWith('show/') ? '0.6' : '0.8')).join('\n')}
+${opts.guide ? `${page(guide.he, '0.7', guide)}\n${page(guide.en, '0.6', guide)}\n` : ''}${library.map((p) => page(p, p.startsWith('show/') ? '0.6' : '0.8')).join('\n')}
 </urlset>
 `;
 }

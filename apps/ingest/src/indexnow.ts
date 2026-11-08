@@ -8,13 +8,22 @@ import type { Store } from '@israel-tv/store';
 
 /** The protocol's limit of addresses per request. */
 export const INDEXNOW_BATCH = 10_000;
-/** `/status` (and `/he/status`) changes with almost every publish: it is sent at most this often. */
+/**
+ * Pages that change with almost every publish (`/status`, `/he/status`, the programme guide in both languages): each
+ * is sent at most this often.
+ */
 export const STATUS_EVERY_MS = 24 * HOUR_MS;
+/** Those pages, each with the key its last submission is kept under. */
+const DAILY: Record<string, string> = {
+  status: 'indexnow:status-at',
+  'he/status': 'indexnow:status-at',
+  'live/guide/': 'indexnow:guide-at',
+  'en/live/guide/': 'indexnow:guide-at',
+};
 
 const KEY = 'indexnow:key';
 /** The host and key the whole site was last submitted for (a new host or key submits everything again). */
 const FULL = 'indexnow:full';
-const STATUS_AT = 'indexnow:status-at';
 /** Addresses a failed submission did not get through; sent again with the next one. */
 const PENDING = 'indexnow:pending';
 export const INDEXNOW_LAST = 'indexnow:last';
@@ -54,7 +63,9 @@ export function pageFor(file: string): string | undefined {
   if (file === sitePaths.landing) return '';
   if (file === sitePaths.statusPage) return 'status';
   if (file === sitePaths.statusPageHe) return 'he/status';
-  const m = /^(he|library|library\/[^/]+|show\/[^/]+|live)\/index\.html$/.exec(file);
+  const m = /^(he|library|library\/[^/]+|show\/[^/]+|live|live\/guide|en\/live\/guide)\/index\.html$/.exec(
+    file,
+  );
   return m ? `${m[1]}/` : undefined;
 }
 
@@ -78,12 +89,12 @@ export interface IndexNowInput {
   log: (line: string) => void;
 }
 
-/** The addresses to submit now, and whether `/status` and the whole site are among them. */
+/** The addresses to submit now, whether the whole site is among them, and the daily pages' keys to stamp. */
 export function indexNowPlan(
   store: Store,
   key: string,
   input: Pick<IndexNowInput, 'base' | 'changed' | 'removed' | 'all' | 'now'>,
-): { urls: string[]; full: boolean; status: boolean } {
+): { urls: string[]; full: boolean; daily: string[] } {
   const now = input.now ?? Date.now();
   const host = new URL(input.base).host;
   const done = store.getState<{ host: string; key: string }>(FULL);
@@ -94,15 +105,16 @@ export function indexNowPlan(
     const p = pageFor(f);
     if (p !== undefined) pages.add(p);
   }
-  const statusAt = store.getState<string>(STATUS_AT);
-  const statusDue = full || !statusAt || now - Date.parse(statusAt) >= STATUS_EVERY_MS;
-  if (!statusDue) {
-    pages.delete('status');
-    pages.delete('he/status');
+  const daily = new Set<string>();
+  for (const [page, stamp] of Object.entries(DAILY)) {
+    if (!pages.has(page)) continue;
+    const at = store.getState<string>(stamp);
+    if (full || !at || now - Date.parse(at) >= STATUS_EVERY_MS) daily.add(stamp);
+    else pages.delete(page);
   }
   const urls = new Set([...pages].map((p) => `${input.base}/${p}`));
   for (const u of store.getState<string[]>(PENDING) ?? []) if (u.startsWith(`${input.base}/`)) urls.add(u);
-  return { urls: [...urls], full, status: pages.has('status') };
+  return { urls: [...urls], full, daily: [...daily] };
 }
 
 /**
@@ -151,7 +163,7 @@ export async function submitIndexNow(store: Store, config: Config, input: IndexN
     }
     store.setState(PENDING, []);
     if (plan.full) store.setState(FULL, { host, key, at });
-    if (plan.status) store.setState(STATUS_AT, at);
+    for (const stamp of plan.daily) store.setState(stamp, at);
     store.setState(INDEXNOW_LAST, { at, ok: true, urls: plan.urls.length, status } satisfies IndexNowLast);
     input.log(
       `indexnow: ${endpointHost} answered ${status} for ${plan.urls.length} URLs${plan.full ? ' (the whole site, first submission)' : ''}${groups.length > 1 ? ` in ${groups.length} requests` : ''}`,

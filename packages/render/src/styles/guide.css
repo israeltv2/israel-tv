@@ -1,0 +1,306 @@
+/* The programme guide (/live/guide/): day tabs, a time grid on wide screens, a list per channel on phones. */
+
+.guide-wrap {
+  padding-block: 4px 40px;
+}
+#ginfo:empty {
+  display: none;
+}
+.gdays {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 12px;
+  scrollbar-width: none;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+}
+.gdays .chip {
+  flex: none;
+}
+.gdays .chip[aria-current] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.gday,
+.gch {
+  padding: 0;
+}
+.gday-h {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  margin: 18px 0 10px;
+}
+.gch {
+  scroll-margin-top: 70px;
+}
+.gch-h {
+  margin: 0;
+  font: 600 0.95rem / 1.25 var(--body);
+}
+.gch-h a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.gch-h a:hover span {
+  text-decoration: underline;
+}
+.gpr {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.gpr li {
+  font-size: 0.9rem;
+}
+.gpr time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.gpr .pt {
+  color: var(--fg);
+}
+.gpr a.pt {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.gpr a.pt:hover {
+  text-decoration: underline;
+}
+.gpr li.now {
+  border-color: var(--on-air);
+}
+.gpr li.now time {
+  color: var(--on-air);
+  font-weight: 600;
+}
+
+/* Phones: each channel a card with its programmes as a list. */
+@media (max-width: 899px) {
+  .gruler,
+  .nowline {
+    display: none !important;
+  }
+  .ggrid {
+    display: grid;
+    gap: 12px;
+  }
+  .gch {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 14px 10px;
+  }
+  .gch-h {
+    margin-bottom: 8px;
+  }
+  .gpr li {
+    display: grid;
+    grid-template-columns: 3.4em 1fr;
+    gap: 10px;
+    padding: 7px 0;
+    border-top: 1px solid var(--border);
+  }
+  .gpr li:first-child {
+    border-top: 0;
+  }
+  .gpr li.past,
+  .gch:not(.open) .gpr li.cut {
+    display: none;
+  }
+  .gpr li.now {
+    background: linear-gradient(to left, color-mix(in srgb, var(--on-air) 14%, transparent), transparent);
+    margin-inline: -14px;
+    padding-inline: 14px;
+    border-top-color: transparent;
+  }
+  [dir="ltr"] .gpr li.now {
+    background: linear-gradient(to right, color-mix(in srgb, var(--on-air) 14%, transparent), transparent);
+  }
+  .gmore {
+    margin-top: 6px;
+    min-height: 40px;
+    padding: 6px 14px;
+    font-size: 0.88rem;
+  }
+}
+
+/* Wide screens: a time grid, channels down the side, time along the line (right to left in Hebrew). */
+@media (min-width: 900px) {
+  .ggrid {
+    --ppm: 4px;
+    --head: 168px;
+    position: relative;
+    width: calc(var(--head) + var(--len) * var(--ppm));
+  }
+  .gscroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-2);
+    scrollbar-width: thin;
+  }
+  .gruler,
+  .gch {
+    display: grid;
+    grid-template-columns: var(--head) 1fr;
+  }
+  .gruler {
+    height: 30px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .gruler > div {
+    position: relative;
+  }
+  .gruler span:not(.gcorner) {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--s) * var(--ppm));
+    padding-inline-start: 6px;
+    border-inline-start: 1px solid var(--border);
+    line-height: 30px;
+  }
+  .gcorner,
+  .gch-h {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 3;
+    background: var(--bg-2);
+    border-inline-end: 1px solid var(--border);
+  }
+  .gch {
+    height: 66px;
+    border-bottom: 1px solid var(--border);
+  }
+  .gch:last-of-type {
+    border-bottom: 0;
+  }
+  .gch-h {
+    display: flex;
+    align-items: center;
+    padding-inline: 12px;
+  }
+  .gch-h span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gpr {
+    position: relative;
+  }
+  .gpr li {
+    position: absolute;
+    inset-block: 6px;
+    inset-inline-start: calc(var(--s) * var(--ppm) + 2px);
+    width: calc(var(--d) * var(--ppm) - 4px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    padding-inline: 9px;
+    overflow: clip;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    line-height: 1.3;
+    transition: background 0.2s var(--ease-out);
+  }
+  .gpr li:hover {
+    background: var(--surface-2);
+  }
+  .gpr li time {
+    font-size: 0.74rem;
+  }
+  .gpr .pt {
+    flex: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* A programme that started before the visible part keeps its time and title in view, beside the channels. */
+  .gpr li time,
+  .gpr li .pt {
+    position: sticky;
+    inset-inline-start: calc(var(--head) + 10px);
+    align-self: flex-start;
+    max-width: 100%;
+  }
+  .gpr li.past {
+    opacity: 0.5;
+  }
+  .gpr li.now {
+    background: color-mix(in srgb, var(--on-air) 12%, var(--surface));
+    box-shadow: inset 0 0 0 1px var(--on-air);
+  }
+  .nowline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    inset-inline-start: calc(var(--head) + var(--s, 0) * var(--ppm));
+    width: 2px;
+    background: var(--on-air);
+    z-index: 2;
+    pointer-events: none;
+  }
+  .nowline::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    inset-inline-start: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--on-air);
+  }
+  .gmore {
+    display: none;
+  }
+}
+
+/* Search results and channels without a guide. */
+.gresults {
+  margin-top: 6px;
+}
+.gres-day {
+  font-size: clamp(1.6rem, 3.6vw, 2.1rem);
+  margin: 22px 0 8px;
+}
+.gnone {
+  margin-top: 40px;
+  padding: 0;
+}
+.gnone h2 {
+  font-size: clamp(1.7rem, 3.8vw, 2.2rem);
+}
+.gnone ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gnone a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+[dir="rtl"] .gnone a {
+  padding: 6px 6px 6px 12px;
+}

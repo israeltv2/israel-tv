@@ -48,6 +48,8 @@ const ALL = [
   'library/mako/index.html',
   'show/iltv_mako_1/index.html',
   'live/index.html',
+  'live/guide/index.html',
+  'en/live/guide/index.html',
   'search/index.html',
   '404.html',
   'sitemap.xml',
@@ -67,6 +69,8 @@ test('site files map to the public pages the sitemap lists; data, images, search
     'library/mako/index.html': 'library/mako/',
     'show/iltv_mako_1/index.html': 'show/iltv_mako_1/',
     'live/index.html': 'live/',
+    'live/guide/index.html': 'live/guide/',
+    'en/live/guide/index.html': 'en/live/guide/',
     'search/index.html': undefined,
     '404.html': undefined,
     'sitemap.xml': undefined,
@@ -115,11 +119,22 @@ test('first submission is the whole site; later ones only changed and removed pa
   expect(first.body.host).toBe('israel-tv.example.workers.dev');
   expect(first.body.keyLocation).toBe(`${BASE}/${first.body.key}.txt`);
   expect(first.body.urlList.sort()).toEqual(
-    ['', 'he/', 'status', 'he/status', 'library/', 'library/mako/', 'show/iltv_mako_1/', 'live/']
+    [
+      '',
+      'he/',
+      'status',
+      'he/status',
+      'library/',
+      'library/mako/',
+      'show/iltv_mako_1/',
+      'live/',
+      'live/guide/',
+      'en/live/guide/',
+    ]
       .map((p) => `${BASE}/${p}`)
       .sort(),
   );
-  expect(lines.at(-1)).toMatch(/api\.indexnow\.org answered 202 for 8 URLs \(the whole site/);
+  expect(lines.at(-1)).toMatch(/api\.indexnow\.org answered 202 for 10 URLs \(the whole site/);
 
   // An hour later: a changed show page, a removed one, and /status again (too soon: left out).
   await run(
@@ -142,6 +157,35 @@ test('first submission is the whole site; later ones only changed and removed pa
   expect(f.calls).toHaveLength(3);
 });
 
+test('the programme guide changes with every publish: each language is sent at most once a day', async () => {
+  const s = store();
+  const config = cloudflare();
+  const f = fakeFetch(202);
+  const t0 = Date.parse('2026-11-08T10:00:00Z');
+  const run = (changed: string[], now: number) =>
+    submitIndexNow(s, config, {
+      base: BASE,
+      changed,
+      removed: [],
+      all: ALL,
+      fetch: f.fn,
+      now,
+      log: () => {},
+    });
+  const guide = ['live/guide/index.html', 'en/live/guide/index.html', 'airings.json', 'epg.json'];
+  await run(['index.html'], t0); // the whole site, the guide with it
+  await run(guide, t0 + 1_800_000);
+  await run([...guide, 'show/iltv_mako_1/index.html'], t0 + 3_600_000);
+  expect(f.calls).toHaveLength(2);
+  // A show page that changed for its own reasons still goes at once; the guide does not.
+  expect(f.calls[1]?.body.urlList).toEqual([`${BASE}/show/iltv_mako_1/`]);
+  await run(guide, t0 + STATUS_EVERY_MS);
+  expect(f.calls[2]?.body.urlList).toEqual([`${BASE}/live/guide/`, `${BASE}/en/live/guide/`]);
+  // Sending the guide does not reset /status's day, and the other way round.
+  await run(['status.html'], t0 + STATUS_EVERY_MS + 60_000);
+  expect(f.calls[3]?.body.urlList).toEqual([`${BASE}/status`]);
+});
+
 test('a failed submission is a warning and a note, and its addresses go with the next one', async () => {
   const s = store();
   const config = cloudflare();
@@ -158,7 +202,7 @@ test('a failed submission is a warning and a note, and its addresses go with the
     log: (l) => lines.push(l),
   });
   expect(lines.at(-1)).toMatch(
-    /^indexnow warning: api\.indexnow\.org answered HTTP 403: Key not valid for 8 URLs/,
+    /^indexnow warning: api\.indexnow\.org answered HTTP 403: Key not valid for 10 URLs/,
   );
   expect(indexNowNote(s, config)).toMatch(/IndexNow: the last submission .* failed: HTTP 403/);
 
@@ -184,7 +228,7 @@ test('a failed submission is a warning and a note, and its addresses go with the
     now,
     log: (l) => lines.push(l),
   });
-  expect(good.calls[0]?.body.urlList).toHaveLength(8);
+  expect(good.calls[0]?.body.urlList).toHaveLength(10);
   expect(indexNowNote(s, config)).toBeUndefined();
   expect(s.getState<{ ok: boolean }>(INDEXNOW_LAST)?.ok).toBe(true);
 });

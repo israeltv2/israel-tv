@@ -13,6 +13,7 @@ import {
   type Freshness,
   GEO_LIMITED,
   type GuideFile,
+  guideMatcher,
   ISRAEL_ONLY,
   isTrailer,
   kalturaImage,
@@ -41,6 +42,7 @@ import {
   type Video,
   videoId,
 } from '@israel-tv/core';
+import { airingLine, airingsFile, renderGuidePage, showAirings } from './guide-html.ts';
 import { renderLandingHtml } from './landing-html.ts';
 import { type LibraryRow, libraryUrls, plain, renderLibrary } from './library-html.ts';
 import { publicStatus } from './public-text.ts';
@@ -243,10 +245,18 @@ function videosFor(s: RenderShow): Video[] {
 export const MAKO_HELPER_NOTE =
   'כדי לצפות בפרקים של קשת 12 צריך את העוזר הביתי של Israel TV. איך מתקינים: github.com/israeltv2/israel-tv';
 
-function metaFor(s: RenderShow, now: number): Meta {
+/**
+ * A show's meta for the apps. `airing`: its next airing in the programme guide, said first in the description
+ * (written at every publish; see guide-html.ts airingLine).
+ */
+function metaFor(s: RenderShow, now: number, airing?: string): Meta {
   const m: Meta = { ...preview(s), videos: videosFor(s) };
-  if (s.show.source === 'mako')
-    m.description = rtl([showDescription(s), MAKO_HELPER_NOTE].filter(Boolean).join('\n\n'));
+  if (s.show.source === 'mako' || airing)
+    m.description = rtl(
+      [airing, showDescription(s), s.show.source === 'mako' ? MAKO_HELPER_NOTE : undefined]
+        .filter(Boolean)
+        .join('\n\n'),
+    );
   // Shown by apps (Nuvio: a "Status" row), and used by them for the year line when it is a bare year.
   const last = airDates(s).at(-1);
   if (last) {
@@ -431,11 +441,19 @@ export function renderSite(input: RenderInput): SiteFiles {
   }
   const shared = new Set([...counts].filter(([, n]) => n > 1).map(([k]) => k));
 
+  // Which show each programme in the guide is (the shows with a page on the website), and their next airings.
+  const showFor = guideMatcher(
+    listed.map((s) => ({ id: s.seriesId, catalog: s.catalog, title: tidyText(s.title) })),
+  );
+  const channelNames = new Map(input.live.map((c) => [c.id, c.name]));
+  const nextAirings = showAirings(input.guide ?? {}, showFor, now);
+
   // Meta and streams for every show ever published (delisted ones too, so watch history still opens).
   const metas = new Map<string, Meta>();
   for (const s of input.shows) {
     if (!hasVideos(s)) continue;
-    const meta = metaFor(s, now);
+    const next = nextAirings.get(s.seriesId)?.[0];
+    const meta = metaFor(s, now, next ? airingLine(next, channelNames) : undefined);
     metas.set(s.seriesId, meta);
     files.set(sitePaths.meta('series', s.seriesId), json({ meta }));
     for (const [season, streams] of seasonStreamFiles(s, input.probes)) {
@@ -623,8 +641,16 @@ export function renderSite(input: RenderInput): SiteFiles {
     ...(input.guide ? { guide: input.guide } : {}),
   });
   for (const [path, html] of library) files.set(path, html);
+  // The full programme guide, and the guide in short for the pages' "on the air next".
+  const withGuide = input.live.length > 0 && hasGuide(input);
+  if (withGuide) {
+    const guideInput = { live: landing.live, guide: input.guide ?? {}, showFor };
+    files.set(sitePaths.guidePage, renderGuidePage(guideInput, 'he'));
+    files.set(sitePaths.guidePageEn, renderGuidePage(guideInput, 'en'));
+    files.set(sitePaths.airings, json(airingsFile(guideInput)));
+  }
   files.set(sitePaths.robots, robotsTxt());
-  files.set(sitePaths.sitemap, sitemapXml(libraryUrls(library.keys())));
+  files.set(sitePaths.sitemap, sitemapXml(libraryUrls(library.keys()), { guide: withGuide }));
   files.set(sitePaths.webManifest, webManifest());
   files.set(sitePaths.search, json(search));
   files.set(sitePaths.extIds, json(extIds));
