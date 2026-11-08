@@ -100,6 +100,14 @@ deploy reported; otherwise (the local publisher, or the very first deploy) the s
 was asked on. To look at the pages without a database: `pnpm shots:site` (screenshots at phone and desktop width,
 light and dark, into `site-screens/`) or `pnpm shots:site --serve` (http://127.0.0.1:7790/).
 
+**IndexNow.** After a publish that went through (Cloudflare publisher, `indexNow.enabled`), the pages it added,
+changed or removed are sent to `api.indexnow.org` in one request (up to 10,000 addresses each): the very first time,
+or after a new address or key, every page of the sitemap; `/status` at most once a day (it changes with nearly every
+publish); search, the 404 page and the JSON files never. A publish that changed no page sends nothing. The key file
+`/<key>.txt` is published with the site. The log has `indexnow: api.indexnow.org answered 202 for N URLs`; a failure
+is only an `indexnow warning:` line and a note on the admin `/status` (the publish stays good), and its addresses go
+with the next submission.
+
 ### The library on the website
 
 The website also has the catalog itself, in Hebrew, rendered with everything else at publish time
