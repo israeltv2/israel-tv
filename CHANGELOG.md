@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.14.2](https://github.com/israeltv2/israel-tv/compare/v0.14.1...v0.14.2) (2026-11-08)
+
+
+### Bug Fixes
+
+* **kan:** episode pages that play from YouTube are told apart, not retried as unknown ([#189](https://github.com/israeltv2/israel-tv/issues/189)) ([fd1df1c](https://github.com/israeltv2/israel-tv/commit/fd1df1ceeb55039716d2e1531ecb021d0911a07e))
+
 ## [0.14.1](https://github.com/israeltv2/israel-tv/compare/v0.14.0...v0.14.1) (2026-11-08)
 
 
