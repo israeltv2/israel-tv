@@ -287,7 +287,7 @@ export function buildStatus(
       if (lists.noPage > 0)
         note(
           'kan-no-web-page',
-          `${lists.noPage} items in Kan's episode lists have no web page (they play from YouTube), so they are not in the catalog`,
+          `${lists.noPage} Kan ${lists.noPage === 1 ? 'episode plays' : 'episodes play'} only from YouTube, so ${lists.noPage === 1 ? 'it is' : 'they are'} not in the catalog`,
           { count: lists.noPage },
         );
       if (skipped.gaveUp > 0)

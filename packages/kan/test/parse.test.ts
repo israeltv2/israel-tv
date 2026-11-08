@@ -207,3 +207,16 @@ test('named episode links inside a season are episodes too (archive, recorded 20
   );
   expect(p.episodes.slice(1).every((e) => e.id === undefined)).toBe(true);
 });
+
+test('an episode page that plays from YouTube is told apart (recorded 2026-11-08)', async () => {
+  const { classifyEpisodePage } = await import('../src/parse.ts');
+  expect(
+    classifyEpisodePage(
+      html('episode-102280-youtube'),
+      KAN_ORIGIN,
+      `${KAN_ORIGIN}/content/kan/kan-11/p-12385/s5/102280/`,
+    ),
+  ).toEqual({ kind: 'youtube' });
+  // A real episode page is still an episode.
+  expect(classifyEpisodePage(html('episode-1006639')).kind).toBe('episode');
+});
