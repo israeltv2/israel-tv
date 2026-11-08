@@ -86,6 +86,55 @@ test('a listed show without episodes is never dropped silently: warned, and name
   expect(mako?.emptyShows).toEqual(['/empty']);
 });
 
+test('episodes past their availability window keep their numbers, are counted on /status, and come back the same', async () => {
+  const store = Store.open(':memory:');
+  const reshet = (key: string, expired: (k: string) => boolean): ScrapedShow => {
+    const s = show(key, [{ key: 's1', title: 'עונה 1', n: 3 }]);
+    return {
+      ...s,
+      source: 'reshet',
+      catalog: 'iltv_reshet13',
+      seasons: s.seasons.map((x) => ({
+        ...x,
+        episodes: x.episodes.map((e) => (expired(e.key) ? { ...e, unavailable: true as const } : e)),
+      })),
+    };
+  };
+  const fake = (expired: (k: string) => boolean) => ({
+    ...adapter(entries('/a', '/gone'), {
+      '/a': reshet('/a', expired),
+      '/gone': reshet('/gone', () => true),
+    }),
+    source: 'reshet' as const,
+  });
+  await runFull(
+    store,
+    fake((k) => k === '/as1-2'),
+    opts,
+  );
+  const numbers = (id: string) => store.assignments(id).episodes.map((e) => `${e.key}=${e.episode}`);
+  const before = numbers('iltv_reshet_1');
+  expect(before).toEqual(['/as1-1=1', '/as1-2=2', '/as1-3=3']);
+  const status = buildStatus(store, ['reshet'], Date.now());
+  const r = status.sources.find((x) => x.source === 'reshet');
+  expect(r?.episodes).toBe(2);
+  expect(r?.notes.join(' ')).toContain(
+    '4 Reshet episodes are past their availability window, so they are not in the catalog',
+  );
+  expect(r?.skipped).toEqual({ noLongerOffered: 4, notVideo: 0 });
+  // A show with nothing offered is kept (numbers reserved) and listed with the other empty shows.
+  expect(r?.emptyShows).toEqual(['/gone']);
+  expect(numbers('iltv_reshet_2')).toEqual(['/gones1-1=1', '/gones1-2=2', '/gones1-3=3']);
+  // Reshet offers it again: same numbers.
+  await runFull(
+    store,
+    fake(() => false),
+    opts,
+  );
+  expect(numbers('iltv_reshet_1')).toEqual(before);
+  expect(store.getShow('iltv_reshet_1')?.show.seasons[0]?.episodes.every((e) => !e.unavailable)).toBe(true);
+});
+
 test('shows refused by bot protection are retried later that night; amber only if still refused after every retry', async () => {
   const { BlockedError } = await import('@israel-tv/net');
   const { runBlockedRetry, retryKey } = await import('../src/runner.ts');

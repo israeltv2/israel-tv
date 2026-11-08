@@ -176,14 +176,20 @@ function seasonLabel(a: SeasonAssignment | undefined, title: string): string | u
   return t;
 }
 
-/** A show without trailers and promos (read before they were left out at the source boundary; model.ts). */
-function withoutTrailers(s: RenderShow): RenderShow {
-  if (!s.show.seasons.some((x) => x.episodes.some((e) => isTrailer(e.title)))) return s;
+/**
+ * A show as published: without trailers and promos (read before they were left out at the source boundary;
+ * model.ts) and without episodes the source no longer offers (`unavailable`; their numbers stay reserved, so the
+ * others keep theirs). A show left with nothing is not in the catalog (hasVideos).
+ */
+function published(s: RenderShow): RenderShow {
+  const out = (e: ScrapedShow['seasons'][number]['episodes'][number]) =>
+    e.unavailable === true || isTrailer(e.title);
+  if (!s.show.seasons.some((x) => x.episodes.some(out))) return s;
   return {
     ...s,
     show: {
       ...s.show,
-      seasons: s.show.seasons.map((x) => ({ ...x, episodes: x.episodes.filter((e) => !isTrailer(e.title)) })),
+      seasons: s.show.seasons.map((x) => ({ ...x, episodes: x.episodes.filter((e) => !out(e)) })),
     },
   };
 }
@@ -386,7 +392,7 @@ export function renderSite(input: RenderInput): SiteFiles {
   const rows = new Map<string, MetaPreview[]>();
 
   const now = input.now ?? Date.now();
-  input = { ...input, shows: input.shows.map(withoutTrailers) };
+  input = { ...input, shows: input.shows.map(published) };
   const listed = input.shows.filter((s) => s.state === 'listed' && hasVideos(s));
   listed.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
   for (const s of listed) {

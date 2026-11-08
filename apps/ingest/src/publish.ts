@@ -64,6 +64,7 @@ import {
   botCheckKey,
   emptyShowsKey,
   episodeCount,
+  offeredCount,
   retryKey,
 } from './runner.ts';
 import { siteImages } from './site-images.ts';
@@ -90,7 +91,7 @@ export function buildStatus(
   for (const source of sources) {
     const read = READS[source];
     const shows = all.filter((s) => s.source === source && s.state === 'listed');
-    const episodes = shows.reduce((n, s) => n + episodeCount(s.show), 0);
+    const episodes = shows.reduce((n, s) => n + offeredCount(s.show), 0);
     // A run stopped for a restart is neither good nor bad: health is judged on the last run that ended by itself.
     const last = store.lastRun(read.kind, source, { settled: true });
     const airing = store.lastRun('airing', source, { settled: true });
@@ -213,6 +214,16 @@ export function buildStatus(
         notes.push(
           `${skipped.gaveUp} Kan episode pages failed to load ${MAX_EPISODE_TRIES} times and were skipped`,
         );
+    }
+    // Reshet episodes past their availability window: kept with their numbers, not in the catalog (render.ts).
+    if (source === 'reshet') {
+      const past = shows.reduce((n, s) => n + episodeCount(s.show) - offeredCount(s.show), 0);
+      if (past > 0) {
+        skippedPages = { noLongerOffered: past, notVideo: 0 };
+        notes.push(
+          `${past} Reshet ${past === 1 ? 'episode is' : 'episodes are'} past their availability window, so ${past === 1 ? 'it is' : 'they are'} not in the catalog`,
+        );
+      }
     }
     // Listed by the site with nothing to watch: a count here, the titles in `emptyShows` (an expandable list).
     const empty = store.getState<string[]>(emptyShowsKey(source)) ?? [];

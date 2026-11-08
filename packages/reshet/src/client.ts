@@ -155,22 +155,18 @@ export async function fetchShow(
     } catch (err) {
       notes.push(`Kaltura lookup failed, episodes not labelled for geo-blocking: ${(err as Error).message}`);
     }
-    // An entry Kaltura no longer has (missing from the answer, which lists every existing one) plays nowhere,
-    // and neither does one past its schedule window (Reshet took it down; 404 in Israel too): the episode stays
-    // (its number never moves) but offers no stream rather than one that fails. A later read gives the stream
-    // back if Reshet puts the episode up again.
+    // An entry Kaltura no longer has (missing from the answer, which lists every existing one) plays nowhere:
+    // its episode stays (its number never moves) but offers no stream rather than one that fails. One past its
+    // schedule window (Reshet took it down; 404 in Israel too) is marked unavailable: kept with its number, left
+    // out of the catalog (counted on /status), and back with the same number when a later read finds it offered.
     const lookedUp = states.size > 0;
     let gone = 0;
-    let expired = 0;
     for (const x of seasons) {
       for (const e of x.episodes) {
         const st = states.get(e.key);
         if (st) {
           e.availableAbroad = !st.blocked;
-          if (st.expired) {
-            e.streams = [];
-            expired++;
-          }
+          if (st.expired) e.unavailable = true;
         } else if (lookedUp) {
           e.streams = [];
           gone++;
@@ -179,10 +175,6 @@ export async function fetchShow(
     }
     if (gone > 0)
       notes.push(`${gone} episodes no longer exist on Reshet's video host: listed without a stream`);
-    if (expired > 0)
-      notes.push(
-        `${expired} episodes are past their availability window on Reshet's video host: listed without a stream`,
-      );
   }
   const single = seasons.length === 1 && !/\d/.test(seasons[0]?.s.title ?? '');
   const out: ScrapedSeason[] = seasons.map((x) => ({

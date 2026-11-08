@@ -192,7 +192,11 @@ function historyBar(days: string[], values: (Health | null)[] | undefined): Chil
 function viewerNotes(s: Source | undefined): string[] {
   const out: string[] = [];
   const gone = s?.skipped?.noLongerOffered ?? 0;
-  if (gone)
+  if (gone && s?.source === 'reshet')
+    out.push(
+      `${num(gone)} Reshet ${gone === 1 ? 'episode is' : 'episodes are'} past their availability window, so ${gone === 1 ? 'it is' : 'they are'} not in the catalog.`,
+    );
+  else if (gone)
     out.push(
       `${num(gone)} Kan ${gone === 1 ? 'episode is' : 'episodes are'} no longer offered (the broadcast rights ended), so ${gone === 1 ? 'it is' : 'they are'} not in the catalog.`,
     );

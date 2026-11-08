@@ -303,7 +303,7 @@ test('an entry past its schedule window is expired (plays nowhere); the profile 
   expect(checked).toEqual(['now']);
 });
 
-test('an expired episode keeps its place and label but offers no stream, and says so', async () => {
+test('an expired episode is kept (its number stays reserved) but marked unavailable', async () => {
   const f = pages({ '/all-shows/kitchen-nightmares-902985891/': 'show-kitchen-nightmares' });
   let first = '';
   const withOneExpired = async (body: unknown) => {
@@ -331,10 +331,12 @@ test('an expired episode keeps its place and label but offers no stream, and say
   );
   const eps = show.seasons.flatMap((s) => s.episodes);
   const ep = eps.find((e) => e.key === first);
-  expect(ep?.streams).toEqual([]);
+  expect(ep?.unavailable).toBe(true);
   expect(ep?.availableAbroad).toBe(false);
-  expect(eps.filter((e) => e.key !== first).every((e) => e.streams.length === 1)).toBe(true);
-  expect(show.notes?.join(' ')).toMatch(/1 episodes are past their availability window/);
+  expect(eps.filter((e) => e.key !== first).every((e) => e.streams.length === 1 && !e.unavailable)).toBe(
+    true,
+  );
+  expect(show.notes?.join(' ') ?? '').not.toMatch(/availability window/);
 });
 
 test('a show split by year before stays split when one read sees a single untitled season', async () => {

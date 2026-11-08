@@ -239,7 +239,7 @@ export async function probeStreams(
       .filter((x) => x.source === 'reshet')
       .sort((a, b) => (b.latestAirDate ?? '').localeCompare(a.latestAirDate ?? ''))) {
       for (const e of s.show.seasons.flatMap((x) => x.episodes)) {
-        const url = e.streams.find((x) => x.kind === 'direct')?.url;
+        const url = e.unavailable ? undefined : e.streams.find((x) => x.kind === 'direct')?.url;
         const known = state[e.key];
         if (url && (!known || (known.height === 0 && now - Date.parse(known.at) > RETRY_MS)))
           todo.push({ key: e.key, url });
