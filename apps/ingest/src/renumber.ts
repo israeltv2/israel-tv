@@ -11,11 +11,16 @@ import { join } from 'node:path';
 import {
   type Assignments,
   assignNumbers,
+  chronological,
+  datesTellOrder,
+  dropRepeatedVideos,
   hintsRunBackwards,
   parseEpisodeHint,
+  printedStartsOver,
   type ScrapedShow,
+  startOverOrder,
 } from '@israel-tv/core';
-import { splitKeys, untitledSeasonsByYear } from '@israel-tv/reshet';
+import { dropCollidingHints, splitKeys, untitledSeasonsByYear } from '@israel-tv/reshet';
 import type { Store } from '@israel-tv/store';
 import { sanctionNumbering } from './numbering-guard.ts';
 import { latestAirDate } from './runner.ts';
@@ -461,4 +466,332 @@ export function afterFullRun(
     ...(run.fetched ? { fetched: run.fetched } : {}),
   });
   return r ? printedLine(r) : undefined;
+}
+
+// numbering-right-2026-11-08 (owner decision 2026-11-08: "dont leave anything, i dont mind if it will discard my
+// watching progress all good"): the numbering freeze broken once, so that every season's numbers are right.
+// Every season of every show is numbered again from what the source says (seasonTargets):
+// - printed numbers that start over (several cycles listed as one season, Kan's זמן אמת): air-date order 1..n;
+// - printed numbers that run against air dates that can order the season: positions, air-date order (kept);
+// - printed numbers for at least half the episodes: each number its first episode by air date; a number printed
+//   twice goes to the first, the other one with the unnumbered episodes: these keep their number when no printed
+//   number claims it, otherwise go after the season's highest, in air-date order;
+// - printed numbers for fewer than half, and air dates that can order the season: air-date order around them
+//   (the printed ones keep their numbers); with bulk-upload dates they are treated as above;
+// - no printed numbers: air-date order when the dates can order the season, else the numbers stay.
+// Episodes no longer listed keep their number unless a listed one now has it (then after the highest).
+// Backup first, one transaction, every move in the report and in a .moves.json next to the backup; the numbering
+// warnings of every show are re-derived (the old ones described numbers this pass re-decided).
+export const NUMBERING_RIGHT = 'numbering-right-2026-11-08';
+
+export type SeasonRule = 'printed' | 'sparse' | 'starts-over' | 'by-date' | 'kept';
+
+/** Where a season's numbers come from, and its stored rows' numbers (all of them, moved or not). */
+export function seasonTargets(
+  season: ScrapedShow['seasons'][number],
+  seasonNumber: number,
+  rows: readonly { key: string; season: number; episode: number }[],
+): { rule: SeasonRule; numbers: Map<string, number> } {
+  const inSeason = rows.filter((r) => r.season === seasonNumber);
+  const current = new Map(inSeason.map((r) => [r.key, r.episode]));
+  const eps = season.episodes.filter((e) => current.has(e.key));
+  const view = { ...season, episodes: eps };
+  const listed = new Set(eps.map((e) => e.key));
+  const unlisted = inSeason.filter((r) => !listed.has(r.key)).sort((a, b) => a.episode - b.episode);
+  const target = new Map<string, number>();
+  const used = new Set<number>();
+  const take = (key: string, n: number) => {
+    target.set(key, n);
+    used.add(n);
+  };
+  const highest = () => Math.max(0, ...used);
+  /**
+   * The rest keep their number when it is free, else take the lowest free number above the highest printed one
+   * (`from`), in the order given.
+   */
+  const keepOrAfter = (keys: string[], claimed: Set<number>, from: () => number) => {
+    const bumped: string[] = [];
+    for (const k of keys) {
+      const n = current.get(k) as number;
+      if (claimed.has(n) || used.has(n)) bumped.push(k);
+      else take(k, n);
+    }
+    for (const k of bumped) {
+      let n = from();
+      while (claimed.has(n) || used.has(n)) n++;
+      take(k, n);
+    }
+  };
+  const hinted = eps.filter((e) => e.numberHint !== undefined);
+  let rule: SeasonRule;
+  if (printedStartsOver(eps)) {
+    rule = 'starts-over';
+    for (const [i, e] of startOverOrder(view).entries()) take(e.key, i + 1);
+  } else if (hintsRunBackwards(eps) || hinted.length === 0) {
+    const order = chronological(view);
+    if (eps.length > 0 && eps.every((e) => e.airDate) && datesTellOrder(eps)) {
+      // Air-date order on the numbers these episodes hold (a gap left by an episode no longer listed stays).
+      rule = 'by-date';
+      const held = eps.map((e) => current.get(e.key) as number).sort((a, b) => a - b);
+      for (const [i, e] of order.entries()) take(e.key, held[i] as number);
+    } else {
+      rule = 'kept';
+      for (const e of eps) take(e.key, current.get(e.key) as number);
+    }
+  } else {
+    const known = evidenceOrder(view);
+    const order = known ?? chronological(view);
+    const owner = new Map<number, string>();
+    for (const e of order)
+      if (e.numberHint !== undefined && !owner.has(e.numberHint)) owner.set(e.numberHint, e.key);
+    const claimed = new Set(owner.keys());
+    for (const [n, k] of owner) take(k, n);
+    const others = order.filter((e) => target.get(e.key) === undefined).map((e) => e.key);
+    // Few printed numbers are anchors in the season's order, when something gives one (dates, or the source's
+    // list order where the printed numbers follow it).
+    if (owner.size * 2 >= eps.length || !known) {
+      rule = 'printed';
+      // Unnumbered episodes ahead of the first printed one, when the numbers below it are free for them, are the
+      // season's first episodes (טעם של חו"ל: "פריז" before "פרק 2"; Keshet's seasons that started at 2).
+      // Only by air date, and aired before it: a list's opening clip or preview ("פתיח", "הצצה") is not one.
+      const byDate = eps.every((e) => e.airDate) && datesTellOrder(eps);
+      const firstAt = byDate ? order.findIndex((e) => owner.get(e.numberHint as number) === e.key) : -1;
+      const first = firstAt > 0 ? (order[firstAt]?.numberHint as number) : 0;
+      const firstDay = order[firstAt]?.airDate ?? '';
+      if (firstAt > 0 && firstAt <= first - 1) {
+        const lead = order.slice(0, firstAt);
+        if (lead.every((e) => (e.airDate ?? '') < firstDay))
+          lead.forEach((e, i) => {
+            const n = first - firstAt + i;
+            if (!claimed.has(n) && !used.has(n)) take(e.key, n);
+          });
+      }
+      keepOrAfter(
+        others.filter((k) => !target.has(k)),
+        claimed,
+        () => Math.max(0, ...claimed) + 1,
+      );
+    } else {
+      rule = 'sparse';
+      let cursor = 0;
+      for (const k of others) {
+        let n = cursor + 1;
+        while (claimed.has(n) || used.has(n)) n++;
+        take(k, n);
+        cursor = n;
+      }
+    }
+  }
+  keepOrAfter(
+    unlisted.map((r) => r.key),
+    new Set(),
+    () => highest() + 1,
+  );
+  return { rule, numbers: target };
+}
+
+/**
+ * The order something says a season's episodes aired in: air dates that can order it (datesTellOrder; undated
+ * episodes in list order, as `chronological`), else the source's list order when its printed numbers are the
+ * places in it (טקסי דרייבר: "פרק 3" third, "פרק 12" twelfth; also listed newest first), else nothing.
+ */
+export function evidenceOrder(
+  season: ScrapedShow['seasons'][number],
+): ScrapedShow['seasons'][number]['episodes'] | undefined {
+  const eps = season.episodes;
+  if (datesTellOrder(eps)) return chronological(season);
+  // Every printed number sits where the list puts it: number = place in the list (+ the same gap for all, for
+  // episodes missing before them), in one direction or the other.
+  const fits = (list: typeof eps) => {
+    const gaps = new Set<number>();
+    list.forEach((e, i) => {
+      if (e.numberHint !== undefined) gaps.add(e.numberHint - (i + 1));
+    });
+    return gaps.size === 1 && [...gaps][0] !== undefined && ([...gaps][0] as number) >= 0;
+  };
+  if (eps.filter((e) => e.numberHint !== undefined).length < 2) return undefined;
+  if (fits(eps)) return eps;
+  const reversed = [...eps].reverse();
+  return fits(reversed) ? reversed : undefined;
+}
+
+export interface RightMove extends PrintedMove {
+  source: string;
+  rule: SeasonRule;
+}
+
+export interface RightReport {
+  id: string;
+  backup?: string;
+  /** Per source and rule: seasons whose numbers moved, and episodes moved. */
+  counts: Record<string, Record<string, { seasons: number; episodes: number }>>;
+  shows: number;
+  seasons: number;
+  moves: RightMove[];
+  /** Episodes left out as a second listing of the same video. */
+  repeats: { seriesId: string; key: string; title: string }[];
+  /** Numbering warnings removed (re-derived), and the ones the stored numbers still give. */
+  warningsCleared: number;
+  warningsLeft: number;
+}
+
+/** A Reshet daily show's year season (untitledSeasonsByYear): numbered by date, printed numbers ignored. */
+const splitYear = (s: ScrapedShow['seasons'][number]) => /^\d{4}$/.test(s.title) && /\|\d{4}$/.test(s.key);
+
+/**
+ * The stored data as today's readers give it: Kan's numbers from its titles, Reshet's title numbers over Kaltura's
+ * (dropCollidingHints), and no video listed twice (dropRepeatedVideos).
+ */
+function refreshed(show: ScrapedShow): ScrapedShow {
+  if (show.source === 'kan') return dropRepeatedVideos(kanHintsFromTitles(show));
+  if (show.source !== 'reshet') return dropRepeatedVideos(show);
+  const seasons = show.seasons.map((s) =>
+    splitYear(s) ? s : { ...s, episodes: dropCollidingHints(s.episodes) },
+  );
+  const next = JSON.stringify(seasons) === JSON.stringify(show.seasons) ? show : { ...show, seasons };
+  return dropRepeatedVideos(next);
+}
+
+const NUMBERING_CODES = ['source-renumbered', 'episode-number-taken', 'numbers-reversed'] as const;
+
+/** Run numbering-right-2026-11-08 once (undefined when it already ran); `dryRun` changes nothing. */
+export function renumberRight(
+  store: Store,
+  backupDir: string,
+  opts: { dryRun?: boolean } = {},
+): RightReport | undefined {
+  const done = store.getState<string[]>(MIGRATIONS_KEY) ?? [];
+  if (done.includes(NUMBERING_RIGHT)) return undefined;
+  const report: RightReport = {
+    id: NUMBERING_RIGHT,
+    counts: {},
+    shows: 0,
+    seasons: 0,
+    moves: [],
+    repeats: [],
+    warningsCleared: 0,
+    warningsLeft: 0,
+  };
+  const plans: {
+    seriesId: string;
+    show: ScrapedShow;
+    next: Assignments;
+    moved: boolean;
+    dataChanged: boolean;
+  }[] = [];
+  for (const row of store.listShows()) {
+    const show = refreshed(row.show);
+    const a = store.assignments(row.seriesId);
+    const seasonOf = new Map(a.seasons.map((s) => [s.key, s]));
+    const before = new Map(row.show.seasons.flatMap((s) => s.episodes.map((e) => [e.key, e.title])));
+    for (const s of show.seasons) for (const e of s.episodes) before.delete(e.key);
+    for (const [key, title] of before) report.repeats.push({ seriesId: row.seriesId, key, title });
+    const moved = new Map<string, number>();
+    let seasons = 0;
+    for (const season of show.seasons) {
+      const sa = seasonOf.get(season.key);
+      if (!sa) continue;
+      const { rule, numbers } = seasonTargets(season, sa.number, a.episodes);
+      const titles = new Map(season.episodes.map((e) => [e.key, e.title]));
+      let count = 0;
+      for (const r of a.episodes) {
+        const to = r.season === sa.number ? numbers.get(r.key) : undefined;
+        if (to === undefined || to === r.episode) continue;
+        count++;
+        moved.set(r.key, to);
+        report.moves.push({
+          seriesId: row.seriesId,
+          source: row.show.source,
+          rule,
+          show: row.title,
+          season: sa.number,
+          key: r.key,
+          title: titles.get(r.key) ?? '(no longer listed by the source)',
+          from: r.episode,
+          to,
+        });
+      }
+      if (count === 0) continue;
+      seasons++;
+      const bySource = report.counts[row.show.source] ?? {};
+      report.counts[row.show.source] = bySource;
+      const c = bySource[rule] ?? { seasons: 0, episodes: 0 };
+      bySource[rule] = c;
+      c.seasons++;
+      c.episodes += count;
+    }
+    if (moved.size > 0) {
+      report.shows++;
+      report.seasons += seasons;
+    }
+    plans.push({
+      seriesId: row.seriesId,
+      show,
+      next: {
+        seasons: a.seasons,
+        episodes: a.episodes.map((e) =>
+          moved.has(e.key) ? { ...e, episode: moved.get(e.key) as number } : e,
+        ),
+      },
+      moved: moved.size > 0,
+      dataChanged: JSON.stringify(show) !== JSON.stringify(row.show),
+    });
+  }
+  // What the numbering rules still say about the new numbers (expected: nothing).
+  const left = new Map(
+    plans.map((p) => [
+      p.seriesId,
+      assignNumbers(p.show, p.next).warnings.filter((w) =>
+        (NUMBERING_CODES as readonly string[]).includes(w.code),
+      ),
+    ]),
+  );
+  report.warningsLeft = [...left.values()].reduce((n, l) => n + l.length, 0);
+  if (opts.dryRun) return report;
+  mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+  report.backup = join(backupDir, `before-${NUMBERING_RIGHT}.sqlite`);
+  store.backupTo(report.backup);
+  const runId = store.startRun('show', 'renumber');
+  store.transaction(() => {
+    for (const p of plans) {
+      if (p.moved) store.replaceAssignments(p.seriesId, p.next);
+      report.warningsCleared += store.clearWarnings(p.seriesId, NUMBERING_CODES);
+      store.addWarnings(runId, p.seriesId, left.get(p.seriesId) ?? []);
+      if (p.dataChanged) {
+        const row = store.getShow(p.seriesId);
+        store.saveShow(p.seriesId, p.show, { seasons: [], episodes: [] }, latestAirDate(p.show), false);
+        if (row) store.restoreShowState(p.seriesId, row);
+      }
+    }
+    store.setState(MIGRATIONS_KEY, [...(store.getState<string[]>(MIGRATIONS_KEY) ?? []), NUMBERING_RIGHT]);
+    const { moves: _, ...summary } = report;
+    store.setState(`${MIGRATIONS_KEY}:${NUMBERING_RIGHT}`, {
+      ...summary,
+      moved: report.moves.length,
+      at: new Date().toISOString(),
+    });
+    sanctionNumbering(store);
+  });
+  writeFileSync(report.backup.replace(/\.sqlite$/, '.moves.json'), JSON.stringify(report.moves, null, 1), {
+    mode: 0o600,
+  });
+  store.finishRun(runId, { status: 'ok', showsOk: report.shows, requests: 0 });
+  return report;
+}
+
+/** One line for the service log; the full list is in the report file and the database. */
+export function rightLine(r: RightReport): string {
+  const counts = Object.entries(r.counts)
+    .map(
+      ([source, rules]) =>
+        `${source} ${Object.entries(rules)
+          .map(([rule, c]) => `${rule} ${c.episodes} in ${c.seasons}`)
+          .join(', ')}`,
+    )
+    .join('; ');
+  const sample = r.moves
+    .slice(0, 5)
+    .map((m) => `${m.seriesId} S${m.season}E${m.from}→E${m.to} "${m.title}"`)
+    .join('; ');
+  return `one-time renumber ${r.id}: ${r.moves.length} episodes moved in ${r.seasons} seasons of ${r.shows} shows (${counts || 'none'})${sample ? `, e.g. ${sample}` : ''}; ${r.repeats.length} repeated listings left out; ${r.warningsCleared} numbering warnings re-derived, ${r.warningsLeft} left; backup ${r.backup ?? 'none (dry run)'}`;
 }

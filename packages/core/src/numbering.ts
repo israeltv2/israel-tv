@@ -59,12 +59,18 @@ export function parseSeasonTitle(title: string): { kind: SeasonKind; number?: nu
 
 /**
  * Read an episode number from text like "פרק 5", "פרק 5@05.11.26" or "פרק 12 - הגמר". "מתוך פרק 1" ("from
- * episode 1", a song or clip taken from it) names another episode, not this one's number.
+ * episode 1", a song or clip taken from it) names another episode, not this one's number. Also "פרק סיום העונה
+ * (20)" (Kan) and "פרק הבכורה" (1).
  */
 export function parseEpisodeHint(text: string | undefined | null): number | undefined {
-  const m = /(?<!מתוך\s*)פרק\s*(\d{1,4})(?!\d)/.exec(text ?? '');
+  const m =
+    /(?<!מתוך\s*)פרק\s*(\d{1,4})(?!\d)/.exec(text ?? '') ??
+    // Kan's season finales: "פרק סיום העונה (20) - …".
+    /פרק\s+(?:ה)?סיום(?:\s+ה?עונה)?\s*\((\d{1,4})\)/.exec(text ?? '');
   const n = m ? Number(m[1]) : Number.NaN;
-  return Number.isInteger(n) && n > 0 ? n : undefined;
+  if (Number.isInteger(n) && n > 0) return n;
+  // "פרק הבכורה" / "תכנית הבכורה" (the premiere) is episode 1; "לפרק הבכורה" (a preview of it) is not.
+  return /(?<![\u0590-\u05FF])(?:פרק|תו?כנית)\s+(?:ה)?בכורה/.test(text ?? '') ? 1 : undefined;
 }
 
 function nextFree(used: Set<number>, from: number): number {
@@ -77,7 +83,7 @@ function nextFree(used: Set<number>, from: number): number {
  * Episodes without a stored number, oldest first: by air date when every one has a date, otherwise in
  * source order, reversed when the source lists newest first (daily shows).
  */
-function chronological(season: ScrapedSeason): ScrapedSeason['episodes'] {
+export function chronological(season: ScrapedSeason): ScrapedSeason['episodes'] {
   const eps = season.episodes;
   const dated = eps.filter((e) => e.airDate);
   if (dated.length === eps.length && eps.length > 0) {
@@ -94,8 +100,24 @@ function chronological(season: ScrapedSeason): ScrapedSeason['episodes'] {
   return eps;
 }
 
-/** True when, among dated episodes with printed numbers, higher numbers mostly have earlier dates. */
+/**
+ * True when a season's air dates can order it: enough different days. Sources that uploaded an archive at once
+ * give most episodes the same day (Reshet: 2015-11-03, 2017-03-28, 2023-04-03; Kan: a season published in one
+ * day); such dates say nothing about order, and the printed numbers are the only evidence.
+ */
+export function datesTellOrder(eps: ScrapedSeason['episodes']): boolean {
+  const dated = eps.filter((e) => e.airDate);
+  const days = new Set(dated.map((e) => e.airDate)).size;
+  // Two episodes on two days can be ordered; from three on, three days at least and one for every two episodes.
+  return days >= Math.min(dated.length, 3) && days >= 2 && days * 2 >= dated.length;
+}
+
+/**
+ * True when, among dated episodes with printed numbers, higher numbers mostly have earlier dates — and the dates
+ * can order the season at all (datesTellOrder): then the printed numbers are positions (newest = 1).
+ */
 export function hintsRunBackwards(eps: ScrapedSeason['episodes']): boolean {
+  if (!datesTellOrder(eps)) return false;
   const pts = eps
     .filter((e) => e.numberHint !== undefined && e.airDate)
     .sort((a, b) => (a.numberHint ?? 0) - (b.numberHint ?? 0));
@@ -109,6 +131,55 @@ export function hintsRunBackwards(eps: ScrapedSeason['episodes']): boolean {
     else if (cur < prev) down++;
   }
   return down > up * 2;
+}
+
+/** The season a title names ("עונה 2 פרק 3"), when it names one. */
+function titleSeason(title: string): number | undefined {
+  const m = /עונה\s*(\d{1,3})(?!\d)/.exec(title);
+  return m ? Number(m[1]) : undefined;
+}
+
+/**
+ * True when a season's printed numbers start over: the source lists several cycles as one season (Kan's זמן אמת:
+ * "פרק 1"–"פרק 16" in 2024, "פרק 1"–"פרק 12" in 2025, …). Seen as three or more numbers each printed by two or
+ * more episodes, the lowest printed number among them, or as a repeated number in a season whose titles name two
+ * different seasons ("עונה 1 פרק 6", "עונה 5 פרק 6"). Such a season is numbered in air-date order; its printed
+ * numbers cannot be kept. (Two specials numbered 1 and 2 ahead of a season that then starts at 1 are not a cycle:
+ * ארץ נהדרת season 18.)
+ */
+export function printedStartsOver(eps: ScrapedSeason['episodes']): boolean {
+  const uses = new Map<number, number>();
+  for (const e of eps)
+    if (e.numberHint !== undefined) uses.set(e.numberHint, (uses.get(e.numberHint) ?? 0) + 1);
+  const repeated = [...uses].filter(([, c]) => c > 1).map(([n]) => n);
+  if (repeated.length === 0) return false;
+  const named = new Set(eps.map((e) => titleSeason(e.title)).filter((n) => n !== undefined));
+  if (named.size >= 2) return true;
+  return repeated.length >= 3 && repeated.includes(Math.min(...uses.keys()));
+}
+
+/**
+ * The order to number a season whose printed numbers start over: by air date when every episode has one, then by
+ * the season and number its title prints (a cycle published in one day), then source order; otherwise as
+ * `chronological`.
+ */
+export function startOverOrder(season: ScrapedSeason): ScrapedSeason['episodes'] {
+  const eps = season.episodes;
+  if (!eps.every((e) => e.airDate)) return chronological(season);
+  // A title without a season belongs to the first one named; an episode without a number follows the numbered.
+  const first = Math.min(...eps.map((e) => titleSeason(e.title) ?? Number.MAX_SAFE_INTEGER));
+  const seasonOf = (e: (typeof eps)[number]) => titleSeason(e.title) ?? first;
+  const last = Number.MAX_SAFE_INTEGER;
+  return eps
+    .map((e, i) => ({ e, i }))
+    .sort(
+      (a, b) =>
+        (a.e.airDate ?? '').localeCompare(b.e.airDate ?? '') ||
+        seasonOf(a.e) - seasonOf(b.e) ||
+        (a.e.numberHint ?? last) - (b.e.numberHint ?? last) ||
+        a.i - b.i,
+    )
+    .map(({ e }) => e);
 }
 
 export function assignNumbers(show: ScrapedShow, previous: Assignments): NumberingResult {
@@ -180,10 +251,24 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
     for (const n of used) if (n > max) max = n;
     // Printed numbers that run against the air dates (the source counts newest = 1) are positions, not
     // episode numbers: number by date instead (and do not report them as renumberings).
-    const trustHints = !hintsRunBackwards(season.episodes);
+    // Printed numbers that start over within the season (several cycles listed as one) cannot be kept either:
+    // the season goes on in air-date order.
+    const startsOver = printedStartsOver(season.episodes);
+    const trustHints = !startsOver && !hintsRunBackwards(season.episodes);
+    // A number two episodes print is the source's mistake or a part 2: the second cannot have it, and that is
+    // not a renumbering.
+    const printedBy = new Map<number, number>();
+    for (const ep of season.episodes)
+      if (ep.numberHint !== undefined) printedBy.set(ep.numberHint, (printedBy.get(ep.numberHint) ?? 0) + 1);
     for (const ep of season.episodes) {
       const stored = episodes.get(ep.key);
-      if (trustHints && stored && ep.numberHint !== undefined && stored.episode !== ep.numberHint) {
+      if (
+        trustHints &&
+        stored &&
+        ep.numberHint !== undefined &&
+        printedBy.get(ep.numberHint) === 1 &&
+        stored.episode !== ep.numberHint
+      ) {
         warnings.push({
           code: 'source-renumbered',
           message: `episode ${ep.key} is now "פרק ${ep.numberHint}" at the source; kept S${stored.season}E${stored.episode}`,
@@ -191,8 +276,10 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
         });
       }
     }
-    const fresh = chronological(season).filter((e) => !episodes.has(e.key));
-    if (!trustHints && fresh.length > 0) {
+    const fresh = (startsOver ? startOverOrder(season) : chronological(season)).filter(
+      (e) => !episodes.has(e.key),
+    );
+    if (!trustHints && !startsOver && fresh.length > 0) {
       warnings.push({
         code: 'numbers-reversed',
         message: `season "${season.title}" (${season.key}): printed numbers run against the air dates; numbered by date`,

@@ -3,6 +3,7 @@ import type { Fetcher } from '@israel-tv/net';
 import { blockedEntries, type EntryState, kalturaPost } from './kaltura.ts';
 import {
   dropCollidingHints,
+  entryThumbUrl,
   type ParsedSeason,
   parseAllShows,
   parseSeasonPage,
@@ -175,6 +176,8 @@ export async function fetchShow(
           if (st.expired) e.unavailable = true;
         } else if (lookedUp) {
           e.streams = [];
+          // Kaltura's still of an entry it no longer has would be a broken image.
+          if (e.thumbnail === entryThumbUrl(e.key)) delete e.thumbnail;
           gone++;
         }
       }

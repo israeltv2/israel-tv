@@ -23,6 +23,14 @@ export const SITE_LIST_PAGES = 40;
 export const RESHET_ORIGIN = 'https://13tv.co.il';
 export const KALTURA_PARTNER = 2748741;
 
+/**
+ * Kaltura's own still of an entry (a frame of the video), for an episode whose record names no image (24 of 13,749
+ * Reshet episodes, 2026-11-08; checked: 200 and the same picture from Israel and from Germany).
+ */
+export function entryThumbUrl(entryId: string): string {
+  return `https://cdnapisec.kaltura.com/p/${KALTURA_PARTNER}/sp/${KALTURA_PARTNER}00/thumbnail/entry_id/${entryId}/width/640/height/360`;
+}
+
 export function playManifestUrl(entryId: string): string {
   return `https://cdnapisec.kaltura.com/p/${KALTURA_PARTNER}/sp/${KALTURA_PARTNER}00/playManifest/entryId/${entryId}/format/applehttp/protocol/https/a.m3u8`;
 }
@@ -209,7 +217,7 @@ function episode(
     ...(f.numberHint && f.numberHint > 0 ? { numberHint: f.numberHint } : {}),
     ...(f.airDate ? { airDate: f.airDate } : {}),
     ...(f.description ? { description: f.description.trim() } : {}),
-    ...(episodeThumb(f.thumb) ? { thumbnail: episodeThumb(f.thumb) } : {}),
+    thumbnail: episodeThumb(f.thumb) ?? entryThumbUrl(entryId),
     ...(f.dur && f.dur > 0 ? { durationSec: Math.round(f.dur) } : {}),
     streams: [{ url: playManifestUrl(entryId), kind: 'direct' }],
     play: { entryId },
@@ -348,12 +356,26 @@ export function parseShowPage(html: string): ParsedShowPage {
  * A printed number that two episodes of one season claim is no episode number (a title's "פרק 3" next to another
  * episode's Kaltura number 3, "חוזרים לפספוסים" 2026-11-07): neither keeps it, so the season is numbered by the rules
  * for unnumbered episodes instead of one taking the number and the other being reported as a clash on every read.
+ * Except when exactly one of them prints it in its title: the title is the broadcaster's own number and wins over
+ * Kaltura's field ("טלוויזיה מהעתיד, עונה 2, פרק 1" keeps 1; the special whose Kaltura number is 1 has none;
+ * 2026-11-08). An episode with no number of its own whose title prints one takes it back (stored data from before).
  */
 export function dropCollidingHints(episodes: ScrapedEpisode[]): ScrapedEpisode[] {
+  const titled = (e: ScrapedEpisode) => parseEpisodeHint(e.title);
+  const list = episodes.map((e) => {
+    const t = titled(e);
+    return e.numberHint === undefined && t !== undefined ? { ...e, numberHint: t } : e;
+  });
   const uses = new Map<number, number>();
-  for (const e of episodes) if (e.numberHint) uses.set(e.numberHint, (uses.get(e.numberHint) ?? 0) + 1);
-  return episodes.map((e) => {
+  const inTitle = new Map<number, number>();
+  for (const e of list) {
+    if (!e.numberHint) continue;
+    uses.set(e.numberHint, (uses.get(e.numberHint) ?? 0) + 1);
+    if (titled(e) === e.numberHint) inTitle.set(e.numberHint, (inTitle.get(e.numberHint) ?? 0) + 1);
+  }
+  return list.map((e) => {
     if (!e.numberHint || (uses.get(e.numberHint) ?? 0) < 2) return e;
+    if (inTitle.get(e.numberHint) === 1 && titled(e) === e.numberHint) return e;
     const { numberHint: _, ...rest } = e;
     return rest;
   });

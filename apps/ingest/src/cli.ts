@@ -52,7 +52,9 @@ import {
   renumberKanReshet,
   renumberNamedSeasons,
   renumberPrinted,
+  renumberRight,
   repairReshetSplit,
+  rightLine,
 } from './renumber.ts';
 import { runAiring, runFull, runOne } from './runner.ts';
 import { createAdapters } from './sources.ts';
@@ -182,6 +184,7 @@ async function main(argv: string[]): Promise<number> {
   const named = migrate ? renumberNamedSeasons(store, config.backup.dir) : undefined;
   const repair = migrate ? repairReshetSplit(store) : undefined;
   const kanPrinted = migrate ? renumberPrinted(store, config.backup.dir, 'kan') : undefined;
+  const right = migrate ? renumberRight(store, config.backup.dir) : undefined;
   const renumberLine =
     [
       renumber
@@ -194,6 +197,7 @@ async function main(argv: string[]): Promise<number> {
         ? `one-time repair ${repair.id}: ${repair.shows} Reshet daily shows re-split by year, ${repair.dropped} empty season numbers dropped (no episode moved)`
         : '',
       kanPrinted ? printedLine(kanPrinted) : '',
+      right ? rightLine(right) : '',
     ]
       .filter(Boolean)
       .join('\n') || undefined;

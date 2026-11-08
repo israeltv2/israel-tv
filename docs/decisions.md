@@ -2079,3 +2079,64 @@ line on 143 Mako and 27 Kan. Filled only from what the sources (and TMDB, for ma
   Hebrew page; so do warnings recorded before the change, until they age out.
 - Chrome and Node write Hebrew relative times for one and two with the number in brackets ("לפני שעה (1)"); the
   pages' script drops the bracket.
+
+## Every season numbered right, once (2026-11-08)
+
+The owner lifted the numbering freeze for one pass, in his words: "dont leave anything, i dont mind if it will
+discard my watching progress all good". Recorded migration `numbering-right-2026-11-08` (apps/ingest/src/renumber.ts,
+`renumberRight`), run once at start-up like the others: a backup of the database first, one transaction, every move
+in a `.moves.json` beside the backup and the summary in `numbering:migrations:numbering-right-2026-11-08`. **The
+freeze is back in force after it** (the numbering guard and `numbering-frozen.test.ts`, which records the new rules).
+
+Measured on a copy of the live database (all shows, 1,936 seasons), before: 100 "source-renumbered", 107
+"episode-number-taken" and 67 "numbers-reversed" warnings; Reshet seasons numbered in upload-date order against
+their own numbers (הישרדות 7: "פרק הבכורה!" was E34); Kan seasons that list several cycles as one (זמן אמת); Keshet
+seasons starting high because one printed number pulled the rest after it (אהרוני מבשל לחברים started at E35).
+
+Every season is numbered again from what the source says (`seasonTargets`):
+
+- **Dates that cannot order a season are no evidence** (`datesTellOrder`): an archive uploaded in a day or two
+  (Reshet's 2015-11-03, 2017-03-28, 2023-04-03; a Kan season published in one day) gives most episodes one date.
+  Fewer than two days, or (from three episodes) fewer than three days or one day per two episodes, says nothing.
+  Printed numbers that "run against" such dates are kept; against dates that can order the season they are
+  positions (newest = 1), and the season is in air-date order, as before (אח לילה, הצינור, הדו"ח היומי).
+- **Printed numbers that start over** (`printedStartsOver`: three or more numbers each printed twice, the lowest
+  among them, or a repeated number in a season whose titles name two seasons, "עונה 1 פרק 6" / "עונה 5 פרק 6"): the
+  season is numbered 1..n by air date, then title season, then number (זמן אמת, פגישה עם רוני קובן, הופה היי). Two
+  specials numbered 1 and 2 ahead of a season that then starts at 1 are not a cycle (ארץ נהדרת 18 stays).
+- **Printed numbers for at least half the episodes** (or few, but no order to place the rest by): each number goes
+  to its first episode in air-date order. A number printed twice (a source's typo, a part 2: נקסט, כמעט שבת שלום) is
+  the first one's; the second, like the unnumbered episodes, keeps its own number when no printed number claims it,
+  else takes the lowest free number above the highest printed one, in order. Unnumbered episodes that aired before
+  the first printed one, when the numbers below it are free, are the season's first (טעם של חו"ל: "פריז" was E9,
+  before "פרק 2"); a list's "פתיח" or "הצצה" is not (only by air date, and aired earlier).
+- **Few printed numbers** (under half) **with an order** (dates that can order the season, or the source's list when
+  its printed numbers are exactly their places in it, טקסי דרייבר): the season in that order, the printed numbers kept
+  as anchors (אהרוני מבשל לחברים, אנשים 2018, העולם הלילה, הכי טעים שיש, שכונת חיים).
+- **No printed numbers:** air-date order on the numbers the episodes hold when the dates can order the season (none
+  needed it), else unchanged. Episodes no longer listed keep their number unless a listed one now has it.
+- **What the readers now read:** "פרק סיום העונה (20)" is 20 (Kan); "פרק הבכורה" / "תכנית הבכורה" is 1 (not "לפרק
+  הבכורה", a preview); on Reshet a number a title prints wins over another episode's Kaltura number (טלוויזיה מהעתיד
+  2: "פרק 1" was E14 behind the special Kaltura numbered 1); a video listed twice in a season (same title, length
+  and text: האח הגדול's "שי ושניר נפרדים") is listed once (`dropRepeatedVideos`; its number stays reserved).
+- **Warnings:** a number two episodes print is no longer reported as a renumbering of the second, and a season whose
+  numbers start over reports nothing; the migration re-derives every show's numbering warnings (its own read of the
+  new numbers gives none). Unrelated history (source notes, season clashes) stays.
+
+Dry run on the copy (counts per source and rule, episodes moved in seasons): Keshet 12 printed 12 in 5, few-printed
+357 in 5; Reshet printed 461 in 38, few-printed 13 in 1; Kan printed 55 in 17, few-printed 3 in 1, start over 60 in
+3: **961 episodes in 70 seasons of 60 shows**, 1 repeated listing left out, 0 numbering warnings after. Examples:
+הישרדות 7 "פרק הבכורה!" E34→E1 (Kaltura numbers kept, the archive's dates ignored); זמן אמת "פרק 1 - על העיוורון"
+(2024) E1→E4 after the 2023 cycle's three; אהבה חדשה 1 "פרק הבכורה" E12→E1; אהרוני מבשל לחברים "להקת שקטק" E36→E1;
+סטודיו אמציה 2 "פרק 1 - חיי כלב" E17→E1; תראו אותי "פרק סיום העונה (20)" E25→E20. Left as they are, on purpose: Keshet
+seasons whose numbers start above 1 because the source has no earlier episode (none prints a "פרק 1" or premiere
+that we put elsewhere: the "one too high" seasons KanBox had are not in this catalog); seasons whose printed numbers
+disagree with upload dates (Kan publishes kids' episodes out of order: printed wins).
+
+**Episode stills.** 180 of 42,448 listed episodes had none (apps draw a numbered tile): 148 Keshet films and
+one-off specials (a page with one featured video) now take the video's own still from its page (schema.org
+`thumbnailUrl`); 24 Reshet episodes whose record names no image take Kaltura's still of the entry
+(`…/thumbnail/entry_id/<id>/width/640/height/360`; checked 200 and the same picture from Israel and from Germany);
+not for an entry Kaltura no longer has. Both fill on the next read. The 8 Kan items without one (5 opening clips,
+"פתיח", and 3 episodes whose pages carry no image) keep the numbered tile: the show's backdrop in its place would
+look like a still of that episode, and the website draws the same numbered tile.

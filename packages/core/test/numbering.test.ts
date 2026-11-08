@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import type { ScrapedEpisode, ScrapedSeason, ScrapedShow } from '../src/model.ts';
-import { type Assignments, assignNumbers, parseEpisodeHint, parseSeasonTitle } from '../src/numbering.ts';
+import {
+  type Assignments,
+  assignNumbers,
+  datesTellOrder,
+  hintsRunBackwards,
+  parseEpisodeHint,
+  parseSeasonTitle,
+  printedStartsOver,
+  startOverOrder,
+} from '../src/numbering.ts';
 
 const EMPTY: Assignments = { seasons: [], episodes: [] };
 
@@ -194,4 +203,125 @@ test('a season gets a number only once it has episodes (sources list empty dupli
     ['s1', 1],
     ['vip', 2],
   ]);
+});
+
+// Round 11 (numbering-right-2026-11-08): the rules that numbered seasons wrong, measured on the live catalog.
+describe('round 11 numbering rules', () => {
+  const t = (key: string, title: string, numberHint?: number, airDate?: string): ScrapedEpisode => ({
+    key,
+    title,
+    streams: [],
+    ...(numberHint ? { numberHint } : {}),
+    ...(airDate ? { airDate } : {}),
+  });
+
+  test('parseEpisodeHint: Kan season finales and premieres', () => {
+    expect(parseEpisodeHint('פרק סיום העונה (20) - בוגד')).toBe(20);
+    expect(parseEpisodeHint("החניכה החדשה - חלק ב' | פרק סיום העונה (16)")).toBe(16);
+    expect(parseEpisodeHint('פרק הבכורה')).toBe(1);
+    expect(parseEpisodeHint('המדרשה, עונה 2, פרק הבכורה')).toBe(1);
+    expect(parseEpisodeHint('תכנית הבכורה: להסתכל בעיניים')).toBe(1);
+    // A preview of the premiere, a premiere inside another sentence, and a plain finale are not numbers.
+    expect(parseEpisodeHint('הצצה לפרק הבכורה של עונה 5')).toBeUndefined();
+    expect(parseEpisodeHint('חשיפה בפרק הבכורה')).toBeUndefined();
+    expect(parseEpisodeHint('פרק סיום העונה')).toBeUndefined();
+    expect(parseEpisodeHint('אגם בוחבוט על אלבום הבכורה')).toBeUndefined();
+  });
+
+  test('datesTellOrder: an archive uploaded in a day or two cannot order a season', () => {
+    const bulk = Array.from({ length: 12 }, (_, i) =>
+      t(`e${i}`, 'x', undefined, i < 11 ? '2023-03-27' : '2023-04-03'),
+    );
+    expect(datesTellOrder(bulk)).toBe(false);
+    expect(datesTellOrder([t('a', 'x', 1, '2020-01-01'), t('b', 'x', 2, '2020-01-08')])).toBe(true);
+    expect(
+      datesTellOrder([
+        t('a', 'x', 1, '2017-03-28'),
+        t('b', 'x', 2, '2017-03-28'),
+        t('c', 'x', 3, '2015-11-03'),
+      ]),
+    ).toBe(false);
+    expect(
+      datesTellOrder(
+        ['2025-05-24', '2025-05-31', '2025-06-02', '2025-06-07'].map((d, i) => t(`e${i}`, 'x', 4 - i, d)),
+      ),
+    ).toBe(true);
+  });
+
+  test("Reshet's archive seasons: Kaltura's numbers against bulk-upload dates are kept (אהבה חדשה 1)", () => {
+    // Listed newest first, all uploaded 2023-03-27 except the premiere (2023-04-03): the dates say nothing.
+    const eps = [
+      t('final', 'סוף לשמועות', 12, '2023-03-27'),
+      ...Array.from({ length: 10 }, (_, i) => t(`m${11 - i}`, 'x', 11 - i, '2023-03-27')),
+      t('premiere', 'פרק הבכורה', 1, '2023-04-03'),
+    ];
+    expect(hintsRunBackwards(eps)).toBe(false);
+    const r = assignNumbers(show([season('s1', 'עונה 1', eps)]), EMPTY);
+    expect(num(r, 'premiere')?.episode).toBe(1);
+    expect(num(r, 'final')?.episode).toBe(12);
+    expect(r.warnings).toEqual([]);
+  });
+
+  test('printed numbers that start over: several cycles in one season are numbered by air date (זמן אמת)', () => {
+    const eps = [
+      t('c1e1', 'פרק 1 - קולות צורמים', 1, '2026-04-27'),
+      t('a9', 'פרק 9 - אתמול היה טוב', 9, '2023-04-22'),
+      t('b1', 'פרק 1 - על העיוורון', 1, '2024-03-06'),
+      t('b2', 'פרק 2 - סוכן ביעד אלים', 2, '2024-03-13'),
+      t('b3', 'פרק 3', 3, '2024-03-20'),
+      t('c1e2', 'פרק 2 - פרשת שופטים', 2, '2026-05-04'),
+      t('aEnd', 'תכנית סיום העונה', undefined, '2023-04-22'),
+      t('a10', 'פרק 10 - כוח כאילו', 10, '2023-04-22'),
+      t('c1e3', 'פרק 3 - תחקיר', 3, '2026-05-18'),
+    ];
+    expect(printedStartsOver(eps)).toBe(true);
+    const r = assignNumbers(show([season('s1', 'עונה 1', eps)]), EMPTY);
+    expect(
+      ['a9', 'a10', 'aEnd', 'b1', 'b2', 'b3', 'c1e1', 'c1e2', 'c1e3'].map((k) => num(r, k)?.episode),
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    // Not a renumbering, not a clash: nothing to report on every read.
+    expect(r.warnings).toEqual([]);
+    expect(assignNumbers(show([season('s1', 'עונה 1', eps)]), r).warnings).toEqual([]);
+  });
+
+  test('titles naming two seasons with a repeated number start over too; their order is season, number (הופה היי)', () => {
+    const eps = [
+      t('s5e6', 'עונה 5 פרק 6 - בעקבות הקמע האבוד חלק א', 6, '2024-03-28'),
+      t('s1e6', 'עונה 1 פרק 6 - קריית שמונה', 6, '2024-03-28'),
+      t('s2e2', 'עונה 2 פרק 2 - בית שמש', 2, '2024-03-28'),
+      t('s1e3', 'פרק 3 - אור עקיבא', 3, '2024-03-24'),
+      t('s1e2', 'עונה 1 פרק 2 - חדרה', 2, '2024-03-24'),
+    ];
+    expect(printedStartsOver(eps)).toBe(true);
+    expect(startOverOrder({ key: 's', title: '', episodes: eps }).map((e) => e.key)).toEqual([
+      's1e2',
+      's1e3',
+      's1e6',
+      's2e2',
+      's5e6',
+    ]);
+  });
+
+  test('two specials numbered 1 and 2 before a season that starts at 1 are not a new cycle (ארץ נהדרת 18)', () => {
+    const eps = [
+      t('sp1', 'ספיישל פתיחת השנה', 1, '2020-09-08'),
+      t('sp2', 'ספיישל סליחות', 2, '2020-09-22'),
+      ...Array.from({ length: 5 }, (_, i) => t(`e${i + 3}`, 'x', i + 3, `2021-01-0${i + 1}`)),
+      t('re1', 'ארץ נהדרת פותחת עונה', 1, '2020-12-23'),
+      t('re2', 'מסיבת סילבסטר', 2, '2020-12-30'),
+    ];
+    expect(printedStartsOver(eps)).toBe(false);
+  });
+
+  test('a number two episodes print is not reported as a renumbering of the second', () => {
+    const eps = [t('a', 'קרב התיקים', 10, '2015-03-23'), t('b', 'סדר פסח חגיגי', 10, '2015-03-30')];
+    const prev: Assignments = {
+      seasons: [{ key: 's', number: 12, kind: 'numbered' }],
+      episodes: [
+        { key: 'a', season: 12, episode: 10 },
+        { key: 'b', season: 12, episode: 23 },
+      ],
+    };
+    expect(assignNumbers(show([season('s', 'עונה 12', eps)]), prev).warnings).toEqual([]);
+  });
 });

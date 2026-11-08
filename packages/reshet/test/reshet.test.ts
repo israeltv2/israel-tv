@@ -268,6 +268,18 @@ test('an episode whose Kaltura entry is gone keeps its place but offers no strea
   expect(eps.find((e) => e.key === dropped)?.streams).toEqual([]);
   expect(eps.filter((e) => e.key !== dropped).every((e) => e.streams.length === 1)).toBe(true);
   expect(show.notes?.join(' ')).toMatch(/1 episodes no longer exist/);
+  // Kaltura's own still would be a broken image for an entry it no longer has.
+  expect(eps.find((e) => e.key === dropped)?.thumbnail ?? '').not.toContain('/thumbnail/entry_id/');
+});
+
+test("an episode whose record names no image gets Kaltura's still of the entry", async () => {
+  const { fromOld } = await import('../src/parse.ts');
+  const e = fromOld({ id: 'x', name: 'המהדורה המרכזית 26.02.23', entryId: '1_hww5pdnu' } as Parameters<
+    typeof fromOld
+  >[0]);
+  expect(e?.thumbnail).toBe(
+    'https://cdnapisec.kaltura.com/p/2748741/sp/274874100/thumbnail/entry_id/1_hww5pdnu/width/640/height/360',
+  );
 });
 
 test('an entry past its schedule window is expired (plays nowhere); the profile is checked with one inside it', async () => {
@@ -571,4 +583,23 @@ test('a printed number two episodes of a season claim is dropped from both', asy
   });
   const out = dropCollidingHints([ep('a', 1), ep('b', 3), ep('c', 3), ep('d')]);
   expect(out.map((e) => e.numberHint)).toEqual([1, undefined, undefined, undefined]);
+});
+
+test("a number a title prints wins over another episode's Kaltura number (טלוויזיה מהעתיד, עונה 2)", async () => {
+  const { dropCollidingHints } = await import('../src/parse.ts');
+  const ep = (key: string, title: string, numberHint?: number) => ({
+    key,
+    title,
+    streams: [],
+    ...(numberHint ? { numberHint } : {}),
+  });
+  const out = dropCollidingHints([
+    ep('special', 'טלוויזיה מהעתיד, עונה 2: ספיישל עצמאות', 1),
+    ep('e1', 'טלוויזיה מהעתיד, עונה 2, פרק 1', 1),
+    // Stored by the reader before: the number was dropped from both; the title gives it back.
+    ep('e2', 'טלוויזיה מהעתיד, עונה 2, פרק 2'),
+  ]);
+  expect(out.map((e) => e.numberHint)).toEqual([undefined, 1, 2]);
+  // "פרק הבכורה" is 1 (המדרשה, עונה 2).
+  expect(dropCollidingHints([ep('p', 'המדרשה, עונה 2, פרק הבכורה'), ep('x', 'x', 4)])[0]?.numberHint).toBe(1);
 });

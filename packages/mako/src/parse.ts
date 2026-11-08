@@ -109,10 +109,16 @@ export function featuredEpisode(
   // Episodes in a season list carry no blurb (one more page per episode would double a full read); a featured
   // video's own page, read anyway, has one.
   const about = vp?.hero?.description?.trim();
+  // The video's still (schema.org thumbnailUrl, else the page's share image): a page with one featured video has
+  // no episode list to take one from (148 films and one-off specials had none, 2026-11-08).
+  const still = [vp?.seo?.schema?.video?.thumbnailUrl, vp?.seo?.image].find(
+    (u) => u && /^https?:\/\//.test(u),
+  );
   return {
     key: vod.itemVcmId,
     title,
     ...(airDate ? { airDate } : {}),
+    ...(still ? { thumbnail: still } : {}),
     ...(about && about.length >= 10 ? { description: about } : {}),
     ...(v.aINT !== undefined ? { availableAbroad: v.aINT } : {}),
     streams: [],

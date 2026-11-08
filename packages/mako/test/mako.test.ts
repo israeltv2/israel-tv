@@ -252,7 +252,12 @@ describe('pages with no episode list, only a featured video (recorded 2026-11-07
     });
     // uploadDate 2026-09-17T21:00:00Z is midnight of the 18th in Israel.
     expect(show.seasons.flatMap((s) => s.episodes)).toEqual([
-      expect.objectContaining({ key: 'e325a4bbfcea0a10VgnVCM100000700a10acRCRD', airDate: '2026-09-18' }),
+      expect.objectContaining({
+        key: 'e325a4bbfcea0a10VgnVCM100000700a10acRCRD',
+        airDate: '2026-09-18',
+        // The video's own still (schema.org thumbnailUrl), not the numbered placeholder apps draw without one.
+        thumbnail: 'https://img.mako.co.il/2026/09/18/Standup_180926_Kobi_Mimon_VOD_autoOrient_i.jpg',
+      }),
     ]);
   });
 
