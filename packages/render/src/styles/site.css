@@ -315,6 +315,15 @@ img {
   .nav a {
     padding: 8px 6px;
   }
+  /* Three links (a page that is itself in the bar, like the status page): a little tighter, or the name touches them. */
+  .nav:has(a:not(.opt) ~ a:not(.opt) ~ a:not(.opt)) a {
+    padding-inline: 4px;
+    font-size: 0.88rem;
+  }
+  .top .wrap:has(.nav a:not(.opt) ~ a:not(.opt) ~ a:not(.opt)) .brand {
+    font-size: 1.3rem;
+    padding-inline-end: 6px;
+  }
 }
 .over .brand,
 .over .nav a,

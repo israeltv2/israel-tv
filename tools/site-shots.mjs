@@ -1,5 +1,5 @@
-// `pnpm shots:site`: the public pages' design check. Renders the landing page (English and Hebrew), the status
-// page and the library pages from the fixture (packages/render/test/fixtures/site.ts) with the site's images, serves them with the local
+// `pnpm shots:site`: the public pages' design check. Renders the landing and status pages (English and Hebrew)
+// and the library pages from the fixture (packages/render/test/fixtures/site.ts) with the site's images, serves them with the local
 // publisher's own server, freezes the clock and screenshots each at phone (375 px) and desktop width in light and dark.
 // Fails on page errors, console errors, failed requests and sideways scrolling. Screenshots go to ./site-screens.
 // `--serve` only serves the pages (http://127.0.0.1:7790/) for a look or a Lighthouse run; `--readme` also writes
@@ -36,6 +36,7 @@ const landing = { ...LANDING, publicUrl: 'https://israel-tv.israeltv2.workers.de
 write(sitePaths.landing, renderLandingHtml(landing, 'en'));
 write(sitePaths.landingHe, renderLandingHtml(landing, 'he'));
 write(sitePaths.statusPage, renderStatusHtml(SITE_STATUS));
+write(sitePaths.statusPageHe, renderStatusHtml(SITE_STATUS, {}, 'he'));
 for (const [path, html] of renderLibrary(LIBRARY)) write(path, html);
 write(sitePaths.status, JSON.stringify(SITE_STATUS));
 write(sitePaths.robots, robotsTxt());
@@ -59,6 +60,7 @@ if (serveOnly) {
     ['landing', '/'],
     ['landing-he', '/he/'],
     ['status', '/status'],
+    ['status-he', '/he/status'],
     ['library', '/library/'],
     ['row', '/library/reshet13/'],
     ['show', '/show/iltv_reshet_1/'],

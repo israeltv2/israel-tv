@@ -281,3 +281,9 @@ details.inner {
   text-align: start;
   unicode-bidi: plaintext;
 }
+
+/* English text kept as it came (a site's own message, an address) on the Hebrew page. */
+.en-text {
+  unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+}

@@ -109,6 +109,8 @@ export const warnings = sqliteTable(
     seriesId: text(),
     code: text().notNull(),
     message: text().notNull(),
+    /** The message's values as JSON (code-specific), so a page can word it in another language. */
+    params: text(),
     createdAt: text().notNull(),
   },
   (t) => [index('warnings_series').on(t.seriesId)],

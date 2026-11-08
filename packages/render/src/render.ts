@@ -630,6 +630,7 @@ export function renderSite(input: RenderInput): SiteFiles {
   files.set(sitePaths.extIds, json(extIds));
   files.set(sitePaths.status, json(status));
   files.set(sitePaths.statusPage, renderStatusHtml(status, origins));
+  files.set(sitePaths.statusPageHe, renderStatusHtml(status, origins, 'he'));
   files.set(sitePaths.registry, json(input.registry));
   files.set(sitePaths.contract, json(CONTRACT));
   if (input.freshness) files.set(sitePaths.freshness, json(input.freshness));

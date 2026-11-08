@@ -18,6 +18,7 @@ const PAGES: Record<string, string> = {
   'landing-en': renderLandingHtml(landing, 'en'),
   'landing-he': renderLandingHtml(landing, 'he'),
   status: renderStatusHtml(SITE_STATUS),
+  'status-he': renderStatusHtml(SITE_STATUS, {}, 'he'),
   library: String(library.get(sitePaths.library)),
   row: String(library.get(sitePaths.libraryRow('reshet13'))),
   show: String(library.get(sitePaths.showPage('iltv_reshet_1'))),

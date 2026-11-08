@@ -42,6 +42,7 @@ const ALL = [
   'index.html',
   'he/index.html',
   'status.html',
+  'he/status.html',
   'status.json',
   'library/index.html',
   'library/mako/index.html',
@@ -60,6 +61,7 @@ test('site files map to the public pages the sitemap lists; data, images, search
     'index.html': '',
     'he/index.html': 'he/',
     'status.html': 'status',
+    'he/status.html': 'he/status',
     'status.json': undefined,
     'library/index.html': 'library/',
     'library/mako/index.html': 'library/mako/',
@@ -113,15 +115,15 @@ test('first submission is the whole site; later ones only changed and removed pa
   expect(first.body.host).toBe('israel-tv.example.workers.dev');
   expect(first.body.keyLocation).toBe(`${BASE}/${first.body.key}.txt`);
   expect(first.body.urlList.sort()).toEqual(
-    ['', 'he/', 'status', 'library/', 'library/mako/', 'show/iltv_mako_1/', 'live/']
+    ['', 'he/', 'status', 'he/status', 'library/', 'library/mako/', 'show/iltv_mako_1/', 'live/']
       .map((p) => `${BASE}/${p}`)
       .sort(),
   );
-  expect(lines.at(-1)).toMatch(/api\.indexnow\.org answered 202 for 7 URLs \(the whole site/);
+  expect(lines.at(-1)).toMatch(/api\.indexnow\.org answered 202 for 8 URLs \(the whole site/);
 
   // An hour later: a changed show page, a removed one, and /status again (too soon: left out).
   await run(
-    ['show/iltv_mako_1/index.html', 'status.html', 'status.json'],
+    ['show/iltv_mako_1/index.html', 'status.html', 'he/status.html', 'status.json'],
     ['show/iltv_mako_2/index.html'],
     t0 + 3_600_000,
   );
@@ -132,8 +134,8 @@ test('first submission is the whole site; later ones only changed and removed pa
   expect(f.calls).toHaveLength(2);
 
   // A day after it was last sent, /status goes again.
-  await run(['status.html'], [], t0 + STATUS_EVERY_MS);
-  expect(f.calls[2]?.body.urlList).toEqual([`${BASE}/status`]);
+  await run(['status.html', 'he/status.html'], [], t0 + STATUS_EVERY_MS);
+  expect(f.calls[2]?.body.urlList).toEqual([`${BASE}/status`, `${BASE}/he/status`]);
 
   // Only data changed: nothing to send.
   await run(['catalog/series/mako.json'], [], t0 + STATUS_EVERY_MS + 1);
@@ -156,7 +158,7 @@ test('a failed submission is a warning and a note, and its addresses go with the
     log: (l) => lines.push(l),
   });
   expect(lines.at(-1)).toMatch(
-    /^indexnow warning: api\.indexnow\.org answered HTTP 403: Key not valid for 7 URLs/,
+    /^indexnow warning: api\.indexnow\.org answered HTTP 403: Key not valid for 8 URLs/,
   );
   expect(indexNowNote(s, config)).toMatch(/IndexNow: the last submission .* failed: HTTP 403/);
 
@@ -182,7 +184,7 @@ test('a failed submission is a warning and a note, and its addresses go with the
     now,
     log: (l) => lines.push(l),
   });
-  expect(good.calls[0]?.body.urlList).toHaveLength(7);
+  expect(good.calls[0]?.body.urlList).toHaveLength(8);
   expect(indexNowNote(s, config)).toBeUndefined();
   expect(s.getState<{ ok: boolean }>(INDEXNOW_LAST)?.ok).toBe(true);
 });

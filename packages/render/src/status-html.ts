@@ -1,7 +1,8 @@
-// The public status page (/status): for viewers first, in plain words — is everything working, and what does it mean
-// for watching — then a card per row, the live channels and, folded away, the details contributors need. Rendered
-// from the status file alone (the same data as /status.json), pre-rendered; a few lines of script only make the
-// times relative.
+// The public status page, in English (/status) and Hebrew (/he/status): for viewers first, in plain words — is
+// everything working, and what does it mean for watching — then a card per row, the live channels and, folded away,
+// the details contributors need. Rendered from the status file alone (the same data as /status.json), pre-rendered; a
+// few lines of script only make the times relative. Every sentence is worded here from the status fields and the
+// notes' codes (status-words.ts), in either language; nothing is translated from the run's English text.
 
 import { type Health, type StatusCatalog, type StatusFile, sitePaths } from '@israel-tv/core';
 import { style } from './assets.ts';
@@ -9,11 +10,13 @@ import { type Child, type Html, html, join, raw } from './html.ts';
 import { fillChip } from './library-html.ts';
 import { CATALOG_MARK, catalogAppName, catalogName, sourceName } from './names.ts';
 import {
+  absolute,
   bdi,
   externalLinks,
   footer,
   head,
   israelTime,
+  type Lang,
   logoTile,
   num,
   siteNav,
@@ -21,12 +24,29 @@ import {
   when,
 } from './page.ts';
 import { type PublicTextOptions, publicStatus } from './public-text.ts';
+import {
+  asEnglish,
+  auditCheck,
+  enCount,
+  heCount,
+  noteText,
+  publishText,
+  tmdbText,
+  viewerNotes,
+  warningHe,
+  warningWord,
+} from './status-words.ts';
 
 export type Level = Health | 'info';
 type Source = StatusFile['sources'][number];
 
-const list = (names: string[]) =>
-  names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+/** Names in a sentence: "A, B and C" / "א, ב ו-ג". */
+const list = (names: string[], lang: Lang = 'en') =>
+  lang === 'he'
+    ? new Intl.ListFormat('he', { type: 'conjunction' }).format(names)
+    : names.length <= 1
+      ? (names[0] ?? '')
+      : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 
 /** Kan's archive is a long back catalogue read last: still filling is expected there, not a problem. */
 const LATER = new Set(['iltv_kanarchive']);
@@ -36,74 +56,137 @@ export function rowState(
   c: StatusCatalog,
   s: Source | undefined,
   status: StatusFile,
+  lang: Lang = 'en',
 ): { level: Level; label: string; line: string } {
+  const he = lang === 'he';
   if (c.source === 'live') {
     const ch = status.live?.channels ?? [];
     const down = ch.filter((x) => x.state === 'down');
     const checked = ch.filter((x) => x.state !== 'unchecked');
     if (s?.health === 'error' && down.length === 0)
-      return {
-        level: 'error',
-        label: 'Not checked lately',
-        line: 'The daily check of the live channels has not run lately. They usually play anyway.',
-      };
+      return he
+        ? {
+            level: 'error',
+            label: 'לא נבדק לאחרונה',
+            line: 'הבדיקה היומית של הערוצים בשידור חי לא רצה לאחרונה. בדרך כלל הם מתנגנים בכל זאת.',
+          }
+        : {
+            level: 'error',
+            label: 'Not checked lately',
+            line: 'The daily check of the live channels has not run lately. They usually play anyway.',
+          };
     if (checked.length > 0 && down.length === checked.length)
-      return {
-        level: 'error',
-        label: 'Not playing',
-        line: 'None of the live channels played in the last check.',
-      };
+      return he
+        ? { level: 'error', label: 'לא מתנגנים', line: 'אף ערוץ בשידור חי לא התנגן בבדיקה האחרונה.' }
+        : {
+            level: 'error',
+            label: 'Not playing',
+            line: 'None of the live channels played in the last check.',
+          };
     if (down.length)
-      return {
-        level: 'warn',
-        label: `${down.length} not playing`,
-        line: `${checked.length - down.length} of ${checked.length} checked channels played in the last check.`,
-      };
-    return {
-      level: 'ok',
-      label: 'Playing',
-      line: checked.length
-        ? `All ${checked.length} checked channels played in the last check.`
-        : 'Every live stream is played once a day to make sure it works.',
-    };
+      return he
+        ? {
+            level: 'warn',
+            label: down.length === 1 ? 'ערוץ אחד לא מתנגן' : `${num(down.length, 'he')} לא מתנגנים`,
+            line: `${num(checked.length - down.length, 'he')} מתוך ${num(checked.length, 'he')} הערוצים שנבדקו התנגנו בבדיקה האחרונה.`,
+          }
+        : {
+            level: 'warn',
+            label: `${down.length} not playing`,
+            line: `${checked.length - down.length} of ${checked.length} checked channels played in the last check.`,
+          };
+    return he
+      ? {
+          level: 'ok',
+          label: 'מתנגנים',
+          line: checked.length
+            ? `כל ${num(checked.length, 'he')} הערוצים שנבדקו התנגנו בבדיקה האחרונה.`
+            : 'כל שידור חי מנוגן פעם ביום, כדי לוודא שהוא עובד.',
+        }
+      : {
+          level: 'ok',
+          label: 'Playing',
+          line: checked.length
+            ? `All ${checked.length} checked channels played in the last check.`
+            : 'Every live stream is played once a day to make sure it works.',
+        };
   }
-  if (!s) return { level: 'info', label: 'Off', line: 'This instance does not read this channel.' };
+  if (!s)
+    return he
+      ? { level: 'info', label: 'כבוי', line: 'השרת הזה לא קורא את הערוץ הזה.' }
+      : { level: 'info', label: 'Off', line: 'This instance does not read this channel.' };
   if (s.health === 'error')
-    return {
-      level: 'error',
-      label: 'Not refreshing',
-      line: 'Reading the channel’s site is failing. Everything already here still plays; the newest episodes may be missing until it is fixed.',
-    };
+    return he
+      ? {
+          level: 'error',
+          label: 'לא מתעדכן',
+          line: 'הקריאה מאתר הערוץ נכשלת. כל מה שכבר כאן ממשיך להתנגן, אבל ייתכן שהפרקים החדשים ביותר יחסרו עד שזה יתוקן.',
+        }
+      : {
+          level: 'error',
+          label: 'Not refreshing',
+          line: 'Reading the channel’s site is failing. Everything already here still plays; the newest episodes may be missing until it is fixed.',
+        };
   if (c.filling)
-    return {
-      level: LATER.has(c.id) ? 'info' : 'warn',
-      label: 'Still filling',
-      line: `${num(c.filling.inCatalog)} of ${num(c.filling.known)} shows are in so far; the rest arrive over the next days.${c.filling.inCatalog > 0 ? ' Shows already here play normally.' : ''}`,
-    };
+    return he
+      ? {
+          level: LATER.has(c.id) ? 'info' : 'warn',
+          label: 'עדיין מתמלא',
+          line:
+            c.filling.inCatalog > 0
+              ? `${num(c.filling.inCatalog, 'he')} מתוך ${num(c.filling.known, 'he')} התוכניות כבר כאן, והשאר יגיעו בימים הקרובים. התוכניות שכבר כאן מתנגנות כרגיל.`
+              : `השורה מתחילה להתמלא: ${num(c.filling.known, 'he')} תוכניות יגיעו בימים הקרובים.`,
+        }
+      : {
+          level: LATER.has(c.id) ? 'info' : 'warn',
+          label: 'Still filling',
+          line: `${num(c.filling.inCatalog)} of ${num(c.filling.known)} shows are in so far; the rest arrive over the next days.${c.filling.inCatalog > 0 ? ' Shows already here play normally.' : ''}`,
+        };
   // A Kan row whose source is amber only because another Kan row is still filling is fine.
   const fillingElsewhere =
     s.source === 'kan' && (status.catalogs ?? []).some((x) => x.source === 'kan' && x.filling);
   // A read that failed outright but is retried soon (Kan's slices: a bot check, the browser not starting).
   if (s.health === 'warn' && s.lastFullRun?.status === 'failed')
-    return {
-      level: 'warn',
-      label: 'Paused',
-      line: `Reading ${s.source === 'kan' ? 'Kan’s' : 'the channel’s'} site is paused for now and is tried again shortly. Everything here still plays.`,
-    };
+    return he
+      ? {
+          level: 'warn',
+          label: 'מושהה',
+          line: `הקריאה ${s.source === 'kan' ? 'מהאתר של כאן' : 'מאתר הערוץ'} מושהית כרגע, וננסה שוב בקרוב. כל מה שכבר כאן מתנגן.`,
+        }
+      : {
+          level: 'warn',
+          label: 'Paused',
+          line: `Reading ${s.source === 'kan' ? 'Kan’s' : 'the channel’s'} site is paused for now and is tried again shortly. Everything here still plays.`,
+        };
   if (s.health === 'warn' && !fillingElsewhere)
-    return {
-      level: 'warn',
-      label: 'Partly refreshed',
-      line: 'The last refresh missed some shows; they are tried again. Everything here still plays.',
-    };
-  return {
-    level: 'ok',
-    label: 'Up to date',
-    line:
-      c.source === 'mako'
-        ? 'Shows and episodes are up to date. Episodes play through your own home helper.'
-        : 'Shows and episodes are up to date.',
-  };
+    return he
+      ? {
+          level: 'warn',
+          label: 'עודכן חלקית',
+          line: 'בעדכון האחרון חלק מהתוכניות לא נקראו, וננסה שוב. כל מה שכבר כאן מתנגן.',
+        }
+      : {
+          level: 'warn',
+          label: 'Partly refreshed',
+          line: 'The last refresh missed some shows; they are tried again. Everything here still plays.',
+        };
+  return he
+    ? {
+        level: 'ok',
+        label: 'מעודכן',
+        line:
+          c.source === 'mako'
+            ? 'התוכניות והפרקים מעודכנים. הפרקים מתנגנים דרך העוזר הביתי שלכם.'
+            : 'התוכניות והפרקים מעודכנים.',
+      }
+    : {
+        level: 'ok',
+        label: 'Up to date',
+        line:
+          c.source === 'mako'
+            ? 'Shows and episodes are up to date. Episodes play through your own home helper.'
+            : 'Shows and episodes are up to date.',
+      };
 }
 
 export interface Overall {
@@ -113,104 +196,157 @@ export interface Overall {
 }
 
 /** The one line at the top: is everything working, and what it means for watching. */
-export function overall(raw: StatusFile): Overall {
+export function overall(raw: StatusFile, lang: Lang = 'en'): Overall {
+  const he = lang === 'he';
   const status = raw;
   const bySource = new Map(status.sources.map((s) => [s.source, s]));
   const rows = (status.catalogs ?? []).map((c) => ({ c, st: rowState(c, bySource.get(c.source), status) }));
   const down = (status.live?.channels ?? []).filter((x) => x.state === 'down');
-  const liveLine = down.length
-    ? ` ${down.length === 1 ? 'One live channel is' : `${down.length} live channels are`} not playing right now.`
-    : '';
+  const liveLine = !down.length
+    ? ''
+    : he
+      ? ` ${down.length === 1 ? 'ערוץ אחד בשידור חי לא מתנגן' : `${num(down.length, 'he')} ערוצים בשידור חי לא מתנגנים`} כרגע.`
+      : ` ${down.length === 1 ? 'One live channel is' : `${down.length} live channels are`} not playing right now.`;
+  const names = (sources: string[]) => list([...new Set(sources.map((s) => sourceName(s, lang)))], lang);
   if (status.publish)
-    return {
-      level: 'error',
-      title: 'The catalog is not being updated right now',
-      detail: `Everything already in it still plays. New episodes will show up once updating works again.${liveLine}`,
-    };
+    return he
+      ? {
+          level: 'error',
+          title: 'הקטלוג לא מתעדכן כרגע',
+          detail: `כל מה שכבר נמצא בו ממשיך להתנגן. פרקים חדשים יופיעו כשהעדכון יחזור לעבוד.${liveLine}`,
+        }
+      : {
+          level: 'error',
+          title: 'The catalog is not being updated right now',
+          detail: `Everything already in it still plays. New episodes will show up once updating works again.${liveLine}`,
+        };
   const failing = [
     ...new Set(
-      (rows.length
+      rows.length
         ? rows.filter((r) => r.st.level === 'error' && r.c.source !== 'live').map((r) => r.c.source)
-        : status.sources.filter((s) => s.health === 'error' && s.source !== 'live').map((s) => s.source)
-      ).map((s) => sourceName(s)),
+        : status.sources.filter((s) => s.health === 'error' && s.source !== 'live').map((s) => s.source),
     ),
   ];
   if (failing.length)
-    return {
-      level: 'error',
-      title: `${list(failing)} ${failing.length === 1 ? 'is' : 'are'} not being refreshed`,
-      detail: `Shows already in the catalog still play; the newest episodes may be missing until it is fixed.${liveLine}`,
-    };
+    return he
+      ? {
+          level: 'error',
+          title: `העדכונים של ${names(failing)} נעצרו`,
+          detail: `התוכניות שכבר בקטלוג ממשיכות להתנגן, אבל ייתכן שהפרקים החדשים ביותר יחסרו עד שזה יתוקן.${liveLine}`,
+        }
+      : {
+          level: 'error',
+          title: `${names(failing)} ${failing.length === 1 ? 'is' : 'are'} not being refreshed`,
+          detail: `Shows already in the catalog still play; the newest episodes may be missing until it is fixed.${liveLine}`,
+        };
   const filling = rows.filter((r) => r.c.filling && !LATER.has(r.c.id));
   const warn = rows.filter((r) => r.st.level === 'warn' && !r.c.filling);
-  if (warn.length || down.length || (!rows.length && status.health === 'warn' && !filling.length))
-    return {
-      level: 'warn',
-      title: 'Mostly working',
-      detail: `You can watch as usual.${
-        warn.filter((r) => r.c.source !== 'live').length
-          ? ` The last refresh of ${list([...new Set(warn.filter((r) => r.c.source !== 'live').map((r) => sourceName(r.c.source)))])} missed a few shows; they are tried again.`
-          : ''
-      }${liveLine}`,
-    };
+  if (warn.length || down.length || (!rows.length && status.health === 'warn' && !filling.length)) {
+    const missed = warn.filter((r) => r.c.source !== 'live').map((r) => r.c.source);
+    return he
+      ? {
+          level: 'warn',
+          title: 'כמעט הכול עובד',
+          detail: `אפשר לצפות כרגיל.${missed.length ? ` בעדכון האחרון של ${names(missed)} חסרו כמה תוכניות, וננסה שוב.` : ''}${liveLine}`,
+        }
+      : {
+          level: 'warn',
+          title: 'Mostly working',
+          detail: `You can watch as usual.${missed.length ? ` The last refresh of ${names(missed)} missed a few shows; they are tried again.` : ''}${liveLine}`,
+        };
+  }
   if (filling.length)
-    return {
-      level: 'info',
-      title: `${list([...new Set(filling.map((r) => sourceName(r.c.source)))])} shows are still being added`,
-      detail:
-        'Everything else is up to date. A new row fills over a few days; the shows already in it play normally.',
-    };
-  return {
-    level: 'ok',
-    title: 'Everything is working',
-    detail: 'All channels are up to date and the live channels are playing.',
-  };
+    return he
+      ? {
+          level: 'info',
+          title: `התוכניות של ${names(filling.map((r) => r.c.source))} עדיין נכנסות`,
+          detail: 'כל השאר מעודכן. שורה חדשה מתמלאת במשך כמה ימים, והתוכניות שכבר נמצאות בה מתנגנות כרגיל.',
+        }
+      : {
+          level: 'info',
+          title: `${names(filling.map((r) => r.c.source))} shows are still being added`,
+          detail:
+            'Everything else is up to date. A new row fills over a few days; the shows already in it play normally.',
+        };
+  return he
+    ? { level: 'ok', title: 'הכול עובד', detail: 'כל הערוצים מעודכנים, והשידורים החיים מתנגנים.' }
+    : {
+        level: 'ok',
+        title: 'Everything is working',
+        detail: 'All channels are up to date and the live channels are playing.',
+      };
 }
 
-const DAY_WORD: Record<string, string> = {
-  ok: 'all good',
-  warn: 'some problems',
-  error: 'failed',
-  none: 'no refresh',
-};
+/** The page's own words that do not depend on the data. */
+const WORDS = {
+  en: {
+    day: { ok: 'all good', warn: 'some problems', error: 'failed', none: 'no refresh' },
+    legend: ['All good', 'Some problems', 'Failed', 'No refresh', 'One bar per day'],
+    channels: 'Channels',
+    lastChecked: 'Last checked',
+    shows: 'Shows',
+    episodes: 'Episodes',
+    lastRead: 'Last read',
+    lastFull: 'Last full refresh',
+    runningNow: 'running now',
+    airingChecked: 'New episodes checked',
+    kanPace: 'A few pages at a time, all day long.',
+    live: { up: 'Playing', down: 'Not playing', unchecked: 'Not checked' },
+    liveH: 'Live channels',
+    helperTag: 'home helper',
+    israelOnly: 'Israel only',
+    detailsH: 'Details for contributors',
+  },
+  he: {
+    day: { ok: 'הכול תקין', warn: 'היו בעיות', error: 'נכשל', none: 'לא היה עדכון' },
+    legend: ['הכול תקין', 'היו בעיות', 'נכשל', 'לא היה עדכון', 'פס אחד לכל יום'],
+    channels: 'ערוצים',
+    lastChecked: 'נבדקו לאחרונה',
+    shows: 'תוכניות',
+    episodes: 'פרקים',
+    lastRead: 'נקרא לאחרונה',
+    lastFull: 'עדכון מלא אחרון',
+    runningNow: 'רץ עכשיו',
+    airingChecked: 'בדיקת פרקים חדשים',
+    kanPace: 'כמה דפים בכל פעם, לאורך כל היום.',
+    live: { up: 'מתנגן', down: 'לא מתנגן', unchecked: 'לא נבדק' },
+    liveH: 'ערוצים בשידור חי',
+    helperTag: 'עוזר ביתי',
+    israelOnly: 'רק בישראל',
+    detailsH: 'פרטים למי שעוזר לתקן',
+  },
+} as const;
 
-function historyBar(days: string[], values: (Health | null)[] | undefined): Child {
+function historyBar(days: string[], values: (Health | null)[] | undefined, lang: Lang): Child {
   if (!values?.length) return '';
+  const he = lang === 'he';
+  const w = WORDS[lang];
   const count = (h: Health | null) => values.filter((v) => v === h).length;
-  const label = `Last ${values.length} days: ${count('ok')} good, ${count('warn')} with problems, ${count('error')} failed, ${count(null)} without a refresh`;
-  const dayLabel = (d: string) =>
-    new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(
-      Date.parse(`${d}T12:00:00Z`),
-    );
+  const label = he
+    ? `${num(values.length, 'he')} הימים האחרונים: ${num(count('ok'), 'he')} תקינים, ${num(count('warn'), 'he')} עם בעיות, ${num(count('error'), 'he')} נכשלו, ${num(count(null), 'he')} בלי עדכון`
+    : `Last ${values.length} days: ${count('ok')} good, ${count('warn')} with problems, ${count('error')} failed, ${count(null)} without a refresh`;
+  const dayFormat = new Intl.DateTimeFormat(he ? 'he-IL' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+  const dayLabel = (d: string) => dayFormat.format(Date.parse(`${d}T12:00:00Z`));
+  const fine = values.length - count(null);
   return html`<div class="hist-wrap"><div class="hist" role="img" aria-label="${label}">${values.map(
     (v, i) =>
-      html`<span class="d ${v ?? 'none'}" title="${`${dayLabel(days[i] ?? '')}: ${DAY_WORD[v ?? 'none']}`}"></span>`,
-  )}</div><div class="hist-legend small muted"><span>${values.length} days ago</span><span>${count('ok')} of ${values.length - count(null)} days fine</span><span>Today</span></div></div>`;
+      html`<span class="d ${v ?? 'none'}" title="${`${dayLabel(days[i] ?? '')}: ${w.day[v ?? 'none']}`}"></span>`,
+  )}</div><div class="hist-legend small muted">${
+    he
+      ? html`<span>לפני ${num(values.length, 'he')} ימים</span><span>${num(count('ok'), 'he')} מתוך ${num(fine, 'he')} ימים תקינים</span><span>היום</span>`
+      : html`<span>${values.length} days ago</span><span>${count('ok')} of ${fine} days fine</span><span>Today</span>`
+  }</div></div>`;
 }
 
-/** What a viewer may want to know about a source, worded here from the status fields (never the run's own text). */
-function viewerNotes(s: Source | undefined): string[] {
-  const out: string[] = [];
-  const gone = s?.skipped?.noLongerOffered ?? 0;
-  if (gone && s?.source === 'reshet')
-    out.push(
-      `${num(gone)} Reshet ${gone === 1 ? 'episode is' : 'episodes are'} past their availability window, so ${gone === 1 ? 'it is' : 'they are'} not in the catalog.`,
-    );
-  else if (gone)
-    out.push(
-      `${num(gone)} Kan ${gone === 1 ? 'episode is' : 'episodes are'} no longer offered (the broadcast rights ended), so ${gone === 1 ? 'it is' : 'they are'} not in the catalog.`,
-    );
-  const bot = s?.botCheck;
-  if (bot?.challenged)
-    out.push(
-      `Kan’s bot check stopped ${num(bot.challenged)} of ${num(bot.pages)} page loads today; reading carries on.`,
-    );
-  return out;
-}
-
-function card(c: StatusCatalog, status: StatusFile, logos: boolean): Html {
+function card(c: StatusCatalog, status: StatusFile, logos: boolean, lang: Lang): Html {
+  const he = lang === 'he';
+  const w = WORDS[lang];
   const s = status.sources.find((x) => x.source === c.source);
-  const st = rowState(c, s, status);
+  const st = rowState(c, s, status, lang);
   const live = c.source === 'live';
   // The live row has no single channel: the site's own icon, in the same tile.
   const tile = live
@@ -222,71 +358,77 @@ function card(c: StatusCatalog, status: StatusFile, logos: boolean): Html {
   const facts: Html[] = [];
   if (live) {
     const ch = status.live?.channels ?? [];
-    facts.push(html`<li><span>Channels</span><strong>${num(ch.length || c.shows)}</strong></li>`);
-    if (status.live) facts.push(html`<li><span>Last checked</span>${when(status.live.at)}</li>`);
+    facts.push(html`<li><span>${w.channels}</span><strong>${num(ch.length || c.shows, lang)}</strong></li>`);
+    if (status.live) facts.push(html`<li><span>${w.lastChecked}</span>${when(status.live.at, lang)}</li>`);
   } else {
     facts.push(
       c.filling && c.shows === 0
-        ? html`<li class="wide">${fillChip(c.filling, 'en')}</li>`
-        : html`<li><span>Shows</span><strong>${num(c.shows)}</strong></li><li><span>Episodes</span><strong>${num(c.episodes)}</strong></li>`,
+        ? html`<li class="wide">${fillChip(c.filling, lang)}</li>`
+        : html`<li><span>${w.shows}</span><strong>${num(c.shows, lang)}</strong></li><li><span>${w.episodes}</span><strong>${num(c.episodes, lang)}</strong></li>`,
     );
     const last = s?.lastFullRun;
     if (last)
       facts.push(
-        html`<li><span>${c.source === 'kan' ? 'Last read' : 'Last full refresh'}</span>${
-          last.status === 'running' && c.source !== 'kan' ? 'running now' : when(last.at)
+        html`<li><span>${c.source === 'kan' ? w.lastRead : w.lastFull}</span>${
+          last.status === 'running' && c.source !== 'kan' ? w.runningNow : when(last.at, lang)
         }</li>`,
       );
     if (s?.lastAiringRun)
-      facts.push(html`<li><span>New episodes checked</span>${when(s.lastAiringRun.at)}</li>`);
+      facts.push(html`<li><span>${w.airingChecked}</span>${when(s.lastAiringRun.at, lang)}</li>`);
   }
   // Notes a viewer can use as they are (plain words, no ids): Kan's bot check, episodes Kan no longer offers.
-  const said = viewerNotes(s);
+  const said = viewerNotes(s, lang);
   let next: Child = '';
-  if (c.source === 'kan') next = 'A few pages at a time, all day long.';
-  else if (sched?.nextFullRun)
-    next = html`${live ? 'Next check' : 'Next full refresh'} <time datetime="${sched.nextFullRun}" data-daily data-future>${`at ${sched.fullRunTime ?? israelTime(sched.nextFullRun)} Israel time`}</time>${
-      !live && sched.airingChecksPerDay
-        ? `; shows on the air are checked for new episodes about ${sched.airingChecksPerDay >= 24 ? 'every hour, more often in the evening' : `${sched.airingChecksPerDay} times a day`}.`
-        : '.'
-    }`;
+  if (c.source === 'kan') next = w.kanPace;
+  else if (sched?.nextFullRun) {
+    const at = sched.fullRunTime ?? israelTime(sched.nextFullRun, lang);
+    const perDay = sched.airingChecksPerDay ?? 0;
+    const time = html`<time datetime="${sched.nextFullRun}" data-daily data-future>${he ? `ב-${at} שעון ישראל` : `at ${at} Israel time`}</time>`;
+    next = he
+      ? html`${live ? 'הבדיקה הבאה' : 'העדכון המלא הבא'} ${time}${
+          !live && perDay
+            ? `. תוכניות שמשודרות עכשיו נבדקות לפרקים חדשים ${perDay >= 24 ? 'בערך פעם בשעה, ובערב לעתים קרובות יותר' : `${heCount(perDay, 'פעם אחת', 'פעמים')} ביום`}.`
+            : '.'
+        }`
+      : html`${live ? 'Next check' : 'Next full refresh'} ${time}${
+          !live && perDay
+            ? `; shows on the air are checked for new episodes about ${perDay >= 24 ? 'every hour, more often in the evening' : `${perDay} times a day`}.`
+            : '.'
+        }`;
+  }
   return html`<article class="card row-card" aria-labelledby="row-${c.id}">
 <div class="row-head">${tile}
-<div class="row-title"><h3 id="row-${c.id}">${catalogName(c.id, 'en')}</h3><span class="muted small"><bdi lang="he" dir="rtl">${catalogAppName(c.id)}</bdi></span></div>
+<div class="row-title"><h3 id="row-${c.id}">${catalogName(c.id, lang)}</h3>${
+    he ? '' : html`<span class="muted small"><bdi lang="he" dir="rtl">${catalogAppName(c.id)}</bdi></span>`
+  }</div>
 <span class="pill ${st.level}">${st.label}</span></div>
 <p class="row-line">${st.line}</p>
 <ul class="facts">${facts}</ul>
 ${next ? html`<p class="small muted next">${next}</p>` : ''}
 ${said.length ? html`<ul class="small muted said">${said.map((n) => html`<li>${n}</li>`)}</ul>` : ''}
-${historyBar(status.history?.days ?? [], status.history?.sources[c.source])}
+${historyBar(status.history?.days ?? [], status.history?.sources[c.source], lang)}
 </article>`;
 }
 
-function liveGrid(status: StatusFile, logos: boolean): Child {
+function liveGrid(status: StatusFile, logos: boolean, lang: Lang): Child {
   const live = status.live;
   if (!live?.channels.length) return '';
-  const word = { up: 'Playing', down: 'Not playing', unchecked: 'Not checked' } as const;
+  const he = lang === 'he';
+  const w = WORDS[lang];
   const cls = { up: 'ok', down: 'error', unchecked: 'info' } as const;
   return html`<section aria-labelledby="live-h" class="live"><div class="wrap">
-<h2 id="live-h">Live channels</h2>
-<p class="muted">Every live stream is played once a day. Last check: ${when(live.at)}${
-    live.abroad ? ', from outside Israel' : ''
-  }. Channels marked <strong>home helper</strong> play only through your own <a href="/#helper">home helper</a>.</p>
+<h2 id="live-h">${w.liveH}</h2>
+<p class="muted">${
+    he
+      ? html`כל שידור חי מנוגן פעם ביום. הבדיקה האחרונה: ${when(live.at, 'he')}${live.abroad ? ', מחוץ לישראל' : ''}. ערוצים שמסומנים <strong>${w.helperTag}</strong> מתנגנים רק דרך <a href="/he/#helper">העוזר הביתי</a> שלכם.`
+      : html`Every live stream is played once a day. Last check: ${when(live.at)}${live.abroad ? ', from outside Israel' : ''}. Channels marked <strong>${w.helperTag}</strong> play only through your own <a href="/#helper">home helper</a>.`
+  }</p>
 <ul class="channels">${live.channels.map(
     (ch) => html`<li class="ch">${logoTile(logos ? { logo: ch.id } : undefined, 40)}
-<span class="ch-name">${bdi(ch.name)}${ch.helper ? raw('<span class="tag">home helper</span>') : ''}${ch.israelOnly ? raw('<span class="tag">Israel only</span>') : ''}</span>
-<span class="pill ${cls[ch.state]}">${word[ch.state]}</span></li>`,
+<span class="ch-name">${bdi(ch.name)}${ch.helper ? html`<span class="tag">${w.helperTag}</span>` : ''}${ch.israelOnly ? html`<span class="tag">${w.israelOnly}</span>` : ''}</span>
+<span class="pill ${cls[ch.state]}">${w.live[ch.state]}</span></li>`,
   )}</ul></div></section>`;
 }
-
-const WARNING_WORDS: Record<string, string> = {
-  'source-note': 'Notes from reading the channels’ sites',
-  'source-renumbered': 'A channel renumbered an episode (ours keeps its number)',
-  'episode-number-taken': 'Two episodes claimed the same number',
-  'image-failed': 'Images that could not be copied',
-};
-const warningWord = (code: string) =>
-  WARNING_WORDS[code] ?? code.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
 function detailsBlock(summary: Child, body: Child, open = false): Html {
   return html`<details${open ? raw(' open') : ''}><summary>${summary}</summary><div class="body">${body}</div></details>`;
@@ -297,9 +439,7 @@ function detailsBlock(summary: Child, body: Child, open = false): Html {
  * the punctuation around it keep their places ("\"פרק 4\" collides", not "\"4 פרק\" collides").
  */
 function mixed(text: string): Html {
-  const parts = text.split(
-    /([\u0590-\u05FF][\u0590-\u05FF0-9 ׳״'\-–.,!?]*[\u0590-\u05FF0-9]|[\u0590-\u05FF])/,
-  );
+  const parts = text.split(/([֐-׿][֐-׿0-9 ׳״'\-–.,!?]*[֐-׿0-9]|[֐-׿])/);
   return html`${parts.map((part, i) => (i % 2 ? html`<bdi dir="rtl">${part}</bdi>` : part))}`;
 }
 
@@ -312,17 +452,32 @@ const showLink = (id: string) =>
     ? html`<a href="/show/${id}/"><code>${id}</code></a>`
     : html`<code>${id}</code>`;
 
+/** A warning's text: in English its message; in Hebrew worded from its values, else the message marked as English. */
+function warningLine(w: StatusFile['warnings'][number], lang: Lang): Html {
+  if (lang === 'he') {
+    const said = warningHe(w);
+    if (said !== undefined) return html`<span>${said}</span>`;
+    return html`<span dir="ltr" lang="en" class="en-text">${mixed(w.message)}</span>`;
+  }
+  return html`<span dir="ltr">${mixed(w.message)}</span>`;
+}
+
 /** The details contributors need, each folded away, all worded from the status fields. */
-function contributorDetails(status: StatusFile): Html[] {
+function contributorDetails(status: StatusFile, lang: Lang): Html[] {
+  const he = lang === 'he';
   const parts: Html[] = [];
-  const name = (src: string) => sourceName(src);
+  const name = (src: string) => sourceName(src, lang);
   const rowLabel = (c: StatusCatalog) =>
-    html`${catalogName(c.id, 'en')} <bdi lang="he" dir="rtl" class="muted">${catalogAppName(c.id)}</bdi>`;
-  if (status.publish || status.tmdb)
+    he
+      ? html`${catalogName(c.id, 'he')}`
+      : html`${catalogName(c.id, 'en')} <bdi lang="he" dir="rtl" class="muted">${catalogAppName(c.id)}</bdi>`;
+  const publish = publishText(status, lang);
+  const tmdb = tmdbText(status, lang);
+  if (publish || tmdb)
     parts.push(
       detailsBlock(
-        'Publishing and matching',
-        html`<ul>${status.publish ? html`<li>${status.publish}</li>` : ''}${status.tmdb ? html`<li>${status.tmdb}</li>` : ''}</ul>`,
+        he ? 'פרסום והתאמה ל-TMDB' : 'Publishing and matching',
+        html`<ul>${publish ? html`<li>${publish}</li>` : ''}${tmdb ? html`<li>${tmdb}</li>` : ''}</ul>`,
         true,
       ),
     );
@@ -330,65 +485,105 @@ function contributorDetails(status: StatusFile): Html[] {
   if (filling.length)
     parts.push(
       detailsBlock(
-        html`Rows still loading <span class="count">${filling.length}</span>`,
-        html`<p class="small muted">A new row is read a few pages at a time; its shows play as soon as they are in.</p><ul class="progress">${filling.map(
-          (c) => {
-            const f = c.filling as NonNullable<StatusCatalog['filling']>;
-            const pct = f.known ? Math.min(100, Math.round((f.inCatalog / f.known) * 100)) : 0;
-            return html`<li><span class="p-name">${rowLabel(c)}</span><span class="p-text">${num(f.inCatalog)} of ${num(f.known)} shows${
-              f.pagesToRead ? html`, ${num(f.pagesToRead)} episode pages to go` : ''
-            }</span><span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${f.known}" aria-valuenow="${f.inCatalog}" aria-label="${catalogName(c.id, 'en')}: ${f.inCatalog} of ${f.known} shows"><i style="width:${pct}%"></i></span></li>`;
-          },
-        )}</ul>`,
+        html`${he ? 'שורות שעדיין נטענות' : 'Rows still loading'} <span class="count">${filling.length}</span>`,
+        html`<p class="small muted">${
+          he
+            ? 'שורה חדשה נקראת כמה דפים בכל פעם, והתוכניות שלה מתנגנות מהרגע שהן נכנסות.'
+            : 'A new row is read a few pages at a time; its shows play as soon as they are in.'
+        }</p><ul class="progress">${filling.map((c) => {
+          const f = c.filling as NonNullable<StatusCatalog['filling']>;
+          const pct = f.known ? Math.min(100, Math.round((f.inCatalog / f.known) * 100)) : 0;
+          const text = he
+            ? html`${num(f.inCatalog, 'he')} מתוך ${num(f.known, 'he')} תוכניות${
+                f.pagesToRead ? html`, עוד ${num(f.pagesToRead, 'he')} דפי פרקים לקריאה` : ''
+              }`
+            : html`${num(f.inCatalog)} of ${num(f.known)} shows${
+                f.pagesToRead ? html`, ${num(f.pagesToRead)} episode pages to go` : ''
+              }`;
+          const aria = he
+            ? `${catalogName(c.id, 'he')}: ${f.inCatalog} מתוך ${f.known} תוכניות`
+            : `${catalogName(c.id, 'en')}: ${f.inCatalog} of ${f.known} shows`;
+          return html`<li><span class="p-name">${rowLabel(c)}</span><span class="p-text">${text}</span><span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${f.known}" aria-valuenow="${f.inCatalog}" aria-label="${aria}"><i style="width:${pct}%"></i></span></li>`;
+        })}</ul>`,
       ),
     );
   parts.push(
     detailsBlock(
-      html`Shows that could not be refreshed <span class="count">${status.failingShows.length}</span>`,
+      html`${he ? 'תוכניות שלא הצלחנו לעדכן' : 'Shows that could not be refreshed'} <span class="count">${status.failingShows.length}</span>`,
       status.failingShows.length
-        ? html`<p class="small muted">Their last good episodes are still in the catalog.</p><div class="table-scroll"><table><thead><tr><th>Show</th><th>Problem</th><th>Last good read</th></tr></thead><tbody>${status.failingShows.map(
-            (f) => html`<tr><td>${bdi(f.title)}</td><td>${f.error}</td><td>${when(f.lastOkAt)}</td></tr>`,
+        ? html`<p class="small muted">${
+            he
+              ? 'הפרקים מהקריאה המוצלחת האחרונה שלהן עדיין בקטלוג.'
+              : 'Their last good episodes are still in the catalog.'
+          }</p><div class="table-scroll"><table><thead><tr><th>${he ? 'תוכנית' : 'Show'}</th><th>${he ? 'הבעיה' : 'Problem'}</th><th>${he ? 'קריאה מוצלחת אחרונה' : 'Last good read'}</th></tr></thead><tbody>${status.failingShows.map(
+            (f) =>
+              html`<tr><td>${bdi(f.title)}</td><td>${asEnglish(f.error, lang)}</td><td>${when(f.lastOkAt, lang)}</td></tr>`,
           )}</tbody></table></div>`
-        : raw('<p class="muted">None: every show was read in its last refresh.</p>'),
+        : html`<p class="muted">${he ? 'אין. כל התוכניות נקראו בעדכון האחרון שלהן.' : 'None: every show was read in its last refresh.'}</p>`,
     ),
   );
-  // Runs that did not finish cleanly, and pages a site lists that are not played.
+  // Runs that did not finish cleanly, pages a site lists that are not played, and the notes said nowhere else.
   const runs = status.sources.flatMap((s) => {
     const lines: Html[] = [];
+    const who = html`<strong>${name(s.source)}:</strong>`;
     const r = s.lastFullRun;
     if (r && r.status !== 'ok' && r.status !== 'running')
       lines.push(
-        html`<li><strong>${name(s.source)}:</strong> the last full read ${r.status === 'partial' ? 'finished with some shows missing' : 'failed'}${r.error ? html` (<span class="muted">${r.error}</span>)` : ''}.</li>`,
+        he
+          ? html`<li>${who} הקריאה המלאה האחרונה ${r.status === 'partial' ? 'הסתיימה בלי חלק מהתוכניות' : 'נכשלה'}${r.error ? html` (<span class="muted">${asEnglish(r.error, lang)}</span>)` : ''}.</li>`
+          : html`<li>${who} the last full read ${r.status === 'partial' ? 'finished with some shows missing' : 'failed'}${r.error ? html` (<span class="muted">${r.error}</span>)` : ''}.</li>`,
       );
     if (s.skipped?.notVideo)
       lines.push(
-        html`<li><strong>${name(s.source)}:</strong> ${num(s.skipped.notVideo)} pages listed among the episodes are articles or promos without video, and are skipped.</li>`,
+        he
+          ? html`<li>${who} ${num(s.skipped.notVideo, 'he')} דפים שמופיעים ברשימת הפרקים הם כתבות או פרומואים בלי וידאו, ולכן מדלגים עליהם.</li>`
+          : html`<li>${who} ${num(s.skipped.notVideo)} pages listed among the episodes are articles or promos without video, and are skipped.</li>`,
       );
-    for (const n of viewerNotes(s)) lines.push(html`<li><strong>${name(s.source)}:</strong> ${n}</li>`);
+    for (const n of viewerNotes(s, lang)) lines.push(html`<li>${who} ${n}</li>`);
+    (s.noteCodes ?? []).forEach((note, i) => {
+      const said = noteText(note, s.notes[i], lang);
+      if (said !== undefined) lines.push(html`<li>${who} ${said}</li>`);
+    });
     return lines;
   });
-  if (runs.length) parts.push(detailsBlock('From the last runs', html`<ul class="runs">${runs}</ul>`));
+  if (runs.length)
+    parts.push(
+      detailsBlock(he ? 'מהריצות האחרונות' : 'From the last runs', html`<ul class="runs">${runs}</ul>`),
+    );
   const blocked = status.sources.filter(
     (s) => s.blocked && (s.blocked.pending.length || s.blocked.recovered.length),
   );
   if (blocked.length)
     parts.push(
       detailsBlock(
-        'Refused by a site’s bot protection',
-        blocked.map(
-          (s) =>
-            html`<h3>${name(s.source)}</h3><p>${s.blocked?.pending.length ? html`Still waiting (${s.blocked.pending.length}): ${join(s.blocked.pending.map(bdi), ', ')}` : 'Nothing waiting.'}${
-              s.blocked?.nextAt ? html` Next try ${when(s.blocked.nextAt, 'en', { future: true })}.` : ''
-            }</p>${s.blocked?.recovered.length ? html`<p class="small muted">Read on a retry: ${join(s.blocked.recovered.map(bdi), ', ')}</p>` : ''}`,
-        ),
+        he ? 'נחסמו על ידי הגנה מפני בוטים' : 'Refused by a site’s bot protection',
+        blocked.map((s) => {
+          const b = s.blocked as NonNullable<Source['blocked']>;
+          const waiting = b.pending.length
+            ? html`${he ? 'עדיין ממתינות' : 'Still waiting'} (${b.pending.length}): ${join(b.pending.map(bdi), ', ')}${he ? '.' : ''}`
+            : he
+              ? 'אין תוכניות שממתינות.'
+              : 'Nothing waiting.';
+          return html`<h3>${name(s.source)}</h3><p>${waiting}${
+            b.nextAt
+              ? he
+                ? html` הניסיון הבא ${when(b.nextAt, 'he', { future: true })}.`
+                : html` Next try ${when(b.nextAt, 'en', { future: true })}.`
+              : ''
+          }</p>${b.recovered.length ? html`<p class="small muted">${he ? 'נקראו בניסיון חוזר' : 'Read on a retry'}: ${join(b.recovered.map(bdi), ', ')}</p>` : ''}`;
+        }),
       ),
     );
   const empty = status.sources.filter((s) => s.emptyShows?.length);
   if (empty.length)
     parts.push(
       detailsBlock(
-        html`Listed by a channel with nothing to watch <span class="count">${empty.reduce((n, s) => n + (s.emptyShows?.length ?? 0), 0)}</span>`,
-        html`<p class="small muted">The channel’s site lists these, but has no episodes to play; they stay out of the catalog until it does.</p>${empty.map(
+        html`${he ? 'מופיעות באתר הערוץ בלי שום דבר לצפייה' : 'Listed by a channel with nothing to watch'} <span class="count">${empty.reduce((n, s) => n + (s.emptyShows?.length ?? 0), 0)}</span>`,
+        html`<p class="small muted">${
+          he
+            ? 'אתר הערוץ מציג אותן, אבל אין בהן פרקים לצפייה. הן יישארו מחוץ לקטלוג עד שיהיו.'
+            : 'The channel’s site lists these, but has no episodes to play; they stay out of the catalog until it does.'
+        }</p>${empty.map(
           (s) =>
             html`<h3>${name(s.source)} <span class="count">${s.emptyShows?.length ?? 0}</span></h3><ul class="name-chips">${(s.emptyShows ?? []).map((t) => html`<li dir="auto">${t}</li>`)}</ul>`,
         )}`,
@@ -397,13 +592,17 @@ function contributorDetails(status: StatusFile): Html[] {
   const a = status.audit;
   parts.push(
     detailsBlock(
-      'Catalog check',
+      he ? 'בדיקת הקטלוג' : 'Catalog check',
       a
-        ? html`<p>${num(a.metas)} shows checked ${when(a.at)}: ${a.problems.length ? `${a.problems.length} kind${a.problems.length === 1 ? '' : 's'} of problem.` : 'no problems.'}</p>${
+        ? html`<p>${
+            he
+              ? html`${heCount(a.metas, 'תוכנית אחת נבדקה', 'תוכניות נבדקו')} ${when(a.at, 'he')}: ${a.problems.length ? `${heCount(a.problems.length, 'סוג אחד של בעיה', 'סוגים של בעיות')}.` : 'לא נמצאו בעיות.'}`
+              : html`${num(a.metas)} shows checked ${when(a.at)}: ${a.problems.length ? `${enCount(a.problems.length, 'kind', 'kinds')} of problem.` : 'no problems.'}`
+          }</p>${
             a.problems.length
-              ? html`<div class="table-scroll"><table><thead><tr><th>Check</th><th>Count</th><th>Examples</th></tr></thead><tbody>${a.problems.map(
+              ? html`<div class="table-scroll"><table><thead><tr><th>${he ? 'בדיקה' : 'Check'}</th><th>${he ? 'כמה' : 'Count'}</th><th>${he ? 'דוגמאות' : 'Examples'}</th></tr></thead><tbody>${a.problems.map(
                   (p) =>
-                    html`<tr><td>${p.check}</td><td>${num(p.count)}</td><td>${join(
+                    html`<tr><td>${auditCheck(p.check, lang)}</td><td>${num(p.count, lang)}</td><td>${join(
                       p.examples.map((x) => html`<code>${x}</code>`),
                       ' ',
                     )}</td></tr>`,
@@ -411,37 +610,49 @@ function contributorDetails(status: StatusFile): Html[] {
               : ''
           }${
             a.gaps?.length
-              ? html`<h3>Show details the sources do not give</h3><p class="small muted">Shows published without genres, a description or a year line. They are filled only from the channel’s own pages and, for shows matched to TMDB, from TMDB; never made up.</p><div class="table-scroll"><table><thead><tr><th>Source</th><th>Shows</th><th>No genres</th><th>No description</th><th>No year</th></tr></thead><tbody>${a.gaps.map(
+              ? html`${
+                  he
+                    ? html`<h3>פרטים על תוכניות שהמקורות לא נותנים</h3><p class="small muted">תוכניות שפורסמו בלי ז׳אנרים, בלי תיאור או בלי שנים. הפרטים האלה נלקחים רק מהאתר של הערוץ, ובתוכניות שהותאמו ל-TMDB גם משם. שום דבר לא ממציאים.</p>`
+                    : html`<h3>Show details the sources do not give</h3><p class="small muted">Shows published without genres, a description or a year line. They are filled only from the channel’s own pages and, for shows matched to TMDB, from TMDB; never made up.</p>`
+                }<div class="table-scroll"><table><thead><tr>${(
+                  he
+                    ? ['מקור', 'תוכניות', 'בלי ז׳אנרים', 'בלי תיאור', 'בלי שנים']
+                    : ['Source', 'Shows', 'No genres', 'No description', 'No year']
+                ).map((h) => html`<th>${h}</th>`)}</tr></thead><tbody>${a.gaps.map(
                   (g) =>
-                    html`<tr><td>${name(g.source)}</td><td>${num(g.shows)}</td><td>${num(g.noGenre)}</td><td>${num(g.noDescription)}</td><td>${num(g.noYear)}</td></tr>`,
+                    html`<tr><td>${name(g.source)}</td><td>${num(g.shows, lang)}</td><td>${num(g.noGenre, lang)}</td><td>${num(g.noDescription, lang)}</td><td>${num(g.noYear, lang)}</td></tr>`,
                 )}</tbody></table></div>`
               : ''
           }`
-        : raw('<p class="muted">Not run yet.</p>'),
+        : html`<p class="muted">${he ? 'עוד לא רצה.' : 'Not run yet.'}</p>`,
     ),
   );
   const groups = new Map<string, StatusFile['warnings']>();
   for (const w of status.warnings) groups.set(w.code, [...(groups.get(w.code) ?? []), w]);
   parts.push(
     detailsBlock(
-      html`Recent warnings <span class="count">${status.warnings.length}</span>`,
+      html`${he ? 'אזהרות אחרונות' : 'Recent warnings'} <span class="count">${status.warnings.length}</span>`,
       status.warnings.length
-        ? html`<p class="small muted">As the publisher logged them, newest first, grouped by kind.</p>${[
-            ...groups,
-          ].map(
+        ? html`<p class="small muted">${
+            he
+              ? 'כפי שהמפרסם רשם אותן, מהחדשה לישנה, לפי סוג.'
+              : 'As the publisher logged them, newest first, grouped by kind.'
+          }</p>${[...groups].map(
             ([code, ws]) =>
-              html`<details class="inner"><summary>${warningWord(code)} <span class="count">${ws.length}</span></summary><div class="body"><ul class="warn-list">${ws
+              html`<details class="inner"><summary>${warningWord(code, lang)} <span class="count">${ws.length}</span></summary><div class="body"><ul class="warn-list">${ws
                 .slice(0, WARNINGS_SHOWN)
                 .map(
                   (w) =>
-                    html`<li><span class="small muted">${when(w.at)}${w.id ? html` · ${showLink(w.id)}` : ''}</span><br><span dir="ltr">${mixed(w.message)}</span></li>`,
+                    html`<li><span class="small muted">${when(w.at, lang)}${w.id ? html` · ${showLink(w.id)}` : ''}</span><br>${warningLine(w, lang)}</li>`,
                 )}</ul>${
                 ws.length > WARNINGS_SHOWN
-                  ? html`<p class="small muted">And ${num(ws.length - WARNINGS_SHOWN)} more of this kind, in <a href="/${sitePaths.status}">status.json</a>.</p>`
+                  ? he
+                    ? html`<p class="small muted">ועוד ${num(ws.length - WARNINGS_SHOWN, 'he')} מהסוג הזה, ב-<a href="/${sitePaths.status}">status.json</a>.</p>`
+                    : html`<p class="small muted">And ${num(ws.length - WARNINGS_SHOWN)} more of this kind, in <a href="/${sitePaths.status}">status.json</a>.</p>`
                   : ''
               }</div></details>`,
           )}`
-        : raw('<p class="muted">None.</p>'),
+        : html`<p class="muted">${he ? 'אין.' : 'None.'}</p>`,
     ),
   );
   return parts;
@@ -469,45 +680,83 @@ function rowsOf(status: StatusFile): StatusCatalog[] {
   }));
 }
 
-/** The public status page. */
-export function renderStatusHtml(file: StatusFile, opts: PublicTextOptions = {}): string {
+/** The status page's address in each language (the language switch, hreflang, the sitemap). */
+export const STATUS_PATHS: Record<Lang, string> = { en: 'status', he: 'he/status' };
+
+/** The public status page, in English or Hebrew. */
+export function renderStatusHtml(file: StatusFile, opts: PublicTextOptions = {}, lang: Lang = 'en'): string {
+  const he = lang === 'he';
   const status = publicStatus(file, opts);
-  const o = overall(status);
+  const o = overall(status, lang);
   // The channel tiles are published with the live row.
   const logos = !!status.live;
   const rows = rowsOf(status);
+  const w = WORDS[lang];
+  const title = he ? 'מצב השירות של Israel TV: הכול עובד?' : 'Israel TV status: is everything working?';
+  const description = he
+    ? `${o.title}. המצב העדכני של Israel TV, התוסף החינמי ל-Stremio ול-Nuvio לקשת 12, רשת 13, כאן ולערוצים ישראליים בשידור חי: מה מעודכן, מה מתנגן, ואיך היו 30 הימים האחרונים.`
+    : `${o.title}. Live status of Israel TV, the free Stremio and Nuvio addon for Keshet 12, Reshet 13, Kan and Israeli live channels: what is up to date, what is playing, and the last 30 days.`;
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: title,
+    description,
+    url: absolute(STATUS_PATHS[lang]),
+    inLanguage: lang,
+    dateModified: status.generatedAt,
+    isPartOf: { '@type': 'WebSite', name: 'Israel TV', url: absolute(he ? 'he/' : '') },
+  };
+  const other = he ? 'en' : 'he';
   return externalLinks(
     html`${head(
       {
-        lang: 'en',
-        title: 'Israel TV status: is everything working?',
-        description: `${o.title}. Live status of Israel TV, the free Stremio and Nuvio addon for Keshet 12, Reshet 13, Kan and Israeli live channels: what is up to date, what is playing, and the last 30 days.`,
-        path: 'status',
+        lang,
+        title,
+        description,
+        path: STATUS_PATHS[lang],
+        alternates: { en: STATUS_PATHS.en, he: STATUS_PATHS.he },
+        jsonLd,
       },
       STATUS_CSS,
     )}<body>
-${topBar('en', siteNav('en', 'status', [{ href: '/#install', label: 'Install', optional: true }]))}
+${topBar(
+  lang,
+  siteNav(
+    lang,
+    'status',
+    [{ href: he ? '/he/#install' : '/#install', label: he ? 'התקנה' : 'Install', optional: true }],
+    `/${STATUS_PATHS[other]}`,
+  ),
+)}
 <main id="main">
 <div class="wrap hero-status">
 <div class="overall ${o.level}" role="status"><div class="dot">${raw(LEVEL_ICON[o.level])}</div>
 <div><h1>${o.title}</h1><p>${o.detail}</p></div></div>
-<p class="updated">Updated ${when(status.generatedAt)}. Something not playing? <a href="https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml">Tell us</a>.</p>
+<p class="updated">${
+      he
+        ? html`עודכן ${when(status.generatedAt, 'he')}. משהו לא מתנגן? <a href="https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml">ספרו לנו</a>.`
+        : html`Updated ${when(status.generatedAt)}. Something not playing? <a href="https://github.com/israeltv2/israel-tv/issues/new?template=broken-source.yml">Tell us</a>.`
+    }</p>
 </div>
 <section class="rows" aria-labelledby="rows-h"><div class="wrap">
-<h2 id="rows-h">Channels</h2>
-<div class="grid two three">${rows.map((c) => card(c, status, logos))}</div>
-${status.history ? html`<div class="legend" aria-hidden="true"><span><i style="background:var(--ok)"></i>All good</span><span><i style="background:var(--warn)"></i>Some problems</span><span><i style="background:var(--error)"></i>Failed</span><span><i style="background:var(--none)"></i>No refresh</span><span>One bar per day</span></div>` : ''}
+<h2 id="rows-h">${w.channels}</h2>
+<div class="grid two three">${rows.map((c) => card(c, status, logos, lang))}</div>
+${status.history ? html`<div class="legend" aria-hidden="true"><span><i style="background:var(--ok)"></i>${w.legend[0]}</span><span><i style="background:var(--warn)"></i>${w.legend[1]}</span><span><i style="background:var(--error)"></i>${w.legend[2]}</span><span><i style="background:var(--none)"></i>${w.legend[3]}</span><span>${w.legend[4]}</span></div>` : ''}
 </div></section>
-${liveGrid(status, logos)}
+${liveGrid(status, logos, lang)}
 <section aria-labelledby="details-h"><div class="wrap">
-<h2 id="details-h">Details for contributors</h2>
-<p class="muted">What the last runs found, for anyone helping to fix things. The same data, machine-readable: <a href="/${sitePaths.status}">status.json</a> (<a href="https://github.com/israeltv2/israel-tv/blob/main/docs/operations.md#the-public-status-page">what the fields mean</a>).</p>
-${contributorDetails(status)}
+<h2 id="details-h">${w.detailsH}</h2>
+<p class="muted">${
+      he
+        ? html`מה שהריצות האחרונות מצאו, למי שעוזר לתקן דברים. אותם נתונים בפורמט למכונות: <a href="/${sitePaths.status}">status.json</a> (<a href="https://github.com/israeltv2/israel-tv/blob/main/docs/operations.md#the-public-status-page">מה כל שדה אומר</a>, באנגלית).`
+        : html`What the last runs found, for anyone helping to fix things. The same data, machine-readable: <a href="/${sitePaths.status}">status.json</a> (<a href="https://github.com/israeltv2/israel-tv/blob/main/docs/operations.md#the-public-status-page">what the fields mean</a>).`
+    }</p>
+${contributorDetails(status, lang)}
 </div></section>
 </main>
-${footer('en')}
+${footer(lang)}
 </body></html>
 `,
-    'en',
+    lang,
   );
 }

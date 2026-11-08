@@ -56,6 +56,8 @@ export const sitePaths = {
   extIds: 'ext-ids.json',
   status: 'status.json',
   statusPage: 'status.html',
+  /** The status page in Hebrew (served at /he/status). */
+  statusPageHe: 'he/status.html',
   registry: 'registry.json',
   freshness: 'freshness.json',
   logo: 'logo.png',
@@ -106,6 +108,10 @@ export interface StatusFile {
   publish?: string;
   /** Set when the last TMDB matching run failed (e.g. a revoked API key). */
   tmdb?: string;
+  /** `publish` as a code and its values, so a page can word it in its own language. */
+  publishNote?: StatusNote;
+  /** `tmdb` as a code and its values. */
+  tmdbNote?: StatusNote;
   sources: {
     source: string;
     health: Health;
@@ -114,6 +120,8 @@ export interface StatusFile {
     lastFullRun?: { at: string; status: string; error?: string };
     lastAiringRun?: { at: string; status: string };
     notes: string[];
+    /** The same notes, in the same order, as codes and values (the `notes` text is their English wording). */
+    noteCodes?: StatusNote[];
     /** Titles the site lists with nothing to watch (from the last complete full read), kept out of the catalog. */
     emptyShows?: string[];
     /**
@@ -127,7 +135,8 @@ export interface StatusFile {
     blocked?: { pending: string[]; recovered: string[]; attempts: number; nextAt?: string };
   }[];
   failingShows: { id: string; title: string; error: string; lastOkAt: string }[];
-  warnings: { at: string; id?: string; code: string; message: string }[];
+  /** `params`: the message's values by name, for a page that words it in another language (newer warnings). */
+  warnings: { at: string; id?: string; code: string; message: string; params?: StatusParams }[];
   /** The publisher's own check of what it just published (apps/ingest catalog-audit.ts). */
   audit?: {
     at: string;
@@ -147,6 +156,15 @@ export interface StatusFile {
   live?: { at: string; abroad: boolean; channels: StatusLiveChannel[] };
   /** When things are refreshed, in the instance's time zone. */
   schedule?: StatusSchedule;
+}
+
+/** A note's values: counts, times (ISO), names, titles. */
+export type StatusParams = Record<string, string | number | string[]>;
+
+/** A note as a code and its values, so that each page can word it in its own language (docs/operations.md). */
+export interface StatusNote {
+  code: string;
+  params?: StatusParams;
 }
 
 export interface StatusCatalog {

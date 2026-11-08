@@ -1,0 +1,1 @@
+ALTER TABLE `warnings` ADD `params` text;
