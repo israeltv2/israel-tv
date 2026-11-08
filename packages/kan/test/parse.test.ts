@@ -183,3 +183,27 @@ test('normal Kan pages carry a bot-scoring script but are not challenges', () =>
     expect(isChallenge(html(n)), n).toBe(false);
   expect(isChallenge(html('challenge-turnstile'))).toBe(true);
 });
+
+test('a multi-season show page links only a few episodes of each older season (recorded 2026-11-08)', () => {
+  // קופה ראשית: Kan has 116 episodes over six seasons; the show page links the current season in full, a few
+  // episodes of the others and the season pages (s1/ … s6/), which are not episodes. The full list comes from
+  // Kan's app (apps/ingest kan.ts).
+  const p = parseShowPage(html('show-p-12832-seasons'), '/content/kan/kan-11/p-12832/');
+  expect(p.episodes.every((e) => /\/(?:s\d+\/)?\d+\/$/.test(e.path))).toBe(true);
+  expect(p.episodes.some((e) => /\/s\d+\/$/.test(e.path))).toBe(false);
+  expect(p.episodes.filter((e) => e.path.includes('/s6/'))).toHaveLength(8);
+  expect(p.episodes.length).toBeLessThan(40);
+  const ids = p.episodes.map((e) => e.id ?? 0);
+  expect(ids).toEqual([...ids].sort((a, b) => a - b));
+});
+
+test('named episode links inside a season are episodes too (archive, recorded 2026-11-08)', () => {
+  // תקומה: 22 episodes at s1/rebirth-1/ … s1/rebirth-22/ and one numbered page; only the numbered one was read.
+  const p = parseShowPage(html('show-p-671191-named'), '/content/archive1/vod/p-671191/');
+  expect(p.episodes).toHaveLength(23);
+  expect(p.episodes[0]).toEqual({ path: '/content/archive1/vod/p-671191/943638/', id: 943638 });
+  expect(p.episodes.slice(1).map((e) => e.path.split('/').at(-2))).toEqual(
+    Array.from({ length: 22 }, (_, i) => `rebirth-${i + 1}`),
+  );
+  expect(p.episodes.slice(1).every((e) => e.id === undefined)).toBe(true);
+});

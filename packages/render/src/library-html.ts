@@ -116,6 +116,12 @@ const STRIP = 18;
 const stremioDetail = (type: string, id: string, video?: string) =>
   `stremio:///detail/${type}/${encodeURIComponent(id)}${video ? `/${encodeURIComponent(video)}` : ''}`;
 
+/**
+ * A show in Nuvio (its own link: Nuvio reads `stremio://` only as an addon to install, so a `stremio:///detail/…` link
+ * just opens the app). Shows only: Nuvio's links know movies and series, not a live channel or an episode.
+ */
+const nuvioShow = (id: string) => `nuvio://meta?type=series&id=${encodeURIComponent(id)}`;
+
 const vtName = (id: string) => `p-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
 /** A show's poster tile, linking to its page. */
@@ -485,7 +491,7 @@ ${poster ? html`<img class="poster" src="${poster}" alt="" width="260" height="3
 <h1 dir="auto">${name}</h1>
 <ul class="facts">${facts.map((f) => html`<li dir="auto">${f.href ? html`<a href="${f.href}">${f.text}</a>` : f.text}</li>`)}</ul>
 ${description ? html`<p class="desc" dir="auto">${description}</p>` : ''}
-<div class="acts"><a class="btn btn-primary" href="${stremioDetail('series', m.id)}">${ICONS.play}צפייה ב-Stremio</a>${
+<div class="acts"><a class="btn btn-primary" href="${stremioDetail('series', m.id)}">${ICONS.play}צפייה ב-Stremio</a><a class="btn btn-ghost" href="${nuvioShow(m.id)}">${ICONS.play}צפייה ב-Nuvio</a>${
       site
         ? html`<a class="btn btn-ghost" href="${site}" rel="noopener">${ICONS.out}לצפייה באתר של ${broadcaster ?? 'הערוץ'}</a>`
         : ''
@@ -494,7 +500,7 @@ ${description ? html`<p class="desc" dir="auto">${description}</p>` : ''}
       s.source === 'mako'
         ? html`הפרקים של קשת 12 מתנגנים דרך <a href="${HELPER_DOC}">העוזר הביתי</a> שלכם. `
         : ''
-    }הכפתור פותח את התוכנית ב-Stremio, אם Israel TV מותקן שם (<a href="/he/#install">איך מתקינים</a>). ב-Nuvio, אחרי ההתקנה, חפשו "<bdi>${name}</bdi>".</p>
+    }הכפתורים פותחים את התוכנית ב-Stremio או ב-Nuvio, אם Israel TV מותקן שם (<a href="/he/#install">איך מתקינים</a>).</p>
 </div></div></header>${
       airings
         ? html`

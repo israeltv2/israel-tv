@@ -298,6 +298,9 @@ test('links that leave the site open in a new tab and say so; app and own links 
   const show = String(files.get(sitePaths.showPage('iltv_mako_1')));
   expect(show).toContain('(נפתח בכרטיסייה חדשה)');
   expect(show).toContain('href="stremio:///detail/series/iltv_mako_1"');
+  // Nuvio's own link opens the show (it reads stremio:// only as an addon install), in the same tab.
+  expect(show).toContain('<a class="btn btn-ghost" href="nuvio://meta?type=series&#38;id=iltv_mako_1">');
+  expect(show).not.toMatch(/href="nuvio:[^"]*"[^>]*target=/);
 });
 
 test('a row without a channel of its own gets a lettered tile, never another channel’s logo', () => {

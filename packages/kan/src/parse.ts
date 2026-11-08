@@ -126,8 +126,11 @@ export function parseLobbyGenres(html: string): Map<string, string[]> {
 export interface KanEpisodeLink {
   /** Path of the episode page. */
   path: string;
-  /** Kan's numeric page id (increases with publication). */
-  id: number;
+  /**
+   * Kan's numeric page id (increases with publication), when the address carries it. Some shows (most of the
+   * archive's, a few kids shows) give their episodes a name instead (`s1/rebirth-1/`): no id until the page is read.
+   */
+  id?: number;
 }
 
 export interface KanShowPage {
@@ -160,14 +163,28 @@ export function cleanKanTitle(raw: string): string {
   return t || raw.trim();
 }
 
-/** Episode links of a show page: `<show>/<id>/` or `<show>/<season>/<id>/`. */
+/**
+ * Episode links of a show page: `<show>/<id>/` or `<show>/<season>/<id>/`, and named ones inside a season,
+ * `<show>/s1/<name>/` or `<show>/עונה-1/<name>/` (measured 2026-11-08: 85 archive and kids episodes, e.g. תקומה's
+ * `s1/rebirth-1/`…`rebirth-22/`). A season page (`<show>/s2/`) is not an episode. Numbered links come first, by id
+ * (publication order); named ones follow in the page's order.
+ */
 export function parseShowPage(html: string, showPath: string): KanShowPage {
   const esc = showPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // The season part, when present, is one path segment: `s2/` on kan.org.il, `עונה-3/` on kankids.
   const re = new RegExp(`href="(?:https://[^"/]+)?(${esc}(?:[^"/]+/)?(\\d+)/)"`, 'g');
+  // The kids sites' season part is Hebrew, written raw or percent-encoded (`עונה-1/`, `%D7%A2…-1/`).
+  const named = new RegExp(
+    `href="(?:https://[^"/]+)?(${esc}(?:s\\d+|עונה-\\d+|%D7%A2%D7%95%D7%A0%D7%94-\\d+)/([^"/?#]*[^"/?#\\d][^"/?#]*)/)"`,
+    'g',
+  );
   const seen = new Map<string, KanEpisodeLink>();
   for (const m of html.matchAll(re)) {
     if (m[1] && m[2] && !seen.has(m[1])) seen.set(m[1], { path: m[1], id: Number(m[2]) });
+  }
+  const byName = new Map<string, KanEpisodeLink>();
+  for (const m of html.matchAll(named)) {
+    if (m[1] && !seen.has(m[1]) && !byName.has(m[1])) byName.set(m[1], { path: m[1] });
   }
   const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1];
   const title =
@@ -184,7 +201,7 @@ export function parseShowPage(html: string, showPath: string): KanShowPage {
     title: cleanKanTitle(title),
     ...(description ? { description } : {}),
     ...(image ? { image } : {}),
-    episodes: [...seen.values()].sort((a, b) => a.id - b.id),
+    episodes: [...[...seen.values()].sort((a, b) => (a.id ?? 0) - (b.id ?? 0)), ...byName.values()],
   };
 }
 

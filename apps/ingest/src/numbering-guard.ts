@@ -35,3 +35,21 @@ export function checkNumbering(store: Store): GuardResult {
 export function sanctionNumbering(store: Store): void {
   store.setState(NUMBERING_HISTORY, store.numberingNow());
 }
+
+/**
+ * After a recorded migration moved some of one show's episodes on purpose: those episodes' stored numbers are their
+ * history from now on. Nothing else is taken over, so any other move (in this show or another) still stops a publish.
+ */
+export function sanctionMoves(store: Store, seriesId: string, keys: readonly string[]): void {
+  const history = store.getState<Record<string, string>>(NUMBERING_HISTORY);
+  if (!history) {
+    sanctionNumbering(store);
+    return;
+  }
+  const now = store.numberingNow();
+  for (const key of keys) {
+    const k = `${seriesId}|${key}`;
+    if (now[k] !== undefined) history[k] = now[k];
+  }
+  store.setState(NUMBERING_HISTORY, history);
+}
