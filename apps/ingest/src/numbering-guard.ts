@@ -37,17 +37,19 @@ export function sanctionNumbering(store: Store): void {
 }
 
 /**
- * After a recorded migration moved one show's numbers on purpose: that show's stored numbers are its history from
- * now on; every other show's history stays as it was (a move elsewhere still stops the publish).
+ * After a recorded migration moved some of one show's episodes on purpose: those episodes' stored numbers are their
+ * history from now on. Nothing else is taken over, so any other move (in this show or another) still stops a publish.
  */
-export function sanctionShow(store: Store, seriesId: string): void {
+export function sanctionMoves(store: Store, seriesId: string, keys: readonly string[]): void {
   const history = store.getState<Record<string, string>>(NUMBERING_HISTORY);
   if (!history) {
     sanctionNumbering(store);
     return;
   }
-  const prefix = `${seriesId}|`;
-  const next = Object.fromEntries(Object.entries(history).filter(([k]) => !k.startsWith(prefix)));
-  for (const [k, v] of Object.entries(store.numberingNow())) if (k.startsWith(prefix)) next[k] = v;
-  store.setState(NUMBERING_HISTORY, next);
+  const now = store.numberingNow();
+  for (const key of keys) {
+    const k = `${seriesId}|${key}`;
+    if (now[k] !== undefined) history[k] = now[k];
+  }
+  store.setState(NUMBERING_HISTORY, history);
 }

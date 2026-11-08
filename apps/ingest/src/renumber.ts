@@ -22,7 +22,7 @@ import {
 } from '@israel-tv/core';
 import { dropCollidingHints, splitKeys, untitledSeasonsByYear } from '@israel-tv/reshet';
 import type { Store } from '@israel-tv/store';
-import { sanctionNumbering, sanctionShow } from './numbering-guard.ts';
+import { sanctionMoves, sanctionNumbering } from './numbering-guard.ts';
 import { latestAirDate } from './runner.ts';
 
 export const MIGRATIONS_KEY = 'numbering:migrations';
@@ -829,7 +829,7 @@ export function rightLine(r: RightReport): string {
 // extras at 17–23, while Kan's season 1 runs to "פרק 21"). So when a refilled show's backlog is all read, its seasons
 // are numbered once more by the numbering-right rules (seasonTargets), that show only: printed numbers to their
 // episodes, extras after them. A backup before the first such show, every move in the log, in the database and in a
-// .moves.json next to the backup; the guard's history is re-taken for that show only.
+// .moves.json next to the backup; the guard's history is re-taken for the moved episodes only.
 export const KAN_FULL_LISTS = 'kan-full-lists-2026-11-08';
 
 export interface ShowRenumber {
@@ -873,7 +873,11 @@ export function renumberKanShow(store: Store, seriesId: string, backupDir: strin
       moved: so.moved + plan.moves.length,
       at: new Date().toISOString(),
     });
-    sanctionShow(store, seriesId);
+    sanctionMoves(
+      store,
+      seriesId,
+      plan.moves.map((m) => m.key),
+    );
   });
   if (plan.moves.length > 0) {
     const file = backup.replace(/\.sqlite$/, '.moves.json');

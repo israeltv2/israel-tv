@@ -173,8 +173,9 @@ export function parseShowPage(html: string, showPath: string): KanShowPage {
   const esc = showPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // The season part, when present, is one path segment: `s2/` on kan.org.il, `עונה-3/` on kankids.
   const re = new RegExp(`href="(?:https://[^"/]+)?(${esc}(?:[^"/]+/)?(\\d+)/)"`, 'g');
+  // The kids sites' season part is Hebrew, written raw or percent-encoded (`עונה-1/`, `%D7%A2…-1/`).
   const named = new RegExp(
-    `href="(?:https://[^"/]+)?(${esc}(?:s\\d+|עונה-\\d+)/([^"/?#]*[^"/?#\\d][^"/?#]*)/)"`,
+    `href="(?:https://[^"/]+)?(${esc}(?:s\\d+|עונה-\\d+|%D7%A2%D7%95%D7%A0%D7%94-\\d+)/([^"/?#]*[^"/?#\\d][^"/?#]*)/)"`,
     'g',
   );
   const seen = new Map<string, KanEpisodeLink>();

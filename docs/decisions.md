@@ -2287,12 +2287,12 @@ it airs next.
   episodes are backlog, never "newly published": no show turns "airing" because of them.
 - **Numbers:** extras read before a show's older episodes took the numbers those episodes print (קופה ראשית season 1:
   six extras at E17–E23, Kan's season 1 runs to "פרק 20"). A show whose full list found older episodes is marked
-  `refill`. Until its backlog is read, a printed episode whose number a stored episode holds waits (never published
-  under a stand-in number). Then that show alone is numbered once more by the numbering-right rules (`seasonTargets`):
+  `refill`. Its backlog waits until it is all read (newly published episodes do not), so no episode is published
+  under a number that then moves. Then that show alone is numbered once more by the numbering-right rules (`seasonTargets`):
   printed numbers to their episodes, extras after them. This is a recorded migration, `kan-full-lists-2026-11-08`,
   under the owner's "dont leave anything, i dont mind if it will discard my watching progress": a backup before the
   first such show, every move in the log, in the database and in `before-kan-full-lists-2026-11-08.moves.json`, and the
-  guard's history re-taken for that show only (`sanctionShow`), so a move anywhere else still stops a publish.
+  guard's history re-taken for the moved episodes only (`sanctionMoves`), so any other move still stops a publish.
 - **Visible on `/status`:** the backfill's progress (`kan-full-lists`), shows Kan's app does not list, read from their
   pages only (`kan-pages-only`: a long one's older episodes may be missing), and YouTube-only items
   (`kan-no-web-page`).

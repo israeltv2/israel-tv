@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { assignNumbers, type ScrapedShow } from '@israel-tv/core';
@@ -552,6 +552,13 @@ test('a show whose image has no copy yet is due, at most once a day', async () =
     lists: FULL_LISTS,
   };
   expect(showDue({ ...fresh }, now, 14)).toBe(false);
+  // Read the older way: due at once, then a day after each try, whether or not its page loaded; a show the app does
+  // not list keeps its usual schedule.
+  const { lists: _, ...older } = fresh;
+  expect(showDue(older, now, 14)).toBe(true);
+  expect(showDue({ ...older, listTriedAt: '2026-11-06T11:30:00Z' }, now, 14)).toBe(false);
+  expect(showDue({ ...older, listTriedAt: '2026-11-05T11:00:00Z' }, now, 14)).toBe(true);
+  expect(showDue({ ...older, pagesOnly: true }, now, 14)).toBe(false);
   expect(showDue({ ...fresh, image: 'https://x/i.jpg' }, now, 14)).toBe(true);
   expect(showDue({ ...fresh, image: 'https://x/i.jpg', artTriedAt: '2026-11-06T10:00:00Z' }, now, 14)).toBe(
     false,
@@ -1228,7 +1235,8 @@ test("a show's older episodes come from Kan's full list; extras that held their 
     'kan:855987 E2',
   ]);
   expect(checkNumbering(store).ok).toBe(true);
-  // The crawl state as an older version left it: the show read, its few links read.
+  // The crawl state as an older version left it: the show read, its few links read, and (a measured answer then) not
+  // in Kan's app: a list found now is still the show's first, so its older episodes are backlog and a refill.
   store.setState('kan:crawl', {
     lobbiesAt: new Date().toISOString(),
     lobbyPosters: true,
@@ -1240,6 +1248,7 @@ test("a show's older episodes come from Kan's full list; extras that held their 
         pending: [],
         failed: [],
         checkedAt: new Date().toISOString(),
+        pagesOnly: true,
       },
     },
   });
@@ -1272,12 +1281,30 @@ test("a show's older episodes come from Kan's full list; extras that held their 
     async close() {},
   };
   const backupDir = mkdtempSync(join(tmpdir(), 'kan-full-'));
+  // At first the backup cannot be written (a file where its folder should be): the check fails visibly and waits.
+  const notADir = join(backupDir, 'file');
+  writeFileSync(notADir, '');
   type S = { shows: Record<string, { refill?: true; pending: string[]; lists?: number; held?: unknown[] }> };
+  let dir = join(notADir, 'backups');
   for (let i = 0; i < 20; i++) {
-    await crawlKan(store, { ...opts(l, 30), priority: [key], backupDir, streamPlays: async () => false });
+    await crawlKan(store, {
+      ...opts(l, 30),
+      priority: [key],
+      backupDir: dir,
+      streamPlays: async () => false,
+    });
     const s = store.getState<S>('kan:crawl')?.shows[key];
+    // Until its backlog is read, none of it is in the catalog (no number that would move later).
+    if (s?.pending.length) expect(store.assignments(seriesId).episodes).toHaveLength(2);
+    if (s?.refill && !s.pending.length && dir !== backupDir) {
+      expect(store.recentWarnings().some((w) => /one-time number check .* failed/.test(w.message))).toBe(
+        true,
+      );
+      dir = backupDir;
+    }
     if (s?.lists === FULL_LISTS && !s.refill && s.pending.length === 0) break;
   }
+  expect(dir).toBe(backupDir); // the failed check was seen, then done
   const s = store.getState<S>('kan:crawl')?.shows[key];
   expect(s).toMatchObject({ lists: FULL_LISTS, pending: [] });
   expect(s?.refill).toBeUndefined();

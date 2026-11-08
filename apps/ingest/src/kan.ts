@@ -379,7 +379,8 @@ export const ART_RETRY_MS = 6 * 3_600_000;
 export function showDue(s: ShowState, now: number, windowDays: number): boolean {
   if (!s.checkedAt) return !s.failedAt || now - Date.parse(s.failedAt) > 7 * DAY_MS;
   // Read the older way (part of its episodes): due at once, and again a day after a try whose full list failed.
-  if (s.lists !== FULL_LISTS && (!s.listTriedAt || now - Date.parse(s.listTriedAt) > DAY_MS)) return true;
+  if (s.lists !== FULL_LISTS && !s.pagesOnly && (!s.listTriedAt || now - Date.parse(s.listTriedAt) > DAY_MS))
+    return true;
   // A show whose current image has no saved copy is read again for it (at most every ART_RETRY_MS).
   if (s.image && s.art?.from !== s.image && (!s.artTriedAt || now - Date.parse(s.artTriedAt) > ART_RETRY_MS))
     return true;
@@ -923,6 +924,8 @@ export async function crawlKan(
       if (!prio.has(key) && !showDue(s, now, opts.airingWindowDays)) continue;
       const id = store.findSeriesId('kan', key);
       const firstRead = !s.checkedAt;
+      // Tried now, whether or not the page loads: a show whose page fails is not due again every slice (showDue).
+      s.listTriedAt = new Date().toISOString();
       const path = new URL(key).pathname;
       let page: ReturnType<typeof parseShowPage>;
       // A broken show page is that show's problem only: note it and try again next week. A show never read
@@ -966,28 +969,35 @@ export async function crawlKan(
       if (image) s.image = image;
       // The show's full list: the show page links only part of a long show (FULL_LISTS); Kan's app lists every
       // episode with its web page. A list that fails keeps the last good one, and is tried again a day later.
+      // `lists` is set only once a real list was read: a show that had none (pagesOnly) and gets one later still
+      // takes its older episodes as backlog, and is checked as a refill.
       const firstList = s.lists !== FULL_LISTS;
-      s.listTriedAt = new Date().toISOString();
       const canList = useApp && !!appProgramId(key, s);
       const feed = canList ? await appFeed(key, s) : undefined;
+      const listed = feed && feed.size > 0 ? appListed(key, s.origin, feed) : undefined;
+      // The app answered for this show with no page under its address (404, an empty list, or only other addresses):
+      // a measured answer, not a failure to retry tomorrow.
       const unknownToApp =
-        canList && (feed?.size === 0 || appStatus.get(appProgramUrl(appProgramId(key, s) ?? '')) === 404);
-      if (feed && feed.size > 0) {
-        const { urls, ids, noPage } = appListed(key, s.origin, feed);
-        s.listed = urls;
-        s.ids = { ...(s.ids ?? {}), ...ids };
-        if (noPage > 0) s.noPage = noPage;
+        canList &&
+        (feed?.size === 0 ||
+          (listed !== undefined && listed.urls.length === 0) ||
+          appStatus.get(appProgramUrl(appProgramId(key, s) ?? '')) === 404);
+      if (listed && listed.urls.length > 0) {
+        s.listed = listed.urls;
+        s.ids = { ...(s.ids ?? {}), ...listed.ids };
+        if (listed.noPage > 0) s.noPage = listed.noPage;
         else delete s.noPage;
         delete s.pagesOnly;
         s.lists = FULL_LISTS;
       } else if (!canList || unknownToApp) {
-        // No app list for this show: its pages are all there is (said on /status when the app is in use).
-        delete s.listed;
-        delete s.noPage;
-        if (useApp) s.pagesOnly = true;
-        else delete s.pagesOnly;
-        s.lists = FULL_LISTS;
+        // No app list for this show: its pages are all there is (said on /status). Read on its usual schedule; a
+        // list found on a later read is still its first.
+        if (listed?.noPage) s.noPage = listed.noPage;
+        s.pagesOnly = true;
       }
+      // Retry counts and newly-published marks kept under an older spelling of the address follow it (pageUrl).
+      if (s.retry) s.retry = Object.fromEntries(Object.entries(s.retry).map(([u, r]) => [pageUrl(u), r]));
+      if (s.fresh) s.fresh = [...new Set(s.fresh.map(pageUrl))];
       const links = page.episodes.map((e) => pageUrl(`${s.origin}${e.path}`));
       // Read already: stored, or held back until the show's other pages are read (never queued again).
       const known = new Set([
@@ -1023,9 +1033,12 @@ export async function crawlKan(
       const gaveUp = new Set(
         [...s.failed, ...(s.skipped ?? []), ...(s.removed ?? []), ...(s.notVideo ?? [])].map(pageUrl),
       );
+      // …and by page id, when Kan's app spells a given-up page's address another way (`s2/123/` for `123/`).
+      const gaveUpIds = new Set([...gaveUp].map((u) => pageIdOf(s, u)).filter((x) => x !== undefined));
       s.pending = episodeOrder(s, [...links, ...(s.listed ?? [])]).filter((u) => {
         const k = keyOf(u);
-        return !(k && known.has(k)) && !gaveUp.has(u);
+        const pid = pageIdOf(s, u);
+        return !(k && known.has(k)) && !gaveUp.has(u) && !(pid && gaveUpIds.has(pid));
       });
       // "Airing" means a read revealed pages we had never seen, not an old backlog or retries: not the first read,
       // and not the first read of the show's full list (its older episodes are backlog).
@@ -1212,17 +1225,26 @@ export async function crawlKan(
     // Refilled shows whose older episodes are all read: their numbers checked once (renumber.ts, KAN_FULL_LISTS).
     for (const [key, s] of Object.entries(state.shows)) {
       if (!s.refill || s.pending.length > 0 || s.held?.length) continue;
-      delete s.refill;
       const seriesId = store.findSeriesId('kan', key);
-      if (!seriesId) continue;
-      const r = renumberKanShow(
-        store,
-        seriesId,
-        opts.backupDir ?? join(store.path === ':memory:' ? tmpdir() : dirname(store.path), 'backups'),
-      );
-      if (r.moves.length > 0) {
-        renumbered += r.moves.length;
-        log(`kan: ${showRenumberLine(r)}`);
+      if (!seriesId) {
+        delete s.refill;
+        continue;
+      }
+      // A failure (the backup cannot be written) is this show's, said on /status; the check runs again next slice.
+      try {
+        const r = renumberKanShow(
+          store,
+          seriesId,
+          opts.backupDir ?? join(store.path === ':memory:' ? tmpdir() : dirname(store.path), 'backups'),
+        );
+        delete s.refill;
+        if (r.moves.length > 0) {
+          renumbered += r.moves.length;
+          log(`kan: ${showRenumberLine(r)}`);
+        }
+      } catch (err) {
+        problems++;
+        warn(seriesId, `Kan ${key}: the one-time number check after its full list failed: ${firstLine(err)}`);
       }
     }
     // 3b. With pages left in the slice, the air dates of episodes read before dates were kept. Low priority: a
@@ -1453,31 +1475,17 @@ export function heldBack(
     pendingPages: number;
     storedPrints: boolean;
     /**
-     * A refilling show (ShowState.refill): whether an episode's printed number is held by a stored episode of its
-     * season. Such an episode waits too, so it is never published under a stand-in number first; the show's
-     * one-time check (settleRefill) gives it its own number when the backlog is read.
+     * A refilling show (ShowState.refill): whether an episode is part of the backlog its full list found. The whole
+     * backlog waits until it is read, then is saved and numbered at once (the show's one-time check), so no episode
+     * is published under a number that moves (an extra may hold its printed number; an unprinted season is ordered
+     * by air date). Newly published episodes are not backlog and go out as usual.
      */
-    taken?: (b: BatchItem) => boolean;
+    backlog?: (b: BatchItem) => boolean;
   },
 ): BatchItem[] {
   if (ctx.pendingPages === 0) return [];
   const prints = ctx.storedPrints || items.some((b) => b.episode.numberHint);
-  return items.filter(
-    (b) => (prints && !b.episode.numberHint) || (!!b.episode.numberHint && !!ctx.taken?.(b)),
-  );
-}
-
-/** Whether a printed number is held in the stored numbers of its season (by another episode). */
-function takenIn(store: Pick<Store, 'assignments'>, seriesId: string, showKey: string) {
-  const a = store.assignments(seriesId);
-  const seasonOf = new Map(a.seasons.map((x) => [x.key, x.number]));
-  return (b: BatchItem): boolean => {
-    const n = seasonOf.get(`${showKey}|s${b.season ?? 1}`);
-    return (
-      n !== undefined &&
-      a.episodes.some((e) => e.season === n && e.episode === b.episode.numberHint && e.key !== b.episode.key)
-    );
-  };
+  return items.filter((b) => (prints && !b.episode.numberHint) || !!ctx.backlog?.(b));
 }
 
 function saveEpisodes(store: Store, key: string, s: ShowState, read: BatchItem[], runId: number): number {
@@ -1487,7 +1495,7 @@ function saveEpisodes(store: Store, key: string, s: ShowState, read: BatchItem[]
   const hold = heldBack(all, {
     pendingPages: s.pending.length,
     storedPrints: (prev?.seasons ?? []).some((x) => x.episodes.some((e) => e.numberHint)),
-    ...(s.refill ? { taken: takenIn(store, seriesId, key) } : {}),
+    ...(s.refill ? { backlog: (b: BatchItem) => !s.fresh?.includes(b.url) } : {}),
   });
   if (hold.length > 0) s.held = hold;
   else delete s.held;
