@@ -241,6 +241,72 @@ export function parseKanGuide(html: string, origin = 'https://www.kan.org.il'): 
   return toRows(items);
 }
 
+const I24Week = z.array(
+  z.looseObject({
+    day: z.number().int().min(0).max(6),
+    startHour: z.string(),
+    endHour: z.string(),
+    show: z
+      .looseObject({
+        title: z.string().nullish(),
+        parsedBody: z.array(z.looseObject({ text: z.string().nullish() })).nullish(),
+        image: z.looseObject({ href: z.string().nullish() }).nullish(),
+      })
+      .nullish(),
+  }),
+);
+
+/**
+ * i24NEWS (api.i24news.tv/v2/<language>/schedules, what its own schedule page reads): a weekly template, each slot a
+ * day (0 is Monday … 6 is Sunday) and `HH:mm` start and end in UTC (an end at or before the start is the next day).
+ * Its site turns a slot into a date the same way (weekday `(day + 1) % 7`, the time read as UTC); checked against the
+ * channel: the Hebrew channel's "מדברים חדשות" slot is Sunday 11:00–13:00 UTC, which its own description gives as
+ * 13:00–15:00 Israel time, Sunday to Thursday. Laid over the days from yesterday to four days ahead.
+ */
+export function parseI24Guide(raw: unknown, now = Date.now()): GuideRow[] {
+  const week = I24Week.parse(raw);
+  const items: Item[] = [];
+  const today = Date.UTC(
+    new Date(now).getUTCFullYear(),
+    new Date(now).getUTCMonth(),
+    new Date(now).getUTCDate(),
+  );
+  for (let k = -1; k <= 4; k++) {
+    const date = today + k * DAY_MS;
+    const day = (new Date(date).getUTCDay() + 6) % 7;
+    for (const slot of week) {
+      if (slot.day !== day || !/^\d{1,2}:\d{2}$/.test(slot.startHour)) continue;
+      const title = clean(slot.show?.title);
+      if (!title) continue;
+      const at = (hhmm: string) => {
+        const [h = 0, m = 0] = hhmm.split(':').map(Number);
+        return date + (h * 60 + m) * 60_000;
+      };
+      const start = at(slot.startHour);
+      let end = /^\d{1,2}:\d{2}$/.test(slot.endHour) ? at(slot.endHour) : undefined;
+      if (end !== undefined && end <= start) end += DAY_MS;
+      const body = clean((slot.show?.parsedBody ?? []).map((p) => p.text ?? '').join(' '));
+      const image = slot.show?.image?.href;
+      items.push({
+        start,
+        ...(end ? { end } : {}),
+        title,
+        ...(body ? { description: body } : {}),
+        ...(image?.startsWith('https://') ? { image } : {}),
+      });
+    }
+  }
+  return toRows(items);
+}
+
+/** i24NEWS's channels by the language of their schedule. */
+export const I24_GUIDE_CHANNELS: Record<string, string> = {
+  he: 'iltv_live_i24he',
+  en: 'iltv_live_i24en',
+  fr: 'iltv_live_i24fr',
+  ar: 'iltv_live_i24ar',
+};
+
 /** Kan's channels on its guide page, by our channel id. */
 export const KAN_GUIDE_CHANNELS: Record<string, number> = {
   iltv_live_kan11: 4444,
@@ -310,6 +376,24 @@ export const GUIDE_SOURCES: Record<string, GuideSource> = {
       return parseCh14Guide(await r.json());
     },
   },
+  ...Object.fromEntries(
+    Object.entries(I24_GUIDE_CHANNELS).map(([lang, channel]) => [
+      `i24${lang}`,
+      {
+        channels: [channel],
+        everyMs: 12 * HOUR_MS,
+        needs: 'live',
+        read: async () => {
+          const r = await fetch(`https://api.i24news.tv/v2/${lang}/schedules`, {
+            headers: UA,
+            signal: AbortSignal.timeout(30_000),
+          });
+          if (!r.ok) throw new Error(`i24NEWS ${lang} guide HTTP ${r.status}`);
+          return parseI24Guide(await r.json());
+        },
+      } satisfies GuideSource,
+    ]),
+  ),
   knesset: {
     channels: ['iltv_live_knesset'],
     everyMs: 12 * HOUR_MS,

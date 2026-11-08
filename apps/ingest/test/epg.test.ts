@@ -6,6 +6,7 @@ import {
   GUIDE_KEY,
   guideFile,
   parseCh14Guide,
+  parseI24Guide,
   parseKanGuide,
   parseKnessetGuide,
   parseMakoGuide,
@@ -28,6 +29,21 @@ function wellFormed(rows: GuideRow[]) {
     if (i > 0) expect(r[0]).toBeGreaterThan((rows[i - 1] as GuideRow)[0]);
   }
 }
+
+test('i24NEWS (recorded 2026-11-08): a weekly template in UTC, laid over the days around now', () => {
+  const now = Date.parse('2026-11-08T12:00:00Z'); // Sunday, 14:00 in Israel
+  const rows = parseI24Guide(JSON.parse(fx('i24-he.json')), now);
+  wellFormed(rows);
+  // Day 6 is Sunday; "11:00" is UTC: 13:00 in Israel, as the programme's own description says.
+  const talk = rows.find((r) => r[2] === 'מדברים חדשות' && iso(r[0]) === '2026-11-08T11:00:00.000Z');
+  expect(talk && iso(talk[1])).toBe('2026-11-08T13:00:00.000Z');
+  expect(talk?.[3]).toMatch(/13:00-15:00/);
+  // From yesterday to four days ahead, nothing outside.
+  expect(rows[0]?.[0]).toBeGreaterThanOrEqual(Date.parse('2026-11-07T00:00:00Z'));
+  expect(rows.at(-1)?.[0]).toBeLessThan(Date.parse('2026-11-13T00:00:00Z'));
+  // A slot that ends after midnight UTC ends the next day.
+  expect(rows.every((r) => r[1] - r[0] <= 6 * 3_600_000)).toBe(true);
+});
 
 test('Keshet 12 (recorded 2026-11-07): UTC starts and durations', () => {
   const rows = parseMakoGuide(JSON.parse(fx('keshet12.json')));
