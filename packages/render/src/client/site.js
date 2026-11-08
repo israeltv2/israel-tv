@@ -8,15 +8,17 @@
 
   // The theme button: dark by default, light on request, remembered in this browser only.
   d.getElementById('theme')?.addEventListener('click', () => {
-    const light = root.dataset.theme !== 'light';
+    // Decide the new theme now and remember that value: the view transition applies it a moment later, so reading
+    // it back from the page here would remember the old one (and the next page would open in the other theme).
+    const next = root.dataset.theme === 'light' ? 'dark' : 'light';
     const apply = () => {
-      root.dataset.theme = light ? 'light' : 'dark';
+      root.dataset.theme = next;
     };
     if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
       d.startViewTransition(apply);
     else apply();
     try {
-      localStorage.setItem('iltv-theme', root.dataset.theme);
+      localStorage.setItem('iltv-theme', next);
     } catch {}
   });
 

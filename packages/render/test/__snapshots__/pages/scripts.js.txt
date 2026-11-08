@@ -8,15 +8,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
@@ -114,15 +114,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
@@ -220,15 +220,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
@@ -326,15 +326,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
@@ -432,15 +432,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
@@ -562,15 +562,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
@@ -668,15 +668,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
@@ -774,15 +774,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
@@ -880,15 +880,15 @@ const d = document;
 const root = d.documentElement;
 const lang = root.lang || 'en';
 d.getElementById('theme')?.addEventListener('click', () => {
-const light = root.dataset.theme !== 'light';
+const next = root.dataset.theme === 'light' ? 'dark' : 'light';
 const apply = () => {
-root.dataset.theme = light ? 'light' : 'dark';
+root.dataset.theme = next;
 };
 if (d.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
 d.startViewTransition(apply);
 else apply();
 try {
-localStorage.setItem('iltv-theme', root.dataset.theme);
+localStorage.setItem('iltv-theme', next);
 } catch {}
 });
 const relative = window.Intl?.RelativeTimeFormat
