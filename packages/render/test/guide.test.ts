@@ -1,6 +1,6 @@
-import { type GuideFile, sitePaths } from '@israel-tv/core';
+import { type GuideFile, LIVE_CHANNELS, sitePaths } from '@israel-tv/core';
 import { describe, expect, test } from 'vitest';
-import { type AiringsFile, broadcastDay, guideDays } from '../src/guide-html.ts';
+import { type AiringsFile, broadcastDay, CHANNEL_EN, channelName, guideDays } from '../src/guide-html.ts';
 import { type RenderInput, type RenderShow, renderSite } from '../src/render.ts';
 
 const show = (id: string, catalog: string, source: 'mako' | 'reshet' | 'kan', title: string): RenderShow => ({
@@ -153,4 +153,11 @@ describe('the programme guide on the website', () => {
     expect(String(none.get(sitePaths.showPage('iltv_reshet_58')))).not.toContain('id="airs"');
     expect(String(none.get(sitePaths.sitemap))).not.toContain('live/guide');
   });
+});
+
+test('every live channel has an English name on the English guide (none falls back to its Hebrew one)', () => {
+  const missing = LIVE_CHANNELS.filter((c) => !CHANNEL_EN[c.id]).map((c) => c.id);
+  expect(missing).toEqual([]);
+  for (const c of LIVE_CHANNELS) expect(channelName(c, 'en'), c.id).not.toMatch(/[\u0590-\u05FF]/);
+  expect(channelName({ id: 'iltv_live_i24he', name: 'i24 עברית' }, 'en')).toBe('i24NEWS Hebrew');
 });
