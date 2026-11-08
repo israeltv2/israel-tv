@@ -5,6 +5,7 @@ export * from './dates.ts';
 export * from './epg.ts';
 export * from './events.ts';
 export * from './freshness.ts';
+export * from './guide-match.ts';
 export * from './hebrew.ts';
 export * from './ids.ts';
 export * from './live.ts';

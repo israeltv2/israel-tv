@@ -1,7 +1,8 @@
 // Every page type rendered from the fixtures, kept as files: a change to the renderer that changes a page shows up
 // here as a diff to review (`vitest -u` accepts it). Inline scripts are compared separately from the markup.
-import { sitePaths } from '@israel-tv/core';
+import { guideMatcher, sitePaths } from '@israel-tv/core';
 import { expect, test } from 'vitest';
+import { renderGuidePage } from '../src/guide-html.ts';
 import { renderLandingHtml } from '../src/landing-html.ts';
 import { renderLibrary } from '../src/library-html.ts';
 import { robotsTxt, sitemapXml, webManifest } from '../src/site-meta.ts';
@@ -14,6 +15,13 @@ const landing = {
   ...(LIBRARY.guide ? { guide: LIBRARY.guide } : {}),
 };
 const library = renderLibrary(LIBRARY);
+const guideInput = {
+  live: LIBRARY.live,
+  guide: LIBRARY.guide ?? {},
+  showFor: guideMatcher(
+    LIBRARY.rows.flatMap((r) => r.shows.map((s) => ({ id: s.meta.id, catalog: r.id, title: s.meta.name }))),
+  ),
+};
 const PAGES: Record<string, string> = {
   'landing-en': renderLandingHtml(landing, 'en'),
   'landing-he': renderLandingHtml(landing, 'he'),
@@ -25,7 +33,12 @@ const PAGES: Record<string, string> = {
   'show-empty': String(library.get(sitePaths.showPage('iltv_reshet_2'))),
   live: String(library.get(sitePaths.livePage)),
   search: String(library.get(sitePaths.searchPage)),
-  sitemap: sitemapXml([...library.keys()].map((p) => p.replace(/index\.html$/, ''))),
+  guide: renderGuidePage(guideInput, 'he'),
+  'guide-en': renderGuidePage(guideInput, 'en'),
+  sitemap: sitemapXml(
+    [...library.keys()].map((p) => p.replace(/index\.html$/, '')),
+    { guide: true },
+  ),
   robots: robotsTxt(),
   manifest: webManifest(),
 };

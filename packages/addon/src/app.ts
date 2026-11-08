@@ -121,6 +121,8 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
   for (const [route, path] of [
     ['/library/', sitePaths.library],
     ['/live/', sitePaths.livePage],
+    ['/live/guide/', sitePaths.guidePage],
+    ['/en/live/guide/', sitePaths.guidePageEn],
     ['/search/', sitePaths.searchPage],
   ] as const) {
     app.get(route, pageAt(path));
@@ -136,6 +138,8 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
   app.get('/registry.json', file(sitePaths.registry, CACHE.list));
   // The search index, for the website's search page.
   app.get(`/${sitePaths.search}`, file(sitePaths.search, CACHE.list));
+  // The programme guide in short, for the website's "on the air next".
+  app.get(`/${sitePaths.airings}`, file(sitePaths.airings, CACHE.list));
   app.get('/freshness.json', file(sitePaths.freshness, CACHE.none));
   // The catalog ↔ resolver contract (docs/contract.md): what a resolver pointed at this catalog reads.
   app.get(`/${sitePaths.contract}`, file(sitePaths.contract, CACHE.list));

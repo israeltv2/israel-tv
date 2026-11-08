@@ -6,6 +6,7 @@ for. (Keshet 12, and some titles when you are abroad, need a little extra setup 
 **[Install it from the website](https://israel-tv.israeltv2.workers.dev/)** ([בעברית](https://israel-tv.israeltv2.workers.dev/he/)) ·
 **[Browse every show](https://israel-tv.israeltv2.workers.dev/library/)** ·
 **[What's on live now](https://israel-tv.israeltv2.workers.dev/live/)** ·
+**[TV guide](https://israel-tv.israeltv2.workers.dev/en/live/guide/)** ([בעברית](https://israel-tv.israeltv2.workers.dev/live/guide/)) ·
 **[Is everything working?](https://israel-tv.israeltv2.workers.dev/status)**
 
 ![status: beta](https://img.shields.io/badge/status-beta-orange) ![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)

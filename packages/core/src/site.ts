@@ -36,6 +36,9 @@ export const sitePaths = {
   libraryRow: (slug: string) => `library/${slug}/index.html`,
   showPage: (seriesId: string) => `show/${seriesId}/index.html`,
   livePage: 'live/index.html',
+  /** The full programme guide, in Hebrew and in English. */
+  guidePage: 'live/guide/index.html',
+  guidePageEn: 'en/live/guide/index.html',
   searchPage: 'search/index.html',
   /** The page for an address that does not exist. */
   notFound: '404.html',
@@ -53,6 +56,8 @@ export const sitePaths = {
   search: 'search.json',
   /** The live programme guide (core epg.ts). */
   epg: 'epg.json',
+  /** The guide in short, with each programme's show in the catalog, for the website's pages (render guide-html.ts). */
+  airings: 'airings.json',
   extIds: 'ext-ids.json',
   status: 'status.json',
   statusPage: 'status.html',

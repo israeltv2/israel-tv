@@ -10,8 +10,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { localAddonApp } from '../apps/ingest/src/local-server.ts';
+import { guideMatcher } from '../packages/core/src/guide-match.ts';
+import { normalizeForSearch } from '../packages/core/src/hebrew.ts';
 import { sitePaths } from '../packages/core/src/site.ts';
 import {
+  airingsFile,
+  renderGuidePage,
   renderLandingHtml,
   renderLibrary,
   renderStatusHtml,
@@ -38,6 +42,24 @@ write(sitePaths.landingHe, renderLandingHtml(landing, 'he'));
 write(sitePaths.statusPage, renderStatusHtml(SITE_STATUS));
 write(sitePaths.statusPageHe, renderStatusHtml(SITE_STATUS, {}, 'he'));
 for (const [path, html] of renderLibrary(LIBRARY)) write(path, html);
+const guideInput = {
+  live: LIBRARY.live,
+  guide: LIBRARY.guide ?? {},
+  showFor: guideMatcher(
+    LIBRARY.rows.flatMap((r) => r.shows.map((s) => ({ id: s.meta.id, catalog: r.id, title: s.meta.name }))),
+  ),
+};
+write(sitePaths.guidePage, renderGuidePage(guideInput, 'he'));
+write(sitePaths.guidePageEn, renderGuidePage(guideInput, 'en'));
+write(sitePaths.airings, JSON.stringify(airingsFile(guideInput)));
+write(
+  sitePaths.search,
+  JSON.stringify(
+    LIBRARY.rows.flatMap((r) =>
+      r.shows.map((s) => [s.meta.id, 'series', r.id, s.meta.name, normalizeForSearch(s.meta.name), '']),
+    ),
+  ),
+);
 write(sitePaths.status, JSON.stringify(SITE_STATUS));
 write(sitePaths.robots, robotsTxt());
 write(sitePaths.sitemap, sitemapXml());
@@ -67,6 +89,9 @@ if (serveOnly) {
     ['row', '/library/reshet13/'],
     ['show', '/show/iltv_reshet_1/'],
     ['live', '/live/'],
+    ['guide', '/live/guide/'],
+    ['guide-en', '/en/live/guide/'],
+    ['search', '/search/?q=%D7%94%D7%99%D7%A9%D7%A8%D7%93%D7%95%D7%AA'],
   ];
   const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : 'chrome' });
   let failed = false;

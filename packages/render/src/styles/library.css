@@ -548,3 +548,93 @@
 .not-found [lang="en"] {
   text-align: right;
 }
+
+/* "On the air next" (client/airings.js): a line on library tiles, a show page's next airings, search results. */
+.tile .air {
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.tile .air.on {
+  color: var(--on-air);
+}
+.airs {
+  padding-block: 28px 0;
+}
+.airs h2 {
+  font-size: clamp(2rem, 4.4vw, 2.6rem);
+}
+.airs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-width: 46rem;
+}
+.airs-list li,
+.airs ul li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.airs ul {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-width: 46rem;
+}
+.airs-list li.now,
+.airs ul li.now {
+  border-color: var(--on-air);
+}
+.airs-list .when,
+.airs .when {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+}
+.airs .until {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.airs-list .ch,
+.airs .ch {
+  color: var(--muted);
+}
+.airs-list .pt,
+.airs .pt {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.airs-list .go {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.soon {
+  margin-top: 34px;
+}
+.soon h2 {
+  font-size: clamp(2rem, 4.4vw, 2.6rem);
+}
+.soon h3 {
+  margin: 18px 0 8px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.guide-link {
+  margin-top: 14px;
+}
+.full-guide {
+  display: inline-block;
+  margin-top: 8px;
+  font-weight: 600;
+}
