@@ -16,12 +16,12 @@ for. (Keshet 12, and some titles when you are abroad, need a little extra setup 
 <p>
 <a href="https://israel-tv.israeltv2.workers.dev/he/"><img src="docs/images/site-landing-desktop.jpg" alt="The Israel TV website: real show posters drifting behind the headline, install in one click, and what every live channel is airing now" width="49%"></a>
 <a href="https://israel-tv.israeltv2.workers.dev/library/"><img src="docs/images/site-library-desktop.jpg" alt="The library: every row of shows, and the live channels with what is on now" width="49%"></a>
-<a href="https://israel-tv.israeltv2.workers.dev/show/iltv_reshet_10/"><img src="docs/images/site-show-desktop.jpg" alt="A show's page: poster, description, seasons and episodes, Watch in Stremio and on the broadcaster's site" width="49%"></a>
+<a href="https://israel-tv.israeltv2.workers.dev/show/iltv_reshet_10/"><img src="docs/images/site-show-desktop.jpg" alt="A show's page: poster, description, seasons and episodes, Watch in Stremio, in Nuvio and on the broadcaster's site" width="49%"></a>
 <a href="https://israel-tv.israeltv2.workers.dev/status"><img src="docs/images/site-status-desktop.jpg" alt="The status page: everything working, each channel's refreshes and the last 30 days" width="49%"></a>
 </p>
 
 The website shows the whole catalog (every show, its episodes, the live guide), but plays nothing itself: its
-buttons open the show in Stremio or on the broadcaster's own site.
+buttons open the show in Stremio, in Nuvio or on the broadcaster's own site.
 
 ## Install
 
