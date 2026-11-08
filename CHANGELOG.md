@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.14.0](https://github.com/israeltv2/israel-tv/compare/v0.13.1...v0.14.0) (2026-11-08)
+
+
+### Features
+
+* **admin:** the dashboard login lasts a year and renews on every visit ([#185](https://github.com/israeltv2/israel-tv/issues/185)) ([8643d8e](https://github.com/israeltv2/israel-tv/commit/8643d8e1319ac3456fe50a4128ac68b9d4dfd221))
+
 ## [0.13.1](https://github.com/israeltv2/israel-tv/compare/v0.13.0...v0.13.1) (2026-11-08)
 
 
