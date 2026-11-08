@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { SOURCES } from './ids.ts';
-import { cleanDescription, isTrailer } from './tidy.ts';
+import { cleanDescription, cleanShowTitle, isTrailer } from './tidy.ts';
 
 /** One playable rendition as the source reports it. */
 export const ScrapedStream = z.strictObject({
@@ -69,8 +69,10 @@ export function cleanShow(show: ScrapedShow): ScrapedShow {
     }
     return o;
   };
-  // Descriptions without what sites add for search engines (cleanDescription); none rather than junk.
-  const { description: rawDescription, ...withoutDescription } = show;
+  // Descriptions without what sites add for search engines (cleanDescription); none rather than junk. Names
+  // without page-title boilerplate (cleanShowTitle).
+  const { description: rawDescription, ...rest } = show;
+  const withoutDescription = { ...rest, title: cleanShowTitle(rest.title) };
   const description = cleanDescription(rawDescription);
   const cleaned: ScrapedShow = {
     ...optUrl(

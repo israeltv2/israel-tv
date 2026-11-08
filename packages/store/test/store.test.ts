@@ -44,6 +44,18 @@ test('numbers survive reopening; only new episodes are added', () => {
   expect(s.airingShows('mako', '2026-11-03').map((r) => r.seriesId)).toEqual([id]);
 });
 
+test('a name stored with page-title boilerplate is read clean; id and numbers stay', () => {
+  const s = Store.open(tmp());
+  const id = s.seriesIdFor('reshet', '/a');
+  const raw = { ...show(['e1', 'e2']), source: 'reshet' as const, title: 'שקשוקה | באדיבות כאן חינוכית' };
+  s.saveShow(id, raw, assignNumbers(raw, s.assignments(id)).added, undefined);
+  const row = s.getShow(id);
+  expect(row?.seriesId).toBe('iltv_reshet_1');
+  expect(row?.title).toBe('שקשוקה');
+  expect(row?.show.title).toBe('שקשוקה');
+  expect(s.assignments(id).episodes.map((e) => e.episode)).toEqual([1, 2]);
+});
+
 test('a failed check keeps the last good data', () => {
   const s = Store.open(tmp());
   const id = s.seriesIdFor('mako', '/a');

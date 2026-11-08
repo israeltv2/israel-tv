@@ -70,6 +70,31 @@ export function tidyEpisodeTitle(title: string, showTitle: string): string {
   return t || raw;
 }
 
+/**
+ * A page title's search-engine tail after a show's name (measured on the live catalog, 2026-11-08: 57 names):
+ * "| תוכניות מלאות", "| פרקים", "– פרקים מלאים לצפייה", "| תכניות לצפיה ישירה", "| הפרקים המלאים", "| כתבות מלאות",
+ * "| סרטים מלאים". Only a kind of item, "full", "to watch" and "live" words: "| דרמה בשני חלקים" is the show's own.
+ */
+const LISTING_TAIL =
+  /\s*[|\-–]\s*(?:ה)?(?:תוכניות|תכניות|תוכנית|תכנית|פרקים|כתבות|סרטים)(?:\s+(?:ה)?(?:מלאים|מלאות|מלאה|מלא))?(?:\s+(?:לצפייה|לצפיה))?(?:\s+ישירה)?\s*$/;
+/** "| באדיבות כאן חינוכית": who lent the show, not its name. */
+const COURTESY_TAIL = /\s*\|\s*באדיבות\s.*$/;
+/** A site section in front of the name ("כאן ארכיון | איפה היינו"). */
+const SECTION_PREFIX = /^כאן ארכיון\s*\|\s*/;
+
+/**
+ * A show's name without the page-title boilerplate sources leave on it, for every source and also for names stored
+ * before this rule (applied when shows are read). A subtitle after a separator stays ("ארץ זרה | סרטו התיעודי של
+ * …", "בילו"יים | דרמה בשני חלקים"). Never empty: the tidied original when nothing would be left.
+ */
+export function cleanShowTitle(title: string): string {
+  const raw = tidyText(title);
+  let t = raw;
+  for (let i = 0; i < 2; i++) t = t.replace(COURTESY_TAIL, '').replace(LISTING_TAIL, '');
+  t = t.replace(SECTION_PREFIX, '').trim();
+  return t || raw;
+}
+
 /** A site's own generic blurb, used by some show pages as their description: not about the show. */
 const BOILERPLATE = [/^ערוץ רשת 13, כל תוכניות הטלוויזיה/];
 

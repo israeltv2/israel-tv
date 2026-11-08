@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import {
   type Assignments,
+  cleanShowTitle,
   seriesId as makeSeriesId,
   NAMED_SEASON_BASE,
   parseSeriesId,
@@ -437,12 +438,13 @@ export class Store {
     const parsed = ScrapedShowSchema.safeParse(JSON.parse(r.data));
     // Data is validated before it is stored; an unreadable row (older format) is skipped, not fatal.
     if (!parsed.success) return undefined;
+    // Names stored before cleanShowTitle get it here, so the next publish shows them clean (ids never change).
     return {
       seriesId: r.seriesId,
       source: r.source as Source,
       catalog: r.catalog,
-      title: r.title,
-      show: parsed.data,
+      title: cleanShowTitle(r.title),
+      show: { ...parsed.data, title: cleanShowTitle(parsed.data.title) },
       latestAirDate: r.latestAirDate,
       latestEpisodeSeenAt: r.latestEpisodeSeenAt,
       lastOkAt: r.lastOkAt,

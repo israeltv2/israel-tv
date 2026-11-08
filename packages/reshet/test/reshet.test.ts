@@ -145,7 +145,7 @@ test('each Kaltura access profile is checked once', async () => {
   const profiles = new Map<number, boolean>();
   const r = await blockedEntries(['a', 'b', 'c', 'd'], profiles, post);
   expect(contexts).toBe(2);
-  expect([...r.values()]).toEqual([false, true, false, true]);
+  expect([...r.values()].map((x) => x.blocked)).toEqual([false, true, false, true]);
   await blockedEntries(['e'], profiles, post);
   expect(contexts).toBe(2);
 });
@@ -201,8 +201,8 @@ test('the Israel-only access profile is labelled even when the check passes (ing
   };
   const r = await blockedEntries(['a', 'b'], new Map(), post);
   expect([...r]).toEqual([
-    ['a', true],
-    ['b', false],
+    ['a', { blocked: true, expired: false }],
+    ['b', { blocked: false, expired: false }],
   ]);
 });
 
@@ -268,6 +268,73 @@ test('an episode whose Kaltura entry is gone keeps its place but offers no strea
   expect(eps.find((e) => e.key === dropped)?.streams).toEqual([]);
   expect(eps.filter((e) => e.key !== dropped).every((e) => e.streams.length === 1)).toBe(true);
   expect(show.notes?.join(' ')).toMatch(/1 episodes no longer exist/);
+});
+
+test('an entry past its schedule window is expired (plays nowhere); the profile is checked with one inside it', async () => {
+  const now = Date.parse('2026-11-08T00:00:00Z');
+  const sec = now / 1000;
+  const checked: string[] = [];
+  const post = async (body: unknown) => {
+    const req = (body as Record<string, { action: string; entryId?: string }>)['2'];
+    if (req?.action === 'list')
+      return [
+        {},
+        {
+          objects: [
+            // Measured: 1_liyr5270 (שקשוקה 1:3), endDate 2023-10-11, playlist 404 in and outside Israel.
+            { id: 'old', accessControlId: 6649992, startDate: 1696924636, endDate: 1697011042 },
+            { id: 'later', accessControlId: 6649992, startDate: sec + 3600 },
+            { id: 'now', accessControlId: 6649992, startDate: sec - 3600, endDate: sec + 3600 },
+            { id: 'open', accessControlId: 6649992 },
+          ],
+        },
+      ];
+    checked.push(req?.entryId ?? '');
+    return [{}, { actions: [] }];
+  };
+  const r = await blockedEntries(['old', 'later', 'now', 'open'], new Map(), post, now);
+  expect(Object.fromEntries([...r].map(([k, v]) => [k, v.expired]))).toEqual({
+    old: true,
+    later: true,
+    now: false,
+    open: false,
+  });
+  expect([...r.values()].every((v) => !v.blocked)).toBe(true);
+  expect(checked).toEqual(['now']);
+});
+
+test('an expired episode keeps its place and label but offers no stream, and says so', async () => {
+  const f = pages({ '/all-shows/kitchen-nightmares-902985891/': 'show-kitchen-nightmares' });
+  let first = '';
+  const withOneExpired = async (body: unknown) => {
+    const req = (body as Record<string, { action: string; filter?: { idIn: string } }>)['2'];
+    if (req?.action === 'list') {
+      const ids = (req.filter?.idIn ?? '').split(',');
+      first = ids[0] ?? '';
+      return [
+        { ks: 'x' },
+        {
+          objects: ids.map((id, i) => ({
+            id,
+            accessControlId: 3387861,
+            ...(i === 0 ? { endDate: 1697011042 } : {}),
+          })),
+        },
+      ];
+    }
+    return kaltura(body);
+  };
+  const show = await fetchShow(
+    f,
+    { key: '/all-shows/kitchen-nightmares-902985891/', title: 'x' },
+    { kaltura: withOneExpired, currentSeasonOnly: true },
+  );
+  const eps = show.seasons.flatMap((s) => s.episodes);
+  const ep = eps.find((e) => e.key === first);
+  expect(ep?.streams).toEqual([]);
+  expect(ep?.availableAbroad).toBe(false);
+  expect(eps.filter((e) => e.key !== first).every((e) => e.streams.length === 1)).toBe(true);
+  expect(show.notes?.join(' ')).toMatch(/1 episodes are past their availability window/);
 });
 
 test('a show split by year before stays split when one read sees a single untitled season', async () => {
