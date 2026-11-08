@@ -28,6 +28,7 @@ import { backupCatalog, checkBackup } from './backup.ts';
 import { type CanaryResult, canaryEvent, runCanary } from './canary.ts';
 import { QUOTA_KEY, type Quota, readQuota } from './cloudflare-quota.ts';
 import { refreshGuides } from './epg.ts';
+import { indexNowNote } from './indexnow.ts';
 import { crawlKan, kanCrawlOptions, kanEnabled, kanShowKnown } from './kan.ts';
 import { checkLive, type LiveCheckOptions } from './live.ts';
 import { localAddonApp } from './local-server.ts';
@@ -626,6 +627,10 @@ export class Daemon {
           ]
         : []),
       ...(this.remoteProblem ? [this.remoteProblem] : []),
+      ...(() => {
+        const n = indexNowNote(this.store, this.config);
+        return n ? [n] : [];
+      })(),
       ...(this.publicUsageProblem ? [this.publicUsageProblem] : []),
       ...(() => {
         const q = this.store.getState<Quota>(QUOTA_KEY);

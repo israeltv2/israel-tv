@@ -257,6 +257,22 @@ export const ConfigSchema = z.strictObject({
       stremioAddonsConfig: z.strictObject({ issuer: z.url(), signature: z.string().min(1) }).optional(),
     })
     .prefault({}),
+  /**
+   * IndexNow: after each publish that changed public pages, tell the search engines that take part (Bing,
+   * DuckDuckGo via Bing, Yandex, Seznam, Naver) which pages are new, changed or gone. No account; the key is
+   * public by design and served at `/<key>.txt`. Only with the Cloudflare publisher (a public site).
+   */
+  indexNow: z
+    .strictObject({
+      enabled: z.boolean().default(true),
+      /** The key. When not set, one is generated on first use and kept in the database. */
+      key: z
+        .string()
+        .regex(/^[a-zA-Z0-9-]{8,128}$/, 'must be 8–128 letters, digits or dashes')
+        .optional(),
+      endpoint: z.url().default('https://api.indexnow.org/indexnow'),
+    })
+    .prefault({}),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

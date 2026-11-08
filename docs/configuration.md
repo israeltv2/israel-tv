@@ -212,6 +212,18 @@ What addon directories need in the published manifest. `stremioAddonsConfig`: th
 listed addon, pasted as it is (`{ "issuer": "https://stremio-addons.net", "signature": "…" }`). It is not a secret
 (it is published in the manifest); the next publish carries it.
 
+## `indexNow`
+
+Tells the search engines that take part in [IndexNow](https://www.indexnow.org/) (Bing, and through it DuckDuckGo;
+Yandex, Seznam, Naver) which public pages a publish added, changed or removed, so they are crawled soon. No account
+is needed. Only with the Cloudflare publisher (a public site); the local publisher never submits.
+
+| Option     | Default                             |                                                                                                                                                                 |
+| ---------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`  | `true`                              | `false` turns it off.                                                                                                                                           |
+| `key`      | generated                           | 8–128 letters, digits or dashes. When not set, a random 32-character key is made once and kept in the database. It is public by design: served at `/<key>.txt`. |
+| `endpoint` | `https://api.indexnow.org/indexnow` | Where submissions go (the shared endpoint passes them on to every engine).                                                                                      |
+
 ## `log`
 
 Defaults: `{ "file": "./data/logs/israel-tv.log", "maxMB": 20, "keep": 10, "level": "info" }`. JSON log lines (pino)

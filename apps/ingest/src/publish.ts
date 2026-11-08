@@ -33,6 +33,7 @@ import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { auditSite } from './catalog-audit.ts';
 import { guideFile } from './epg.ts';
+import { indexNowEnabled, indexNowKey, keyFile, submitIndexNow } from './indexnow.ts';
 import {
   KAN_LATER,
   kanArtwork,
@@ -520,6 +521,11 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
         files.set(path, content.replaceAll(ORIGIN_TOKEN, base));
     }
   }
+  // The IndexNow key file (public by design), so the search engines can check the key a submission names.
+  if (indexNowEnabled(config)) {
+    const key = indexNowKey(store, config);
+    files.set(keyFile(key), key);
+  }
   return files;
 }
 
@@ -591,7 +597,7 @@ export const comparable = (content: string) =>
 export function writeSite(
   dir: string,
   files: SiteFiles,
-): { written: number; deleted: number; total: number; changed: string[] } {
+): { written: number; deleted: number; total: number; changed: string[]; removed: string[] } {
   mkdirSync(dir, { recursive: true });
   const marked = existsSync(join(dir, MARKER));
   if (!marked && readdirSync(dir).length > 0) {
@@ -604,7 +610,7 @@ export function writeSite(
   const all = new Map(files);
   all.set('_headers', HEADERS_FILE);
   all.set('.assetsignore', `${MARKER}\n`);
-  let deleted = 0;
+  const removed: string[] = [];
   const changed: string[] = [];
   for (const [path, content] of all) {
     const p = join(dir, path);
@@ -626,10 +632,10 @@ export function writeSite(
     const rel = relative(dir, p).split('\\').join('/');
     if (rel !== MARKER && !all.has(rel)) {
       rmSync(p);
-      deleted++;
+      removed.push(rel);
     }
   }
-  return { written: changed.length, deleted, total: all.size, changed };
+  return { written: changed.length, deleted: removed.length, total: all.size, changed, removed };
 }
 
 /** A publishing problem the user can fix (credentials, permissions); printed without a stack trace. */
@@ -1055,10 +1061,13 @@ export async function publishSite(
   config: Config,
   log: (line: string) => void,
   retries: PublishRetry = PUBLISH_RETRY,
+  /** Stand-ins for tests: the deploy and the fetch IndexNow submits with. */
+  hooks: { deploy?: () => Promise<DeployResult>; fetch?: typeof fetch } = {},
 ): Promise<boolean> {
   const t0 = Date.now();
   const kind = config.publisher.type;
   let w: ReturnType<typeof writeSite>;
+  let files: SiteFiles;
   // Published episode numbers never move: refuse to publish when one would (see numbering-guard.ts).
   const guard = checkNumbering(store);
   if (!guard.ok) {
@@ -1079,7 +1088,8 @@ export async function publishSite(
     { warn: log },
   );
   try {
-    w = writeSite(config.publisher.dir, renderFromStore(store, config));
+    files = renderFromStore(store, config);
+    w = writeSite(config.publisher.dir, files);
   } catch (err) {
     // Render/write problems (disk full, permissions) are publish failures too, visible on /status.
     const runId = store.startRun('publish', kind);
@@ -1104,7 +1114,11 @@ export async function publishSite(
   }
   const runId = store.startRun('publish', kind);
   try {
-    const d = await deployWithRetries(() => deploy(config, process.env, originKnown), log, retries);
+    const d = await deployWithRetries(
+      hooks.deploy ?? (() => deploy(config, process.env, originKnown)),
+      log,
+      retries,
+    );
     store.finishRun(runId, { status: 'ok' });
     if (d.versionId) store.setState(DATA_VERSION, d.versionId);
     if (worker) store.setState(WORKER_DEPLOYED, worker);
@@ -1114,6 +1128,17 @@ export async function publishSite(
     log(
       `publish: ${w.written} of ${w.total} files changed, ${w.deleted} removed; ${d.detail}${d.url ? ` → ${d.url}/manifest.json` : ''} (${Math.round((Date.now() - t0) / 1000)} s)`,
     );
+    // Search engines hear about the new, changed and removed pages; a failure here never fails the publish.
+    const base = publicBase(config, store);
+    if (base && indexNowEnabled(config))
+      await submitIndexNow(store, config, {
+        base,
+        changed: w.changed,
+        removed: w.removed,
+        all: files.keys(),
+        log,
+        ...(hooks.fetch ? { fetch: hooks.fetch } : {}),
+      });
     return true;
   } catch (err) {
     store.finishRun(runId, { status: 'failed', error: (err as Error).message });
