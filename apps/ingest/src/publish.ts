@@ -42,6 +42,7 @@ import {
   kanArtwork,
   kanArtworkDir,
   kanBotCheck,
+  kanFullLists,
   kanRowProgress,
   kanSkippedPages,
   MAX_EPISODE_TRIES,
@@ -268,6 +269,26 @@ export function buildStatus(
           'kan-waiting-retry',
           `${skipped.waiting} Kan ${skipped.waiting === 1 ? 'show waits' : 'shows wait'} to read an episode page again that failed to load (tried up to ${MAX_EPISODE_TRIES} times, ${RETRY_GAP_MS / HOUR_MS} hours apart; the show's later episodes follow it)`,
           { count: skipped.waiting, tries: MAX_EPISODE_TRIES, hours: RETRY_GAP_MS / HOUR_MS },
+        );
+      // Kan's full episode lists (kan.ts FULL_LISTS): the backfill's progress, and what the lists cannot give.
+      const lists = kanFullLists(store);
+      if (lists.waiting > 0 || lists.toRead > 0)
+        note(
+          'kan-full-lists',
+          `reading Kan's full episode lists: ${lists.shows - lists.waiting} of ${lists.shows} shows done, ${lists.toRead} older episode pages found in them still to read`,
+          { done: lists.shows - lists.waiting, shows: lists.shows, pages: lists.toRead },
+        );
+      if (lists.pagesOnly > 0)
+        note(
+          'kan-pages-only',
+          `${lists.pagesOnly} Kan ${lists.pagesOnly === 1 ? 'show is' : 'shows are'} not in Kan's app, so only the episodes ${lists.pagesOnly === 1 ? 'its page links' : 'their pages link'} are read (a long show's older episodes may be missing)`,
+          { count: lists.pagesOnly },
+        );
+      if (lists.noPage > 0)
+        note(
+          'kan-no-web-page',
+          `${lists.noPage} items in Kan's episode lists have no web page (they play from YouTube), so they are not in the catalog`,
+          { count: lists.noPage },
         );
       if (skipped.gaveUp > 0)
         note(

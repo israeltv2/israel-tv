@@ -1,0 +1,2883 @@
+{
+ "title": "תקומה",
+ "type": {
+  "value": "feed"
+ },
+ "entry": [
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-1/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=679006",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 1,
+     "episode_title": "דור בארץ",
+     "duration": "00:58:21",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 1 - דור בארץ",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "דור בארץ",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "1",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "28-12-1997",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 1 - דור בארץ",
+     "description": "המרד הערבי הגדול והמאבק בבריטים (1936–1947)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:21",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "679009",
+   "title": "פרק 1 - דור בארץ",
+   "description": "המרד הערבי הגדול והמאבק בבריטים (1936–1947)",
+   "summary": "המרד הערבי הגדול והמאבק בבריטים (1936–1947)",
+   "published": "2024-01-07T04:06:06+02:00",
+   "updated": "4.12.2025 15:32:36",
+   "published_date": "04:06",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-1/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/pbjplb0j/tkuma_1.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/pbjplb0j/tkuma_1.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/pbjplb0j/tkuma_1.jpg?width=480&height=480&v=1da411ed940ae10",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/pbjplb0j/tkuma_1.jpg?width=468&v=1da411ed940ae10",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/pbjplb0j/tkuma_1.jpg?width=480&height=480&v=1da411ed940ae10&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/pbjplb0j/tkuma_1.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_06kc4syp/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_06kc4syp/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-2/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=679003",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 2,
+     "episode_title": "מדינה בדרך",
+     "duration": "00:58:09",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 2 - מדינה בדרך",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "מדינה בדרך",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "2",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "04-01-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 2 - מדינה בדרך",
+     "description": "מלחמת העצמאות והכרזת המדינה (1947–1948)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:09",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "679006",
+   "title": "פרק 2 - מדינה בדרך",
+   "description": "מלחמת העצמאות והכרזת המדינה (1947–1948)",
+   "summary": "מלחמת העצמאות והכרזת המדינה (1947–1948)",
+   "published": "2024-01-07T04:06:00+02:00",
+   "updated": "4.12.2025 15:34:47",
+   "published_date": "04:06",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-2/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/qtnnzf0v/tkuma_2.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qtnnzf0v/tkuma_2.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qtnnzf0v/tkuma_2.jpg?width=480&height=480&v=1da411ed5ad2710",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qtnnzf0v/tkuma_2.jpg?width=468&v=1da411ed5ad2710",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qtnnzf0v/tkuma_2.jpg?width=480&height=480&v=1da411ed5ad2710&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qtnnzf0v/tkuma_2.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_4bubqfom/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_4bubqfom/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-3/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=679000",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 3,
+     "episode_title": "מגש הכסף",
+     "duration": "00:58:09",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 3 - מגש הכסף",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "מגש הכסף",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "3",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "11-01-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 3 - מגש הכסף",
+     "description": "הדיפת צבאות ערב והסכמי שביתת הנשק (1948–1949)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:09",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "679003",
+   "title": "פרק 3 - מגש הכסף",
+   "description": "הדיפת צבאות ערב והסכמי שביתת הנשק (1948–1949)",
+   "summary": "הדיפת צבאות ערב והסכמי שביתת הנשק (1948–1949)",
+   "published": "2024-01-07T04:05:56+02:00",
+   "updated": "4.12.2025 15:35:39",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-3/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/4nplzlot/tkuma_3.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4nplzlot/tkuma_3.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4nplzlot/tkuma_3.jpg?width=480&height=480&v=1da411ed2d01ed0",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4nplzlot/tkuma_3.jpg?width=468&v=1da411ed2d01ed0",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4nplzlot/tkuma_3.jpg?width=480&height=480&v=1da411ed2d01ed0&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4nplzlot/tkuma_3.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_3748psfx/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_3748psfx/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-4/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678997",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 4,
+     "episode_title": "קיבוץ גלויות",
+     "duration": "00:58:02",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 4 - קיבוץ גלויות",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "קיבוץ גלויות",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "4",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "18-01-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 4 - קיבוץ גלויות",
+     "description": "העלייה ההמונית לישראל (1948–1958)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:02",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "679000",
+   "title": "פרק 4 - קיבוץ גלויות",
+   "description": "העלייה ההמונית לישראל (1948–1958)",
+   "summary": "העלייה ההמונית לישראל (1948–1958)",
+   "published": "2024-01-07T04:05:50+02:00",
+   "updated": "4.12.2025 15:32:54",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-4/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/qw4d3ow4/tkuma_4.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qw4d3ow4/tkuma_4.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qw4d3ow4/tkuma_4.jpg?width=480&height=480&v=1da411ecfae1e50",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qw4d3ow4/tkuma_4.jpg?width=468&v=1da411ecfae1e50",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qw4d3ow4/tkuma_4.jpg?width=480&height=480&v=1da411ecfae1e50&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/qw4d3ow4/tkuma_4.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_ckogn6my/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_ckogn6my/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-5/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678994",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 5,
+     "episode_title": "עם במדים",
+     "duration": "00:58:09",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 5 - עם במדים",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "עם במדים",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "5",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "25-01-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 5 - עם במדים",
+     "description": "פעולות התגמול ומבצע סיני (1949–1956)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:09",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678997",
+   "title": "פרק 5 - עם במדים",
+   "description": "פעולות התגמול ומבצע סיני (1949–1956)",
+   "summary": "פעולות התגמול ומבצע סיני (1949–1956)",
+   "published": "2024-01-07T04:05:45+02:00",
+   "updated": "4.12.2025 15:35:01",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-5/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/z0oaz5nq/tkuma_5.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/z0oaz5nq/tkuma_5.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/z0oaz5nq/tkuma_5.jpg?width=480&height=480&v=1da411eccb32dd0",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/z0oaz5nq/tkuma_5.jpg?width=468&v=1da411eccb32dd0",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/z0oaz5nq/tkuma_5.jpg?width=480&height=480&v=1da411eccb32dd0&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/z0oaz5nq/tkuma_5.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_ei664v5x/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_ei664v5x/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-6/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678991",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 6,
+     "episode_title": "בצל השואה",
+     "duration": "00:58:09",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 6 - בצל השואה",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "בצל השואה",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "6",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "01-02-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 6 - בצל השואה",
+     "description": "שתיקת הניצולים ומשפט אייכמן (1948–1966)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:09",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678994",
+   "title": "פרק 6 - בצל השואה",
+   "description": "שתיקת הניצולים ומשפט אייכמן (1948–1966)",
+   "summary": "שתיקת הניצולים ומשפט אייכמן (1948–1966)",
+   "published": "2024-01-07T04:05:39+02:00",
+   "updated": "4.12.2025 15:33:18",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-6/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/34jp5mak/tkuma_6.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/34jp5mak/tkuma_6.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/34jp5mak/tkuma_6.jpg?width=480&height=480&v=1da411ec94445d0",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/34jp5mak/tkuma_6.jpg?width=468&v=1da411ec94445d0",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/34jp5mak/tkuma_6.jpg?width=480&height=480&v=1da411ec94445d0&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/34jp5mak/tkuma_6.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_k6t22tat/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_k6t22tat/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-7/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678988",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 7,
+     "episode_title": "הגידו כן לזקן",
+     "duration": "00:57:02",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 7 - הגידו כן לזקן",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "הגידו כן לזקן",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "7",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "08-02-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 7 - הגידו כן לזקן",
+     "description": "מנהיגותו של דוד בן גוריון (1948–1967)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 57,
+    "duration_length": "57:02",
+    "duration_date": "07.01.24 | 57",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678991",
+   "title": "פרק 7 - הגידו כן לזקן",
+   "description": "מנהיגותו של דוד בן גוריון (1948–1967)",
+   "summary": "מנהיגותו של דוד בן גוריון (1948–1967)",
+   "published": "2024-01-07T04:05:34+02:00",
+   "updated": "4.12.2025 15:35:21",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-7/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/1dzlkmej/tkuma_7.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/1dzlkmej/tkuma_7.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/1dzlkmej/tkuma_7.jpg?width=480&height=480&v=1da411ec5ff7b10",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/1dzlkmej/tkuma_7.jpg?width=468&v=1da411ec5ff7b10",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/1dzlkmej/tkuma_7.jpg?width=480&height=480&v=1da411ec5ff7b10&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/1dzlkmej/tkuma_7.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_b4xbvky8/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_b4xbvky8/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-8/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678985",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 8,
+     "episode_title": " קו פרשת המים",
+     "duration": "00:57:40",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 8 - קו פרשת המים",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": " קו פרשת המים",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "8",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "15-02-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 8 - קו פרשת המים",
+     "description": "מלחמת ששת הימים (1967)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 57,
+    "duration_length": "57:40",
+    "duration_date": "07.01.24 | 57",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678988",
+   "title": "פרק 8 - קו פרשת המים",
+   "description": "מלחמת ששת הימים (1967)",
+   "summary": "מלחמת ששת הימים (1967)",
+   "published": "2024-01-07T04:05:29+02:00",
+   "updated": "4.12.2025 15:33:06",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-8/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/jkgfatp0/tkuma_8.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jkgfatp0/tkuma_8.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jkgfatp0/tkuma_8.jpg?width=480&height=480&v=1da411ec2ecbcd0",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jkgfatp0/tkuma_8.jpg?width=468&v=1da411ec2ecbcd0",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jkgfatp0/tkuma_8.jpg?width=480&height=480&v=1da411ec2ecbcd0&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jkgfatp0/tkuma_8.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_big1ne6r/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_big1ne6r/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-9/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678982",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 9,
+     "episode_title": "תקומה | פרק 9 - מעולם מצבנו לא היה טוב יותר",
+     "duration": "00:58:14.",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 9 - מעולם מצבנו לא היה טוב יותר",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "תקומה | פרק 9 - מעולם מצבנו לא היה טוב יותר",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "9",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "22-02-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "תקומה | פרק 9 - מעולם מצבנו לא היה טוב יותר",
+     "description": "ישראל בין מלחמת ששת הימים למלחמת יום כיפור (1967–1973)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": null,
+    "duration_length": "00:58:14.",
+    "duration_date": "07.01.24 | ",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678985",
+   "title": "תקומה | פרק 9 - מעולם מצבנו לא היה טוב יותר",
+   "description": "ישראל בין מלחמת ששת הימים למלחמת יום כיפור (1967–1973)",
+   "summary": "ישראל בין מלחמת ששת הימים למלחמת יום כיפור (1967–1973)",
+   "published": "2024-01-07T04:05:24+02:00",
+   "updated": "4.12.2025 15:33:15",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-9/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/3i2p5yep/tkuma_9.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/3i2p5yep/tkuma_9.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/3i2p5yep/tkuma_9.jpg?width=480&height=480&v=1da411ebfc67690",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/3i2p5yep/tkuma_9.jpg?width=468&v=1da411ebfc67690",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/3i2p5yep/tkuma_9.jpg?width=480&height=480&v=1da411ebfc67690&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/3i2p5yep/tkuma_9.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_bkok8nll/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_bkok8nll/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-10/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678979",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 10,
+     "episode_title": "רעידת אדמה",
+     "duration": "00:58:12",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 10 - רעידת אדמה",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "רעידת אדמה",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "10",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "01-03-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 10 - רעידת אדמה",
+     "description": "מלחמת יום הכיפורים (1973)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:12",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678982",
+   "title": "פרק 10 - רעידת אדמה",
+   "description": "מלחמת יום הכיפורים (1973)",
+   "summary": "מלחמת יום הכיפורים (1973)",
+   "published": "2024-01-07T04:05:19+02:00",
+   "updated": "4.12.2025 15:32:43",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-10/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/o20bmevr/tkuma_10.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/o20bmevr/tkuma_10.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/o20bmevr/tkuma_10.jpg?width=480&height=480&v=1da411ebce17f10",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/o20bmevr/tkuma_10.jpg?width=468&v=1da411ebce17f10",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/o20bmevr/tkuma_10.jpg?width=480&height=480&v=1da411ebce17f10&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/o20bmevr/tkuma_10.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_iremepvc/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_iremepvc/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-11/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678976",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 11,
+     "episode_title": "האופסימיסט",
+     "duration": "00:58:09",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 11 - האופסימיסט",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "האופסימיסט",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "11",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "08-03-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 11 - האופסימיסט",
+     "description": "ערביי ישראל ממלחמת העצמאות עד \"יום האדמה\" (1948–1976)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:09",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678979",
+   "title": "פרק 11 - האופסימיסט",
+   "description": "ערביי ישראל ממלחמת העצמאות עד \"יום האדמה\" (1948–1976)",
+   "summary": "ערביי ישראל ממלחמת העצמאות עד \"יום האדמה\" (1948–1976)",
+   "published": "2024-01-07T04:05:14+02:00",
+   "updated": "4.12.2025 15:35:09",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-11/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/hdydabel/tkuma_11.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/hdydabel/tkuma_11.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/hdydabel/tkuma_11.jpg?width=480&height=480&v=1da411eb9eca910",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/hdydabel/tkuma_11.jpg?width=468&v=1da411eb9eca910",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/hdydabel/tkuma_11.jpg?width=480&height=480&v=1da411eb9eca910&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/hdydabel/tkuma_11.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_o2kjqz42/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_o2kjqz42/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-12/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678973",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 12,
+     "episode_title": "ישראל השנייה",
+     "duration": "00:57:54",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 12 - ישראל השנייה",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "ישראל השנייה",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "12",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "15-03-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 12 - ישראל השנייה",
+     "description": "המחאה העדתית והמהפך הפוליטי (1959–1981)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 57,
+    "duration_length": "57:54",
+    "duration_date": "07.01.24 | 57",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678976",
+   "title": "פרק 12 - ישראל השנייה",
+   "description": "המחאה העדתית והמהפך הפוליטי (1959–1981)",
+   "summary": "המחאה העדתית והמהפך הפוליטי (1959–1981)",
+   "published": "2024-01-07T04:05:09+02:00",
+   "updated": "4.12.2025 15:35:42",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-12/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/rmddrh3a/tkuma_12.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rmddrh3a/tkuma_12.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rmddrh3a/tkuma_12.jpg?width=480&height=480&v=1da411eb6d72bb0",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rmddrh3a/tkuma_12.jpg?width=468&v=1da411eb6d72bb0",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rmddrh3a/tkuma_12.jpg?width=480&height=480&v=1da411eb6d72bb0&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rmddrh3a/tkuma_12.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_cr8qwof2/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_cr8qwof2/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-13/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678970",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 13,
+     "episode_title": "הלנצח תאכל חרב?",
+     "duration": "00:58:10",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 13 - הלנצח תאכל חרב?",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "הלנצח תאכל חרב?",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "13",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "22-03-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 13 - הלנצח תאכל חרב?",
+     "description": "הסכם השלום עם מצרים (1977–1982)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:10",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678973",
+   "title": "פרק 13 - הלנצח תאכל חרב?",
+   "description": "הסכם השלום עם מצרים (1977–1982)",
+   "summary": "הסכם השלום עם מצרים (1977–1982)",
+   "published": "2024-01-07T04:05:04+02:00",
+   "updated": "4.12.2025 15:33:09",
+   "published_date": "04:05",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-13/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/stfhyohz/tkuma_13.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/stfhyohz/tkuma_13.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/stfhyohz/tkuma_13.jpg?width=480&height=480&v=1da411eb3cb7250",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/stfhyohz/tkuma_13.jpg?width=468&v=1da411eb3cb7250",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/stfhyohz/tkuma_13.jpg?width=480&height=480&v=1da411eb3cb7250&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/stfhyohz/tkuma_13.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_r35u9whc/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_r35u9whc/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-14/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678967",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 14,
+     "episode_title": "אתחלתא דגאולה",
+     "duration": "00:58:10",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 14 - אתחלתא דגאולה",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "אתחלתא דגאולה",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "14",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "29-03-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 14 - אתחלתא דגאולה",
+     "description": "התנחלויות \"גוש אמונים\" (1967–1984)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:10",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678970",
+   "title": "פרק 14 - אתחלתא דגאולה",
+   "description": "התנחלויות \"גוש אמונים\" (1967–1984)",
+   "summary": "התנחלויות \"גוש אמונים\" (1967–1984)",
+   "published": "2024-01-07T04:04:59+02:00",
+   "updated": "4.12.2025 15:35:28",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-14/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/ap5lt05p/tkuma_14.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/ap5lt05p/tkuma_14.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/ap5lt05p/tkuma_14.jpg?width=480&height=480&v=1da411eb0ffcf30",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/ap5lt05p/tkuma_14.jpg?width=468&v=1da411eb0ffcf30",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/ap5lt05p/tkuma_14.jpg?width=480&height=480&v=1da411eb0ffcf30&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/ap5lt05p/tkuma_14.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_cx9jiy9f/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_cx9jiy9f/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-15/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678964",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 15,
+     "episode_title": "בנתיב הטרור בילאדי-בילאדי ",
+     "duration": "00:58:13",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 15 - בנתיב הטרור בילאדי-בילאדי",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "בנתיב הטרור בילאדי-בילאדי ",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "15",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "05-04-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 15 - בנתיב הטרור בילאדי-בילאדי ",
+     "description": "ישראל נגד ארגוני הטרור הפלסטיניים (1967–1982)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:13",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678967",
+   "title": "פרק 15 - בנתיב הטרור בילאדי-בילאדי ",
+   "description": "ישראל נגד ארגוני הטרור הפלסטיניים (1967–1982)",
+   "summary": "ישראל נגד ארגוני הטרור הפלסטיניים (1967–1982)",
+   "published": "2024-01-07T04:04:54+02:00",
+   "updated": "4.12.2025 15:32:48",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-15/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/21qjafvg/tkuma_15.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/21qjafvg/tkuma_15.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/21qjafvg/tkuma_15.jpg?width=480&height=480&v=1da411eae353d80",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/21qjafvg/tkuma_15.jpg?width=468&v=1da411eae353d80",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/21qjafvg/tkuma_15.jpg?width=480&height=480&v=1da411eae353d80&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/21qjafvg/tkuma_15.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_u39i5a6c/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_u39i5a6c/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-16/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678961",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 16,
+     "episode_title": "שלח את עמי",
+     "duration": "00:58:15",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 16 - שלח את עמי",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "שלח את עמי",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "16",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "12-04-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 16 - שלח את עמי",
+     "description": "ישראל ויהדות ברית המועצות (1948–1994)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:15",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678964",
+   "title": "פרק 16 - שלח את עמי",
+   "description": "ישראל ויהדות ברית המועצות (1948–1994)",
+   "summary": "ישראל ויהדות ברית המועצות (1948–1994)",
+   "published": "2024-01-07T04:04:50+02:00",
+   "updated": "4.12.2025 15:34:33",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-16/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/lvnfkjto/tkuma_16.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/lvnfkjto/tkuma_16.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/lvnfkjto/tkuma_16.jpg?width=480&height=480&v=1da411eab5cf030",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/lvnfkjto/tkuma_16.jpg?width=468&v=1da411eab5cf030",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/lvnfkjto/tkuma_16.jpg?width=480&height=480&v=1da411eab5cf030&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/lvnfkjto/tkuma_16.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_2wq0w246/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_2wq0w246/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-17/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678957",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 17,
+     "episode_title": "סדק בבית",
+     "duration": "00:58:00",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 17 - סדק בבית",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "סדק בבית",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "17",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "19-04-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 17 - סדק בבית",
+     "description": "מלחמת לבנון הראשונה (1982)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:00",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678961",
+   "title": "פרק 17 - סדק בבית",
+   "description": "מלחמת לבנון הראשונה (1982)",
+   "summary": "מלחמת לבנון הראשונה (1982)",
+   "published": "2024-01-07T04:04:44+02:00",
+   "updated": "4.12.2025 15:38:03",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-17/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/sixp4axe/tkuma_17.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sixp4axe/tkuma_17.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sixp4axe/tkuma_17.jpg?width=480&height=480&v=1da411ea8890fb0",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sixp4axe/tkuma_17.jpg?width=468&v=1da411ea8890fb0",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sixp4axe/tkuma_17.jpg?width=480&height=480&v=1da411ea8890fb0&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sixp4axe/tkuma_17.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_6o4vq7l4/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_6o4vq7l4/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-18/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678945",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 18,
+     "episode_title": "תנו לחיות בארץ הזאת",
+     "duration": "00:58:07",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 18 - תנו לחיות בארץ הזאת",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "תנו לחיות בארץ הזאת",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "18",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "26-04-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 18 - תנו לחיות בארץ הזאת",
+     "description": "כלכלה מימי הצנע ועד נפילת הבורסה (1949–1986)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:07",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678957",
+   "title": "פרק 18 - תנו לחיות בארץ הזאת",
+   "description": "כלכלה מימי הצנע ועד נפילת הבורסה (1949–1986)",
+   "summary": "כלכלה מימי הצנע ועד נפילת הבורסה (1949–1986)",
+   "published": "2024-01-07T04:04:39+02:00",
+   "updated": "4.12.2025 15:37:10",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-18/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/4qfbe0tt/tkuma_18.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4qfbe0tt/tkuma_18.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4qfbe0tt/tkuma_18.jpg?width=480&height=480&v=1da411ea5034450",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4qfbe0tt/tkuma_18.jpg?width=468&v=1da411ea5034450",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4qfbe0tt/tkuma_18.jpg?width=480&height=480&v=1da411ea5034450&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/4qfbe0tt/tkuma_18.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_71m9lode/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_71m9lode/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-19/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678954",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 19,
+     "episode_title": "בבל וירושלים",
+     "duration": "00:58:21",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 19 - בבל וירושלים",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "בבל וירושלים",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "19",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "03-05-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 19 - בבל וירושלים",
+     "description": "ישראל ויהדות ארצות הברית (1948–1994)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:21",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678945",
+   "title": "פרק 19 - בבל וירושלים",
+   "description": "ישראל ויהדות ארצות הברית (1948–1994)",
+   "summary": "ישראל ויהדות ארצות הברית (1948–1994)",
+   "published": "2024-01-07T04:04:19+02:00",
+   "updated": "4.12.2025 15:37:53",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-19/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/exsjmn0f/tkuma_19.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/exsjmn0f/tkuma_19.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/exsjmn0f/tkuma_19.jpg?width=480&height=480&v=1da411e9959bb70",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/exsjmn0f/tkuma_19.jpg?width=468&v=1da411e9959bb70",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/exsjmn0f/tkuma_19.jpg?width=480&height=480&v=1da411e9959bb70&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/exsjmn0f/tkuma_19.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_7iodmb8e/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_7iodmb8e/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-20/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678951",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 20,
+     "episode_title": "הכותל וההר",
+     "duration": "00:58:06",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 20 - הכותל וההר",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "הכותל וההר",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "20",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "10-05-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 20 - הכותל וההר",
+     "description": "יחסי חילונים ודתיים (1948–1993)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:06",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678954",
+   "title": "פרק 20 - הכותל וההר",
+   "description": "יחסי חילונים ודתיים (1948–1993)",
+   "summary": "יחסי חילונים ודתיים (1948–1993)",
+   "published": "2024-01-07T04:04:34+02:00",
+   "updated": "4.12.2025 15:36:55",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-20/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/jg1pejiz/tkuma_20.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jg1pejiz/tkuma_20.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jg1pejiz/tkuma_20.jpg?width=480&height=480&v=1da411ea22f8ae0",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jg1pejiz/tkuma_20.jpg?width=468&v=1da411ea22f8ae0",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jg1pejiz/tkuma_20.jpg?width=480&height=480&v=1da411ea22f8ae0&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/jg1pejiz/tkuma_20.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_kzdk96tu/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_kzdk96tu/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-21/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=678948",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 21,
+     "episode_title": "האבן וענף הזית",
+     "duration": "00:58:11",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 21 - האבן וענף הזית",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "האבן וענף הזית",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "21",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "17-05-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 21 - האבן וענף הזית",
+     "description": "האינתיפדה הראשונה והסכם אוסלו (1987–1993)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:11",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678951",
+   "title": "פרק 21 - האבן וענף הזית",
+   "description": "האינתיפדה הראשונה והסכם אוסלו (1987–1993)",
+   "summary": "האינתיפדה הראשונה והסכם אוסלו (1987–1993)",
+   "published": "2024-01-07T04:04:29+02:00",
+   "updated": "4.12.2025 15:37:38",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-21/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/mzah4nz0/tkuma_21.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/mzah4nz0/tkuma_21.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/mzah4nz0/tkuma_21.jpg?width=480&height=480&v=1da411e9f520d70",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/mzah4nz0/tkuma_21.jpg?width=468&v=1da411e9f520d70",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/mzah4nz0/tkuma_21.jpg?width=480&height=480&v=1da411e9f520d70&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/mzah4nz0/tkuma_21.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_kqwbu5ex/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_kqwbu5ex/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-22/",
+    "play_next_feed_url": "https://mobapi.kan.org.il/api/mobile/program?id=671191&subid=943638",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 1,
+     "episode_number": 22,
+     "episode_title": "שלום חבר",
+     "duration": "00:58:29",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פרק 22 - שלום חבר",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "1",
+     "content_episodeTitle": "שלום חבר",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "22",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "24-05-1998",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "פרק 22 - שלום חבר",
+     "description": "מהסכם אוסלו ועד רצח רבין (1993–1995)",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 58,
+    "duration_length": "58:29",
+    "duration_date": "07.01.24 | 58",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "678948",
+   "title": "פרק 22 - שלום חבר",
+   "description": "מהסכם אוסלו ועד רצח רבין (1993–1995)",
+   "summary": "מהסכם אוסלו ועד רצח רבין (1993–1995)",
+   "published": "2024-01-07T04:04:24+02:00",
+   "updated": "4.12.2025 15:37:25",
+   "published_date": "04:04",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/s1/rebirth-22/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/rizh5w4g/tkuma_22.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rizh5w4g/tkuma_22.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rizh5w4g/tkuma_22.jpg?width=480&height=480&v=1da411e9c4e9170",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rizh5w4g/tkuma_22.jpg?width=468&v=1da411e9c4e9170",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rizh5w4g/tkuma_22.jpg?width=480&height=480&v=1da411e9c4e9170&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/rizh5w4g/tkuma_22.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_n071qt8e/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_n071qt8e/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  },
+  {
+   "extensions": {
+    "audio_player_background_image": "https://mobapi.kan.org.il/media/pgldpihx/640x360-169-with-logo_תקומה.jpg?width=480",
+    "share_url": "https://www.kan.org.il/content/archive1/vod/p-671191/943638/",
+    "play_next_feed_url": "",
+    "recommendation": {
+     "more_type": {
+      "value": null
+     }
+    },
+    "analyticsCustomProperties": {
+     "programId": 671191,
+     "show_name": "תקומה",
+     "cq_id": null,
+     "kantar_content_id": null,
+     "kantar_stream_id": null,
+     "channel_name": "סדרות",
+     "document_type": "Video",
+     "general_tags": null,
+     "genre_tags": "ארכיון, היסטוריה",
+     "season": 0,
+     "episode_number": 1,
+     "episode_title": "תקומה | פתיח",
+     "duration": "00:01:00",
+     "program_type": "טלויזיה",
+     "program_genre": "ארכיון, היסטוריה",
+     "program_format": "סדרה",
+     "article_type": "",
+     "page_name": "תקומה | פתיח",
+     "item_author": "",
+     "content_id": "671191",
+     "content_program": "תקומה",
+     "content_tvShow": "תקומה",
+     "content_channel": "סדרות",
+     "content_type": "Video",
+     "content_genre": "ארכיון, היסטוריה",
+     "content_season": "0",
+     "content_episodeTitle": "תקומה | פתיח",
+     "stream_type": "video",
+     "content_customDimension_1": "",
+     "content_customDimension_2": "1",
+     "content_customDimension_3": null,
+     "content_customDimension_4": "סדרה",
+     "content_customDimension_6": "",
+     "content_customDimension_7": "20-08-2025",
+     "content_customDimension_8": null
+    },
+    "tag": null,
+    "on_demand": {
+     "title": "תקומה | פתיח",
+     "description": "פתיח הסדרה התיעודית \"תקומה\"",
+     "show_name": "תקומה"
+    },
+    "open_with_plugin_id": "kan_player",
+    "isLive": false,
+    "duration": 1,
+    "duration_length": "1:00",
+    "duration_date": "20.08.25 | 1",
+    "mainid": null
+   },
+   "programId": "671191",
+   "id": "943638",
+   "title": "תקומה | פתיח",
+   "description": "פתיח הסדרה התיעודית \"תקומה\"",
+   "summary": "פתיח הסדרה התיעודית \"תקומה\"",
+   "published": "2025-08-20T10:58:13+03:00",
+   "updated": "4.12.2025 15:31:36",
+   "published_date": "10:58",
+   "credit": "‏04 בדצמבר 2025",
+   "author": {
+    "name": ""
+   },
+   "classification": "",
+   "link": {
+    "rel": "alternate",
+    "href": "https://www.kan.org.il/content/archive1/vod/p-671191/943638/?app=true"
+   },
+   "media_group": [
+    {
+     "type": "image",
+     "media_item": [
+      {
+       "src": "https://mobapi.kan.org.il/media/sasfszyy/תקומה-פתיח.jpg?width=480",
+       "key": "image_base",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sasfszyy/תקומה-פתיח.jpg?width=480",
+       "key": "image_base_16x9",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sasfszyy/תקומה-פתיח.jpg?width=480&height=480&v=1dc11c1b1580bd0",
+       "key": "image_base_1x1",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sasfszyy/תקומה-פתיח.jpg?width=468&v=1dc11c1b1580bd0",
+       "key": "image_base_468",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sasfszyy/תקומה-פתיח.jpg?width=480&height=480&v=1dc11c1b1580bd0&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_1x1_icon",
+       "type": "image"
+      },
+      {
+       "src": "https://mobapi.kan.org.il/media/sasfszyy/תקומה-פתיח.jpg?width=480&category=images%2Ficon-play-thumbnails.png",
+       "key": "image_base_16x9_icon",
+       "type": "image"
+      }
+     ]
+    }
+   ],
+   "type": {
+    "value": "video"
+   },
+   "content": {
+    "type": "video/hls",
+    "src": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_8p5dzaye/format/applehttp/protocol/https/desiredFileName.m3u8",
+    "teaser": "https://cdnapisec.kaltura.com/p/2717431/sp/271743100/playManifest/entryId/1_8p5dzaye/format/applehttp/protocol/https/desiredFileName.m3u8"
+   },
+   "media_component": null,
+   "isShowStaticLabel": false
+  }
+ ]
+}

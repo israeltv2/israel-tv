@@ -333,6 +333,13 @@ one episode, `/status` says how far each row is (`first fill of iltv_kan11 … i
 starts with a "⏳ עדיין בטעינה" item; the source is amber meanwhile (the archive row is read last and only noted).
 Episode pages are read breadth-first: newly published episodes, then the shows with the fewest episodes.
 
+A show's episodes are found in its show page's links and in Kan's app list of the show, which has every episode (a
+show page links only part of a long show). Since 2026-11-08 every show is read this way once (`/status`: "reading
+Kan's full episode lists: N of M shows done, P older episode pages found in them still to read"). When a show's
+older episodes are all in, its numbers are checked once against Kan's printed numbers: extras read earlier may move
+after the printed episodes (logged as `one-time renumber kan-full-lists-2026-11-08 of <series>`, backup and moves in
+`backup.dir`). Shows Kan's app does not list are named on `/status` as read from their pages only.
+
 ### Shows the site refused (bot protection)
 
 Mako and Reshet sometimes answer a show page with a bot-protection page (Mako's is Radware: a redirect to

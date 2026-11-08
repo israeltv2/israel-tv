@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { assignNumbers, type ScrapedShow } from '@israel-tv/core';
 import type { PageLoader } from '@israel-tv/kan';
 import { Store } from '@israel-tv/store';
@@ -539,9 +541,16 @@ test('a Kan show keeps our own copy of its image, used for its poster, backgroun
 }, 30_000);
 
 test('a show whose image has no copy yet is due, at most once a day', async () => {
-  const { showDue } = await import('../src/kan.ts');
+  const { showDue, FULL_LISTS } = await import('../src/kan.ts');
   const now = Date.parse('2026-11-06T12:00:00Z');
-  const fresh = { origin: 'o', catalog: 'c', pending: [], failed: [], checkedAt: '2026-11-06T11:00:00Z' };
+  const fresh = {
+    origin: 'o',
+    catalog: 'c',
+    pending: [],
+    failed: [],
+    checkedAt: '2026-11-06T11:00:00Z',
+    lists: FULL_LISTS,
+  };
   expect(showDue({ ...fresh }, now, 14)).toBe(false);
   expect(showDue({ ...fresh, image: 'https://x/i.jpg' }, now, 14)).toBe(true);
   expect(showDue({ ...fresh, image: 'https://x/i.jpg', artTriedAt: '2026-11-06T10:00:00Z' }, now, 14)).toBe(
@@ -1161,4 +1170,222 @@ test('stored episodes without an air date get it from the app list (same id and 
   expect(base.urls.some((u) => /\/p-11843\/\d+/.test(u))).toBe(false);
   await crawlKan(store, opts(withApp, 4));
   expect(asked.filter((u) => u.includes('program?id=11843'))).toHaveLength(1);
+});
+
+// ---- full lists (2026-11-08): Kan's app list as well as the show page ---------------------------------------------
+
+/** The episode page fixture, as the page of another Kan episode: its id and title swapped in. */
+function episodePage(id: string, title: string): string {
+  const esc = (t: string) =>
+    [...t]
+      .map((c) =>
+        /[\w ]/.test(c) ? c : `\\u${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`,
+      )
+      .join('');
+  const recorded =
+    '"title":"\\u05D7\\u05D1\\u05E8\\u05D9 \\u0022\\u05E7\\u05D5\\u05E4\\u05D4 \\u05E8\\u05D0\\u05E9\\u05D9\\u05EA\\u0022 \\u05DE\\u05EA\\u05DB\\u05D5\\u05E0\\u05E0\\u05D9\\u05DD \\u05DC\\u05D0\\u05D9\\u05E8\\u05D5\\u05D5\\u05D9\\u05D6\\u05D9\\u05D5\\u05DF"';
+  const html = fx('episode-1006639');
+  if (!html.includes(recorded)) throw new Error('the recorded episode title moved');
+  return html.replaceAll('1006639', id).replace(recorded, `"title":"${esc(title)}"`);
+}
+
+const appJson = (n: string) =>
+  JSON.parse(readFileSync(new URL(`../../../packages/kan/test/fixtures/${n}.json`, import.meta.url), 'utf8'));
+
+test("a show's older episodes come from Kan's full list; extras that held their numbers move after them, once", async () => {
+  // קופה ראשית (2026-11-08): the show page linked a few season-1 episodes; extras read early took the next numbers.
+  const { checkNumbering } = await import('../src/numbering-guard.ts');
+  const { FULL_LISTS } = await import('../src/kan.ts');
+  const store = Store.open(':memory:');
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-12832/';
+  const seriesId = store.seriesIdFor('kan', key);
+  const stored: ScrapedShow = {
+    source: 'kan',
+    key,
+    title: 'קופה ראשית',
+    catalog: 'iltv_kan11',
+    pageUrl: key,
+    seasons: [
+      {
+        key: `${key}|s1`,
+        title: 'עונה 1',
+        episodes: [
+          { key: 'kan:89248', title: 'פרק 1 - שלי מהבית', numberHint: 1, streams: [] },
+          { key: 'kan:855987', title: 'הרמת כוסית', streams: [] },
+        ],
+      },
+    ],
+  };
+  store.saveShow(
+    seriesId,
+    stored,
+    assignNumbers(stored, store.assignments(seriesId)).added,
+    undefined,
+    false,
+  );
+  expect(store.assignments(seriesId).episodes.map((e) => `${e.key} E${e.episode}`)).toEqual([
+    'kan:89248 E1',
+    'kan:855987 E2',
+  ]);
+  expect(checkNumbering(store).ok).toBe(true);
+  // The crawl state as an older version left it: the show read, its few links read.
+  store.setState('kan:crawl', {
+    lobbiesAt: new Date().toISOString(),
+    lobbyPosters: true,
+    lobbyGenres: true,
+    shows: {
+      [key]: {
+        origin: 'https://www.kan.org.il',
+        catalog: 'iltv_kan11',
+        pending: [],
+        failed: [],
+        checkedAt: new Date().toISOString(),
+      },
+    },
+  });
+  // Season 1 of the real list (20 printed episodes, a behind-the-scenes page) and the extras (no season in the app).
+  const feed = appJson('app-program-12832');
+  feed.entry = feed.entry.filter((e: { extensions?: { analyticsCustomProperties?: { season?: number } } }) =>
+    [1, 0, undefined].includes(e.extensions?.analyticsCustomProperties?.season),
+  );
+  const titles = new Map<string, string>(
+    feed.entry.map((e: { id: string; title: string }) => [e.id, e.title]),
+  );
+  const showPage = `<h1>קופה ראשית</h1><a href="/content/kan/kan-11/p-12832/s1/89248/">1</a><a href="/content/kan/kan-11/p-12832/855987/">x</a><a href="/content/kan/kan-11/p-12832/s1/">עונה 1</a>`;
+  const read: string[] = [];
+  const l = {
+    urls: read,
+    async load(url: string) {
+      read.push(url);
+      const p = new URL(url).pathname;
+      if (p === '/content/kan/kan-11/p-12832/') return { status: 200, html: showPage, challenged: false };
+      const id = /\/p-12832\/(?:s\d+\/)?(\d+)\/$/.exec(p)?.[1];
+      if (id && titles.has(id))
+        return { status: 200, html: episodePage(id, titles.get(id) ?? ''), challenged: false };
+      return { status: 404, html: '', challenged: false };
+    },
+    async text(url: string) {
+      return /program\?id=12832/.test(url)
+        ? { status: 200, body: JSON.stringify(feed), challenged: false }
+        : { status: 404, body: '', challenged: false };
+    },
+    async close() {},
+  };
+  const backupDir = mkdtempSync(join(tmpdir(), 'kan-full-'));
+  type S = { shows: Record<string, { refill?: true; pending: string[]; lists?: number; held?: unknown[] }> };
+  for (let i = 0; i < 20; i++) {
+    await crawlKan(store, { ...opts(l, 30), priority: [key], backupDir, streamPlays: async () => false });
+    const s = store.getState<S>('kan:crawl')?.shows[key];
+    if (s?.lists === FULL_LISTS && !s.refill && s.pending.length === 0) break;
+  }
+  const s = store.getState<S>('kan:crawl')?.shows[key];
+  expect(s).toMatchObject({ lists: FULL_LISTS, pending: [] });
+  expect(s?.refill).toBeUndefined();
+  const byKey = new Map(store.assignments(seriesId).episodes.map((e) => [e.key, e.episode]));
+  // Every printed episode of season 1 has its own number…
+  for (const [id, title] of titles) {
+    const n = /^\s*פרק (\d+)/.exec(title)?.[1];
+    if (n) expect([id, byKey.get(`kan:${id}`)]).toEqual([id, Number(n)]);
+  }
+  // …and the extra that held "פרק 2"'s number follows the printed ones.
+  expect(byKey.get('kan:855987')).toBeGreaterThan(20);
+  // Trailers are skipped, as before.
+  expect([...titles].filter(([, t]) => t === 'טריילר').every(([id]) => !byKey.has(`kan:${id}`))).toBe(true);
+  // The move is recorded: the guard passes, a backup was taken, no numbering note is left.
+  expect(checkNumbering(store).ok).toBe(true);
+  expect(existsSync(join(backupDir, 'before-kan-full-lists-2026-11-08.sqlite'))).toBe(true);
+  expect(store.recentWarnings().filter((w) => w.code === 'episode-number-taken')).toEqual([]);
+  // The older episodes were backlog, not news: the show is not "airing" because of them.
+  expect(
+    store.getState<{ shows: Record<string, { lastNewAt?: string }> }>('kan:crawl')?.shows[key]?.lastNewAt,
+  ).toBeUndefined();
+  // Every page was read once.
+  const episodeReads = read.filter((u) => /\/\d+\/$/.test(u));
+  expect(new Set(episodeReads).size).toBe(episodeReads.length);
+});
+
+test('named episode pages (archive) are read once, by the ids the app gives them', async () => {
+  // תקומה (2026-11-08): 22 episodes at s1/rebirth-1/ … rebirth-22/, one numbered page; only that one was in.
+  const store = Store.open(':memory:');
+  const key = 'https://www.kan.org.il/content/archive1/vod/p-671191/';
+  const feed = appJson('app-program-671191');
+  const byPath = new Map<string, { id: string; title: string }>(
+    feed.entry.map((e: { id: string; title: string; extensions?: { share_url?: string } }) => [
+      new URL(e.extensions?.share_url ?? 'https://x/').pathname,
+      { id: e.id, title: e.title },
+    ]),
+  );
+  const read: string[] = [];
+  const l = {
+    urls: read,
+    async load(url: string) {
+      read.push(url);
+      const p = new URL(url).pathname;
+      if (p === '/lobby/series/') return { status: 200, html: fx('lobby-series'), challenged: false };
+      if (p === '/content/archive1/vod/p-671191/')
+        return { status: 200, html: fx('show-p-671191-named'), challenged: false };
+      const e = byPath.get(p);
+      if (e) return { status: 200, html: episodePage(e.id, e.title), challenged: false };
+      if (p === '/content/archive1/vod/p-671191/943638/')
+        return { status: 200, html: episodePage('943638', 'תקומה - מאחורי הקלעים'), challenged: false };
+      return { status: 404, html: '', challenged: false };
+    },
+    async text(url: string) {
+      return /program\?id=671191/.test(url)
+        ? { status: 200, body: JSON.stringify(feed), challenged: false }
+        : { status: 404, body: '', challenged: false };
+    },
+    async close() {},
+  };
+  for (let i = 0; i < 10 && kanEpisodes(store).length < 23; i++)
+    await crawlKan(store, { ...opts(l, 40), priority: [key], streamPlays: async () => false });
+  const show = store.listShows({ source: 'kan' }).find((x) => x.show.key === key);
+  const eps = show?.show.seasons.flatMap((x) => x.episodes) ?? [];
+  expect(eps.length).toBe(byPath.size); // the numbered page is in the app's list too
+  expect(eps.some((e) => e.key === 'kan:679009')).toBe(true); // s1/rebirth-1/
+  // A re-read of the show finds nothing new and reads no episode page again.
+  const before = read.length;
+  const st = store.getState<{ shows: Record<string, { checkedAt?: string; pending: string[] }> }>(
+    'kan:crawl',
+  );
+  const s = st?.shows[key];
+  if (s) s.checkedAt = '2026-01-01T00:00:00Z';
+  store.setState('kan:crawl', st);
+  await crawlKan(store, { ...opts(l, 40), priority: [key], streamPlays: async () => false });
+  expect(store.getState<typeof st>('kan:crawl')?.shows[key]?.pending).toEqual([]);
+  expect(read.slice(before).filter((u) => u.includes('/p-671191/s1/'))).toEqual([]);
+});
+
+test("the order of a show's pages: by id, one address per id, named ones without an id last", async () => {
+  const { episodeOrder, appListed } = await import('../src/kan.ts');
+  const o = 'https://www.kan.org.il';
+  const show = `${o}/content/kan/kan-11/p-1/`;
+  expect(
+    episodeOrder({ ids: { [`${show}s1/b/`]: '5' } }, [
+      `${show}s2/30/`,
+      `${show}s1/a/`,
+      `${show}s1/b/`,
+      `${show}10/`,
+      `${show}s1/10/`,
+    ]),
+  ).toEqual([`${show}s1/b/`, `${show}10/`, `${show}s2/30/`, `${show}s1/a/`]);
+  const item = (id: string, pageUrl?: string) =>
+    [id, { id, title: id, stream: { kind: 'none' as const }, ...(pageUrl ? { pageUrl } : {}) }] as const;
+  expect(
+    appListed(
+      show,
+      o,
+      new Map([
+        item('1', `${show}s1/1/`),
+        item('2', `${show}s1/name-2/`),
+        item('3'), // a YouTube clip: no web page
+        item('4', `${o}/content/kan/kan-11/p-9/4/`), // another show's
+        item('5', `https://www.kan.org.il/content/kan/kan-11/p-1/%D7%A2%D7%95%D7%A0%D7%94-2/5/`),
+      ]),
+    ),
+  ).toEqual({
+    urls: [`${show}s1/1/`, `${show}s1/name-2/`, `${show}עונה-2/5/`],
+    ids: { [`${show}s1/name-2/`]: '2' },
+    noPage: 1,
+  });
 });

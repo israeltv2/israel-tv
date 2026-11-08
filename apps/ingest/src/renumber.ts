@@ -6,7 +6,7 @@
 //   them; never two in one season (a clash is a warning on /status).
 // - Reshet: an untitled season among several becomes one season per air year, numbered by position (oldest = 1),
 //   episodes by air date within the year (packages/reshet untitledSeasonsByYear).
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type Assignments,
@@ -22,7 +22,7 @@ import {
 } from '@israel-tv/core';
 import { dropCollidingHints, splitKeys, untitledSeasonsByYear } from '@israel-tv/reshet';
 import type { Store } from '@israel-tv/store';
-import { sanctionNumbering } from './numbering-guard.ts';
+import { sanctionNumbering, sanctionShow } from './numbering-guard.ts';
 import { latestAirDate } from './runner.ts';
 
 export const MIGRATIONS_KEY = 'numbering:migrations';
@@ -654,6 +654,66 @@ function refreshed(show: ScrapedShow): ScrapedShow {
 
 const NUMBERING_CODES = ['source-renumbered', 'episode-number-taken', 'numbers-reversed'] as const;
 
+/** One show's numbers by the numbering-right rules (seasonTargets): what moves, and its data as today's readers give it. */
+function planRight(
+  store: Pick<Store, 'assignments'>,
+  row: { seriesId: string; title: string; show: ScrapedShow },
+): {
+  show: ScrapedShow;
+  next: Assignments;
+  moves: RightMove[];
+  /** Per season that moved: its rule and how many episodes. */
+  seasonMoves: { rule: SeasonRule; count: number }[];
+  repeats: RightReport['repeats'];
+  dataChanged: boolean;
+} {
+  const show = refreshed(row.show);
+  const a = store.assignments(row.seriesId);
+  const seasonOf = new Map(a.seasons.map((s) => [s.key, s]));
+  const before = new Map(row.show.seasons.flatMap((s) => s.episodes.map((e) => [e.key, e.title])));
+  for (const s of show.seasons) for (const e of s.episodes) before.delete(e.key);
+  const repeats = [...before].map(([key, title]) => ({ seriesId: row.seriesId, key, title }));
+  const moved = new Map<string, number>();
+  const moves: RightMove[] = [];
+  const seasonMoves: { rule: SeasonRule; count: number }[] = [];
+  for (const season of show.seasons) {
+    const sa = seasonOf.get(season.key);
+    if (!sa) continue;
+    const { rule, numbers } = seasonTargets(season, sa.number, a.episodes);
+    const titles = new Map(season.episodes.map((e) => [e.key, e.title]));
+    let count = 0;
+    for (const r of a.episodes) {
+      const to = r.season === sa.number ? numbers.get(r.key) : undefined;
+      if (to === undefined || to === r.episode) continue;
+      count++;
+      moved.set(r.key, to);
+      moves.push({
+        seriesId: row.seriesId,
+        source: row.show.source,
+        rule,
+        show: row.title,
+        season: sa.number,
+        key: r.key,
+        title: titles.get(r.key) ?? '(no longer listed by the source)',
+        from: r.episode,
+        to,
+      });
+    }
+    if (count > 0) seasonMoves.push({ rule, count });
+  }
+  return {
+    show,
+    next: {
+      seasons: a.seasons,
+      episodes: a.episodes.map((e) => (moved.has(e.key) ? { ...e, episode: moved.get(e.key) as number } : e)),
+    },
+    moves,
+    seasonMoves,
+    repeats,
+    dataChanged: JSON.stringify(show) !== JSON.stringify(row.show),
+  };
+}
+
 /** Run numbering-right-2026-11-08 once (undefined when it already ran); `dryRun` changes nothing. */
 export function renumberRight(
   store: Store,
@@ -680,39 +740,10 @@ export function renumberRight(
     dataChanged: boolean;
   }[] = [];
   for (const row of store.listShows()) {
-    const show = refreshed(row.show);
-    const a = store.assignments(row.seriesId);
-    const seasonOf = new Map(a.seasons.map((s) => [s.key, s]));
-    const before = new Map(row.show.seasons.flatMap((s) => s.episodes.map((e) => [e.key, e.title])));
-    for (const s of show.seasons) for (const e of s.episodes) before.delete(e.key);
-    for (const [key, title] of before) report.repeats.push({ seriesId: row.seriesId, key, title });
-    const moved = new Map<string, number>();
-    let seasons = 0;
-    for (const season of show.seasons) {
-      const sa = seasonOf.get(season.key);
-      if (!sa) continue;
-      const { rule, numbers } = seasonTargets(season, sa.number, a.episodes);
-      const titles = new Map(season.episodes.map((e) => [e.key, e.title]));
-      let count = 0;
-      for (const r of a.episodes) {
-        const to = r.season === sa.number ? numbers.get(r.key) : undefined;
-        if (to === undefined || to === r.episode) continue;
-        count++;
-        moved.set(r.key, to);
-        report.moves.push({
-          seriesId: row.seriesId,
-          source: row.show.source,
-          rule,
-          show: row.title,
-          season: sa.number,
-          key: r.key,
-          title: titles.get(r.key) ?? '(no longer listed by the source)',
-          from: r.episode,
-          to,
-        });
-      }
-      if (count === 0) continue;
-      seasons++;
+    const plan = planRight(store, row);
+    report.repeats.push(...plan.repeats);
+    report.moves.push(...plan.moves);
+    for (const { rule, count } of plan.seasonMoves) {
       const bySource = report.counts[row.show.source] ?? {};
       report.counts[row.show.source] = bySource;
       const c = bySource[rule] ?? { seasons: 0, episodes: 0 };
@@ -720,21 +751,16 @@ export function renumberRight(
       c.seasons++;
       c.episodes += count;
     }
-    if (moved.size > 0) {
+    if (plan.moves.length > 0) {
       report.shows++;
-      report.seasons += seasons;
+      report.seasons += plan.seasonMoves.length;
     }
     plans.push({
       seriesId: row.seriesId,
-      show,
-      next: {
-        seasons: a.seasons,
-        episodes: a.episodes.map((e) =>
-          moved.has(e.key) ? { ...e, episode: moved.get(e.key) as number } : e,
-        ),
-      },
-      moved: moved.size > 0,
-      dataChanged: JSON.stringify(show) !== JSON.stringify(row.show),
+      show: plan.show,
+      next: plan.next,
+      moved: plan.moves.length > 0,
+      dataChanged: plan.dataChanged,
     });
   }
   // What the numbering rules still say about the new numbers (expected: nothing).
@@ -794,4 +820,75 @@ export function rightLine(r: RightReport): string {
     .map((m) => `${m.seriesId} S${m.season}E${m.from}→E${m.to} "${m.title}"`)
     .join('; ');
   return `one-time renumber ${r.id}: ${r.moves.length} episodes moved in ${r.seasons} seasons of ${r.shows} shows (${counts || 'none'})${sample ? `, e.g. ${sample}` : ''}; ${r.repeats.length} repeated listings left out; ${r.warningsCleared} numbering warnings re-derived, ${r.warningsLeft} left; backup ${r.backup ?? 'none (dry run)'}`;
+}
+
+// kan-full-lists-2026-11-08 (round of 2026-11-08, under the owner's "dont leave anything, i dont mind if it will
+// discard my watching progress"): Kan shows were read from their show pages, which link only part of a long show
+// (kan.ts FULL_LISTS); their older episodes are now read from Kan's full list. Extras and specials read before them
+// (without a printed number) took the next numbers, which printed episodes read now need (קופה ראשית season 1: six
+// extras at 17–23, while Kan's season 1 runs to "פרק 21"). So when a refilled show's backlog is all read, its seasons
+// are numbered once more by the numbering-right rules (seasonTargets), that show only: printed numbers to their
+// episodes, extras after them. A backup before the first such show, every move in the log, in the database and in a
+// .moves.json next to the backup; the guard's history is re-taken for that show only.
+export const KAN_FULL_LISTS = 'kan-full-lists-2026-11-08';
+
+export interface ShowRenumber {
+  seriesId: string;
+  moves: RightMove[];
+  backup?: string;
+}
+
+/** Number one refilled Kan show again by the numbering-right rules (see KAN_FULL_LISTS). */
+export function renumberKanShow(store: Store, seriesId: string, backupDir: string): ShowRenumber {
+  const row = store.getShow(seriesId);
+  if (!row) return { seriesId, moves: [] };
+  const plan = planRight(store, { seriesId, title: row.show.title, show: row.show });
+  const result: ShowRenumber = { seriesId, moves: plan.moves };
+  const backup = join(backupDir, `before-${KAN_FULL_LISTS}.sqlite`);
+  if (plan.moves.length > 0 && !existsSync(backup)) {
+    mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    store.backupTo(backup);
+    result.backup = backup;
+  }
+  const runId = store.startRun('show', 'renumber');
+  store.transaction(() => {
+    if (plan.moves.length > 0) store.replaceAssignments(seriesId, plan.next);
+    // The numbering notes of this show are re-derived from its new numbers.
+    store.clearWarnings(seriesId, NUMBERING_CODES);
+    store.addWarnings(
+      runId,
+      seriesId,
+      assignNumbers(plan.show, plan.next).warnings.filter((w) =>
+        (NUMBERING_CODES as readonly string[]).includes(w.code),
+      ),
+    );
+    if (plan.dataChanged) {
+      store.saveShow(seriesId, plan.show, { seasons: [], episodes: [] }, latestAirDate(plan.show), false);
+      store.restoreShowState(seriesId, row);
+    }
+    const key = `${MIGRATIONS_KEY}:${KAN_FULL_LISTS}`;
+    const so = store.getState<{ shows: number; moved: number; at?: string }>(key) ?? { shows: 0, moved: 0 };
+    store.setState(key, {
+      shows: so.shows + 1,
+      moved: so.moved + plan.moves.length,
+      at: new Date().toISOString(),
+    });
+    sanctionShow(store, seriesId);
+  });
+  if (plan.moves.length > 0) {
+    const file = backup.replace(/\.sqlite$/, '.moves.json');
+    const earlier: RightMove[] = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : [];
+    writeFileSync(file, JSON.stringify([...earlier, ...plan.moves], null, 1), { mode: 0o600 });
+  }
+  store.finishRun(runId, { status: 'ok', showsOk: 1, requests: 0 });
+  return result;
+}
+
+/** One line for the service log. */
+export function showRenumberLine(r: ShowRenumber): string {
+  const sample = r.moves
+    .slice(0, 5)
+    .map((m) => `S${m.season}E${m.from}→E${m.to} "${m.title}"`)
+    .join('; ');
+  return `one-time renumber ${KAN_FULL_LISTS} of ${r.seriesId}: ${r.moves.length} episodes moved${sample ? ` (${sample})` : ''}${r.backup ? `; backup ${r.backup}` : ''}`;
 }

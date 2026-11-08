@@ -59,3 +59,22 @@ test("an item with Kan's rights-ended note is left to its page, even with a Kalt
   });
   expect(p.items[0]?.stream).toEqual({ kind: 'other' });
 });
+
+test("a show's whole list from the app, with each episode's web page (recorded 2026-11-08)", () => {
+  // קופה ראשית: 121 items; every one with a web page is under the show's address (s1 … s6, or none for extras).
+  const p = parseAppProgram(json('app-program-12832'));
+  expect(p.items).toHaveLength(121);
+  const withPage = p.items.filter((i) => i.pageUrl);
+  expect(
+    withPage.every((i) => i.pageUrl?.startsWith('https://www.kan.org.il/content/kan/kan-11/p-12832/')),
+  ).toBe(true);
+  expect(withPage.every((i) => i.pageUrl?.endsWith(`/${i.id}/`))).toBe(true);
+  // Items without a web page play from YouTube: nothing to read.
+  expect(p.items.filter((i) => !i.pageUrl).every((i) => i.stream.kind === 'other')).toBe(true);
+  const seasons = new Map<number, number>();
+  for (const i of p.items) seasons.set(i.seasonNumber ?? 0, (seasons.get(i.seasonNumber ?? 0) ?? 0) + 1);
+  expect(seasons.get(3)).toBe(20);
+  // An archive show names its episode pages (s1/rebirth-1/): the app gives each one's page id.
+  const named = parseAppProgram(json('app-program-671191'));
+  expect(named.items.find((i) => i.pageUrl?.endsWith('/s1/rebirth-1/'))?.id).toBe('679009');
+});

@@ -2254,3 +2254,47 @@ it airs next.
   later. Only the show's own meta carries it; catalog rows do not (every row page would change with every airing).
   Meta files are data, not pages, so IndexNow is not involved. Stremio's own guide grid already had the programmes
   (`epgProvider`, `metasDetailed`); nothing there changed, and programmes are still never a channel's `videos`.
+
+## Kan's full episode lists (2026-11-08)
+
+**Reported:** קופה ראשית showed seasons 3, 4 and 5 with one episode each. **Measured** in a browser that day: Kan has
+116 episodes in six seasons (21/20/20/23/24/8); the catalog had 34. Across the 198 shows whose app list answered (of
+339 with a numeric id; the rest were cut off by Cloudflare's rate limit during the measurement), Kan's app listed
+1,442 more episodes than the catalog held, over 65 shows (פגישה עם רוני קובן 222 vs 36, כאן ספיישלים 184 vs 4, ערב עם שי
+שטרן 180 vs 34, תקומה 23 vs 1). `/status` said nothing, because the crawl had read everything it had found.
+
+**Causes**, both in finding episodes, none in reading them:
+
+- **A show page links only part of a show.** It links the current season in full, a few episodes of each older
+  season, and the season pages (`s1/` … `s6/`), and it loads the rest only on "טען עוד"
+  (`?page=2&itemsToShow=10&lastLoadedSeasonId=…`). The season tabs miss seasons too: בואו לאכול איתי's page has tabs for
+  2–12 but none for 1 or 7. Reading season pages would not have been complete.
+- **Named episode addresses were not episodes.** Most of the archive's shows and a few kids shows give their episodes
+  a name, `s1/rebirth-1/`, rather than the numeric page id the parser required. 85 such episodes are in the
+  measured lists.
+
+**Fix:**
+
+- **Each show's full list comes from Kan's app** (`program?id=…`, already read in the same cleared browser session for
+  naming episodes), along with the show page's links. Every item whose web page is under the show's own address is an
+  episode page to read; its page id is the app item's id, so named addresses have ids before they are read (and learn
+  them from the page's player when the app does not list them). Ids and numbers still come from the pages' rules, in
+  page-id order (`episodeOrder`). Items with no web page play from YouTube; they are counted and not read.
+- **Upgrade:** every show read the older way is due at once (`ShowState.lists`, `FULL_LISTS`). The list is one app
+  request per show (its own budget, 20 a slice), and app-trusted shows name their episodes in bulk. The older
+  episodes are backlog, never "newly published": no show turns "airing" because of them.
+- **Numbers:** extras read before a show's older episodes took the numbers those episodes print (קופה ראשית season 1:
+  six extras at E17–E23, Kan's season 1 runs to "פרק 20"). A show whose full list found older episodes is marked
+  `refill`. Until its backlog is read, a printed episode whose number a stored episode holds waits (never published
+  under a stand-in number). Then that show alone is numbered once more by the numbering-right rules (`seasonTargets`):
+  printed numbers to their episodes, extras after them. This is a recorded migration, `kan-full-lists-2026-11-08`,
+  under the owner's "dont leave anything, i dont mind if it will discard my watching progress": a backup before the
+  first such show, every move in the log, in the database and in `before-kan-full-lists-2026-11-08.moves.json`, and the
+  guard's history re-taken for that show only (`sanctionShow`), so a move anywhere else still stops a publish.
+- **Visible on `/status`:** the backfill's progress (`kan-full-lists`), shows Kan's app does not list, read from their
+  pages only (`kan-pages-only`: a long one's older episodes may be missing), and YouTube-only items
+  (`kan-no-web-page`).
+
+Not changed: extras Kan's app files under season 0 stay in season 1, where their pages' players put them (moving
+them to a specials season would move numbers viewers have); a show page's "טען עוד" is not followed (the app list
+has every episode; the few shows the app does not list are named on `/status`).

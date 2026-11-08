@@ -118,6 +118,24 @@ export function noteText(note: StatusNote, english: string | undefined, lang: La
         ? `${c === 1 ? 'תוכנית אחת ממתינה' : `${num(c, 'he')} תוכניות ממתינות`} לקריאה חוזרת של דף פרק שלא נטען (עד ${num(n(p, 'tries'), 'he')} ניסיונות, בהפרש של ${num(n(p, 'hours'), 'he')} שעות). הפרקים הבאים ${c === 1 ? 'שלה' : 'שלהן'} ממתינים לו.`
         : `${enCount(c, 'show waits', 'shows wait')} to read again an episode page that failed to load (up to ${n(p, 'tries')} tries, ${n(p, 'hours')} hours apart); the later episodes wait for it.`;
     }
+    case 'kan-full-lists': {
+      const pages = n(p, 'pages');
+      return he
+        ? `קוראים את רשימות הפרקים המלאות של כאן: ${num(n(p, 'done'), 'he')} מתוך ${num(n(p, 'shows'), 'he')} תוכניות נקראו${pages > 0 ? `, ועוד ${num(pages, 'he')} פרקים ישנים שנמצאו בהן ממתינים לקריאה` : ''}.`
+        : `Reading Kan’s full episode lists: ${num(n(p, 'done'))} of ${num(n(p, 'shows'))} shows done${pages > 0 ? `; ${num(pages)} older episodes found in them still to read` : ''}.`;
+    }
+    case 'kan-pages-only': {
+      const c = n(p, 'count');
+      return he
+        ? `${c === 1 ? 'תוכנית אחת לא מופיעה' : `${num(c, 'he')} תוכניות לא מופיעות`} באפליקציה של כאן, ולכן נקראים רק הפרקים שהדף ${c === 1 ? 'שלה' : 'שלהן'} מקשר אליהם (ייתכן שחסרים פרקים ישנים).`
+        : `${enCount(c, 'show is', 'shows are')} not in Kan’s app, so only the episodes their pages link are read (older ones may be missing).`;
+    }
+    case 'kan-no-web-page': {
+      const c = n(p, 'count');
+      return he
+        ? `${c === 1 ? 'פריט אחד' : `${num(c, 'he')} פריטים`} ברשימות של כאן ${c === 1 ? 'מנוגן' : 'מנוגנים'} מיוטיוב ואין ${c === 1 ? 'לו' : 'להם'} דף באתר, ולכן ${c === 1 ? 'הוא לא' : 'הם לא'} בקטלוג.`
+        : `${enCount(c, 'item', 'items')} in Kan’s lists ${c === 1 ? 'plays' : 'play'} from YouTube with no web page, so ${c === 1 ? 'it is' : 'they are'} not in the catalog.`;
+    }
     case 'kan-gave-up': {
       const c = n(p, 'count');
       return he

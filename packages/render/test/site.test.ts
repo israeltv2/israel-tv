@@ -374,3 +374,21 @@ test('the landing page without a known address: the script fills in the install 
   expect(html).toContain('href="/manifest.json" data-stremio');
   expect(html).not.toMatch(/donat|sponsor|patreon|ko-fi|buymeacoffee|google-analytics|gtag/i);
 });
+
+test("Kan's full lists on the status page: progress, shows the app does not list, YouTube-only items", async () => {
+  const { noteText } = await import('../src/status-words.ts');
+  const say = (code: string, params: Record<string, number>, lang: 'he' | 'en') =>
+    String(noteText({ code, params }, undefined, lang));
+  expect(say('kan-full-lists', { done: 120, shows: 361, pages: 1442 }, 'he')).toBe(
+    'קוראים את רשימות הפרקים המלאות של כאן: 120 מתוך 361 תוכניות נקראו, ועוד 1,442 פרקים ישנים שנמצאו בהן ממתינים לקריאה.',
+  );
+  expect(say('kan-full-lists', { done: 361, shows: 361, pages: 0 }, 'en')).toBe(
+    'Reading Kan’s full episode lists: 361 of 361 shows done.',
+  );
+  expect(say('kan-pages-only', { count: 1 }, 'he')).toBe(
+    'תוכנית אחת לא מופיעה באפליקציה של כאן, ולכן נקראים רק הפרקים שהדף שלה מקשר אליהם (ייתכן שחסרים פרקים ישנים).',
+  );
+  expect(say('kan-no-web-page', { count: 35 }, 'he')).toBe(
+    '35 פריטים ברשימות של כאן מנוגנים מיוטיוב ואין להם דף באתר, ולכן הם לא בקטלוג.',
+  );
+});

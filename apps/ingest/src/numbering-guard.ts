@@ -35,3 +35,19 @@ export function checkNumbering(store: Store): GuardResult {
 export function sanctionNumbering(store: Store): void {
   store.setState(NUMBERING_HISTORY, store.numberingNow());
 }
+
+/**
+ * After a recorded migration moved one show's numbers on purpose: that show's stored numbers are its history from
+ * now on; every other show's history stays as it was (a move elsewhere still stops the publish).
+ */
+export function sanctionShow(store: Store, seriesId: string): void {
+  const history = store.getState<Record<string, string>>(NUMBERING_HISTORY);
+  if (!history) {
+    sanctionNumbering(store);
+    return;
+  }
+  const prefix = `${seriesId}|`;
+  const next = Object.fromEntries(Object.entries(history).filter(([k]) => !k.startsWith(prefix)));
+  for (const [k, v] of Object.entries(store.numberingNow())) if (k.startsWith(prefix)) next[k] = v;
+  store.setState(NUMBERING_HISTORY, next);
+}
