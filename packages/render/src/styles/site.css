@@ -536,14 +536,17 @@ details > summary {
   gap: 12px;
   align-items: center;
 }
-/* An accordion header's focus ring sits inside its box, quietly: visible, not a frame around the whole card. */
+/* An accordion header is a control, not text: a click or double click toggles it and never selects its words. Its
+   focus ring (keyboard only) sits just inside the box, the same ring as everywhere else, with no tint that could read
+   as a selection. */
 details > summary {
-  border-radius: 14px;
+  border-radius: 13px;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 details > summary:focus-visible {
-  outline-offset: -2px;
-  outline-width: 1.5px;
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  outline-offset: -3px;
 }
 details > summary::-webkit-details-marker {
   display: none;
@@ -564,6 +567,14 @@ details > summary::before {
 details[open] > summary::before,
 [dir="rtl"] details[open] > summary::before {
   transform: rotate(45deg);
+}
+/* Opening and closing move: the shared script (site.js, "Accordions") grows or shrinks the box to its height while the
+   body fades. Not CSS alone (::details-content with interpolate-size): WebKit animates the opening that way but not
+   the closing. Reduced motion, or no script: they toggle at once. */
+@media (prefers-reduced-motion: no-preference) {
+  details > summary::before {
+    transition-duration: 0.3s;
+  }
 }
 details > .body {
   padding: 0 16px 16px;

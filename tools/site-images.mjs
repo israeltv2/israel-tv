@@ -1,8 +1,10 @@
 // `pnpm images:site`: make the public pages' images from the branding (assets/branding) into assets/site: the
 // favicon set (favicon.ico from icon.svg; PNG icons and the Apple touch icon from the logo), the 1200×630 share
-// image and a lighter copy of the background for the landing page's header. Run it after changing the branding and
-// commit the results; publishing only copies them. Uses the installed Chrome (Edge on Windows) through Playwright.
-import { readFileSync, writeFileSync } from 'node:fs';
+// image and a lighter copy of the background for the landing page's header; and from each live channel's logo
+// (assets/logos/*.png, 512 px, which the apps get) the pages' small WebP copy (assets/logos/site, 128 px: the largest
+// logo tile is 64 px). Run it after changing the branding or a logo and commit the results (`--logos`: only the logos);
+// publishing only copies them. Uses the installed Chrome (Edge on Windows) through Playwright.
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
@@ -46,6 +48,37 @@ function ico(images) {
     offset += png.length;
   });
   return Buffer.concat([head, ...images.map((x) => x.png)]);
+}
+
+// The channel logos for the pages: 128 px WebP (lossy with alpha), from the 512 px PNGs.
+const logos = join(repo, 'assets/logos');
+mkdirSync(join(logos, 'site'), { recursive: true });
+for (const file of readdirSync(logos).filter((f) => f.endsWith('.png'))) {
+  await page.setContent('<body></body>');
+  const webp = await page.evaluate(
+    async (src) => {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 128;
+      const g = c.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, 0, 0, 128, 128);
+      return c.toDataURL('image/webp', 0.9);
+    },
+    dataUrl(join(logos, file), 'image/png'),
+  );
+  writeFileSync(
+    join(logos, 'site', file.replace(/\.png$/, '.webp')),
+    Buffer.from(webp.split(',')[1], 'base64'),
+  );
+}
+if (process.argv.includes('--logos')) {
+  await browser.close();
+  console.log(`wrote the logos' site copies to ${join(logos, 'site')}`);
+  process.exit(0);
 }
 
 const small = [];

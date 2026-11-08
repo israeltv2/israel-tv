@@ -465,7 +465,7 @@ function showPage(s: LibraryShow, row: LibraryRow): string {
       ...(posterUrl ? { image: posterUrl } : {}),
     },
     html`<header class="show-hero">${m.background ? html`<img class="bg" src="${sized(m.background, 1280)}" alt="" fetchpriority="low" decoding="async">` : ''}<div class="wrap">
-${poster ? html`<img class="poster" src="${poster}" alt="" width="260" height="390" style="view-transition-name:${vtName(m.id)}">` : raw('<span></span>')}
+${poster ? html`<img class="poster" src="${poster}" alt="" width="260" height="390" fetchpriority="high" style="view-transition-name:${vtName(m.id)}">` : raw('<span></span>')}
 <div>
 <nav aria-label="מיקום"><ol class="crumbs"><li><a href="/library/">ספרייה</a></li><li><a href="${rowHref(row.id)}">${rowName(row.id)}</a></li></ol></nav>
 <h1 dir="auto">${name}</h1>

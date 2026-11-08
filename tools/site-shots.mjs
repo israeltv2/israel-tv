@@ -45,8 +45,10 @@ write(sitePaths.webManifest, webManifest());
 write(sitePaths.manifest, JSON.stringify({ id: 'fixture', name: LANDING.name }));
 cpSync(join(repo, 'assets/site'), dir, { recursive: true });
 mkdirSync(join(dir, 'logos'));
-for (const f of readdirSync(join(repo, 'assets/logos')))
+for (const f of readdirSync(join(repo, 'assets/logos')).filter((x) => x.endsWith('.png')))
   copyFileSync(join(repo, 'assets/logos', f), join(dir, 'logos', f));
+for (const f of readdirSync(join(repo, 'assets/logos/site')))
+  copyFileSync(join(repo, 'assets/logos/site', f), join(dir, 'logos', f));
 
 const port = serveOnly ? 7790 : 7791;
 await listen(localAddonApp(dir).fetch, '127.0.0.1', port, '--port');

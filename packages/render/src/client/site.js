@@ -96,6 +96,50 @@
     tick.classList.add('on');
   }
 
+  // Accordions (<details>): opening and closing move, the box growing or shrinking to its height (300 ms) while its
+  // body fades (200 ms). A click during the motion turns it around from where it is. With reduced motion they toggle
+  // at once.
+  const ease = 'cubic-bezier(0.23, 1, 0.32, 1)';
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches && root.animate) {
+    const shut = (det) =>
+      det.querySelector(':scope > summary').offsetHeight + det.offsetHeight - det.clientHeight;
+    d.addEventListener('click', (e) => {
+      const summary = e.target.closest?.('details > summary');
+      if (!summary || e.defaultPrevented || e.button) return;
+      const det = summary.parentElement;
+      e.preventDefault();
+      const from = det.getBoundingClientRect().height;
+      det.motion?.cancel();
+      const opening = !det.open || det.dataset.closing === '1';
+      det.open = true;
+      const to = opening ? det.offsetHeight : shut(det);
+      det.dataset.closing = opening ? '' : '1';
+      det.style.overflow = 'clip';
+      const body = [...det.children].filter((c) => c !== summary);
+      // A fade turned around starts from where it was.
+      const shown = body.map((c) => (det.fades?.length ? +getComputedStyle(c).opacity : opening ? 0 : 1));
+      for (const f of det.fades ?? []) f.cancel();
+      det.fades = body.map((c, i) =>
+        c.animate({ opacity: [shown[i], opening ? 1 : 0] }, { duration: 200, fill: 'forwards' }),
+      );
+      // Held at its end until the box is closed (or let go), so no frame shows it open again in between.
+      const motion = det.animate(
+        { height: [`${from}px`, `${to}px`] },
+        { duration: 300, easing: ease, fill: 'forwards' },
+      );
+      det.motion = motion;
+      motion.onfinish = () => {
+        motion.cancel();
+        det.motion = null;
+        det.style.overflow = '';
+        det.dataset.closing = '';
+        if (!opening) det.open = false;
+        for (const f of det.fades) f.cancel();
+        det.fades = [];
+      };
+    });
+  }
+
   // The live guide: hide what ended, mark what is on (with its progress), show the next few.
   const air = () => {
     const now = Date.now();

@@ -129,7 +129,10 @@ The pages are plain static files (about 1,100 next to the catalog's ~3,700; the 
 pages change only when their show does, and the live guide is written in whole (its first 36 hours) rather than cut
 at the moment of publishing, so a quiet run uploads none of them; the page's script hides what has ended and shows
 what is on. Images stay where the broadcasters host them, asked for at the size shown where their image service
-can resize (Reshet, Kan). `sitemap.xml` lists every row, show and the live page. Nothing plays on the website
+can resize (Reshet, Kan). A portrait poster over 100 KB on a host that cannot resize (Keshet 12's are often 200+ KB) is
+published as our own lighter copy (`art/<id>-poster.jpg`, at most 400 px wide, used by the apps too); channel logos
+on the pages are 128 px WebP copies of the 512 px PNGs the apps get (`assets/logos/site`, made by
+`pnpm images:site --logos`). Browsers keep the fonts a year, logos a week and artwork a day (`_headers`). `sitemap.xml` lists every row, show and the live page. Nothing plays on the website
 (see decisions.md, "Round 9"). An address that does not exist gets `404.html` (Hebrew and English, with search and the
 ways back in); on Cloudflare through `not_found_handling: "404-page"`, in the local server for browsers (apps get JSON).
 

@@ -63,9 +63,11 @@ export const sitePaths = {
   logo: 'logo.png',
   background: 'background.jpg',
   channelLogo: (id: string) => `logos/${id}.png`,
+  /** The same logo, small, for the website's logo tiles. */
+  channelLogoSite: (id: string) => `logos/${id}.webp`,
   /** Our copy of a show's artwork (sources whose images are refused outside Israel). */
   artwork: (seriesId: string) => `art/${seriesId}.jpg`,
-  /** A show's portrait poster made by us (its own image was not portrait). */
+  /** A show's poster made by us (its own image was not portrait, or was needlessly heavy). */
   poster: (seriesId: string) => `art/${seriesId}-poster.jpg`,
   /** The poster for a show whose image cannot be published yet. */
   posterPlaceholder: 'art/placeholder-poster.jpg',

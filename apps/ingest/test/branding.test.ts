@@ -17,12 +17,16 @@ test('the local server serves images and fills the origin into JSON', async () =
   const dir = mkdtempSync(join(tmpdir(), 'site-'));
   mkdirSync(join(dir, 'logos'));
   writeFileSync(join(dir, 'logos', 'iltv_live_kan11.png'), 'png');
+  writeFileSync(join(dir, 'logos', 'iltv_live_kan11.webp'), 'webp');
   writeFileSync(join(dir, 'logo.png'), 'png');
   writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ logo: '{{israel-tv-origin}}/logo.png' }));
   const app = localAddonApp(dir);
   const img = await app.request('http://home:7700/logos/iltv_live_kan11.png');
   expect(img.status).toBe(200);
   expect(img.headers.get('content-type')).toBe('image/png');
+  expect((await app.request('http://home:7700/logos/iltv_live_kan11.webp')).headers.get('content-type')).toBe(
+    'image/webp',
+  );
   expect((await app.request('http://home:7700/logo.png')).status).toBe(200);
   expect((await app.request('http://home:7700/logos/..%2Fmanifest.json')).status).toBe(404);
   expect(
@@ -48,9 +52,14 @@ test("the resolver's manifest names its own logo and background", async () => {
 
 test('every live channel has a logo tile, and its meta points at our copy', async () => {
   const { LIVE_CHANNELS } = await import('@israel-tv/core');
-  const { channelLogo } = await import('@israel-tv/resolver');
+  const { channelLogo, channelLogoSite } = await import('@israel-tv/resolver');
+  const { imageSize } = await import('../src/posters.ts');
   const { liveRender } = await import('../src/live.ts');
-  for (const c of LIVE_CHANNELS) expect(channelLogo(c.id), c.id).toBeDefined();
+  for (const c of LIVE_CHANNELS) {
+    expect(channelLogo(c.id), c.id).toBeDefined();
+    // The pages' small copy (pnpm images:site --logos): 128 px WebP.
+    expect(imageSize(channelLogoSite(c.id) ?? new Uint8Array()), c.id).toEqual({ w: 128, h: 128 });
+  }
   const live = liveRender(new Set(['iltv_live_kan11']));
   expect(live.find((c) => c.id === 'iltv_live_kan11')?.logo).toBe(
     '{{israel-tv-origin}}/logos/iltv_live_kan11.png',

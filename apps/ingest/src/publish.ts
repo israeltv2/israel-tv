@@ -31,7 +31,7 @@ import {
   renderStatusHtml,
   type SiteFiles,
 } from '@israel-tv/render';
-import { brandImage, channelLogo } from '@israel-tv/resolver';
+import { brandImage, channelLogo, channelLogoSite } from '@israel-tv/resolver';
 import { RELEASE_VERSION, scrub, secretValues } from '@israel-tv/runtime';
 import type { RunKind, ShowRow, Store } from '@israel-tv/store';
 import { auditSite } from './catalog-audit.ts';
@@ -569,8 +569,11 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   if (config.sources.live && !hiddenSources.has('live')) {
     for (const c of LIVE_CHANNELS) {
       const png = channelLogo(c.id);
-      if (png) {
+      const webp = channelLogoSite(c.id);
+      // The pages show the small copy; the apps get the PNG. A logo is shown only with both.
+      if (png && webp) {
         assets.set(sitePaths.channelLogo(c.id), png);
+        assets.set(sitePaths.channelLogoSite(c.id), webp);
         logos.add(c.id);
       }
     }
@@ -657,6 +660,8 @@ const NOINDEX = [
 /**
  * Cloudflare's static-asset headers. Every matching rule applies, values added up, so a rule that sets its own
  * Cache-Control first detaches the one from `/*` (`! Cache-Control`): one value per response.
+ * Files that do not change are kept by browsers: the fonts for a year (a changed font gets a new file name), channel
+ * logos for a week and show artwork for a day, each re-checked in the background after that.
  */
 export const HEADERS_FILE = `/*
   Access-Control-Allow-Origin: *
@@ -675,6 +680,15 @@ export const HEADERS_FILE = `/*
 /he/status*
   ! Cache-Control
   Cache-Control: no-store
+/fonts/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+/logos/*
+  ! Cache-Control
+  Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
+/art/*
+  ! Cache-Control
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 ${NOINDEX.map((p) => `${p}\n  X-Robots-Tag: noindex`).join('\n')}
 `;
 

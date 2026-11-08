@@ -2140,3 +2140,48 @@ one-off specials (a page with one featured video) now take the video's own still
 not for an entry Kaltura no longer has. Both fill on the next read. The 8 Kan items without one (5 opening clips,
 "פתיח", and 3 episodes whose pages carry no image) keep the numbered tile: the show's backdrop in its place would
 look like a still of that episode, and the website draws the same numbered tile.
+||||||| parent of 9886ee8 (feat(site): accordions open and close with motion, lighter posters and logos)
+
+## Site motion and page weight (2026-11-08)
+
+**Accordions move.** Every `<details>` on the site (show page seasons, the status page's contributor details and
+their inner groups, the landing page's questions) opens and closes with the same motion: the box grows or shrinks to
+its height (300 ms, the site's ease-out) while its body fades (200 ms), and a click during the motion turns it around
+from where it is. The shared script does it with the Web Animations API, not CSS alone: `::details-content` with
+`interpolate-size: allow-keywords` animated the opening in WebKit 27 (Playwright) but not the closing, so one script
+path serves Chromium, WebKit and Firefox alike, tested frame by frame (height monotonic both ways, no frame shown open
+again after a close, reversal mid-way). Reduced motion or no script: they toggle at once. A season's header is a
+control: `user-select: none` (a click or double click no longer selects "עונה 6"), and its keyboard focus is the
+site's ring drawn just inside the box, without the tint that read as a selection. On screens 1100 px and wider the
+episodes are two to a row (right to left), instead of one narrow column beside an empty half.
+
+**Page weight, measured first** (Lighthouse 12.8.2 on the live site, mobile / desktop performance score, LCP):
+
+| Page                                          | Mobile            | Desktop | Bytes      | Notes                                  |
+| --------------------------------------------- | ----------------- | ------- | ---------- | -------------------------------------- |
+| `/`, `/he/`                                   | 99–100, 1.7–1.9 s | 99–100  | 3.1 MB     | LCP is the headline; bytes are posters |
+| `/library/`                                   | 98, 2.0 s         | 98      | 3.9 MB     |                                        |
+| `/live/`, `/search/`, `/status`, `/he/status` | 99–100            | 100     | 0.1–0.6 MB |                                        |
+| largest show (1,833 episodes, 480 listed)     | 95, 2.9 s         | 99      | 2.4 MB     | HTML 250 KB, 28 KB compressed          |
+| a small show (6 episodes)                     | 88, 3.9 s         | 98      | 1.2 MB     | LCP: a 373 KB PNG poster               |
+| another small show (6 episodes)               | 95, 2.9 s         | 99      | 1.1 MB     | LCP: a 157 KB JPEG poster              |
+
+Blocking time was 0 and layout shift ≤ 0.011 everywhere; HTML is compressed by Cloudflare (250 KB → 28 KB), so the
+episode lists were left as they are (480 episodes is the cap; lazy seasons would cost the pages their content for
+search engines and save little). What was slow was images: show pages wait for the poster (LCP), and Keshet 12's
+posters are 420×600 JPEGs of 150–260 KB, which their CDN does not resize (`imwidth`, `width`, `w` all ignored).
+
+- **Heavy posters get a lighter copy of ours**: when a portrait JPEG poster is over 100 KB on a host that cannot
+  resize, the poster check (`measurePosters`) re-encodes it at most 400 px wide (quality 80, `jpeg-js`, already a
+  dependency) and keeps it if it is at most 60% of the original: e.g. 229 KB → 56 KB. It is published at
+  `art/<id>-poster.jpg` like the portrait versions, for the apps too. Posters measured before this are fetched once
+  more (Reshet's are not: Cloudinary resizes them). PNG posters stay as they are (no decoder; 4 of 660 at Keshet 12).
+- **The show page's poster is fetched first** (`fetchpriority="high"`; the backdrop already had `low`).
+- **Channel logos** on the pages were the 512 px PNGs the apps get (22 KB each, 24 of them on `/live/` and the
+  landing page): now 128 px WebP copies (1–3 KB, made by `pnpm images:site --logos`, committed); the apps keep the PNG.
+- **Browser caching**: fonts a year (`immutable`; a changed font gets a new name), channel logos a week and artwork a
+  day, both re-checked in the background after that (`stale-while-revalidate`). Pages keep 10 minutes.
+- Not done: Keshet 12's episode stills (52 KB at 624 px, shown at 200) have smaller siblings (`_c`, 435 px, 31 KB),
+  but 19% of a sample of 172 had none, and a missing still would be a broken image and a console error. Show
+  backdrops (Keshet 12's are 1920×1080, 300–400 KB) are the apps' full-screen backgrounds, so they stay; on the pages
+  they load last.
