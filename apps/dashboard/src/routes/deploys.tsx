@@ -194,6 +194,17 @@ export function Deploys() {
               ) : (
                 <HealthPill state="ok" label="Every published show page passed" />
               )}
+              {d.audit?.gaps?.length ? (
+                <div className="mt-3 text-muted text-xs">
+                  Not given by the sources (or TMDB):{' '}
+                  {d.audit.gaps
+                    .map(
+                      (g) =>
+                        `${g.source} ${num(g.noGenre)} without genres, ${num(g.noDescription)} without a description, ${num(g.noYear)} without a year (of ${num(g.shows)})`,
+                    )
+                    .join(' · ')}
+                </div>
+              ) : null}
             </CardBody>
           </Card>
         </div>

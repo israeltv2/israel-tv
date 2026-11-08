@@ -40,6 +40,16 @@ test('genres for a filter: one spelling, no "תכניות" prefix, no site secti
     'שעשועונים',
     'דוקומנטרי',
   ]);
+  // Kan's lobby cards (several in one string, archive labels, an unfilled page template) and TMDB's Hebrew names.
+  expect(
+    cleanGenres(['מוזיקה, דרמה, ילדים ונוער', 'ארכיון', 'טלוויזיה ישראלית', '$' + '{elem.Genres}']),
+  ).toEqual(['מוזיקה', 'דרמה', 'ילדים']);
+  expect(cleanGenres(['דוקו', 'דוקו ריאליטי', 'בידור ואירוח, כללי', 'דיבורים'])).toEqual([
+    'דוקומנטרי',
+    'דוקו-ריאליטי',
+    'בידור ואירוח',
+    'אירוח',
+  ]);
 });
 
 test('trailers and promos are not episodes', async () => {
@@ -65,6 +75,17 @@ test('a closing pointer to another page of the site is dropped', async () => {
   // Names in «» are not pointers.
   expect(cleanDescription('הסדרה החדשה של «כאן»')).toBe('הסדרה החדשה של «כאן»');
   expect(cleanDescription('עונה חדשה. בכיכובם של «רוני» ו«דנה»')).toBe('עונה חדשה. בכיכובם של «רוני» ו«דנה»');
+});
+
+test('a leading "<name> לצפייה ישירה -" is dropped (Reshet show site pages)', async () => {
+  const { cleanDescription } = await import('../src/tidy.ts');
+  expect(
+    cleanDescription('בני ערובה לצפייה ישירה - סדרת מתח בכיכובה של אילת זורר. יעל היא מנתחת בכירה'),
+  ).toBe('סדרת מתח בכיכובה של אילת זורר. יעל היא מנתחת בכירה');
+  // Only as a prefix: an ordinary sentence that mentions it later keeps its start.
+  expect(cleanDescription('סדרה חדשה. כל הפרקים לצפייה ישירה - באתר')).toBe(
+    'סדרה חדשה. כל הפרקים לצפייה ישירה - באתר',
+  );
 });
 
 test('descriptions lose what sites add for search engines (the live cases)', async () => {

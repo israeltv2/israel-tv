@@ -1,0 +1,150 @@
+{
+  "lastUpdate": "Thu, 15 Oct 2026 21:37:09 +0300",
+  "timestamp": 1792089429553,
+  "pageType": "Subvertical",
+  "channelId": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+  "sch": "4569fe0b46ea0a10",
+  "channelName": "עונה 1",
+  "pageUrl": "/mako-vod-keshet/kobi_maimon_standup-s1",
+  "domoPageView": {
+    "content_type": "channel",
+    "is_blocked_content": {
+      "israel": 0,
+      "international": 0
+    },
+    "channel_depth": 3,
+    "item_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+    "channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+    "page_url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1"
+  },
+  "preload": true,
+  "makoCatDFP": {
+    "cust_params": {
+      "location_sub_campaign": "%LOCATION_SUB_CAMPAIGN%",
+      "payinguser": "%IS_PAYING_USER%",
+      "video_from_time": "%VIDEO_FROM_TIME%",
+      "bundleId": "%PRODUCT_BUNDLE_ID%",
+      "pushTags": "%PUSH_TAGS%",
+      "language": "%LANGUAGE%",
+      "locale": "%LOCALE%",
+      "deviceid": "%DEVICE_ID%",
+      "version": "%VERSION%",
+      "devicetype": "%DEVICE_TYPE%",
+      "MAKOPAGE": "%GUID%",
+      "advertiserId": "%ADVERTISER_ID%",
+      "carrier": "%CARRIER%",
+      "LEVEL4": "kobimaimonstandup",
+      "osVersion": "%OS_VERSION%",
+      "LEVEL5": "s1",
+      "paidContent": "%IS_PAID_CONTENT%",
+      "appid": "%APP_ID%",
+      "makoHN": "%HOUSE_NUMBERS%",
+      "random_number": "%RANDOM_NUMBER%",
+      "osType": "%OS_TYPE%",
+      "deviceModel": "%DEVICE_MODEL%",
+      "pushTrigger": "%PUSH_TRIGGER%"
+    },
+    "iu": "/242748299/mako/vod/vod_keshet/"
+  },
+  "seo": {
+    "title": "הסטנדאפ של קובי מימון - המופע המלא לצפייה ישירה | 12+",
+    "description": "הסטנדאפ של קובי מימון - המופע המלא לצפייה ישירה. תתכוננו להיכנס לראש של קובי מימון במופע סטנדאפ מיוחד על זוגיות וחיי הנישואים",
+    "type": "tv_show",
+    "image": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_x5_autoOrient_i.jpg",
+    "canonical": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup",
+    "schema": {
+      "@context": "https://schema.org",
+      "@type": "TvSeries",
+      "name": "הסטנדאפ של קובי מימון",
+      "description": "הסטנדאפ של קובי מימון - המופע המלא לצפייה ישירה. תתכוננו להיכנס לראש של קובי מימון במופע סטנדאפ מיוחד על זוגיות וחיי הנישואים",
+      "image": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_x5_autoOrient_i.jpg",
+      "url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup",
+      "genre": [
+        "הופעות",
+        "קומדיה"
+      ],
+      "provider": {
+        "@type": "Organization",
+        "name": "תכניות קשת"
+      },
+      "publisher": {
+        "@type": "NewsMediaOrganization",
+        "name": "שידורי קשת"
+      }
+    }
+  },
+  "vod": {
+    "channelId": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+    "itemVcmId": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+    "galleryChannelId": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+    "programId": "cbe2c422d5ea0a10VgnVCM100000700a10acRCRD",
+    "mostCurrent": true,
+    "domoPlay": {
+      "content_type": "vod",
+      "channel_depth": 3,
+      "item_id": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+      "channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD"
+    },
+    "pageUrl": "/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm",
+    "domoClick": {
+      "content_type": "vod",
+      "clicked_item_id": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+      "click_type": "link",
+      "channel_depth": -1,
+      "clicked_channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+      "referring_component": "080b8750-hero-41d9-refc-e6bfe67f099c",
+      "clicked_item_url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm"
+    },
+    "iPromoType": "Program",
+    "aINT": false,
+    "aIL": true
+  },
+  "hero": {
+    "itemVcmId": "be0bd72a9f9a0a10VgnVCM100000700a10acRCRD",
+    "channelId": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+    "logo": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_logo_e.png",
+    "logoAltText": "לוגו הסטנדאפ של קובי מימון",
+    "description": "הוא שיאן גינס בסטנדאפ שכבש את הבמות הגדולות בישראל. תתכוננו להיכנס לראש של קובי מימון במופע סטנדאפ מיוחד על זוגיות וחיי הנישואים",
+    "pics": [
+      {
+        "picUrl": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_x5_re.jpg",
+        "altText": "סט הסטנדאפ של קובי מימון"
+      }
+    ],
+    "mobilePics": [
+      {
+        "picUrl": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_e_NoLogo_re.jpg",
+        "altText": "סט הסטנדאפ של קובי מימון"
+      }
+    ],
+    "buttonText": "לצפייה",
+    "makoRefComp": "Specific_Episode"
+  },
+  "menu": [],
+  "historyObject": {
+    "pageUrl": "/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm",
+    "title": "הסטנדאפ של קובי מימון",
+    "programId": "cbe2c422d5ea0a10VgnVCM100000700a10acRCRD",
+    "domoClick": {
+      "content_type": "vod",
+      "clicked_item_id": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+      "click_type": "link",
+      "channel_depth": 3,
+      "clicked_channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+      "referring_component": "ERROR_NO_REFERRER",
+      "clicked_item_url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm"
+    },
+    "picUrl": "https://img.mako.co.il/2026/09/18/Standup_180926_Kobi_Mimon_VOD_autoOrient_i.jpg",
+    "hero": {
+      "title": "הסטנדאפ של קובי מימון",
+      "extraInfo": "18.09.26",
+      "picUrl": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_x5_re.jpg",
+      "logo": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_logo_e.png",
+      "subtitle": "הסטנדאפ של קובי מימון",
+      "description": "תתכוננו להיכנס לראש של קובי מימון "
+    },
+    "buttonText": "להמשך צפייה",
+    "sch": "4569fe0b46ea0a10",
+    "seasonUrl": "/mako-vod-keshet/kobi_maimon_standup-s1"
+  }
+}

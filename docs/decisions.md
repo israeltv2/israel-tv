@@ -2030,3 +2030,39 @@ Measured on a copy of the live database and the runs/warnings of the three days 
   an episode is marked `unavailable`: kept, so its number stays reserved and returns the same if Reshet reopens it,
   but left out of the catalog, as Kan's episodes whose rights ended are; a show with nothing offered is listed on
   /status with the other shows that have nothing to watch.
+
+## Show metadata gaps: genres, descriptions, year lines (2026-11-08)
+
+Measured on the live catalog (every show's meta): no genres on all 360 Kan shows, 72 Reshet and 48 Mako; no
+description on 41 Reshet (mostly the shows read from their own site pages, iltv_reshet_226–255) and 1 Kan; no year
+line on 143 Mako and 27 Kan. Filled only from what the sources (and TMDB, for matched shows) actually say:
+
+- **Kan genres: the lobby cards.** Every lobby card names the show's genres, and the lobbies are read daily anyway
+  (no extra page): Kan 11's list has a `digital-series-genres` line (27 of its 42 recorded cards fill it), the kids
+  lobbies their cards' JSON `Genres` (all but two), the archive a line on each grid card and a list on featured ones
+  (116 of 171 after cleaning). Kan's own show and episode pages carry `"genre":[]`. Labels that say where a show sits,
+  not what it is ("ארכיון", "טלוויזיה ישראלית", "חינוכית", "כללי") and an unfilled page template are dropped; Kan's
+  names are mapped to the ones the other sources use ("דוקו" → "דוקומנטרי", "ילדים ונוער" → "ילדים"). Shows of the kids
+  row are read from Kan's kids lobbies only, so they are "ילדים" whatever else the card says. Stored shows take their
+  genres when the lobbies are read (right after this release, then daily), without a page read.
+- **Kan year lines: the app list's publication days.** The 27 shows had episodes read before air dates were kept,
+  most not due for the page re-read that dates them. A show with undated stored episodes now reads its app list (one
+  request, from the app lists' own per-slice budget; never a page, never a faster pace) at most weekly, and takes an
+  item's publication day only for the same page id and title (the app's day equals the page's: "Kan's app API").
+- **Mako year lines: the video's publication day.** All 143 were films and one-off specials (a page with one featured
+  video and no episode list). The featured video's own page, already read for its title, has schema.org
+  `video.uploadDate`; its day in Israel is the episode's air date (a dated title still wins). Kan's year lines are
+  publication days too, so the convention is the same: first and latest episode year.
+- **Reshet descriptions: the show's own site page.** Shows read from their site page (`/vod/hostages/`, no VOD record)
+  have an empty description meta on their all-shows page and a real one on the site page, which is read anyway; a
+  leading "‹name› לצפייה ישירה -" is cleaned off. The VodPlaylist template (The Voice, its All-Stars) has nothing about
+  the show itself, only per-episode texts. Reshet genres: the newer template has none, Kaltura entries have no tags or
+  categories (checked), the site pages' sections ("תרבות ובידור", "VOD") are not genres; only TMDB can fill those.
+- **TMDB, matched shows only (matching unchanged: one exact Israeli title match).** After matching, each matched
+  show's details are read in Hebrew (`/tv/<id>?language=he-IL`, at most monthly): genres (TMDB's "Talk" and "Soap"
+  mapped to "אירוח" and "אופרת סבון"), the overview when it is Hebrew, first and last air year. Used only where the
+  source gives nothing: genres when the source has none, a description when it has none, a year line when no episode
+  is dated. Of the measured gaps, matched shows: 77 Kan and 16 Reshet without genres (4 Mako), 11 Reshet without a
+  description.
+- **Visible:** the catalog check on `/status` (and the dashboard's) counts per source the shows still without
+  genres, a description or a year line.

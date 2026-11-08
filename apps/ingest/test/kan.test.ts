@@ -1070,3 +1070,95 @@ test('an unnumbered episode waits behind its printed siblings, so "פרק 2" kee
   expect(byKey.get('kan:1006640')).toBe(9);
   expect(store.recentWarnings().filter((w) => w.code === 'episode-number-taken')).toEqual([]);
 });
+
+// ---- show metadata: genres from the lobby cards, air dates from the app list (2026-11-08) ------------------------
+
+test("a Kan show's genres: its card's, in the project's names; a kids-row show is a children's show", async () => {
+  const { kanGenres } = await import('../src/kan.ts');
+  expect(kanGenres({ catalog: 'iltv_kan11', genres: ['בישול', 'אוכל', 'קומדיה'] })).toEqual([
+    'בישול',
+    'קומדיה',
+  ]);
+  expect(kanGenres({ catalog: 'iltv_kanarchive', genres: ['ארכיון', 'דוקו'] })).toEqual(['דוקומנטרי']);
+  expect(kanGenres({ catalog: 'iltv_kanarchive', genres: ['ארכיון'] })).toEqual([]);
+  expect(kanGenres({ catalog: 'iltv_kan11' })).toEqual([]);
+  // The kids row is read from Kan's kids lobbies only: that is the source saying so.
+  expect(kanGenres({ catalog: 'iltv_kankids' })).toEqual(['ילדים']);
+  expect(kanGenres({ catalog: 'iltv_kankids', genres: ['ילדים ונוער', 'דרמה'] })).toEqual(['ילדים', 'דרמה']);
+});
+
+/** A stored Kan show with one episode (as an earlier slice would have saved it). */
+function storeKanShow(store: Store, key: string, episode: { key: string; title: string; airDate?: string }) {
+  const seriesId = store.seriesIdFor('kan', key);
+  const show: ScrapedShow = {
+    source: 'kan',
+    key,
+    title: 'מטבח',
+    catalog: 'iltv_kan11',
+    pageUrl: key,
+    seasons: [{ key: `${key}|s1`, title: 'עונה 1', episodes: [{ ...episode, streams: [] }] }],
+  };
+  store.saveShow(seriesId, show, assignNumbers(show, store.assignments(seriesId)).added, undefined, false);
+  return seriesId;
+}
+
+test('lobby genres reach shows already stored, without a page read, and stay on later saves', async () => {
+  const store = Store.open(':memory:');
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-11843/';
+  const id = storeKanShow(store, key, { key: 'kan:1', title: 'פרק 1', airDate: '2026-01-01' });
+  const l = loader(routes);
+  await crawlKan(store, opts(l, 4)); // the lobbies (and nothing else: no show page is recorded)
+  expect(store.getShow(id)?.show.genres).toEqual(['בישול', 'קומדיה']);
+  expect(l.urls.some((u) => u.includes('/p-11843/'))).toBe(false);
+  // Numbers untouched.
+  expect(store.assignments(id).episodes).toEqual([
+    expect.objectContaining({ key: 'kan:1', season: 1, episode: 1 }),
+  ]);
+});
+
+test('stored episodes without an air date get it from the app list (same id and title), at most weekly', async () => {
+  const { appDates } = await import('../src/kan.ts');
+  const item = (id: string, title: string, published?: string) =>
+    [id, { id, title, stream: { kind: 'none' as const }, ...(published ? { published } : {}) }] as const;
+  const feed = new Map([
+    item('1', 'פרק 1', '2021-03-04'),
+    item('2', 'פרק אחר', '2021-03-11'),
+    item('3', 'פרק 3'),
+  ]);
+  expect(
+    appDates(
+      [
+        { key: 'kan:1', title: 'פרק 1' },
+        { key: 'kan:2', title: 'פרק 2' }, // another title: not taken as the same episode
+        { key: 'kan:3', title: 'פרק 3' }, // no date in the app
+        { key: 'kan:4', title: 'פרק 4' }, // not listed
+        { key: 'kan:5', title: 'פרק 5', airDate: '2020-01-01' }, // dated already
+      ],
+      feed,
+    ),
+  ).toEqual(new Map([['kan:1', '2021-03-04']]));
+
+  // In a slice: one app request for the show, never a page; not asked again within the week.
+  const store = Store.open(':memory:');
+  const key = 'https://www.kan.org.il/content/kan/kan-11/p-11843/';
+  const id = storeKanShow(store, key, { key: 'kan:5551', title: 'פרק 1' });
+  const asked: string[] = [];
+  const base = loader(routes);
+  const withApp = {
+    ...base,
+    async text(url: string) {
+      asked.push(url);
+      const body = /program\?id=11843/.test(url)
+        ? { entry: [{ id: '5551', title: 'פרק 1', published: '2021-03-04T21:00:00+02:00' }] }
+        : { entry: [] };
+      return { status: 200, body: JSON.stringify(body), challenged: false };
+    },
+  };
+  const r = await crawlKan(store, opts(withApp, 4));
+  expect(store.getShow(id)?.show.seasons[0]?.episodes[0]?.airDate).toBe('2021-03-04');
+  expect(r.note).toMatch(/1 stored episodes dated from the app API/);
+  expect(asked.filter((u) => u.includes('program?id=11843'))).toHaveLength(1);
+  expect(base.urls.some((u) => /\/p-11843\/\d+/.test(u))).toBe(false);
+  await crawlKan(store, opts(withApp, 4));
+  expect(asked.filter((u) => u.includes('program?id=11843'))).toHaveLength(1);
+});

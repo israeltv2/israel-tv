@@ -343,3 +343,22 @@ test('the catalog audit flags page-title boilerplate left on a show name', async
     'page-title boilerplate in a name',
   );
 });
+
+test('the catalog audit counts, per source, shows without genres, a description of their own or a year line', async () => {
+  const { auditSite } = await import('../src/catalog-audit.ts');
+  const { MAKO_HELPER_NOTE } = await import('@israel-tv/render');
+  const meta = (id: string, m: Record<string, unknown>) => [
+    `meta/series/${id}.json`,
+    JSON.stringify({ meta: { id, name: 'שם', posterShape: 'poster', ...m } }),
+  ];
+  const files = new Map<string, string | Uint8Array>([
+    ['manifest.json', '{}'],
+    meta('iltv_mako_1', { description: `‫${MAKO_HELPER_NOTE}‬`, releaseInfo: '2024' }),
+    meta('iltv_mako_2', { description: `סדרה על משהו.\n\n${MAKO_HELPER_NOTE}`, genres: ['דרמה'] }),
+    meta('iltv_kan_1', { description: 'תכנית על משהו', genres: ['ילדים'], releaseInfo: '2020–2022' }),
+  ] as [string, string][]);
+  expect(auditSite(files, Store.open(':memory:')).gaps).toEqual([
+    { source: 'kan', shows: 1, noGenre: 0, noDescription: 0, noYear: 0 },
+    { source: 'mako', shows: 2, noGenre: 1, noDescription: 1, noYear: 1 },
+  ]);
+});

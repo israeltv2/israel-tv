@@ -129,7 +129,16 @@ export interface StatusFile {
   failingShows: { id: string; title: string; error: string; lastOkAt: string }[];
   warnings: { at: string; id?: string; code: string; message: string }[];
   /** The publisher's own check of what it just published (apps/ingest catalog-audit.ts). */
-  audit?: { at: string; metas: number; problems: { check: string; count: number; examples: string[] }[] };
+  audit?: {
+    at: string;
+    metas: number;
+    problems: { check: string; count: number; examples: string[] }[];
+    /**
+     * Per source, shows published without genres, a description of their own or a year line: what the sources (and
+     * TMDB, for matched shows) do not give. Nothing is invented to fill them.
+     */
+    gaps?: { source: string; shows: number; noGenre: number; noDescription: number; noYear: number }[];
+  };
   /** The catalog's rows as published, in the apps' order (shows with something to watch). */
   catalogs?: StatusCatalog[];
   /** One health per day for each source, oldest day first (days in `schedule.timezone`). */

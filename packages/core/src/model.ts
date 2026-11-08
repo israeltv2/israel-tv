@@ -110,20 +110,45 @@ export function cleanShow(show: ScrapedShow): ScrapedShow {
   return r.data;
 }
 
-/** One name per genre across sources (Keshet and Reshet spell some differently). */
+/**
+ * What TMDB says about a show it is matched to (apps/ingest tmdb.ts), in Hebrew: used only where the source says
+ * nothing (no genres, no description, no dated episode), never instead of it.
+ */
+export interface TmdbDetails {
+  genres?: string[];
+  overview?: string;
+  /** First and last air year ("2019"). */
+  firstYear?: string;
+  lastYear?: string;
+}
+
+/** One name per genre across sources (Keshet, Reshet, Kan and TMDB's Hebrew names spell some differently). */
 const GENRE_NAMES: Record<string, string> = {
   'לייף סטייל': 'לייפסטייל',
   שעשועון: 'שעשועונים',
   תעודה: 'דוקומנטרי',
+  דוקו: 'דוקומנטרי',
   'דוקו ותחקירים': 'דוקומנטרי',
+  'דוקו ריאליטי': 'דוקו-ריאליטי',
+  'דוקו טבע': 'טבע',
   תחקיר: 'תחקירים',
   אוכל: 'בישול',
+  'ילדים ונוער': 'ילדים',
+  // TMDB's "Talk" and "Soap".
+  דיבורים: 'אירוח',
+  סבון: 'אופרת סבון',
 };
+
+/**
+ * Labels sources put among genres that say where a show sits, not what it is: an archive, a channel, a site
+ * section, "general" (Kan's lobbies: "ארכיון", "טלוויזיה ישראלית", "חינוכית", "כללי"; Reshet: "דיגיטל").
+ */
+const NOT_GENRES = new Set(['ארכיון', 'טלוויזיה ישראלית', 'חינוכית', 'כללי', 'דיגיטל', 'שונות']);
 
 /**
  * Genres as a source gives them, cleaned for a filter: one spelling ("תוכניות" → "תכניות", "לייף סטייל" →
  * "לייפסטייל"), no "תכניות" prefix ("תכניות אקטואליה" → "אקטואליה"), no site sections (anything with a channel
- * number, "חדשות 13"), no empties or repeats, at most 5.
+ * number, "חדשות 13"; NOT_GENRES), one per comma-separated name, no empties or repeats, at most 5.
  */
 export function cleanGenres(list: readonly (string | null | undefined)[] | null | undefined): string[] {
   const one = (g: string) =>
@@ -137,8 +162,11 @@ export function cleanGenres(list: readonly (string | null | undefined)[] | null 
   return [
     ...new Set(
       (list ?? [])
-        .map((g) => named(one(g ?? '')))
-        .filter((g) => g.length > 0 && g.length <= 40 && !/\d/.test(g)),
+        // Kan lists several in one string ("מוזיקה, דרמה, ילדים ונוער").
+        .flatMap((g) => (g ?? '').split(','))
+        .map((g) => named(one(g)))
+        // No channel numbers ("חדשות 13"), no page-template text left unfilled ("${elem.Genres}").
+        .filter((g) => g.length > 0 && g.length <= 40 && !/[\d${}<>]/.test(g) && !NOT_GENRES.has(g)),
     ),
   ].slice(0, 5);
 }

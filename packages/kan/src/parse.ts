@@ -77,6 +77,52 @@ export function parseLobbyPosters(html: string): Map<string, string> {
   return out;
 }
 
+/**
+ * The genres each show's lobby card names, by show path (`/content/…/`), as Kan writes them (one string may hold
+ * several, "מוזיקה, דרמה, ילדים ונוער"; the caller cleans them). Three layouts, recorded 2026-11-07:
+ * - Kan 11's list: the card's link holds a `digital-series-genres` element (empty on some cards);
+ * - the kids lobbies: their cards as JSON (`"Url":"…","Genres":"…"`);
+ * - the archive: a grid card's link holds a `<p class="mb-3">` line, a featured card has an `info-genre` list after
+ *   its link.
+ * A card without genres is left out.
+ */
+export function parseLobbyGenres(html: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const add = (url: string, raw: string[]) => {
+    const path = /\/content\/[^"?#]*\/$/.exec(url)?.[0];
+    const names = raw
+      .flatMap((g) => g.split(','))
+      .map((g) => stripTags(g))
+      .filter(Boolean);
+    if (path && names.length) out.set(path, [...new Set([...(out.get(path) ?? []), ...names])]);
+  };
+  for (const m of html.matchAll(/"Url":"([^"]+)"[^{}]*?"Genres":"((?:[^"\\]|\\.)*)"/g)) {
+    let genres = m[2] ?? '';
+    try {
+      genres = JSON.parse(`"${genres}"`) as string;
+    } catch {}
+    add(m[1] ?? '', [genres]);
+  }
+  const links = [...html.matchAll(/href="(?:https:\/\/[^"/]+)?((?:\/[\w-]+)?\/content\/[^"?#]+\/)"/g)];
+  for (const [i, m] of links.entries()) {
+    const start = m.index ?? 0;
+    // From this link to the next one (a card's own markup), and within it the link's own anchor.
+    const next = links[i + 1]?.index ?? html.length;
+    const card = html.slice(start, Math.min(next, start + 8000));
+    const close = card.indexOf('</a>');
+    const anchor = close < 0 ? card : card.slice(0, close);
+    const inside = [
+      ...anchor.matchAll(/class="[^"]*digital-series-genres[^"]*">([^<]*)</g),
+      ...anchor.matchAll(/<p class="mb-3">([^<]*)<\/p>/g),
+    ].map((x) => x[1] ?? '');
+    const listed = [...card.matchAll(/<ul class="info-genre[^"]*">([\s\S]*?)<\/ul>/g)].flatMap((x) =>
+      [...(x[1] ?? '').matchAll(/<li>([\s\S]*?)<\/li>/g)].map((li) => li[1] ?? ''),
+    );
+    add(m[1] ?? '', [...inside, ...listed]);
+  }
+  return out;
+}
+
 export interface KanEpisodeLink {
   /** Path of the episode page. */
   path: string;

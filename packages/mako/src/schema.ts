@@ -77,7 +77,15 @@ export type ShowPage = z.infer<typeof ShowPage>;
 
 /** A single video's own page (`…/VOD-….htm`): its title (with the air date on dated items) and ids. */
 export const VodPage = z.looseObject({
-  seo: z.looseObject({ title: z.string().optional() }).nullish(),
+  seo: z
+    .looseObject({
+      title: z.string().optional(),
+      /** schema.org data of the video: `uploadDate` is when Mako published it (an ISO instant). */
+      schema: z
+        .looseObject({ video: z.looseObject({ uploadDate: z.string().nullish() }).nullish() })
+        .nullish(),
+    })
+    .nullish(),
   /** The video's own blurb (what the episode is about). */
   hero: z.looseObject({ description: z.string().nullish() }).nullish(),
   vod: FeaturedVod.extend({ channelName: z.string().optional() }),
