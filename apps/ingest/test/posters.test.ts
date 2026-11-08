@@ -325,3 +325,21 @@ test('the catalog audit flags what a viewer should never see', async () => {
   ])
     expect(checks, c).toContain(c);
 });
+
+test('the catalog audit flags page-title boilerplate left on a show name', async () => {
+  const { auditSite } = await import('../src/catalog-audit.ts');
+  const files = (name: string) =>
+    new Map<string, string | Uint8Array>([
+      ['manifest.json', '{}'],
+      [
+        'meta/series/iltv_kan_9.json',
+        JSON.stringify({ meta: { id: 'iltv_kan_9', name, posterShape: 'poster' } }),
+      ],
+    ]);
+  const checks = (name: string) =>
+    auditSite(files(name), Store.open(':memory:')).problems.map((p) => p.check);
+  expect(checks('מבט שני | כתבות מלאות')).toContain('page-title boilerplate in a name');
+  expect(checks('ארץ זרה | סרטו התיעודי של העיתונאי שלומי אלדר')).not.toContain(
+    'page-title boilerplate in a name',
+  );
+});

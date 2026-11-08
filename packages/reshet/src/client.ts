@@ -1,6 +1,6 @@
 import type { ScrapedEpisode, ScrapedSeason, ScrapedShow } from '@israel-tv/core';
 import type { Fetcher } from '@israel-tv/net';
-import { blockedEntries, kalturaPost } from './kaltura.ts';
+import { blockedEntries, type EntryState, kalturaPost } from './kaltura.ts';
 import {
   dropCollidingHints,
   type ParsedSeason,
@@ -149,21 +149,29 @@ export async function fetchShow(
   const ids = seasons.flatMap((x) => x.episodes.map((e) => e.key));
   if (ids.length > 0) {
     // Only adds the "blocked outside Israel" label: if Kaltura's API fails, the show is still read.
-    let blocked = new Map<string, boolean>();
+    let states = new Map<string, EntryState>();
     try {
-      blocked = await blockedEntries(ids, opts.profiles ?? new Map(), opts.kaltura ?? kalturaPost);
+      states = await blockedEntries(ids, opts.profiles ?? new Map(), opts.kaltura ?? kalturaPost);
     } catch (err) {
       notes.push(`Kaltura lookup failed, episodes not labelled for geo-blocking: ${(err as Error).message}`);
     }
-    // An entry Kaltura no longer has (missing from the answer, which lists every existing one) plays nowhere:
-    // its episode stays (its number never moves) but offers no stream rather than one that fails.
-    const lookedUp = blocked.size > 0;
+    // An entry Kaltura no longer has (missing from the answer, which lists every existing one) plays nowhere,
+    // and neither does one past its schedule window (Reshet took it down; 404 in Israel too): the episode stays
+    // (its number never moves) but offers no stream rather than one that fails. A later read gives the stream
+    // back if Reshet puts the episode up again.
+    const lookedUp = states.size > 0;
     let gone = 0;
+    let expired = 0;
     for (const x of seasons) {
       for (const e of x.episodes) {
-        const b = blocked.get(e.key);
-        if (b !== undefined) e.availableAbroad = !b;
-        else if (lookedUp) {
+        const st = states.get(e.key);
+        if (st) {
+          e.availableAbroad = !st.blocked;
+          if (st.expired) {
+            e.streams = [];
+            expired++;
+          }
+        } else if (lookedUp) {
           e.streams = [];
           gone++;
         }
@@ -171,6 +179,10 @@ export async function fetchShow(
     }
     if (gone > 0)
       notes.push(`${gone} episodes no longer exist on Reshet's video host: listed without a stream`);
+    if (expired > 0)
+      notes.push(
+        `${expired} episodes are past their availability window on Reshet's video host: listed without a stream`,
+      );
   }
   const single = seasons.length === 1 && !/\d/.test(seasons[0]?.s.title ?? '');
   const out: ScrapedSeason[] = seasons.map((x) => ({

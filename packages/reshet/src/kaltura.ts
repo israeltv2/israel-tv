@@ -26,19 +26,40 @@ function check(r: unknown, i: number): Record<string, unknown> {
   return x;
 }
 
-/**
- * Entry id → blocked here (true/false). Entries share access-control profiles, so each profile is
- * checked once (with one of its entries) and remembered in `profiles` across calls.
- */
 /** Kaltura access-control profiles that limit playback to Israel (measured 2026-11-06). */
 export const ISRAEL_ONLY_PROFILES: ReadonlySet<number> = new Set([3387861]);
 
+/**
+ * What Kaltura says about an entry: `blocked` when it plays only from Israel; `expired` when it is outside its
+ * schedule window (`endDate` passed, or `startDate` still ahead). An expired entry plays nowhere, Israel included:
+ * its playlist answers 404 and the playback check says SCHEDULED_RESTRICTED (measured 2026-11-08: 462 of 13,747
+ * Reshet episodes, on all three access profiles).
+ */
+export type EntryState = { blocked: boolean; expired: boolean };
+
+type ListedEntry = {
+  id: string;
+  accessControlId?: number;
+  startDate?: number | null;
+  endDate?: number | null;
+};
+
+const outsideWindow = (o: ListedEntry, nowSec: number) =>
+  (!!o.endDate && o.endDate < nowSec) || (!!o.startDate && o.startDate > nowSec);
+
+/**
+ * Entry id → its state (EntryState). Entries share access-control profiles, so each profile is checked once
+ * (with one of its entries inside its schedule window when there is one, so the schedule does not hide a
+ * country rule) and remembered in `profiles` across calls.
+ */
 export async function blockedEntries(
   entryIds: string[],
   profiles: Map<number, boolean>,
   post: Post = kalturaPost,
-): Promise<Map<string, boolean>> {
-  const out = new Map<string, boolean>();
+  now: number = Date.now(),
+): Promise<Map<string, EntryState>> {
+  const out = new Map<string, EntryState>();
+  const nowSec = now / 1000;
   for (let i = 0; i < entryIds.length; i += 500) {
     const chunk = entryIds.slice(i, i + 500);
     const r = await post({
@@ -50,11 +71,16 @@ export async function blockedEntries(
         ks: '{1:result:ks}',
         filter: { idIn: chunk.join(',') },
         pager: { pageSize: 500 },
-        responseProfile: { type: 1, fields: 'id,accessControlId' },
+        responseProfile: { type: 1, fields: 'id,accessControlId,startDate,endDate' },
       },
     });
-    const objects = (check(r, 1).objects ?? []) as { id: string; accessControlId?: number }[];
-    for (const o of objects) {
+    const objects = (check(r, 1).objects ?? []) as ListedEntry[];
+    // Entries inside their window first: the one a profile is checked with.
+    const ordered = [
+      ...objects.filter((o) => !outsideWindow(o, nowSec)),
+      ...objects.filter((o) => outsideWindow(o, nowSec)),
+    ];
+    for (const o of ordered) {
       const profile = o.accessControlId ?? 0;
       if (!profiles.has(profile)) {
         const pc = check(
@@ -79,7 +105,10 @@ export async function blockedEntries(
       }
       // Blocked as seen from here, or on the access profile measured as Israel-only (so the label is right
       // even when ingest runs inside Israel, where the playback check passes).
-      out.set(o.id, (profiles.get(profile) ?? false) || ISRAEL_ONLY_PROFILES.has(profile));
+      out.set(o.id, {
+        blocked: (profiles.get(profile) ?? false) || ISRAEL_ONLY_PROFILES.has(profile),
+        expired: outsideWindow(o, nowSec),
+      });
     }
   }
   return out;

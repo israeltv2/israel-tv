@@ -2,7 +2,7 @@
 // poster shapes and reachability, numbering, leftover site text, year lines, and catalog items that disagree with
 // their show pages. Results are on /status ("Catalog audit"); nothing is fetched (remote posters' shapes come
 // from their measurements).
-import { ORIGIN_TOKEN, type StatusFile } from '@israel-tv/core';
+import { cleanShowTitle, ORIGIN_TOKEN, type StatusFile } from '@israel-tv/core';
 import type { SiteFiles } from '@israel-tv/render';
 import type { Store } from '@israel-tv/store';
 import { imageSize, isPortrait, reachableAbroad, remotePosterShape } from './posters.ts';
@@ -84,6 +84,10 @@ export function auditSite(
     }
     // Text and year line.
     if (!meta.name?.trim() || JUNK.test(meta.name)) flag('empty name or site text in a name', id);
+    else {
+      const plainName = meta.name.replace(/[\u202A-\u202E\u200E\u200F]/g, '').trim();
+      if (cleanShowTitle(plainName) !== plainName) flag('page-title boilerplate in a name', id);
+    }
     if (meta.description && JUNK.test(meta.description)) flag('site text in a description', id);
     if (meta.releaseInfo && !/^\d{4}(?:–(?:\d{4}|present))?$/.test(meta.releaseInfo))
       flag('year line not "2024", "2021–2024" or "2024–present"', id);
