@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.13.1](https://github.com/israeltv2/israel-tv/compare/v0.13.0...v0.13.1) (2026-11-08)
+
+
+### Bug Fixes
+
+* **site:** English names for the i24NEWS channels and ynet on the English guide ([#183](https://github.com/israeltv2/israel-tv/issues/183)) ([42b7293](https://github.com/israeltv2/israel-tv/commit/42b7293a3c86ac668dd94cc459132cd05185de00))
+
 ## [0.13.0](https://github.com/israeltv2/israel-tv/compare/v0.12.1...v0.13.0) (2026-11-08)
 
 
