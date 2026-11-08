@@ -6,8 +6,9 @@
 //   Channel 14 c14.co.il/wp-json/now14-api/v1/shidurim (JSON)            every 6 h (robots.txt allows /wp-json/)
 //   Knesset    knesset.tv schedule page (HTML, ~3.6 MB, all days)        every 12 h
 //   Kan 11, Kan Educational, Makan 33: kan.org.il/tv-guide/ (HTML)      read by the Kan crawler's browser (kan.ts)
-// Not covered: i24 (its API holds an undated weekly template its own site no longer shows), Channel 10 (behind a
-// bot checkpoint), Channel 24, ynet and the 24/7 loop channels (no schedule published).
+//   i24NEWS ×4 api.i24news.tv/v2/<lang>/schedules (JSON weekly template)  every 12 h, one request per language
+// Not covered: Channel 10 (behind a bot checkpoint), Channel 24, ynet, Channel 9 and the 24/7 loop channels (no
+// schedule published).
 import {
   type Config,
   DAY_MS,

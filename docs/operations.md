@@ -316,12 +316,15 @@ carry `x-israel-tv-probe: canary`, so its plays never count as usage or failures
 
 `epg.json` (published) holds each channel's programmes from 6 hours ago to 3 days ahead, from the broadcasters' own
 schedule pages: Keshet 12 (mako.co.il) and Reshet 13 (13tv.co.il) through the scrapers, Channel 14 (c14.co.il
-wp-json) and the Knesset (knesset.tv) directly, every 6 hours (Knesset 12) after an airing check; Kan 11, Kan
+wp-json) and the Knesset (knesset.tv) directly, every 6 hours (Knesset 12) after an airing check; the four i24NEWS
+channels from i24's own schedule API (one request per language every 12 hours: a weekly template, day 0 Monday, times
+in UTC, laid over the days around now the way its site does); Kan 11, Kan
 Educational and Makan 33 through the Kan browser, one guide page per crawl slice (each channel, today and tomorrow,
 twice a day). A failed read keeps the last good guide and says why on the dashboard (kv `epg:guide`). The addon puts
 "עכשיו … · אחר כך …" first in every live tile's description at request time and answers Stremio's guide pages
-(`/catalog/tv/iltv_live/date=YYYY-MM-DD.json` → `metasDetailed`). Not covered: i24 (an undated weekly template its own
-site no longer shows), Channel 10 (bot checkpoint), Channel 24, ynet and the 24/7 loop channels (no schedule).
+(`/catalog/tv/iltv_live/date=YYYY-MM-DD.json` → `metasDetailed`). Not covered: Channel 10 (bot checkpoint), Channel
+24, ynet, Channel 9 and the 24/7 loop channels (no schedule published); the website's guide lists them by name as
+channels without a guide.
 
 ### Kan's first fill
 
