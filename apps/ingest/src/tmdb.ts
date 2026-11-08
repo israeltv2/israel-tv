@@ -4,7 +4,7 @@
 // named seasons do not line up with TMDB's season numbers.
 
 import { setTimeout as sleep } from 'node:timers/promises';
-import { DAY_MS, normalizeForSearch, type TmdbDetails } from '@israel-tv/core';
+import { DAY_MS, normalizeForSearch, type ScrapedShow, type TmdbDetails } from '@israel-tv/core';
 import type { Store } from '@israel-tv/store';
 
 const API = 'https://api.themoviedb.org/3';
@@ -88,6 +88,28 @@ export interface TmdbResult {
   original_name: string;
   origin_country?: string[];
   original_language?: string;
+  first_air_date?: string;
+}
+
+/** The year a show's earliest dated episode aired, if any is dated. */
+export function firstAirYear(show: ScrapedShow): number | undefined {
+  let first: string | undefined;
+  for (const s of show.seasons)
+    for (const e of s.episodes) if (e.airDate && (!first || e.airDate < first)) first = e.airDate;
+  return first ? Number(first.slice(0, 4)) : undefined;
+}
+
+/**
+ * Two of our shows with one name and one TMDB match (לאהוב את אנה: Reshet's 2008 drama, Keshet's 2018 reality show;
+ * TMDB 105361 first aired 2008-07-01): the one whose first episode year is nearer TMDB's first air year is that
+ * show; "a" or "b", or undefined when the years do not tell (unknown, or as near as each other within a year).
+ */
+export function nearerShow(tmdbYear: number | undefined, a?: number, b?: number): 'a' | 'b' | undefined {
+  if (tmdbYear === undefined || a === undefined || b === undefined) return undefined;
+  const da = Math.abs(a - tmdbYear);
+  const db = Math.abs(b - tmdbYear);
+  if (Math.abs(da - db) <= 1) return undefined;
+  return da < db ? 'a' : 'b';
 }
 
 /** The single result that is clearly the same show, or undefined. */
@@ -143,8 +165,33 @@ export async function matchShows(
         imdbId = ext.imdb_id && /^tt\d+$/.test(ext.imdb_id) ? ext.imdb_id : null;
         matched++;
       }
-      // One TMDB/IMDb id must lead to one of our series; a second match is left unassigned and reported.
-      const taken = hit ? store.seriesWithExternalIds(hit.id, imdbId).filter((x) => x !== row.seriesId) : [];
+      // One TMDB/IMDb id must lead to one of our series; a second match is left unassigned and reported, unless
+      // the years say which show it is (nearerShow): then that one has it and the other is simply not matched.
+      let taken = hit ? store.seriesWithExternalIds(hit.id, imdbId).filter((x) => x !== row.seriesId) : [];
+      const tmdbYear = hit?.first_air_date ? Number(hit.first_air_date.slice(0, 4)) || undefined : undefined;
+      const holder = taken.length === 1 ? store.getShow(taken[0] as string) : undefined;
+      const which = holder
+        ? nearerShow(tmdbYear, firstAirYear(row.show), firstAirYear(holder.show))
+        : undefined;
+      if (holder && which === 'b') {
+        // The other show is the match: this one is not matched, and nothing is wrong.
+        store.setExternalIds(row.seriesId, { tmdbId: null, imdbId: null });
+        delete aliases[row.seriesId];
+        delete details[row.seriesId];
+        checked++;
+        await sleep(opts.delayMs ?? 250);
+        continue;
+      }
+      if (holder && which === 'a') {
+        store.setExternalIds(holder.seriesId, { tmdbId: null, imdbId: null });
+        delete aliases[holder.seriesId];
+        delete details[holder.seriesId];
+        store.clearWarnings(holder.seriesId, ['tmdb-duplicate']);
+        opts.log?.(
+          `tmdb: ${hit?.id} moved from ${holder.seriesId} to ${row.seriesId} (first aired ${tmdbYear})`,
+        );
+        taken = [];
+      }
       if (taken.length > 0) {
         store.addWarnings(runId, row.seriesId, [
           {
@@ -157,6 +204,7 @@ export async function matchShows(
         delete aliases[row.seriesId];
         delete details[row.seriesId];
       } else {
+        store.clearWarnings(row.seriesId, ['tmdb-duplicate']);
         store.setExternalIds(row.seriesId, { tmdbId: hit?.id ?? null, imdbId });
         if (hit) aliases[row.seriesId] = await aliasesOf(get, apiKey, hit.id, row.title);
         else {

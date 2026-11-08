@@ -31,6 +31,7 @@ import {
   stopSignal,
 } from '@israel-tv/runtime';
 import { STOPPED_FOR_RESTART, Store } from '@israel-tv/store';
+import { cleanStaleWarnings, cleanupLine } from './cleanup.ts';
 import { adminToken, lanAddresses, listen, startDaemon } from './daemon.ts';
 import { crawlKan, kanCrawlOptions } from './kan.ts';
 import { checkLive } from './live.ts';
@@ -185,6 +186,7 @@ async function main(argv: string[]): Promise<number> {
   const repair = migrate ? repairReshetSplit(store) : undefined;
   const kanPrinted = migrate ? renumberPrinted(store, config.backup.dir, 'kan') : undefined;
   const right = migrate ? renumberRight(store, config.backup.dir) : undefined;
+  const stale = migrate ? cleanStaleWarnings(store, config.backup.dir) : undefined;
   const renumberLine =
     [
       renumber
@@ -198,6 +200,7 @@ async function main(argv: string[]): Promise<number> {
         : '',
       kanPrinted ? printedLine(kanPrinted) : '',
       right ? rightLine(right) : '',
+      stale ? cleanupLine(stale) : '',
     ]
       .filter(Boolean)
       .join('\n') || undefined;

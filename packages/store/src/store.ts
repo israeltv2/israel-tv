@@ -760,6 +760,55 @@ export class Store {
       .run().changes as number;
   }
 
+  /**
+   * Remove the source notes a newer read replaces, so a note lives only as long as the source still says it: the
+   * notes of one show (`show`, the "<source>:<key>" its notes carry, and those that start with its name, "<title>: …",
+   * on its series or on none: notes recorded before they carried the key) or of one page (`url`). Returns how many.
+   */
+  clearNotes(by: { show?: string; url?: string; seriesId?: string | null; title?: string }): number {
+    const conds = [];
+    if (by.show) conds.push(sql`json_extract(${t.warnings.params}, '$.show') = ${by.show}`);
+    if (by.url) conds.push(sql`json_extract(${t.warnings.params}, '$.url') = ${by.url}`);
+    if (by.title) {
+      const prefix = `${by.title}: `;
+      const owner = by.seriesId
+        ? sql`(${t.warnings.seriesId} = ${by.seriesId} or ${t.warnings.seriesId} is null)`
+        : sql`${t.warnings.seriesId} is null`;
+      conds.push(sql`(${owner} and substr(${t.warnings.message}, 1, ${prefix.length}) = ${prefix})`);
+    }
+    if (conds.length === 0) return 0;
+    return this.db
+      .delete(t.warnings)
+      .where(and(eq(t.warnings.code, 'source-note'), or(...conds)))
+      .run().changes as number;
+  }
+
+  /** Look a show up on TMDB again at the next matching run (a recorded clean-up). */
+  forgetTmdbCheck(seriesId: string): void {
+    this.db.update(t.shows).set({ tmdbCheckedAt: null }).where(eq(t.shows.seriesId, seriesId)).run();
+  }
+
+  /** Every warning of these codes, oldest first (a recorded clean-up reads them). */
+  warningsOf(codes: readonly string[]): (typeof t.warnings.$inferSelect)[] {
+    return this.db
+      .select()
+      .from(t.warnings)
+      .where(inArray(t.warnings.code, [...codes]))
+      .orderBy(t.warnings.createdAt)
+      .all();
+  }
+
+  /** Remove warnings by id (a recorded clean-up). Returns how many. */
+  deleteWarnings(ids: readonly number[]): number {
+    let n = 0;
+    for (let i = 0; i < ids.length; i += 500)
+      n += this.db
+        .delete(t.warnings)
+        .where(inArray(t.warnings.id, ids.slice(i, i + 500)))
+        .run().changes as number;
+    return n;
+  }
+
   /** Record warnings; one already recorded for the same show with the same text is not repeated. */
   addWarnings(
     runId: number | null,

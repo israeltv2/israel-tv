@@ -201,3 +201,22 @@ test('year seasons stored with the year as their number move to position numbers
   expect(m.episodes).toEqual([{ key: 'c', season: 3, episode: 4 }]);
   expect(store.renumberYearSeasons()).toBe(0); // once
 });
+
+test('clearNotes: by show key, by page, and older notes by the show name; other codes and shows stay', () => {
+  const store = Store.open(':memory:');
+  const add = (seriesId: string | null, message: string, params?: Record<string, unknown>) =>
+    store.addWarnings(null, seriesId, [{ code: 'source-note', message, ...(params ? { params } : {}) }]);
+  add('iltv_mako_1', 'שקשוקה: a', { show: 'mako:/s' });
+  add(null, 'שקשוקה: listed, but its page has no episodes');
+  add(null, 'שקשוקה 2: listed, but its page has no episodes');
+  add('iltv_kan_1', 'Kan episode https://k/1/: try 1', { kan: 'episode', url: 'https://k/1/' });
+  store.addWarnings(null, 'iltv_mako_1', [{ code: 'source-renumbered', message: 'שקשוקה: x' }]);
+  expect(store.clearNotes({ show: 'mako:/s', seriesId: 'iltv_mako_1', title: 'שקשוקה' })).toBe(2);
+  expect(store.clearNotes({ url: 'https://k/1/' })).toBe(1);
+  expect(
+    store
+      .recentWarnings(10)
+      .map((w) => w.message)
+      .sort(),
+  ).toEqual(['שקשוקה 2: listed, but its page has no episodes', 'שקשוקה: x']);
+});

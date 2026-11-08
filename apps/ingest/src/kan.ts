@@ -420,10 +420,14 @@ export async function crawlKan(
     for (const k of Object.keys(days).sort().slice(0, -14)) delete days[k];
   };
   /** A note for /status; `params` let a page word it in Hebrew (the site's own message stays as it came). */
-  const warn = (seriesId: string | null | undefined, message: string, params?: Record<string, unknown>) =>
+  // A note about one page replaces that page's earlier note (try 2 replaces try 1), and goes once the page reads.
+  const warn = (seriesId: string | null | undefined, message: string, params?: Record<string, unknown>) => {
+    if (typeof params?.url === 'string') store.clearNotes({ url: params.url });
     store.addWarnings(runId, seriesId ?? null, [
       { code: 'source-note', message, ...(params ? { params } : {}) },
     ]);
+  };
+  const settled = (url: string) => store.clearNotes({ url });
   /** Show images Kan refused in this slice, by reason: one line per reason at the end, not one per show. */
   const refusedArt = new Map<string, string[]>();
   const refuseArt = (key: string, why: string) => refusedArt.set(why, [...(refusedArt.get(why) ?? []), key]);
@@ -898,10 +902,17 @@ export async function crawlKan(
       if (page.episodes.length === 0 && known.size > 0 && id) {
         problems++;
         store.markShowFailed(id, 'kept last good data: the show page lists no episodes (layout change?)');
-        warn(id, `Kan ${key}: show page lists no episodes`);
+        warn(id, `Kan ${key}: show page lists no episodes`, {
+          kan: 'show',
+          url: key,
+          detail: 'show page lists no episodes',
+        });
       }
       // A good read of the show page clears an earlier failure (e.g. one empty page during a Kan deploy).
-      else if (id && page.episodes.length > 0) store.markShowChecked(id);
+      else if (id && page.episodes.length > 0) {
+        store.markShowChecked(id);
+        settled(key);
+      }
     }
 
     // 3. Episode pages, airing shows first, oldest episode first within a show.
@@ -975,6 +986,7 @@ export async function crawlKan(
             const e = appEpisode({ ...item, stream: item.stream });
             delete s.retry?.[url];
             s.pending.shift();
+            settled(url);
             if (isTrailer(e.title)) {
               s.skipped = [...new Set([...(s.skipped ?? []), url])];
               if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
@@ -1008,6 +1020,7 @@ export async function crawlKan(
             s[list] = [...new Set([...(s[list] ?? []), url])];
             if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
             s.pending.shift();
+            settled(url);
             continue;
           }
           if (page.kind === 'unknown') {
@@ -1022,12 +1035,14 @@ export async function crawlKan(
             s.skipped = [...new Set([...(s.skipped ?? []), url])];
             if (s.fresh) s.fresh = s.fresh.filter((u) => u !== url);
             s.pending.shift();
+            settled(url);
             continue;
           }
           state.goodEpisode = { ...(state.goodEpisode ?? {}), [origin(url)]: url };
           delete s.retry?.[url];
           batch.push({ episode: toEpisode(e), season: e.seasonNumber, url });
           s.pending.shift();
+          settled(url);
         }
       } finally {
         if (listed) {

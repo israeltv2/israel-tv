@@ -482,3 +482,38 @@ test('trailers: a new show with only a trailer is "nothing yet"; a show we have 
   const id = store.findSeriesId('reshet', '/new') ?? '';
   expect(store.getShow(id)?.lastError).toMatch(/kept last good data/);
 });
+
+test("a show's notes last only as long as the source says them: a complete read replaces them, an airing check does not", async () => {
+  const store = Store.open(':memory:');
+  const note = (msg: string) => store.recentWarnings(50).filter((w) => w.message.includes(msg));
+  // First seen with nothing to watch (no series yet), and an old note under the name before the clean-up of names.
+  await runFull(store, adapter(entries('/a'), { '/a': show('/a', []) }), opts);
+  store.addWarnings(null, null, [
+    { code: 'source-note', message: '/a: listed, but its page has no episodes (an older read)' },
+  ]);
+  expect(note('/a: listed, but its page has no episodes')).toHaveLength(2);
+  // Now it has episodes and a season page that is gone: the old notes go, the new one is said.
+  const withNote = {
+    ...show('/a', [{ key: 's1', title: 'עונה 1', n: 2 }]),
+    notes: ['season "עונה 2" is gone (404)'],
+  };
+  await runFull(store, adapter(entries('/a'), { '/a': withNote }), opts);
+  expect(note('no episodes')).toEqual([]);
+  expect(note('is gone (404)')).toHaveLength(1);
+  // An airing check reads one season: it neither repeats nor removes the full read's note.
+  const today = new Date().toISOString().slice(0, 10);
+  await runAiring(
+    store,
+    adapter([], { '/a': show('/a', [{ key: 's1', title: 'עונה 1', n: 2, date: today }]) }),
+    14,
+    opts,
+  );
+  expect(note('is gone (404)')).toHaveLength(1);
+  // The next complete read no longer finds the dead season: the note goes.
+  await runFull(
+    store,
+    adapter(entries('/a'), { '/a': show('/a', [{ key: 's1', title: 'עונה 1', n: 2 }]) }),
+    opts,
+  );
+  expect(note('is gone (404)')).toEqual([]);
+});
