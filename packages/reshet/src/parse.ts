@@ -5,6 +5,7 @@
 // Video is on Kaltura (partner 2748741); episodes are keyed by the Kaltura entry id, which is the same in
 // both templates.
 import {
+  cleanDescription,
   cleanGenres,
   kalturaImage,
   parseDottedDate,
@@ -437,6 +438,8 @@ export interface ShowSitePage {
   seriesId?: string;
   /** VOD links to several series and no way to tell the show's own: those were left out. */
   mixed?: boolean;
+  /** The page's description meta (the show's blurb on its own site page), when it has one. */
+  description?: string;
 }
 
 const VOD_ITEM = /^\/allshows\/series\/(\d+)\/season\/(\d+)\/\d+\/?$/;
@@ -498,9 +501,12 @@ export function parseShowSitePage(
     seen.add(c.episode.key);
     return true;
   });
+  const front = page?.PageMeta?.pageType === 'hp';
+  const description = front ? undefined : cleanDescription(pageDescription(html));
   return {
-    front: page?.PageMeta?.pageType === 'hp',
+    front,
     episodes: episodes.map(({ season, at, episode }) => ({ season, at, episode })),
+    ...(description ? { description } : {}),
     lists,
     morePages,
     ...(seriesId ? { seriesId } : {}),

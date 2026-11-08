@@ -100,7 +100,8 @@ const BOILERPLATE = [/^ערוץ רשת 13, כל תוכניות הטלוויזי�
 
 /**
  * A show or episode description without what sites add for search engines (measured on the live data): template
- * placeholders ("%%excerpt%%"), a site-section prefix ("חדשות 13 | …"), a trailing "| …, לצפייה ישירה" segment or
+ * placeholders ("%%excerpt%%"), a site-section prefix ("חדשות 13 | …"), a leading "<name> לצפייה ישירה -", a trailing
+ * "| …, לצפייה ישירה" segment or
  * "לצפייה ישירה" ending; a site's generic blurb is no description at all. Ordinary sentences stay as written.
  */
 export function cleanDescription(raw: string | undefined | null): string | undefined {
@@ -108,6 +109,8 @@ export function cleanDescription(raw: string | undefined | null): string | undef
   let t = tidyText(raw).replace(/%%[a-z_]+%%/gi, ' ');
   t = tidyText(t)
     .replace(/^(?:חדשות 13|רשת 13|ערוץ 13|קשת 12|N12)\s*\|\s*/, '')
+    // A leading "<name> לצפייה ישירה - " (Reshet's show site pages: "בני ערובה לצפייה ישירה - סדרת מתח …").
+    .replace(/^[^.!?|]{0,60}?לצפייה ישירה\s*[-–:|]\s*/, '')
     // A closing pointer to another page of the site ("… בעמוד כאן תסריטים >>"): the link is not here. Only ">>"
     // (a closing » ends quoted names: "הסדרה החדשה של «כאן»").
     .replace(/(?:^|(?<=[.!?:]))\s*[^.!?:]*>>\s*$/, '')

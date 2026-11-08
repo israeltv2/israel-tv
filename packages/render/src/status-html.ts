@@ -409,6 +409,13 @@ function contributorDetails(status: StatusFile): Html[] {
                     )}</td></tr>`,
                 )}</tbody></table></div>`
               : ''
+          }${
+            a.gaps?.length
+              ? html`<h3>Show details the sources do not give</h3><p class="small muted">Shows published without genres, a description or a year line. They are filled only from the channel’s own pages and, for shows matched to TMDB, from TMDB; never made up.</p><div class="table-scroll"><table><thead><tr><th>Source</th><th>Shows</th><th>No genres</th><th>No description</th><th>No year</th></tr></thead><tbody>${a.gaps.map(
+                  (g) =>
+                    html`<tr><td>${name(g.source)}</td><td>${num(g.shows)}</td><td>${num(g.noGenre)}</td><td>${num(g.noDescription)}</td><td>${num(g.noYear)}</td></tr>`,
+                )}</tbody></table></div>`
+              : ''
           }`
         : raw('<p class="muted">Not run yet.</p>'),
     ),

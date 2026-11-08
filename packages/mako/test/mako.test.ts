@@ -241,6 +241,30 @@ describe('pages with no episode list, only a featured video (recorded 2026-11-07
     ]);
   });
 
+  test('a stand-up special: dated by the day Mako published its video (Israel time), the year line', async () => {
+    const f = fixtureFetcher({
+      '/mako-vod-keshet/kobi_maimon_standup': 'show-kobi-maimon-standup',
+      '/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm': 'vod-kobi-maimon-standup',
+    });
+    const show = await fetchShow(f, {
+      key: '/mako-vod-keshet/kobi_maimon_standup',
+      title: 'הסטנדאפ של קובי מימון',
+    });
+    // uploadDate 2026-09-17T21:00:00Z is midnight of the 18th in Israel.
+    expect(show.seasons.flatMap((s) => s.episodes)).toEqual([
+      expect.objectContaining({ key: 'e325a4bbfcea0a10VgnVCM100000700a10acRCRD', airDate: '2026-09-18' }),
+    ]);
+  });
+
+  test('publishedDay: Israel calendar day of an instant, nothing for anything else', async () => {
+    const { publishedDay } = await import('../src/parse.ts');
+    expect(publishedDay('2026-11-04T22:00:00Z')).toBe('2026-11-05');
+    expect(publishedDay('2026-07-01T12:00:00Z')).toBe('2026-07-01');
+    expect(publishedDay('')).toBeUndefined();
+    expect(publishedDay('soon')).toBeUndefined();
+    expect(publishedDay(undefined)).toBeUndefined();
+  });
+
   test('a page that lists episodes never falls back to its featured video', () => {
     const eps = episodesFromPage(parseShowPage(fx('show-main-newscast')));
     expect(eps.length).toBeGreaterThan(1);

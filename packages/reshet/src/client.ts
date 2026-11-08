@@ -1,4 +1,4 @@
-import type { ScrapedEpisode, ScrapedSeason, ScrapedShow } from '@israel-tv/core';
+import { cleanDescription, type ScrapedEpisode, type ScrapedSeason, type ScrapedShow } from '@israel-tv/core';
 import type { Fetcher } from '@israel-tv/net';
 import { blockedEntries, type EntryState, kalturaPost } from './kaltura.ts';
 import {
@@ -57,7 +57,7 @@ async function readSitePages(
   f: Fetcher,
   show: string,
   opts: { first?: string; seriesId?: string | undefined },
-): Promise<{ seasons: ParsedSeason[]; notes: string[]; nothing?: string }> {
+): Promise<{ seasons: ParsedSeason[]; notes: string[]; nothing?: string; description?: string }> {
   const notes: string[] = [];
   const found: SiteEpisode[] = [];
   let seriesId = opts.seriesId;
@@ -109,7 +109,11 @@ async function readSitePages(
   }
   const seen = new Set<string>();
   const unique = found.filter((e) => !seen.has(e.episode.key) && seen.add(e.episode.key));
-  return { seasons: siteSeasons(unique), notes };
+  return {
+    seasons: siteSeasons(unique),
+    notes,
+    ...(first.description ? { description: first.description } : {}),
+  };
 }
 
 export async function fetchShow(
@@ -128,6 +132,8 @@ export async function fetchShow(
       ...(sitePage === entry.key ? { first: html } : {}),
       seriesId: parsed.seriesId,
     });
+    // The show page's blurb is often empty or the channel's generic one; the show's own site page has its own.
+    if (!cleanDescription(parsed.description) && site.description) parsed.description = site.description;
     if (site.seasons.length > 0) parsed.seasons = site.seasons;
     // Nothing found: the page's own reason ("lists no videos") unless the site read knows better.
     else notes.push(site.nothing ?? parsed.note ?? `its page ${sitePage} lists no full episodes`);

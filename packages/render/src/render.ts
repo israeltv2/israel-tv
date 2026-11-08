@@ -35,6 +35,7 @@ import {
   type Stream,
   sitePaths,
   streamName,
+  type TmdbDetails,
   tidyEpisodeTitle,
   tidyText,
   type Video,
@@ -60,6 +61,8 @@ export interface RenderShow {
   imdbId: string | null;
   /** Other names (from TMDB, in English or the original): found by search, never shown. */
   aliases?: string[];
+  /** What TMDB says about the show (matched shows only): fills what the source leaves empty, nothing else. */
+  tmdb?: TmdbDetails;
 }
 
 export interface LiveChannelRender {
@@ -146,20 +149,32 @@ export function hasEnded(s: RenderShow, now: number): boolean | undefined {
  */
 export function releaseInfo(s: RenderShow): string | undefined {
   const dates = airDates(s);
-  const first = dates[0]?.slice(0, 4);
-  const last = dates.at(-1)?.slice(0, 4);
+  // No dated episode: the years TMDB gives a matched show, in the same form.
+  const first = dates[0]?.slice(0, 4) ?? s.tmdb?.firstYear;
+  const last = dates.at(-1)?.slice(0, 4) ?? s.tmdb?.lastYear ?? first;
   if (!first || !last) return undefined;
   return first === last ? first : `${first}–${last}`;
+}
+
+/** The show's genres: the source's; TMDB's (matched shows) when the source gives none. */
+export function showGenres(s: RenderShow): string[] {
+  const own = cleanGenres(s.show.genres);
+  return own.length ? own : cleanGenres(s.tmdb?.genres);
+}
+
+/** The show's description: the source's; TMDB's Hebrew overview (matched shows) when the source has none. */
+export function showDescription(s: RenderShow): string | undefined {
+  return cleanDescription(s.show.description) ?? cleanDescription(s.tmdb?.overview);
 }
 
 function preview(s: RenderShow): MetaPreview {
   const p: MetaPreview = { id: s.seriesId, type: 'series', name: rtl(tidyText(s.title)), posterShape: SHAPE };
   if (s.show.poster) p.poster = s.show.poster;
-  const description = cleanDescription(s.show.description);
+  const description = showDescription(s);
   if (description) p.description = rtl(description);
   const year = releaseInfo(s);
   if (year) p.releaseInfo = year;
-  const genres = cleanGenres(s.show.genres);
+  const genres = showGenres(s);
   if (genres.length) p.genres = genres;
   if (s.imdbId) p.imdb_id = s.imdbId;
   return p;
@@ -231,9 +246,7 @@ export const MAKO_HELPER_NOTE =
 function metaFor(s: RenderShow, now: number): Meta {
   const m: Meta = { ...preview(s), videos: videosFor(s) };
   if (s.show.source === 'mako')
-    m.description = rtl(
-      [cleanDescription(s.show.description), MAKO_HELPER_NOTE].filter(Boolean).join('\n\n'),
-    );
+    m.description = rtl([showDescription(s), MAKO_HELPER_NOTE].filter(Boolean).join('\n\n'));
   // Shown by apps (Nuvio: a "Status" row), and used by them for the year line when it is a bare year.
   const last = airDates(s).at(-1);
   if (last) {
@@ -334,7 +347,7 @@ function genreOptions(input: RenderInput, catalog: string): string[] {
   const n = new Map<string, number>();
   for (const s of input.shows)
     if (s.catalog === catalog && s.state === 'listed' && hasVideos(s))
-      for (const g of cleanGenres(s.show.genres)) n.set(g, (n.get(g) ?? 0) + 1);
+      for (const g of showGenres(s)) n.set(g, (n.get(g) ?? 0) + 1);
   // A filter that finds one show is noise.
   return [...n]
     .filter(([, count]) => count >= 2)
@@ -399,7 +412,7 @@ export function renderSite(input: RenderInput): SiteFiles {
     const row = rows.get(s.catalog) ?? [];
     row.push(preview(s));
     rows.set(s.catalog, row);
-    const genres = cleanGenres(s.show.genres);
+    const genres = showGenres(s);
     search.push([
       s.seriesId,
       'series',
@@ -569,7 +582,7 @@ export function renderSite(input: RenderInput): SiteFiles {
         .filter((s) => s.catalog === c.id && metas.has(s.seriesId))
         .map((s) => {
           const meta = metas.get(s.seriesId) as Meta;
-          const description = cleanDescription(s.show.description);
+          const description = showDescription(s);
           return {
             source: s.show.source,
             meta: { ...meta, description: description ? plain(description) : '' },

@@ -5,6 +5,7 @@ import {
   parseEpisodeHint,
   type ScrapedEpisode,
   type ScrapedSeason,
+  zonedDay,
 } from '@israel-tv/core';
 import { z } from 'zod';
 import { IndexResponse, ShowPage, VodPage, VodSlot } from './schema.ts';
@@ -86,6 +87,12 @@ export function cleanVodTitle(seoTitle: string | undefined): string {
   );
 }
 
+/** An ISO instant ("2026-09-17T21:00:00Z") as Israel's calendar day ("2026-09-18"); undefined when it is not one. */
+export function publishedDay(iso: string | null | undefined): string | undefined {
+  const ms = iso && /^\d{4}-\d{2}-\d{2}T/.test(iso) ? Date.parse(iso) : Number.NaN;
+  return Number.isFinite(ms) ? zonedDay(ms, 'Asia/Jerusalem') : undefined;
+}
+
 /** The one episode of a page that only features a video, from the video's own page when it could be read. */
 export function featuredEpisode(
   page: ShowPage,
@@ -95,7 +102,9 @@ export function featuredEpisode(
 ): ScrapedEpisode {
   const vp = rawVodPage === undefined ? undefined : VodPage.safeParse(rawVodPage).data;
   const title = cleanVodTitle(vp?.seo?.title) || showTitle;
-  const airDate = parseDottedDate(title);
+  // The date in a dated title ("… 05.11.26"), else the day Mako published the video (Israel's calendar day): the
+  // year line of a film or a one-off special, which has no episode list to date it.
+  const airDate = parseDottedDate(title) ?? publishedDay(vp?.seo?.schema?.video?.uploadDate);
   const v = vp?.vod ?? vod;
   // Episodes in a season list carry no blurb (one more page per episode would double a full read); a featured
   // video's own page, read anyway, has one.

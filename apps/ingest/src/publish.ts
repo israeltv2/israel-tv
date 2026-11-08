@@ -20,6 +20,7 @@ import {
   STALE_PUBLISH_HOURS,
   type StatusFile,
   sitePaths,
+  type TmdbDetails,
 } from '@israel-tv/core';
 import {
   publicStatus,
@@ -69,7 +70,15 @@ import {
 } from './runner.ts';
 import { siteImages } from './site-images.ts';
 import { probeResults } from './stream-probe.ts';
-import { ALIASES_KEY } from './tmdb.ts';
+import { ALIASES_KEY, DETAILS_KEY } from './tmdb.ts';
+
+/** The details fields of a stored TMDB record (without its bookkeeping). */
+const tmdbOnly = ({ genres, overview, firstYear, lastYear }: TmdbDetails): TmdbDetails => ({
+  ...(genres ? { genres } : {}),
+  ...(overview ? { overview } : {}),
+  ...(firstYear ? { firstYear } : {}),
+  ...(lastYear ? { lastYear } : {}),
+});
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -441,6 +450,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     return { ...show, poster: poster ?? placeholder };
   };
   const aliases = store.getState<Record<string, string[]>>(ALIASES_KEY) ?? {};
+  const tmdbDetails = store.getState<Record<string, TmdbDetails & { tmdbId: number }>>(DETAILS_KEY) ?? {};
   const shows: RenderShow[] = rows.map((r) => ({
     seriesId: r.seriesId,
     catalog: r.catalog,
@@ -458,6 +468,10 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
     tmdbId: r.tmdbId,
     imdbId: r.imdbId,
     ...(aliases[r.seriesId]?.length ? { aliases: aliases[r.seriesId] } : {}),
+    // Only for the show TMDB is matched to now (a match can be dropped or moved).
+    ...(r.tmdbId && tmdbDetails[r.seriesId]?.tmdbId === r.tmdbId
+      ? { tmdb: tmdbOnly(tmdbDetails[r.seriesId] as TmdbDetails) }
+      : {}),
   }));
   for (const [path, name] of [
     [sitePaths.logo, 'logo'],

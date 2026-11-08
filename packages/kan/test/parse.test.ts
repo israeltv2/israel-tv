@@ -65,6 +65,31 @@ test('lobby posters: the portrait poster on each show card, by show path', async
   expect(kids.get('/content/kids/ktantanim-main/p-1010382/')).toMatch(/200x200_character/);
 });
 
+test("lobby genres: each card's genres by show path, in all three lobby layouts (recorded 2026-11-07)", async () => {
+  const { parseLobbyGenres } = await import('../src/parse.ts');
+  // Kan 11: the card's hidden genres line; empty on some cards (left out).
+  const kan11 = parseLobbyGenres(html('lobby-kan11'));
+  expect(kan11.get('/content/kan/kan-11/p-11843/')).toEqual(['בישול', 'אוכל', 'קומדיה']);
+  expect(kan11.has('/content/kan/kan-11/p-12229/')).toBe(false);
+  // Kids: the cards' JSON; the preschool lobby's addresses carry a "/kids" prefix.
+  expect(parseLobbyGenres(html('lobby-kids-teens')).get('/content/kids/hinuchit-main/p-863865/')).toEqual([
+    'ילדים ונוער',
+    'דרמה',
+    'מוזיקה',
+  ]);
+  expect(parseLobbyGenres(html('lobby-kids-tiny')).get('/content/kids/ktantanim-main/bluey/')).toEqual(
+    expect.arrayContaining(['קטנטנים', 'אנימציה']),
+  );
+  // Archive: a grid card's line, a featured card's list (archive labels are dropped later, by cleanGenres).
+  const archive = parseLobbyGenres(html('lobby-series'));
+  expect(archive.get('/content/archive1/vod/p-991366/')).toEqual(['ארכיון', 'דוקו']);
+  expect(archive.get('/content/archive1/vod/p-1102158/')).toEqual([
+    'טלוויזיה ישראלית',
+    'דוקומנטרי',
+    'ארכיון',
+  ]);
+});
+
 test('show page image: a picture the page shows, not the share image Kan refuses', async () => {
   const { parseShowPage } = await import('../src/parse.ts');
   const page = parseShowPage(html('show-p-1006421'), '/content/kan/kan-11/p-1006421/');

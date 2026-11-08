@@ -68,7 +68,8 @@ numbering conflicts, renumberings at the source, thin results and dead season li
 
 `/status` is for viewers first: one line on top says whether everything is working and what that means for
 watching; then a card per row (shows, episodes, last and next refresh, a 30-day bar), the live channels as last
-checked, and, folded away, the details for contributors (shows that failed, notes, the catalog check, recent
+checked, and, folded away, the details for contributors (shows that failed, notes, the catalog check with the count of
+shows per source still without genres, a description or a year line, recent
 warnings). It is rendered at publish time from the same data as `/status.json`; a few lines of script only turn
 times into "3 hours ago" in the reader's time zone (without it they read "7 Nov, 03:30 Israel time"). Its times are
 `<time>` elements, which the publisher leaves out when it compares status files, so a quiet run uploads nothing.

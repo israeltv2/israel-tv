@@ -1,0 +1,200 @@
+{
+  "lastUpdate": "Thu, 15 Oct 2026 19:19:25 +0300",
+  "timestamp": 1792081165743,
+  "pageType": "VOD",
+  "domoPageView": {
+    "content_type": "vod",
+    "channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+    "is_blocked_content": {
+      "israel": 0,
+      "international": 1
+    },
+    "channel_depth": 3,
+    "item_id": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+    "page_url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm"
+  },
+  "makoCatDFP": {
+    "cust_params": {
+      "location_sub_campaign": "%LOCATION_SUB_CAMPAIGN%",
+      "payinguser": "%IS_PAYING_USER%",
+      "video_from_time": "%VIDEO_FROM_TIME%",
+      "bundleId": "%PRODUCT_BUNDLE_ID%",
+      "pushTags": "%PUSH_TAGS%",
+      "language": "%LANGUAGE%",
+      "locale": "%LOCALE%",
+      "deviceid": "%DEVICE_ID%",
+      "version": "%VERSION%",
+      "devicetype": "%DEVICE_TYPE%",
+      "MAKOPAGE": "%GUID%",
+      "advertiserId": "%ADVERTISER_ID%",
+      "carrier": "%CARRIER%",
+      "LEVEL4": "kobimaimonstandup",
+      "osVersion": "%OS_VERSION%",
+      "LEVEL5": "s1",
+      "paidContent": "%IS_PAID_CONTENT%",
+      "appid": "%APP_ID%",
+      "makoHN": "%HOUSE_NUMBERS%",
+      "random_number": "%RANDOM_NUMBER%",
+      "osType": "%OS_TYPE%",
+      "deviceModel": "%DEVICE_MODEL%",
+      "pushTrigger": "%PUSH_TRIGGER%"
+    },
+    "iu": "/242748299/mako/vod/vod_keshet/"
+  },
+  "seo": {
+    "title": "   - הסטנדאפ של קובי מימון | 12+",
+    "description": "   - הסטנדאפ של קובי מימון. תתכוננו להיכנס לראש של קובי מימון  צפו בפרק המלא ב+12, אפליקציית הסטרימינג של ישראל",
+    "type": "tv_show",
+    "image": "https://img.mako.co.il/2026/09/18/Standup_180926_Kobi_Mimon_VOD_autoOrient_i.jpg",
+    "canonical": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm",
+    "schema": {
+      "@context": "https://schema.org",
+      "@type": "TVEpisode",
+      "name": "הסטנדאפ של קובי מימון",
+      "description": "תתכוננו להיכנס לראש של קובי מימון ",
+      "image": "https://img.mako.co.il/2026/09/18/Standup_180926_Kobi_Mimon_VOD_autoOrient_i.jpg",
+      "url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm",
+      "partOfTVSeries": {
+        "@type": "TVSeries",
+        "name": "הסטנדאפ של קובי מימון",
+        "url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup"
+      },
+      "partOfSeason": {
+        "@type": "TVSeason",
+        "name": "עונה 1",
+        "url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1"
+      },
+      "video": {
+        "@type": "VideoObject",
+        "name": "הסטנדאפ של קובי מימון",
+        "description": "תתכוננו להיכנס לראש של קובי מימון ",
+        "thumbnailUrl": "https://img.mako.co.il/2026/09/18/Standup_180926_Kobi_Mimon_VOD_autoOrient_i.jpg",
+        "uploadDate": "2026-09-17T21:00:00Z",
+        "duration": "PT35M17S",
+        "contentUrl": "https://mako-vod.akamaized.net/i/VOD/KESHET/Standup_Shows/Kobi_Maimon/StandUp_Kobi_Maimon_190926_VOD/StandUp_Kobi_Maimon_190926_VOD_,550,850,1400,2200,.mp4.csmil/master.m3u8"
+      },
+      "provider": {
+        "@type": "Organization",
+        "name": "תכניות קשת"
+      },
+      "publisher": {
+        "@type": "NewsMediaOrganization",
+        "name": "שידורי קשת"
+      }
+    }
+  },
+  "vod": {
+    "channelName": "עונה 1",
+    "channelId": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+    "sch": "4569fe0b46ea0a10",
+    "itemVcmId": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+    "galleryChannelId": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+    "programId": "cbe2c422d5ea0a10VgnVCM100000700a10acRCRD",
+    "programUrl": "/mako-vod-keshet/kobi_maimon_standup",
+    "programDomoClick": {
+      "content_type": "channel",
+      "clicked_item_id": "cbe2c422d5ea0a10VgnVCM100000700a10acRCRD",
+      "click_type": "link",
+      "channel_depth": -1,
+      "referring_component": "080b8750-hero-41d9-refc-e6bfe67f099c",
+      "clicked_channel_id": "cbe2c422d5ea0a10VgnVCM100000700a10acRCRD",
+      "clicked_item_url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup"
+    },
+    "pageUrl": "/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm",
+    "domoPlay": {
+      "content_type": "vod",
+      "channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+      "channel_depth": 3,
+      "item_id": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD"
+    },
+    "domoClick": {
+      "content_type": "vod",
+      "clicked_item_id": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+      "click_type": "link",
+      "channel_depth": -1,
+      "referring_component": "080b8750-hero-41d9-refc-e6bfe67f099c",
+      "clicked_channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+      "clicked_item_url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm"
+    },
+    "isLive": false,
+    "aIL": true,
+    "aINT": false,
+    "iPromoType": "Episode"
+  },
+  "hero": {
+    "title": "הסטנדאפ של קובי מימון",
+    "extraInfo": "18.09.26",
+    "logo": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_logo_e.png",
+    "logoAltText": "לוגו הסטנדאפ של קובי מימון",
+    "description": "הוא שיאן גינס בסטנדאפ שכבש את הבמות הגדולות בישראל. תתכוננו להיכנס לראש של קובי מימון במופע סטנדאפ מיוחד על זוגיות וחיי הנישואים",
+    "pics": [
+      {
+        "picUrl": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_x5_re.jpg",
+        "altText": "סט הסטנדאפ של קובי מימון"
+      }
+    ],
+    "mobilePics": [
+      {
+        "picUrl": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_i_re.jpg",
+        "altText": "סט הסטנדאפ של קובי מימון"
+      }
+    ]
+  },
+  "menu": [
+    {
+      "buttonText": "לצפייה",
+      "id": "specificEpisode",
+      "makoRefComp": "Specific_Episode",
+      "pageUrl": "/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm",
+      "domoClick": {
+        "content_type": "vod",
+        "clicked_item_id": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+        "click_type": "link",
+        "channel_depth": -1,
+        "referring_component": "9ced3b0e-page-navi-refc-eb3fe7b8e0de",
+        "clicked_channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+        "clicked_item_url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm"
+      }
+    },
+    {
+      "id": "allEpisodes",
+      "makoRefComp": "All_Episodes",
+      "pageUrl": "/mako-vod?type=moreEpisodes",
+      "domoClick": {
+        "content_type": "channel",
+        "clicked_item_id": "b5f4c13070733210VgnVCM2000002a0c10acRCRD",
+        "click_type": "link",
+        "channel_depth": 0,
+        "referring_component": "9ced3b0e-page-navi-refc-eb3fe7b8e0de",
+        "clicked_channel_id": "b5f4c13070733210VgnVCM2000002a0c10acRCRD",
+        "clicked_item_url": "https://www.mako.co.il/mako-vod?type=moreEpisodes"
+      }
+    }
+  ],
+  "historyObject": {
+    "pageUrl": "/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm",
+    "title": "הסטנדאפ של קובי מימון",
+    "programId": "cbe2c422d5ea0a10VgnVCM100000700a10acRCRD",
+    "domoClick": {
+      "content_type": "vod",
+      "clicked_item_id": "e325a4bbfcea0a10VgnVCM100000700a10acRCRD",
+      "click_type": "link",
+      "channel_depth": 3,
+      "referring_component": "ERROR_NO_REFERRER",
+      "clicked_channel_id": "4569fe0b46ea0a10VgnVCM100000700a10acRCRD",
+      "clicked_item_url": "https://www.mako.co.il/mako-vod-keshet/kobi_maimon_standup-s1/VOD-e325a4bbfcea0a1027.htm"
+    },
+    "picUrl": "https://img.mako.co.il/2026/09/18/Standup_180926_Kobi_Mimon_VOD_autoOrient_i.jpg",
+    "hero": {
+      "title": "הסטנדאפ של קובי מימון",
+      "extraInfo": "18.09.26",
+      "picUrl": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_x5_re.jpg",
+      "logo": "https://img.mako.co.il/2026/09/17/KobiMyamonSU_logo_e.png",
+      "subtitle": "הסטנדאפ של קובי מימון",
+      "description": "תתכוננו להיכנס לראש של קובי מימון "
+    },
+    "buttonText": "להמשך צפייה",
+    "sch": "4569fe0b46ea0a10",
+    "seasonUrl": "/mako-vod-keshet/kobi_maimon_standup-s1"
+  }
+}

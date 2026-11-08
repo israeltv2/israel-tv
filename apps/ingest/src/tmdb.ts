@@ -4,7 +4,7 @@
 // named seasons do not line up with TMDB's season numbers.
 
 import { setTimeout as sleep } from 'node:timers/promises';
-import { DAY_MS, normalizeForSearch } from '@israel-tv/core';
+import { DAY_MS, normalizeForSearch, type TmdbDetails } from '@israel-tv/core';
 import type { Store } from '@israel-tv/store';
 
 const API = 'https://api.themoviedb.org/3';
@@ -13,6 +13,42 @@ export const ALIASES_KEY = 'tmdb:aliases';
 type Aliases = Record<string, string[]>;
 /** Shows matched before aliases were kept get theirs a few at a time. */
 const ALIAS_BACKFILL_PER_RUN = 60;
+/**
+ * seriesId → what TMDB says about a matched show in Hebrew (genres, overview, first and last air year): used only where
+ * the source says nothing (render.ts), never instead of it.
+ */
+export const DETAILS_KEY = 'tmdb:details';
+type DetailsState = Record<string, TmdbDetails & { tmdbId: number; at: string }>;
+/** A matched show's details are read again after this long (TMDB adds overviews and seasons over time). */
+const DETAILS_EVERY_MS = 30 * DAY_MS;
+/** At most this many details requests per run (all ~300 matched shows fit in one run). */
+const DETAILS_PER_RUN = 400;
+
+/** A show's details as TMDB gives them in Hebrew: genre names, overview (when TMDB has a Hebrew one), years. */
+export function parseDetails(d: {
+  genres?: { name?: string | null }[] | null;
+  overview?: string | null;
+  first_air_date?: string | null;
+  last_air_date?: string | null;
+}): TmdbDetails {
+  const year = (s: string | null | undefined) => /^(\d{4})-\d{2}-\d{2}$/.exec(s ?? '')?.[1];
+  const genres = (d.genres ?? []).map((g) => g.name?.trim() ?? '').filter(Boolean);
+  const overview = d.overview?.trim() ?? '';
+  const first = year(d.first_air_date);
+  const last = year(d.last_air_date) ?? first;
+  return {
+    ...(genres.length ? { genres } : {}),
+    // TMDB answers with an empty overview when it has none in the language asked for.
+    ...(/[\u0590-\u05FF]/.test(overview) && overview.length >= 10 ? { overview } : {}),
+    ...(first ? { firstYear: first } : {}),
+    ...(first && last ? { lastYear: last } : {}),
+  };
+}
+
+async function detailsOf(get: Get, apiKey: string, id: number): Promise<TmdbDetails> {
+  const q = new URLSearchParams({ api_key: apiKey, language: 'he-IL' });
+  return parseDetails((await get(`${API}/tv/${id}?${q}`)) as Parameters<typeof parseDetails>[0]);
+}
 
 /** A matched show's other names, cleaned: no repeats, at most 8, none longer than 60 characters. */
 export function cleanAliases(names: (string | null | undefined)[], title: string): string[] {
@@ -89,6 +125,11 @@ export async function matchShows(
   let matched = 0;
   let checked = 0;
   const aliases: Aliases = { ...(store.getState<Aliases>(ALIASES_KEY) ?? {}) };
+  const details: DetailsState = { ...(store.getState<DetailsState>(DETAILS_KEY) ?? {}) };
+  const keep = () => {
+    store.setState(ALIASES_KEY, aliases);
+    store.setState(DETAILS_KEY, details);
+  };
   try {
     for (const row of rows) {
       const q = new URLSearchParams({ api_key: apiKey, language: 'he-IL', query: row.title });
@@ -113,10 +154,14 @@ export async function matchShows(
         ]);
         store.setExternalIds(row.seriesId, { tmdbId: null, imdbId: null });
         delete aliases[row.seriesId];
+        delete details[row.seriesId];
       } else {
         store.setExternalIds(row.seriesId, { tmdbId: hit?.id ?? null, imdbId });
         if (hit) aliases[row.seriesId] = await aliasesOf(get, apiKey, hit.id, row.title);
-        else delete aliases[row.seriesId];
+        else {
+          delete aliases[row.seriesId];
+          delete details[row.seriesId];
+        }
       }
       checked++;
       await sleep(opts.delayMs ?? 250);
@@ -130,10 +175,30 @@ export async function matchShows(
       aliases[r.seriesId] = await aliasesOf(get, apiKey, r.tmdbId as number, r.title);
       await sleep(opts.delayMs ?? 250);
     }
-    store.setState(ALIASES_KEY, aliases);
+    // Matched shows' details (new matches, matches made before details were kept, and month-old ones).
+    const cutoff = Date.now() - DETAILS_EVERY_MS;
+    const all = store.listShows();
+    const due = all
+      .filter((r) => {
+        const d = details[r.seriesId];
+        return r.tmdbId && (!d || d.tmdbId !== r.tmdbId || Date.parse(d.at) < cutoff);
+      })
+      .slice(0, DETAILS_PER_RUN);
+    for (const r of due) {
+      details[r.seriesId] = {
+        ...(await detailsOf(get, apiKey, r.tmdbId as number)),
+        tmdbId: r.tmdbId as number,
+        at: new Date().toISOString(),
+      };
+      await sleep(opts.delayMs ?? 250);
+    }
+    // A show no longer matched keeps no details.
+    const matchedIds = new Set(all.flatMap((r) => (r.tmdbId ? [r.seriesId] : [])));
+    for (const id of Object.keys(details)) if (!matchedIds.has(id)) delete details[id];
+    keep();
     store.finishRun(runId, { status: 'ok', showsOk: matched, requests: checked });
   } catch (err) {
-    store.setState(ALIASES_KEY, aliases);
+    keep();
     store.finishRun(runId, {
       status: 'failed',
       showsOk: matched,

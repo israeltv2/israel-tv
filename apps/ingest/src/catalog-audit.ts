@@ -3,7 +3,7 @@
 // their show pages. Results are on /status ("Catalog audit"); nothing is fetched (remote posters' shapes come
 // from their measurements).
 import { cleanShowTitle, ORIGIN_TOKEN, type StatusFile } from '@israel-tv/core';
-import type { SiteFiles } from '@israel-tv/render';
+import { MAKO_HELPER_NOTE, type SiteFiles } from '@israel-tv/render';
 import type { Store } from '@israel-tv/store';
 import { imageSize, isPortrait, reachableAbroad, remotePosterShape } from './posters.ts';
 
@@ -14,6 +14,7 @@ type Meta = {
   posterShape?: string;
   description?: string;
   releaseInfo?: string;
+  genres?: string[];
   background?: string;
   videos?: { id: string; title?: string; season?: number; episode?: number; thumbnail?: string }[];
 };
@@ -47,6 +48,8 @@ export function auditSite(
         items.set(m.id, m);
   }
   let metas = 0;
+  /** Per source, shows published without genres, a description of their own or a year line (not problems: gaps). */
+  const gaps = new Map<string, { shows: number; noGenre: number; noDescription: number; noYear: number }>();
   for (const [path, body] of files) {
     const m = /^meta\/series\/([^/]+)\.json$/.exec(path);
     // The rows' own notices (⏳ still loading, ⚠ failed) are not shows.
@@ -54,6 +57,17 @@ export function auditSite(
     metas++;
     const meta = (JSON.parse(body) as { meta: Meta }).meta;
     const id = meta.id;
+    const source = /^iltv_([a-z]+)_/.exec(id)?.[1] ?? '?';
+    const gap = gaps.get(source) ?? { shows: 0, noGenre: 0, noDescription: 0, noYear: 0 };
+    gaps.set(source, gap);
+    gap.shows++;
+    if (!meta.genres?.length) gap.noGenre++;
+    // Keshet 12 pages add the home-helper note to every description: a description is the show's own text.
+    const own = (meta.description ?? '')
+      .replace(/[\u202A-\u202E\u200E\u200F]/g, '')
+      .replace(MAKO_HELPER_NOTE, '');
+    if (own.trim().length < 10) gap.noDescription++;
+    if (!meta.releaseInfo) gap.noYear++;
     // Posters: shaped "poster", portrait, reachable from abroad.
     if (meta.posterShape !== 'poster') flag('series shown with a non-poster shape', id);
     if (!meta.poster) flag('no poster', id);
@@ -103,5 +117,10 @@ export function auditSite(
   const problems = [...found]
     .map(([check, ids]) => ({ check, count: ids.length, examples: ids.slice(0, 3) }))
     .sort((a, b) => b.count - a.count);
-  return { at: new Date(now).toISOString(), metas, problems };
+  return {
+    at: new Date(now).toISOString(),
+    metas,
+    problems,
+    gaps: [...gaps].sort(([a], [b]) => a.localeCompare(b)).map(([source, g]) => ({ source, ...g })),
+  };
 }

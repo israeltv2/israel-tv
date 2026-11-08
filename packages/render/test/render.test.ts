@@ -437,3 +437,41 @@ test('Kaltura episode stills stored unsized are published at 640×360', () => {
     `${still}/width/640/height/360`,
   );
 });
+
+test("TMDB's details (matched shows) fill only what the source leaves empty: genres, description, year line", () => {
+  const tmdb = {
+    genres: ['דרמה', 'דיבורים'],
+    overview: 'סדרה על לידות בבית חולים.',
+    firstYear: '2019',
+    lastYear: '2022',
+  };
+  // Undated episodes, no genres, no description: all three from TMDB, in the project's names and forms.
+  const bare = yearShow([], { tmdbId: 7, tmdb });
+  bare.show = {
+    ...bare.show,
+    genres: [],
+    seasons: [{ key: 's', title: '', episodes: [{ key: 'e', title: 'א', streams: [] }] }],
+  };
+  bare.seasons = [{ key: 's', number: 1, kind: 'single' }];
+  bare.episodes = [{ key: 'e', season: 1, episode: 1 }];
+  const filled = renderSite({ ...base, shows: [bare] });
+  const preview = read(filled, 'catalog/series/iltv_keshet12.json').metas[0];
+  expect(preview).toMatchObject({ genres: ['דרמה', 'אירוח'], releaseInfo: '2019–2022' });
+  expect(preview.description).toContain('סדרה על לידות בבית חולים.');
+  // The Keshet 12 page still adds its helper note after it.
+  expect(read(filled, 'meta/series/iltv_mako_54.json').meta.description).toMatch(
+    /סדרה על לידות[\s\S]*העוזר הביתי/,
+  );
+  expect(read(filled, 'search.json')[0][6]).toEqual(['דרמה', 'אירוח']);
+  // The source's own genres, description and dated episodes always win.
+  const own = yearShow(['2024-03-01'], { tmdbId: 7, tmdb });
+  own.show = { ...own.show, description: 'הסדרה של הערוץ עצמו.' };
+  const kept = read(renderSite({ ...base, shows: [own] }), 'catalog/series/iltv_keshet12.json').metas[0];
+  expect(kept).toMatchObject({ genres: ['דוקומנטרי'], releaseInfo: '2024' });
+  expect(kept.description).toContain('הסדרה של הערוץ עצמו.');
+  // One TMDB year: one year.
+  bare.tmdb = { firstYear: '2020', lastYear: '2020' };
+  expect(
+    read(renderSite({ ...base, shows: [bare] }), 'catalog/series/iltv_keshet12.json').metas[0].releaseInfo,
+  ).toBe('2020');
+});

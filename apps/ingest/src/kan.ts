@@ -12,6 +12,7 @@ import {
   assignNumbers,
   type BrowserConfig,
   type Config,
+  cleanGenres,
   cleanShow,
   DAY_MS,
   HOUR_MS,
@@ -40,6 +41,7 @@ import {
   parseAppCategory,
   parseAppProgram,
   parseLobby,
+  parseLobbyGenres,
   parseLobbyPosters,
   parseShowPage,
 } from '@israel-tv/kan';
@@ -133,6 +135,10 @@ interface ShowState {
   retry?: Record<string, { n: number; at: string }>;
   /** Pages of episodes we have without an air date (read before dates were kept), re-read when time is left. */
   undated?: string[];
+  /** The genres the show's lobby card names, as Kan writes them (cleaned when used: kanGenres). */
+  genres?: string[];
+  /** Last time the app list was read for the air dates of stored episodes without one (APP_DATES_EVERY_MS). */
+  datesAt?: string;
   /**
    * Episodes read without a printed number, held back until the show's other pages are read (see saveEpisodes), so
    * they never take a number a printed episode read after them needs.
@@ -158,6 +164,8 @@ interface CrawlState {
   lobbiesAt?: string;
   /** Lobbies have been read since posters were taken from them (an older state reads them once more). */
   lobbyPosters?: true;
+  /** Lobbies have been read since genres were taken from them (an older state reads them once more). */
+  lobbyGenres?: true;
   /** The way show images are copied; a newer way tries every show still without a copy again at once. */
   artMethod?: number;
   backoffUntil?: string;
@@ -172,6 +180,21 @@ interface CrawlState {
   lastChallengeAt?: string;
   /** Pages and images loaded per day (UTC) and how many of them met Cloudflare's bot check: the measured rate. */
   botCheck?: Record<string, BotCheckDay>;
+}
+
+/**
+ * A show with stored episodes that have no air date reads its app list for them at most this often (one request, from
+ * the app lists' own budget; never a page). Kan's app gives each episode's publication day, the same day its page gives
+ * (docs/decisions.md "Kan's app API").
+ */
+export const APP_DATES_EVERY_MS = 7 * DAY_MS;
+
+/**
+ * A Kan show's genres: what its lobby card names, cleaned to the project's names; a show of the kids row (read from
+ * Kan's kids lobbies) is a children's show whatever else its card says.
+ */
+export function kanGenres(s: Pick<ShowState, 'catalog' | 'genres'>): string[] {
+  return cleanGenres([...(s.catalog === 'iltv_kankids' ? ['ילדים'] : []), ...(s.genres ?? [])]);
 }
 
 /** A guide page (one channel, one day) is read again after this long. */
@@ -561,6 +584,8 @@ export async function crawlKan(
   const appProblems: string[] = [];
   /** Episodes named from the app API in this slice (no page read). */
   let fromApp = 0;
+  /** Stored episodes given their air date from the app API in this slice. */
+  let datedFromApp = 0;
   /** Stream checks made in this slice (each one small GET of a master playlist on Kan's CDN). */
   let streamChecks = 0;
   const geo = opts.streamPlays ? undefined : createGeoFetch(opts.proxy ? [opts.proxy] : []);
@@ -610,7 +635,13 @@ export async function crawlKan(
       s?.art?.from !== poster &&
       (!s?.artTriedAt || now - Date.parse(s.artTriedAt) > ART_RETRY_MS);
     const missingArt = Object.values(state.shows).some((s) => s.lobbyPoster && artDue(s.lobbyPoster, s));
-    if (!state.lobbiesAt || !state.lobbyPosters || missingArt || now - Date.parse(state.lobbiesAt) > DAY_MS) {
+    if (
+      !state.lobbiesAt ||
+      !state.lobbyPosters ||
+      !state.lobbyGenres ||
+      missingArt ||
+      now - Date.parse(state.lobbiesAt) > DAY_MS
+    ) {
       const byUrl = new Map<string, string>();
       const captured = new Map<string, NonNullable<LoadedPage['images']>[number]>();
       let lobbyEmpty = false;
@@ -650,6 +681,7 @@ export async function crawlKan(
         if (html === '') continue; // this lobby failed above
         const paths = parseLobby(html, l.origin, l.channelPath);
         const posters = parseLobbyPosters(html);
+        const genres = parseLobbyGenres(html);
         if (paths.length === 0) {
           // A lobby that loads but lists no shows is a layout change: say so and try again next slice.
           problems++;
@@ -669,6 +701,9 @@ export async function crawlKan(
           };
           const poster = posters.get(path);
           const show = state.shows[key];
+          // Shows on two lobbies (kids-teens and preschool) take the genres of the card that has them.
+          const named = genres.get(path);
+          if (named?.length && show) show.genres = named;
           if (poster && show) {
             show.lobbyPoster = new URL(poster, l.origin).toString();
             show.image = show.lobbyPoster;
@@ -680,6 +715,9 @@ export async function crawlKan(
       if (!lobbyEmpty && byUrl.size === new Set(KAN_LOBBIES.map((l) => l.url)).size) {
         state.lobbiesAt = new Date(now).toISOString();
         state.lobbyPosters = true;
+        state.lobbyGenres = true;
+        // Stored shows take their cards' genres now (no page read); later saves keep them (saveEpisodes).
+        for (const [key, show] of Object.entries(state.shows)) setGenres(store, key, kanGenres(show));
         // Shows whose poster could not be copied this time (or is no longer on a lobby) wait ART_RETRY_MS, so a missing
         // copy never makes every slice read the lobbies.
         for (const show of Object.values(state.shows))
@@ -1008,6 +1046,26 @@ export async function crawlKan(
       if (s.undated?.length === 0) delete s.undated;
       if (dates.size > 0) dateEpisodes(store, key, dates);
     }
+    // 3c. With app lists left in the slice, the same from the app: one request gives a show's publication days
+    //     (measured 2026-11-08: 27 Kan shows had no dated episode, most read before dates were kept and not due
+    //     for a page re-read). Never a page; at most once a week per show (APP_DATES_EVERY_MS).
+    for (const [key, s] of Object.entries(state.shows)) {
+      if (!useApp || feeds >= opts.pagesPerRun) break;
+      if (s.datesAt && now - Date.parse(s.datesAt) < APP_DATES_EVERY_MS) continue;
+      if (!appProgramId(key, s)) continue;
+      const id = store.findSeriesId('kan', key);
+      const stored = id ? (store.getShow(id)?.show.seasons.flatMap((x) => x.episodes) ?? []) : [];
+      if (!stored.some((e) => !e.airDate)) continue;
+      checkStop();
+      const feed = await appFeed(key, s);
+      if (!feed) continue;
+      s.datesAt = new Date(now).toISOString();
+      const dates = appDates(stored, feed);
+      if (dates.size > 0) {
+        dateEpisodes(store, key, dates);
+        datedFromApp += dates.size;
+      }
+    }
 
     // 4. Settle pages that answered a server error with nothing comparable loading after them.
     for (const { site, kind } of [...new Map(suspects.map((x) => [`${x.site} ${x.kind}`, x])).values()]) {
@@ -1026,6 +1084,7 @@ export async function crawlKan(
     // Shows paused on an episode page that failed: visible on /status for as long as they wait.
     const waitingShows = shows.filter((s) => s.pending[0] && s.retry?.[s.pending[0]]).length;
     note = `${pages} pages + ${feeds} app lists${calm ? ' (calm pace: a bot check in the last day)' : ''}, +${newEpisodes} episodes (${fromApp} named by the app API), ${pendingTotal} episode pages still to read`;
+    if (datedFromApp > 0) note += `; ${datedFromApp} stored episodes dated from the app API`;
     if (appProblems.length > 0)
       warn(
         null,
@@ -1224,6 +1283,7 @@ function saveEpisodes(store: Store, key: string, s: ShowState, read: BatchItem[]
       title: s.title || base.title,
       ...(s.description ? { description: s.description } : {}),
       ...(s.image ? { poster: s.image, background: s.image } : {}),
+      ...(kanGenres(s).length ? { genres: kanGenres(s) } : {}),
     },
     batch,
   );
@@ -1243,6 +1303,33 @@ function renameShow(store: Store, key: string, title: string): void {
   if (!seriesId || !row || row.show.title === title) return;
   const show = { ...row.show, title };
   store.saveShow(seriesId, show, { seasons: [], episodes: [] }, latestAirDate(show), false);
+}
+
+/** A stored show's genres, changed in place (numbers and everything else unchanged). */
+function setGenres(store: Store, key: string, genres: string[]): void {
+  const seriesId = store.findSeriesId('kan', key);
+  const row = seriesId ? store.getShow(seriesId) : undefined;
+  if (!seriesId || !row || genres.length === 0) return;
+  if (JSON.stringify(row.show.genres ?? []) === JSON.stringify(genres)) return;
+  const show = { ...row.show, genres };
+  store.saveShow(seriesId, show, { seasons: [], episodes: [] }, latestAirDate(show), false);
+}
+
+/**
+ * Air dates for stored episodes without one, from the show's app list: an item's publication day, taken only where the
+ * item is the same episode (same page id and title). Episode key → day.
+ */
+export function appDates(
+  episodes: { key: string; title: string; airDate?: string | undefined }[],
+  feed: Map<string, AppItem>,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const e of episodes) {
+    if (e.airDate) continue;
+    const item = feed.get(e.key.replace(/^kan:/, ''));
+    if (item?.published && item.title.trim() === e.title.trim()) out.set(e.key, item.published);
+  }
+  return out;
 }
 
 /** Add air dates to episodes we already have (numbers and everything else unchanged). */

@@ -333,6 +333,18 @@ export const DeploysSchema = z.object({
       at: iso,
       metas: z.number(),
       problems: z.array(z.object({ check: z.string(), count: z.number(), examples: z.array(z.string()) })),
+      /** Per source, shows published without genres, a description of their own or a year line. */
+      gaps: z
+        .array(
+          z.object({
+            source: z.string(),
+            shows: z.number(),
+            noGenre: z.number(),
+            noDescription: z.number(),
+            noYear: z.number(),
+          }),
+        )
+        .optional(),
     })
     .optional(),
   /** Shows whose last read failed (their last good data is still published). */

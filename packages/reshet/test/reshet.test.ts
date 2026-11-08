@@ -420,6 +420,8 @@ test('fetchShow reads such a show from its site page: every full episode, number
   const show = await fetchShow(f, { key: '/all-shows/hostages/', title: 'בני ערובה' }, { kaltura });
   expect(f.urls.map((u) => new URL(u).pathname)).toEqual(['/all-shows/hostages/', '/vod/hostages/']);
   expect(show.notes).toBeUndefined();
+  // The show page has no blurb; its own site page does (without the leading "… לצפייה ישירה -").
+  expect(show.description).toMatch(/^סדרת מתח בכיכובה של אילת זורר\. /);
   expect(show.seasons.map((s) => [s.key, s.title, s.episodes.length])).toEqual([
     ['/all-shows/hostages/|s1', 'עונה 1', 11],
   ]);
@@ -457,6 +459,15 @@ test('a site page with grids: full-episode grids by season, clips and articles l
     seriesId: '1',
   });
   expect(other.episodes).toEqual([]);
+});
+
+test("a site page's description meta is the show's blurb; the channel's generic one is none", () => {
+  const where = { show: '/x/', page: '/x/' };
+  expect(parseShowSitePage(html('page-password'), where).description).toMatch(
+    /^שעשועון בהנחיית מאיה ורטהיימר/,
+  );
+  expect(parseShowSitePage(html('page-x-factor'), where).description).toMatch(/^אקס פקטור לאירוויזיון/);
+  expect(parseShowSitePage(html('page-parpar-nechmad'), where).description).toBeUndefined();
 });
 
 test('episodes that are items under the show\'s own "episodes" section (Kan kids reruns)', () => {
