@@ -1,5 +1,6 @@
 // FROZEN numbering rules (owner decision, 2026-11-06; named seasons changed the same day by the recorded
-// migration named-seasons-lowest-free-2026-11-06, before going public). Apps keep watch progress by series:season:episode, so the
+// migration named-seasons-lowest-free-2026-11-06, before going public; bulk-upload dates, numbers that start over
+// and "פרק הבכורה" / "פרק סיום העונה (N)" added by numbering-right-2026-11-08, the owner's one-time exception). Apps keep watch progress by series:season:episode, so the
 // numbers these inputs get must never change. If this test fails, a rule change would number episodes
 // differently: do not edit the expectations. A change that must move existing episodes needs a recorded one-time
 // migration (apps/ingest/src/renumber.ts, with a backup) and the owner's approval; the publisher's numbering guard
@@ -97,6 +98,43 @@ const CASES: [string, ScrapedShow, ReturnType<typeof run>][] = [
       },
     ]),
     { seasons: { k: 'numbered:1' }, episodes: { p4: '1:4', p1: '1:1', t: '1:5', p1b: '1:6' } },
+  ],
+  [
+    'printed numbers against dates of a bulk upload are kept: the dates cannot order the season',
+    show([
+      {
+        key: 'a',
+        title: 'עונה 1',
+        episodes: [
+          ep('fin', 'פרק סיום עוצר נשימה', '2015-11-09', 4),
+          ep('e3', 'x', '2015-11-09', 3),
+          ep('e2', 'x', '2017-03-28', 2),
+          ep('pre', 'פרק הבכורה', '2017-03-28', 1),
+        ],
+      },
+    ]),
+    { seasons: { a: 'numbered:1' }, episodes: { fin: '1:4', e3: '1:3', e2: '1:2', pre: '1:1' } },
+  ],
+  [
+    'printed numbers that start over (several cycles in one season): air-date order, nothing kept',
+    show([
+      {
+        key: 'z',
+        title: 'עונה 1',
+        episodes: [
+          ep('y2', 'פרק 1', '2025-04-17', 1),
+          ep('y1a', 'פרק 1', '2024-03-06', 1),
+          ep('y1b', 'פרק 2', '2024-03-13', 2),
+          ep('y2b', 'פרק 2', '2025-04-17', 2),
+          ep('y1c', 'פרק 3', '2024-03-20', 3),
+          ep('y2c', 'פרק 3', '2025-04-17', 3),
+        ],
+      },
+    ]),
+    {
+      seasons: { z: 'numbered:1' },
+      episodes: { y1a: '1:1', y1b: '1:2', y1c: '1:3', y2: '1:4', y2b: '1:5', y2c: '1:6' },
+    },
   ],
   [
     'named seasons fill the lowest free numbers in list order; empty seasons get none; "עונת 2023" is a year',

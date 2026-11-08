@@ -60,6 +60,28 @@ export const ScrapedShow = z.strictObject({
 });
 export type ScrapedShow = z.infer<typeof ScrapedShow>;
 
+/**
+ * A video the source lists twice in one season under two ids (Reshet's האח הגדול: "שי ושניר נפרדים", two Kaltura
+ * entries of 5,414 s with one text): the first listing stays, the second is left out. Same title, same duration and
+ * the same description (or none on both); a re-edit with another length is another episode.
+ */
+export function dropRepeatedVideos(show: ScrapedShow): ScrapedShow {
+  let changed = false;
+  const seasons = show.seasons.map((s) => {
+    const seen = new Set<string>();
+    const episodes = s.episodes.filter((e) => {
+      if (e.durationSec === undefined || !e.title.trim()) return true;
+      const id = `${e.title.trim()}\n${e.durationSec}\n${e.description?.trim() ?? ''}`;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    if (episodes.length !== s.episodes.length) changed = true;
+    return episodes.length === s.episodes.length ? s : { ...s, episodes };
+  });
+  return changed ? { ...show, seasons } : show;
+}
+
 const isHttpUrl = (u: unknown) => typeof u === 'string' && /^https?:\/\//.test(u) && URL.canParse(u);
 
 /**
@@ -102,7 +124,7 @@ export function cleanShow(show: ScrapedShow): ScrapedShow {
         }),
     })),
   };
-  const r = ScrapedShow.safeParse(cleaned);
+  const r = ScrapedShow.safeParse(dropRepeatedVideos(cleaned));
   if (!r.success) {
     const i = r.error.issues[0];
     throw new Error(`source data failed validation at ${i?.path.join('.') ?? '?'}: ${i?.message ?? ''}`);

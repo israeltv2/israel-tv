@@ -80,10 +80,16 @@ export const VodPage = z.looseObject({
   seo: z
     .looseObject({
       title: z.string().optional(),
-      /** schema.org data of the video: `uploadDate` is when Mako published it (an ISO instant). */
+      /** schema.org data of the video: `uploadDate` is when Mako published it (an ISO instant), `thumbnailUrl` its still. */
       schema: z
-        .looseObject({ video: z.looseObject({ uploadDate: z.string().nullish() }).nullish() })
+        .looseObject({
+          video: z
+            .looseObject({ uploadDate: z.string().nullish(), thumbnailUrl: z.string().nullish() })
+            .nullish(),
+        })
         .nullish(),
+      /** The page's share image: the video's still. */
+      image: z.string().nullish(),
     })
     .nullish(),
   /** The video's own blurb (what the episode is about). */
