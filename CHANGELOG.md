@@ -3,6 +3,13 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.12.0](https://github.com/israeltv2/israel-tv/compare/v0.11.1...v0.12.0) (2026-11-08)
+
+
+### Features
+
+* **site:** accordions open and close with motion, lighter posters and logos ([#177](https://github.com/israeltv2/israel-tv/issues/177)) ([bfb53a6](https://github.com/israeltv2/israel-tv/commit/bfb53a66ca2fdbe4d4fd3b69ff5dd706ed8eddf1))
+
 ## [0.11.1](https://github.com/israeltv2/israel-tv/compare/v0.11.0...v0.11.1) (2026-11-08)
 
 
