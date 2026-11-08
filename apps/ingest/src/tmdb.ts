@@ -150,6 +150,7 @@ export async function matchShows(
           {
             code: 'tmdb-duplicate',
             message: `${row.title}: TMDB ${hit?.id} already matched to ${taken.join(', ')}; not assigned`,
+            params: { title: row.title, tmdbId: String(hit?.id ?? ''), taken },
           },
         ]);
         store.setExternalIds(row.seriesId, { tmdbId: null, imdbId: null });

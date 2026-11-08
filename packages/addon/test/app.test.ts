@@ -318,3 +318,14 @@ test('a page that names the address it was asked on varies by Host (no cross-hos
   expect(res.headers.get('vary')).toBe('Host');
   expect((await page.request('https://a.example/status')).headers.get('vary')).toBeNull();
 });
+
+test('the status page in Hebrew is served at /he/status, like the English one, never cached', async () => {
+  const pages = createAddonApp({
+    read: async (p) => (p === 'he/status.html' ? '<html lang="he">מצב</html>' : undefined),
+  });
+  const res = await pages.request('/he/status');
+  expect(res.status).toBe(200);
+  expect(res.headers.get('content-type')).toContain('text/html');
+  expect(res.headers.get('cache-control')).toBe('no-store');
+  expect(await res.text()).toContain('מצב');
+});

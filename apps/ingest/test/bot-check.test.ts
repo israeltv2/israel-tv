@@ -91,6 +91,27 @@ test('Radware through every retry: the show is delayed with its last good data, 
   expect(notes).toMatch(
     /the site's bot check answered 4 of \d+ requests today \(\d+\.\d%\); 0 read on a quick retry, 1 show delayed/,
   );
+  // The same notes as codes and values, one for one, so the status page can word them in Hebrew too.
+  expect(status?.noteCodes?.length).toBe(status?.notes.length);
+  expect(status?.noteCodes).toContainEqual({
+    code: 'blocked-retrying',
+    params: { count: 1, attempt: 1, of: 3, at: '2026-11-07T01:30:00.000Z', titles: [NEWSCAST.title] },
+  });
+  expect(status?.noteCodes).toContainEqual(
+    expect.objectContaining({
+      code: 'bot-check-rate',
+      params: expect.objectContaining({ pages: 4, delayed: 1 }),
+    }),
+  );
+  // The warning keeps its values (stored with it), and status.json carries them.
+  const warning = buildStatus(store, ['mako'], Date.now()).warnings.find((w) => w.code === 'bot-check');
+  expect(warning?.params).toEqual({
+    source: 'mako',
+    count: 1,
+    at: '2026-11-07T01:30:00.000Z',
+    titles: [NEWSCAST.title],
+    more: 0,
+  });
   // The retry later that night reads it.
   await runBlockedRetry(store, recordedMako(0), { ...opts, now: t0 + 31 * 60_000 });
   expect(store.getState(retryKey('mako'))).toMatchObject({ pending: [], recovered: [NEWSCAST.title] });

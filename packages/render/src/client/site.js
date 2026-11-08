@@ -37,7 +37,9 @@
   const ago = (t) => {
     const s = (t - Date.now()) / 1000;
     const unit = UNITS.find(([limit]) => Math.abs(s) < limit);
-    return relative.format(Math.round(s / unit[2]), unit[1]);
+    // Hebrew's one and two have words of their own ("לפני שעה", "לפני שעתיים"), which ICU follows with the number
+    // in brackets ("לפני שעה (1)"): the word says it already.
+    return relative.format(Math.round(s / unit[2]), unit[1]).replace(/\s*\(\d+\)$/, '');
   };
   for (const el of d.querySelectorAll('time[datetime]')) {
     if (el.hasAttribute('data-abs')) continue;

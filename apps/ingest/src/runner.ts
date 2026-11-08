@@ -147,7 +147,11 @@ export async function ingestShow(
     // Listed by the source but its page is gone, and we never had it: nothing to publish or keep.
     if ((err as { status?: number }).status === 404) {
       store.addWarnings(runId, null, [
-        { code: 'source-note', message: `${entry.title}: listed, but its page is gone (404)` },
+        {
+          code: 'source-note',
+          message: `${entry.title}: listed, but its page is gone (404)`,
+          params: { title: entry.title, note: 'page-gone' },
+        },
       ]);
       return { kind: 'empty' };
     }
@@ -184,6 +188,7 @@ export async function ingestShow(
       {
         code: 'source-note',
         message: `${entry.title}: only a trailer so far (not in the catalog until an episode)`,
+        params: { title: entry.title, note: 'trailer-only' },
       },
     ]);
     return { kind: 'empty' };
@@ -194,14 +199,26 @@ export async function ingestShow(
     store.addWarnings(
       runId,
       null,
-      notes.map((message) => ({ code: 'source-note', message: `${entry.title}: ${message}` })),
+      notes.map((message) => ({
+        code: 'source-note',
+        message: `${entry.title}: ${message}`,
+        params: scraped.notes?.length
+          ? { title: entry.title, detail: message }
+          : { title: entry.title, note: 'no-episodes' },
+      })),
     );
     return { kind: 'empty' };
   }
   const thin = thinReason(prev?.show, show);
   if (thin) {
     if (knownId && prev) store.markShowFailed(knownId, `kept last good data: ${thin}`);
-    store.addWarnings(runId, knownId ?? null, [{ code: 'thin-result', message: `${entry.title}: ${thin}` }]);
+    store.addWarnings(runId, knownId ?? null, [
+      {
+        code: 'thin-result',
+        message: `${entry.title}: ${thin}`,
+        params: { title: entry.title, detail: thin },
+      },
+    ]);
     throw new Error(thin);
   }
   const seriesId = knownId ?? store.seriesIdFor(adapter.source, entry.key);
@@ -209,7 +226,11 @@ export async function ingestShow(
     store.addWarnings(
       runId,
       seriesId,
-      scraped.notes.map((message) => ({ code: 'source-note', message: `${entry.title}: ${message}` })),
+      scraped.notes.map((message) => ({
+        code: 'source-note',
+        message: `${entry.title}: ${message}`,
+        params: { title: entry.title, detail: message },
+      })),
     );
   }
   const numbering = assignNumbers(show, store.assignments(seriesId));
@@ -526,6 +547,13 @@ export function deferBlocked(
     {
       code: 'bot-check',
       message: `${sourceName(source)}'s bot check delayed ${blocked.length} ${blocked.length === 1 ? 'show' : 'shows'}; retried at ${next.nextAt?.slice(11, 16)} UTC (last good data kept): ${names.slice(0, 5).join(', ')}${names.length > 5 ? ` +${names.length - 5} more` : ''}`,
+      params: {
+        source,
+        count: blocked.length,
+        ...(next.nextAt ? { at: next.nextAt } : {}),
+        titles: names.slice(0, 5),
+        more: Math.max(0, names.length - 5),
+      },
     },
   ]);
   return next;

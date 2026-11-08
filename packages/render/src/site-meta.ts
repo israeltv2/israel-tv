@@ -1,5 +1,5 @@
 // The small files search engines and browsers ask for: robots.txt, sitemap.xml and the web app manifest. Only the
-// pages (landing in two languages, status, the library) are for indexing; the addon's JSON and data paths are not.
+// pages (landing and status in two languages, the library) are for indexing; the addon's JSON and data paths are not.
 import { sitePaths } from '@israel-tv/core';
 import { absolute, BRAND } from './page.ts';
 
@@ -15,20 +15,23 @@ Sitemap: ${absolute(sitePaths.sitemap)}
 `;
 }
 
-/** The sitemap: the home page in both languages, the status page and, given, the library's pages. */
+/** The sitemap: the home and status pages in both languages (each with its other language), and the library's pages. */
 export function sitemapXml(library: string[] = []): string {
-  const page = (path: string, alternates: boolean, priority: string) =>
+  const page = (path: string, priority: string, pair?: { en: string; he: string }) =>
     `<url><loc>${absolute(path)}</loc>${
-      alternates
-        ? `<xhtml:link rel="alternate" hreflang="en" href="${absolute('')}"/><xhtml:link rel="alternate" hreflang="he" href="${absolute('he/')}"/><xhtml:link rel="alternate" hreflang="x-default" href="${absolute('')}"/>`
+      pair
+        ? `<xhtml:link rel="alternate" hreflang="en" href="${absolute(pair.en)}"/><xhtml:link rel="alternate" hreflang="he" href="${absolute(pair.he)}"/><xhtml:link rel="alternate" hreflang="x-default" href="${absolute(pair.en)}"/>`
         : ''
     }<priority>${priority}</priority></url>`;
+  const home = { en: '', he: 'he/' };
+  const status = { en: 'status', he: 'he/status' };
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${page('', true, '1.0')}
-${page('he/', true, '0.9')}
-${page('status', false, '0.5')}
-${library.map((p) => page(p, false, p.startsWith('show/') ? '0.6' : '0.8')).join('\n')}
+${page('', '1.0', home)}
+${page('he/', '0.9', home)}
+${page('status', '0.5', status)}
+${page('he/status', '0.5', status)}
+${library.map((p) => page(p, p.startsWith('show/') ? '0.6' : '0.8')).join('\n')}
 </urlset>
 `;
 }

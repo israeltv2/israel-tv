@@ -24,6 +24,7 @@ import {
   PROJECT_URL,
   siteNav,
   sized,
+  statusHref,
   topBar,
 } from './page.ts';
 import type { Overall } from './status-html.ts';
@@ -137,8 +138,8 @@ export function renderLandingHtml(input: LandingInput, lang: Lang = 'en'): strin
   };
 
   const statusChip = input.status
-    ? html`<a class="status-chip ${input.status.level}" href="/status"><i aria-hidden="true"></i>${he ? HE_STATUS[input.status.level] : input.status.title} · ${t(lang, 'Status page', 'דף המצב')}</a>`
-    : html`<a class="status-chip" href="/status"><i aria-hidden="true"></i>${t(lang, 'Status page', 'דף המצב')}</a>`;
+    ? html`<a class="status-chip ${input.status.level}" href="${statusHref(lang)}"><i aria-hidden="true"></i>${he ? HE_STATUS[input.status.level] : input.status.title} · ${t(lang, 'Status page', 'דף המצב')}</a>`
+    : html`<a class="status-chip" href="${statusHref(lang)}"><i aria-hidden="true"></i>${t(lang, 'Status page', 'דף המצב')}</a>`;
 
   // One card per row, every card built the same way: a header (logo tile, name), the counts or the first-fill line,
   // where it plays, and a fan of posters. The parts line up across cards (subgrid), whatever is in them.
@@ -177,7 +178,7 @@ ${
         ],
         [
           'בתחילת שורה מופיע ⚠.',
-          'האתר של הערוץ לא נקרא כבר זמן מה. מה שרואים הוא הרשימה הטובה האחרונה, והיא ממשיכה להתנגן. <a href="/status">דף המצב</a> מראה מה קורה.',
+          'האתר של הערוץ לא נקרא כבר זמן מה. מה שרואים הוא הרשימה הטובה האחרונה, והיא ממשיכה להתנגן. <a href="/he/status">דף המצב</a> מראה מה קורה.',
         ],
         [
           'בתחילת שורה מופיע ⏳.',
@@ -185,7 +186,7 @@ ${
         ],
         [
           'משהו לא מתנגן.',
-          `בדקו את <a href="/status">דף המצב</a>, ואם הבעיה לא מופיעה שם, <a href="${BROKEN_URL}">ספרו לנו</a> באיזו תוכנית ובאיזה פרק. אם כתוב "${ISRAEL_ONLY_LABEL}" ואתם בחו״ל, זו החלטה של הערוץ.`,
+          `בדקו את <a href="/he/status">דף המצב</a>, ואם הבעיה לא מופיעה שם, <a href="${BROKEN_URL}">ספרו לנו</a> באיזו תוכנית ובאיזה פרק. אם כתוב "${ISRAEL_ONLY_LABEL}" ואתם בחו״ל, זו החלטה של הערוץ.`,
         ],
         [
           'החיפוש לא מוצא את התוכנית.',
@@ -422,7 +423,7 @@ ${faq.map(([q, a]) => html`<details><summary>${q}</summary><div class="body"><p>
 <a class="btn btn-plain" href="${PROJECT_URL}">${ICONS.github}${t(lang, 'Source code', 'קוד המקור')}</a>
 <a class="btn btn-plain" href="${ISSUES_URL}">${t(lang, 'Report a problem', 'דיווח על בעיה')}</a>
 <a class="btn btn-plain" href="${DOCS_URL}">${t(lang, 'Documentation', 'תיעוד')}</a>
-<a class="btn btn-plain" href="/status">${t(lang, 'Status', 'מצב השירות')}</a>
+<a class="btn btn-plain" href="${statusHref(lang)}">${t(lang, 'Status', 'מצב השירות')}</a>
 </div>
 </div></section>
 </main>

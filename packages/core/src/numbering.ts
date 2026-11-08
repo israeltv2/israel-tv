@@ -35,6 +35,8 @@ export interface Assignments {
 export interface NumberingWarning {
   code: 'season-number-taken' | 'episode-number-taken' | 'source-renumbered' | 'numbers-reversed';
   message: string;
+  /** The message's values, for pages that word it in another language. */
+  params: Record<string, string | number>;
 }
 
 export interface NumberingResult extends Assignments {
@@ -148,6 +150,7 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
       warnings.push({
         code: 'season-number-taken',
         message: `season "${season.title}" (${season.key}) wants ${number}, already used; numbered as named`,
+        params: { title: season.title, key: season.key, number },
       });
       number = undefined;
       kind = 'named';
@@ -184,6 +187,7 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
         warnings.push({
           code: 'source-renumbered',
           message: `episode ${ep.key} is now "פרק ${ep.numberHint}" at the source; kept S${stored.season}E${stored.episode}`,
+          params: { key: ep.key, hint: ep.numberHint, season: stored.season, episode: stored.episode },
         });
       }
     }
@@ -192,6 +196,7 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
       warnings.push({
         code: 'numbers-reversed',
         message: `season "${season.title}" (${season.key}): printed numbers run against the air dates; numbered by date`,
+        params: { title: season.title, key: season.key },
       });
     }
     // First pass: episodes whose printed number is free, so a later duplicate cannot steal it.
@@ -214,6 +219,7 @@ export function assignNumbers(show: ScrapedShow, previous: Assignments): Numberi
         warnings.push({
           code: 'episode-number-taken',
           message: `episode ${ep.key} "פרק ${ep.numberHint}" collides in season ${seasonNumber}; numbered ${n}`,
+          params: { key: ep.key, hint: ep.numberHint, season: seasonNumber, number: n },
         });
       }
       const a = { key: ep.key, season: seasonNumber, episode: n };

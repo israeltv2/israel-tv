@@ -23,6 +23,7 @@ export const SITE_STATUS: StatusFile = {
       lastFullRun: { at: '2026-11-07T01:30:00.010Z', status: 'ok' },
       lastAiringRun: { at: '2026-11-07T06:05:00.075Z', status: 'ok' },
       notes: ['2 shows listed by the site with nothing to watch (not in the catalog)'],
+      noteCodes: [{ code: 'empty-shows', params: { count: 2 } }],
       emptyShows: ["אופירה וברקוביץ'", 'חדשות האוכל'],
     },
     {
@@ -33,6 +34,7 @@ export const SITE_STATUS: StatusFile = {
       lastFullRun: { at: '2026-11-07T01:54:34.466Z', status: 'ok' },
       lastAiringRun: { at: '2026-11-07T06:06:02.480Z', status: 'ok' },
       notes: ['3 shows listed by the site with nothing to watch (not in the catalog)'],
+      noteCodes: [{ code: 'empty-shows', params: { count: 3 } }],
       emptyShows: ['The X Factor ישראל', 'אגדת דשא', 'פרפר נחמד | באדיבות כאן חינוכית'],
     },
     {
@@ -46,6 +48,14 @@ export const SITE_STATUS: StatusFile = {
         'first fill of iltv_kankids (כאן חינוכית: ילדים ונוער) in progress: 21 of 61 shows in the catalog, 1546 episode pages to read',
         '14 Kan episodes are no longer offered by Kan (their broadcast rights ended), so they are not in the catalog',
         "Kan's bot check stopped 3 of 412 page loads today; the crawl waits and tries again",
+        "2 Kan shows wait to read an episode page again that failed to load (tried up to 3 times, 6 hours apart; the show's later episodes follow it)",
+      ],
+      noteCodes: [
+        { code: 'first-fill', params: { catalog: 'iltv_kan11', inCatalog: 91, known: 118, pagesToRead: 608 } },
+        { code: 'first-fill', params: { catalog: 'iltv_kankids', inCatalog: 21, known: 61, pagesToRead: 1546 } },
+        { code: 'kan-no-longer-offered', params: { count: 14 } },
+        { code: 'kan-bot-check', params: { challenged: 3, pages: 412 } },
+        { code: 'kan-waiting-retry', params: { count: 2, tries: 3, hours: 6 } },
       ],
       skipped: { noLongerOffered: 14, notVideo: 2 },
       botCheck: { challenged: 3, pages: 412 },
@@ -57,6 +67,7 @@ export const SITE_STATUS: StatusFile = {
       episodes: 0,
       lastFullRun: { at: '2026-11-07T06:47:58.826Z', status: 'ok' },
       notes: ['23 channels answering (every stream played daily; Mako channels through the home helper)'],
+      noteCodes: [{ code: 'live-answering', params: { count: 23 } }],
     },
   ],
   failingShows: [
@@ -73,18 +84,28 @@ export const SITE_STATUS: StatusFile = {
       code: 'episode-number-taken',
       message: 'episode kan:830066 "פרק 1" collides in season 1; numbered 2',
       id: 'iltv_kan_118',
+      params: { key: 'kan:830066', hint: 1, season: 1, number: 2 },
     },
     {
       at: '2026-11-07T05:55:28.711Z',
       code: 'source-renumbered',
       message: 'episode kan:721263 is now "פרק 2" at the source; kept S1E4',
       id: 'iltv_kan_8',
+      params: { key: 'kan:721263', hint: 2, season: 1, episode: 4 },
     },
     {
       at: '2026-11-07T05:35:29.656Z',
       code: 'source-note',
       message:
         'Kan episode https://www.kan.org.il/content/kan/kan-11/p-445792/447786/: no video player config on the page (layout changed?) (try 2 of 3; the show waits for it)',
+      params: {
+        kan: 'episode',
+        url: 'https://www.kan.org.il/content/kan/kan-11/p-445792/447786/',
+        detail: 'no video player config on the page (layout changed?)',
+        tries: 2,
+        of: 3,
+        gaveUp: 0,
+      },
     },
     {
       at: '2026-11-07T02:15:25.690Z',

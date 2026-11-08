@@ -764,7 +764,7 @@ export class Store {
   addWarnings(
     runId: number | null,
     seriesId: string | null,
-    list: readonly { code: string; message: string }[],
+    list: readonly { code: string; message: string; params?: Record<string, unknown> }[],
   ): void {
     if (list.length === 0) return;
     const createdAt = now();
@@ -780,7 +780,16 @@ export class Store {
     if (fresh.length === 0) return;
     this.db
       .insert(t.warnings)
-      .values(fresh.map((w) => ({ runId, seriesId, code: w.code, message: w.message, createdAt })))
+      .values(
+        fresh.map((w) => ({
+          runId,
+          seriesId,
+          code: w.code,
+          message: w.message,
+          params: w.params ? JSON.stringify(w.params) : null,
+          createdAt,
+        })),
+      )
       .run();
   }
 

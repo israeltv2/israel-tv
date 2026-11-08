@@ -8,7 +8,7 @@ import type { Store } from '@israel-tv/store';
 
 /** The protocol's limit of addresses per request. */
 export const INDEXNOW_BATCH = 10_000;
-/** `/status` changes with almost every publish: it is sent at most this often. */
+/** `/status` (and `/he/status`) changes with almost every publish: it is sent at most this often. */
 export const STATUS_EVERY_MS = 24 * HOUR_MS;
 
 const KEY = 'indexnow:key';
@@ -53,6 +53,7 @@ export const keyFile = (key: string) => `${key}.txt`;
 export function pageFor(file: string): string | undefined {
   if (file === sitePaths.landing) return '';
   if (file === sitePaths.statusPage) return 'status';
+  if (file === sitePaths.statusPageHe) return 'he/status';
   const m = /^(he|library|library\/[^/]+|show\/[^/]+|live)\/index\.html$/.exec(file);
   return m ? `${m[1]}/` : undefined;
 }
@@ -95,7 +96,10 @@ export function indexNowPlan(
   }
   const statusAt = store.getState<string>(STATUS_AT);
   const statusDue = full || !statusAt || now - Date.parse(statusAt) >= STATUS_EVERY_MS;
-  if (!statusDue) pages.delete('status');
+  if (!statusDue) {
+    pages.delete('status');
+    pages.delete('he/status');
+  }
   const urls = new Set([...pages].map((p) => `${input.base}/${p}`));
   for (const u of store.getState<string[]>(PENDING) ?? []) if (u.startsWith(`${input.base}/`)) urls.add(u);
   return { urls: [...urls], full, status: pages.has('status') };

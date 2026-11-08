@@ -2066,3 +2066,17 @@ line on 143 Mako and 27 Kan. Filled only from what the sources (and TMDB, for ma
   description.
 - **Visible:** the catalog check on `/status` (and the dashboard's) counts per source the shows still without
   genres, a description or a year line.
+||||||| parent of e74950f (feat(site): status page in Hebrew at /he/status)
+
+## The status page in Hebrew (2026-11-08)
+
+- `/he/status` is the status page in Hebrew, rendered from the same status file as `/status`; the Hebrew pages'
+  header, footer and landing page link to it, and each status page offers the other as its language switch, with
+  `hreflang` alternates in the head and the sitemap.
+- Nothing is translated from English text: the notes the publisher writes carry a code and their values beside the
+  English (`noteCodes`, `publishNote`, `tmdbNote`, `warnings[].params`, stored with each warning in a new `params`
+  column), and each page words them itself (packages/render `status-words.ts`). `/status.json` only gained fields.
+  What the sites themselves say (an error message, a Kan page's own note) stays as it came, shown as English on the
+  Hebrew page; so do warnings recorded before the change, until they age out.
+- Chrome and Node write Hebrew relative times for one and two with the number in brackets ("לפני שעה (1)"); the
+  pages' script drops the bracket.

@@ -19,6 +19,8 @@ import {
   type Source,
   STALE_PUBLISH_HOURS,
   type StatusFile,
+  type StatusNote,
+  type StatusParams,
   sitePaths,
   type TmdbDetails,
 } from '@israel-tv/core';
@@ -90,6 +92,16 @@ const READS: Record<Source, { kind: RunKind; failedIs: Health; lastGood: 'latest
   live: { kind: 'full', failedIs: 'error', lastGood: 'latest' },
 };
 
+/** A warning's stored values (JSON), or nothing when they cannot be read. */
+function parseParams(json: string): StatusParams | undefined {
+  try {
+    const v = JSON.parse(json) as unknown;
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as StatusParams) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function buildStatus(
   store: Store,
   sources: Source[],
@@ -105,6 +117,12 @@ export function buildStatus(
     const last = store.lastRun(read.kind, source, { settled: true });
     const airing = store.lastRun('airing', source, { settled: true });
     const notes: string[] = [];
+    const noteCodes: StatusNote[] = [];
+    /** A note in English and as a code with its values (the status page words it in either language). */
+    const note = (code: string, text: string, params?: StatusNote['params']) => {
+      notes.push(text);
+      noteCodes.push(params ? { code, params } : { code });
+    };
     let health: Health = 'ok';
     const lastGood =
       read.lastGood === 'any'
@@ -115,14 +133,17 @@ export function buildStatus(
     if (!last) {
       health = 'warn';
       const limited = store.lastRun(read.kind, `${source}:limited`, { settled: true });
-      notes.push(
-        limited
-          ? 'only a limited test run (--limit) so far; the full run follows at schedule.fullRun'
-          : 'no full run yet',
-      );
+      if (limited)
+        note(
+          'limited-run-only',
+          'only a limited test run (--limit) so far; the full run follows at schedule.fullRun',
+        );
+      else note('no-full-run', 'no full run yet');
     } else if (last.status === 'failed') {
       health = read.failedIs;
-      notes.push(`last full run failed: ${last.error ?? 'unknown error'}`);
+      note('last-run-failed', `last full run failed: ${last.error ?? 'unknown error'}`, {
+        error: last.error ?? '',
+      });
     }
     // Shows refused by the site's bot protection (in the full run or a later airing read) wait for a retry with their
     // last good data kept: only shows still refused after every retry, or failures of another kind, make it amber.
@@ -132,56 +153,75 @@ export function buildStatus(
       const names = (list: string[]) =>
         list.slice(0, 5).join(', ') + (list.length > 5 ? ` +${list.length - 5} more` : '');
       const total = r.pending.length + r.recovered.length;
+      const titles = r.pending.map((p) => p.title);
       if (r.pending.length === 0)
-        notes.push(
+        note(
+          'blocked-recovered',
           `${total} ${total === 1 ? 'show was' : 'shows were'} refused by the site's bot protection and read on a retry`,
+          { count: total },
         );
       else if (r.nextAt)
-        notes.push(
-          `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} refused by the site's bot protection, retry ${r.attempts + 1} of ${BLOCK_RETRIES} at ${r.nextAt.slice(11, 16)} UTC: ${names(r.pending.map((p) => p.title))}`,
+        note(
+          'blocked-retrying',
+          `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} refused by the site's bot protection, retry ${r.attempts + 1} of ${BLOCK_RETRIES} at ${r.nextAt.slice(11, 16)} UTC: ${names(titles)}`,
+          { count: r.pending.length, attempt: r.attempts + 1, of: BLOCK_RETRIES, at: r.nextAt, titles },
         );
       else {
         health = 'warn';
-        notes.push(
-          `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} still refused by the site's bot protection after ${r.attempts} retries: ${names(r.pending.map((p) => p.title))}`,
+        note(
+          'blocked-still',
+          `${r.pending.length} ${r.pending.length === 1 ? 'show' : 'shows'} still refused by the site's bot protection after ${r.attempts} retries: ${names(titles)}`,
+          { count: r.pending.length, attempts: r.attempts, titles },
         );
       }
     }
     if (last?.status === 'partial') {
       health = 'warn';
-      notes.push(
-        r && r.others > 0
-          ? `last full run: ${r.others} ${r.others === 1 ? 'show' : 'shows'} failed (not blocked)`
-          : last.showsFailed > 0
-            ? `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`
-            : `last run partial: ${last.error ?? 'stopped early'}`,
-      );
+      if (r && r.others > 0)
+        note(
+          'run-partial-failed',
+          `last full run: ${r.others} ${r.others === 1 ? 'show' : 'shows'} failed (not blocked)`,
+          { count: r.others },
+        );
+      else if (last.showsFailed > 0)
+        note(
+          'run-partial-failed',
+          `last full run partial: ${last.showsFailed} ${last.showsFailed === 1 ? 'show' : 'shows'} failed`,
+          { count: last.showsFailed },
+        );
+      else
+        note('run-partial', `last run partial: ${last.error ?? 'stopped early'}`, {
+          error: last.error ?? '',
+        });
     }
     // The bot check's answer rate today, measured: said plainly, never a warning by itself.
     const bot = store.getState<Record<string, BotCheckDay>>(botCheckKey(source))?.[
       new Date(now).toISOString().slice(0, 10)
     ];
     if (bot?.pages)
-      notes.push(
+      note(
+        'bot-check-rate',
         `the site's bot check answered ${bot.pages} of ${bot.requests} requests today (${((100 * bot.pages) / Math.max(1, bot.requests)).toFixed(1)}%); ${bot.cleared} read on a quick retry, ${bot.delayed} ${bot.delayed === 1 ? 'show' : 'shows'} delayed to a later retry`,
+        { pages: bot.pages, requests: bot.requests, cleared: bot.cleared, delayed: bot.delayed },
       );
     // Time since the last good run; for a source that never had one, since its first attempt.
     const everGood = store.lastGoodRun(read.kind, source);
     const ref = everGood ?? (last ? store.firstRun(read.kind, source) : undefined);
     if (last && ref && now - Date.parse(ref.startedAt) > 36 * HOUR_MS) {
       health = 'error';
-      notes.push(
-        lastGood ? 'no successful run in 36 hours' : 'never succeeded, first tried over 36 hours ago',
-      );
+      if (lastGood) note('no-success-36h', 'no successful run in 36 hours');
+      else note('never-succeeded-36h', 'never succeeded, first tried over 36 hours ago');
     }
     if (source === 'live') {
       if (last)
-        notes.push(
+        note(
+          'live-answering',
           `${last.showsOk} channels answering (every stream played daily; Mako channels through the home helper)`,
+          { count: last.showsOk },
         );
     } else if (shows.length === 0 && last) {
       health = 'error';
-      notes.push('no shows');
+      note('no-shows', 'no shows');
     }
     // The same facts as some notes, as fields: the status page words them itself (in either language).
     let skippedPages: { noLongerOffered: number; notVideo: number } | undefined;
@@ -193,35 +233,47 @@ export function buildStatus(
         const name = CATALOGS.find((c) => c.id === catalog)?.name ?? catalog;
         // The archive is a long back catalogue read last: noted, not a warning.
         if (!KAN_LATER.has(catalog) && health === 'ok') health = 'warn';
-        notes.push(
+        note(
+          'first-fill',
           `first fill of ${catalog} (${name}) in progress: ${p.inCatalog} of ${p.known} shows in the catalog, ${p.backlog} episode pages to read`,
+          { catalog, inCatalog: p.inCatalog, known: p.known, pagesToRead: p.backlog },
         );
       }
       // Pages Kan lists as episodes with nothing to play: expected, explained, not a warning.
       const skipped = kanSkippedPages(store);
       skippedPages = { noLongerOffered: skipped.removed, notVideo: skipped.notVideo };
       if (skipped.removed > 0)
-        notes.push(
+        note(
+          'kan-no-longer-offered',
           `${skipped.removed} Kan episodes are no longer offered by Kan (their broadcast rights ended), so they are not in the catalog`,
+          { count: skipped.removed },
         );
       // Kan's bot check, measured: any page it stopped today is said plainly (the crawl waits and tries again).
       const today = kanBotCheck(store)[new Date().toISOString().slice(0, 10)];
       if (today?.pages) botCheck = { challenged: today.challenged, pages: today.pages };
       if (today?.challenged)
-        notes.push(
+        note(
+          'kan-bot-check',
           `Kan's bot check stopped ${today.challenged} of ${today.pages} page loads today; the crawl waits and tries again`,
+          { challenged: today.challenged, pages: today.pages },
         );
       if (skipped.notVideo > 0)
-        notes.push(
+        note(
+          'kan-not-video',
           `${skipped.notVideo} pages Kan lists among episodes are articles or promos without video (skipped)`,
+          { count: skipped.notVideo },
         );
       if (skipped.waiting > 0)
-        notes.push(
+        note(
+          'kan-waiting-retry',
           `${skipped.waiting} Kan ${skipped.waiting === 1 ? 'show waits' : 'shows wait'} to read an episode page again that failed to load (tried up to ${MAX_EPISODE_TRIES} times, ${RETRY_GAP_MS / HOUR_MS} hours apart; the show's later episodes follow it)`,
+          { count: skipped.waiting, tries: MAX_EPISODE_TRIES, hours: RETRY_GAP_MS / HOUR_MS },
         );
       if (skipped.gaveUp > 0)
-        notes.push(
+        note(
+          'kan-gave-up',
           `${skipped.gaveUp} Kan episode pages failed to load ${MAX_EPISODE_TRIES} times and were skipped`,
+          { count: skipped.gaveUp, tries: MAX_EPISODE_TRIES },
         );
     }
     // Reshet episodes past their availability window: kept with their numbers, not in the catalog (render.ts).
@@ -229,16 +281,20 @@ export function buildStatus(
       const past = shows.reduce((n, s) => n + episodeCount(s.show) - offeredCount(s.show), 0);
       if (past > 0) {
         skippedPages = { noLongerOffered: past, notVideo: 0 };
-        notes.push(
+        note(
+          'reshet-past-window',
           `${past} Reshet ${past === 1 ? 'episode is' : 'episodes are'} past their availability window, so ${past === 1 ? 'it is' : 'they are'} not in the catalog`,
+          { count: past },
         );
       }
     }
     // Listed by the site with nothing to watch: a count here, the titles in `emptyShows` (an expandable list).
     const empty = store.getState<string[]>(emptyShowsKey(source)) ?? [];
     if (empty.length > 0)
-      notes.push(
+      note(
+        'empty-shows',
         `${empty.length} ${empty.length === 1 ? 'show' : 'shows'} listed by the site with nothing to watch (not in the catalog)`,
+        { count: empty.length },
       );
     const retry = store.getState<BlockedRetry | null>(retryKey(source));
     out.push({
@@ -257,6 +313,7 @@ export function buildStatus(
         : {}),
       ...(airing ? { lastAiringRun: { at: airing.startedAt, status: airing.status } } : {}),
       notes,
+      ...(noteCodes.length ? { noteCodes } : {}),
       ...(skippedPages && (skippedPages.noLongerOffered || skippedPages.notVideo)
         ? { skipped: skippedPages }
         : {}),
@@ -279,6 +336,10 @@ export function buildStatus(
     lastMatch?.status === 'failed'
       ? `last TMDB matching failed (${lastMatch.startedAt}): ${lastMatch.error ?? ''}`
       : undefined;
+  const matchCode: StatusNote | undefined =
+    lastMatch?.status === 'failed'
+      ? { code: 'tmdb-failed', params: { at: lastMatch.startedAt, error: lastMatch.error ?? '' } }
+      : undefined;
   const lastPublish =
     store.lastRun('publish', 'cloudflare', { settled: true }) ??
     store.lastRun('publish', 'local', { settled: true });
@@ -290,15 +351,32 @@ export function buildStatus(
       : lastGoodPublish && now - Date.parse(lastGoodPublish.startedAt) > STALE_PUBLISH_HOURS * HOUR_MS
         ? `the catalog has not been published since ${lastGoodPublish.startedAt}`
         : undefined;
+  const publishCode: StatusNote | undefined =
+    lastPublish?.status === 'failed' && failing.alert
+      ? {
+          code: 'publish-failed',
+          params: {
+            at: lastPublish.startedAt,
+            inRow: failing.inRow,
+            error: (lastPublish.error ?? '').split('\n')[0] ?? '',
+          },
+        }
+      : publishNote && lastGoodPublish
+        ? { code: 'publish-stale', params: { since: lastGoodPublish.startedAt } }
+        : undefined;
   const failingShows = all
     .filter((s) => s.lastError && s.state === 'listed')
     .map((s) => ({ id: s.seriesId, title: s.title, error: s.lastError ?? '', lastOkAt: s.lastOkAt }));
-  const warnings = store.recentWarnings(50).map((w) => ({
-    at: w.createdAt,
-    code: w.code,
-    message: w.message,
-    ...(w.seriesId ? { id: w.seriesId } : {}),
-  }));
+  const warnings = store.recentWarnings(50).map((w) => {
+    const params = w.params ? parseParams(w.params) : undefined;
+    return {
+      at: w.createdAt,
+      code: w.code,
+      message: w.message,
+      ...(w.seriesId ? { id: w.seriesId } : {}),
+      ...(params ? { params } : {}),
+    };
+  });
   const worst: Health =
     out.some((s) => s.health === 'error') || publishNote
       ? 'error'
@@ -311,6 +389,8 @@ export function buildStatus(
     health: worst,
     ...(publishNote ? { publish: publishNote } : {}),
     ...(matchNote ? { tmdb: matchNote } : {}),
+    ...(publishCode ? { publishNote: publishCode } : {}),
+    ...(matchCode ? { tmdbNote: matchCode } : {}),
     sources: out,
     failingShows,
     warnings,
@@ -538,6 +618,7 @@ export function renderFromStore(store: Store, config: Config): SiteFiles {
   const audited = publicStatus({ ...published, audit }, origins);
   files.set(sitePaths.status, JSON.stringify(audited));
   files.set(sitePaths.statusPage, renderStatusHtml(audited, origins));
+  files.set(sitePaths.statusPageHe, renderStatusHtml(audited, origins, 'he'));
   // With the public address known, write it into every file now: no file then needs the Worker for it.
   const base = publicBase(config, store);
   if (base) {
@@ -589,6 +670,9 @@ export const HEADERS_FILE = `/*
   Cache-Control: public, max-age=300
   X-Robots-Tag: noindex
 /status*
+  ! Cache-Control
+  Cache-Control: no-store
+/he/status*
   ! Cache-Control
   Cache-Control: no-store
 ${NOINDEX.map((p) => `${p}\n  X-Robots-Tag: noindex`).join('\n')}
@@ -643,7 +727,7 @@ export function writeSite(
     try {
       const old = readFileSync(p);
       same =
-        path === sitePaths.status || path === sitePaths.statusPage
+        path === sitePaths.status || path === sitePaths.statusPage || path === sitePaths.statusPageHe
           ? comparable(old.toString()) === comparable(String(content))
           : old.equals(Buffer.from(content));
     } catch {}

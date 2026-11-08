@@ -228,6 +228,36 @@ describe('nothing private is published', () => {
     expect(json).not.toMatch(/192\.168|media-box/);
     const page = renderStatusHtml(leaky);
     expect(page).not.toMatch(/192\.168|media-box/);
+    // The Hebrew page too, with the same strings as codes and values (notes, warnings, the publish note).
+    const coded: StatusFile = {
+      ...leaky,
+      publish: 'last publish failed: connect ECONNREFUSED 10.1.2.3:443',
+      publishNote: {
+        code: 'publish-failed',
+        params: { at: '2026-11-07T01:30:00Z', inRow: 2, error: 'connect ECONNREFUSED 10.1.2.3:443' },
+      },
+      tmdbNote: {
+        code: 'tmdb-failed',
+        params: { at: '2026-11-07T01:30:00Z', error: 'GET /home/me/key failed' },
+      },
+      sources: leaky.sources.map((s) => ({
+        ...s,
+        noteCodes: [{ code: 'some-new-note' }],
+        notes: ['helper http://media-box.local:7701 refused'],
+      })),
+      failingShows: [{ id: 'x', title: 'x', error: 'ECONNREFUSED 10.9.8.7:7701', lastOkAt: '' }],
+      warnings: [
+        {
+          at: '2026-11-07T01:30:00Z',
+          code: 'source-note',
+          message: 'x: http://media-box.local/x',
+          params: { kan: 'show', url: 'http://media-box.local/x', detail: 'proxy 10.9.8.7:8080 refused' },
+        },
+      ],
+    };
+    const he = renderStatusHtml(coded, {}, 'he');
+    expect(he).not.toMatch(/192\.168|media-box|10\.1\.2\.3|10\.9\.8\.7|\/home\/me/);
+    expect(he).toContain('[private address]');
     const files = renderSite({
       version: '1',
       shows: [],
@@ -237,6 +267,63 @@ describe('nothing private is published', () => {
       catalogWarnings: {},
     });
     expect(String(files.get('status.json'))).not.toMatch(/192\.168|media-box/);
+    expect(String(files.get('he/status.html'))).not.toMatch(/192\.168|media-box/);
+  });
+});
+
+describe('the status page in Hebrew', () => {
+  const he = renderStatusHtml(SITE_STATUS, {}, 'he');
+  const main = he.slice(0, he.indexOf('id="details-h"'));
+
+  test('right to left, with its own address and the English page as its other language', () => {
+    expect(he).toContain('<html lang="he" dir="rtl">');
+    expect(he).toContain(`<link rel="canonical" href="${ORIGIN_TOKEN}/he/status">`);
+    expect(he).toContain(`hreflang="en" href="${ORIGIN_TOKEN}/status"`);
+    expect(he).toContain(`hreflang="he" href="${ORIGIN_TOKEN}/he/status"`);
+    expect(he).toContain('<a href="/status" class="opt" hreflang="en" lang="en">English</a>');
+    expect(he).toContain('<meta property="og:locale" content="he_IL">');
+    const ld = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/.exec(he)?.[1] ?? '{}');
+    expect(ld).toMatchObject({ '@type': 'WebPage', inLanguage: 'he', url: `${ORIGIN_TOKEN}/he/status` });
+    // The English page links here, and the Hebrew header and footer link to this page, not the English one.
+    expect(renderStatusHtml(SITE_STATUS)).toContain(
+      '<a href="/he/status" class="opt" hreflang="he" lang="he">עברית</a>',
+    );
+    expect(he).toContain('<a href="/he/status" aria-current="page">מצב</a>');
+    expect(he).toContain('<a href="/he/status">מצב השירות</a>');
+  });
+
+  test('the viewer part reads in Hebrew: no English words but names, times in Hebrew', () => {
+    expect(overall(SITE_STATUS, 'he')).toMatchObject({ level: 'warn', title: 'כמעט הכול עובד' });
+    const words = text(main)
+      .replace(/Israel TV|Stremio|Nuvio|GitHub|English|Français|ynet/g, '')
+      .replace(/\(נפתח בכרטיסייה חדשה\)/g, '');
+    expect(words).not.toMatch(/[A-Za-z]{3,}/);
+    expect(words).toMatch(/7 בנוב׳, \d\d:\d\d שעון ישראל/);
+    expect(main).toContain('ערוץ אחד בשידור חי לא מתנגן כרגע.');
+    expect(main).toContain('14 פרקים כבר לא זמינים באתר של כאן');
+    expect(main).toContain('השורה מתחילה להתמלא: 171 תוכניות יגיעו בימים הקרובים.');
+  });
+
+  test('notes and warnings are worded from their codes; one without values stays English, marked so', () => {
+    expect(he).toContain('2 תוכניות ממתינות לקריאה חוזרת של דף פרק שלא נטען');
+    expect(he).toContain('הפרק "פרק 1" (<bdi dir="ltr" lang="en">kan:830066</bdi>) התנגש בפרק אחר בעונה 1');
+    expect(he).toContain('<span dir="ltr" lang="en" class="en-text">Kan https://www.kan.org.il/');
+    expect(text(he)).not.toContain('collides');
+    const failing = {
+      ...SITE_STATUS,
+      sources: SITE_STATUS.sources.map((s) => ({ ...s, health: 'error' as const })),
+    };
+    expect(overall(failing, 'he').title).toBe('העדכונים של קשת 12, רשת 13 וכאן נעצרו');
+  });
+
+  test('both pages are in the sitemap, each with the other as its alternate', () => {
+    const map = sitemapXml();
+    expect(map).toContain(
+      `<loc>${ORIGIN_TOKEN}/he/status</loc><xhtml:link rel="alternate" hreflang="en" href="${ORIGIN_TOKEN}/status"/>`,
+    );
+    expect(map).toContain(
+      `<loc>${ORIGIN_TOKEN}/status</loc><xhtml:link rel="alternate" hreflang="en" href="${ORIGIN_TOKEN}/status"/><xhtml:link rel="alternate" hreflang="he" href="${ORIGIN_TOKEN}/he/status"/>`,
+    );
   });
 });
 

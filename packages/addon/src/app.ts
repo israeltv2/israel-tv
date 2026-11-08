@@ -131,6 +131,7 @@ export function createAddonApp(reader: SiteReader, opts: AddonOptions = {}) {
   app.get('/show/:id{iltv_[a-z0-9]+_[0-9]+}', (c) => c.redirect(`/show/${c.req.param('id')}/`, 301));
   app.get('/show/:id{iltv_[a-z0-9]+_[0-9]+}/', (c) => pageAt(sitePaths.showPage(c.req.param('id')))(c));
   app.get('/status', file(sitePaths.statusPage, CACHE.none, 'text/html; charset=utf-8'));
+  app.get('/he/status', file(sitePaths.statusPageHe, CACHE.none, 'text/html; charset=utf-8'));
   app.get('/status.json', file(sitePaths.status, CACHE.none));
   app.get('/registry.json', file(sitePaths.registry, CACHE.list));
   // The search index, for the website's search page.

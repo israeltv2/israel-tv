@@ -419,8 +419,11 @@ export async function crawlKan(
     }
     for (const k of Object.keys(days).sort().slice(0, -14)) delete days[k];
   };
-  const warn = (seriesId: string | null | undefined, message: string) =>
-    store.addWarnings(runId, seriesId ?? null, [{ code: 'source-note', message }]);
+  /** A note for /status; `params` let a page word it in Hebrew (the site's own message stays as it came). */
+  const warn = (seriesId: string | null | undefined, message: string, params?: Record<string, unknown>) =>
+    store.addWarnings(runId, seriesId ?? null, [
+      { code: 'source-note', message, ...(params ? { params } : {}) },
+    ]);
   /** Show images Kan refused in this slice, by reason: one line per reason at the end, not one per show. */
   const refusedArt = new Map<string, string[]>();
   const refuseArt = (key: string, why: string) => refusedArt.set(why, [...(refusedArt.get(why) ?? []), key]);
@@ -434,6 +437,14 @@ export async function crawlKan(
       warn(
         null,
         `Kan: ${keys.length} show ${keys.length === 1 ? 'image' : 'images'} ${what}; tried again within ${ART_RETRY_MS / 3_600_000} hours (e.g. ${sample})`,
+        {
+          kan: 'art-refused',
+          count: keys.length,
+          botCheck: why === 'bot check' ? 1 : 0,
+          why,
+          hours: ART_RETRY_MS / 3_600_000,
+          examples: sample,
+        },
       );
     }
     refusedArt.clear();
@@ -802,7 +813,7 @@ export async function crawlKan(
       const chargeShow = (message: string) => {
         if (s.checkedAt) s.checkedAt = new Date().toISOString();
         else s.failedAt = new Date().toISOString();
-        warn(id, `Kan ${key}: ${message}`);
+        warn(id, `Kan ${key}: ${message}`, { kan: 'show', url: key, detail: message });
         if (id) {
           problems++;
           store.markShowFailed(id, `kept last good data: ${message}`);
@@ -941,7 +952,14 @@ export async function crawlKan(
             const outcome = goOn
               ? `gave up after ${tries} tries`
               : `try ${tries} of ${MAX_EPISODE_TRIES}; the show waits for it`;
-            warn(seriesId, `Kan episode ${url}: ${message} (${outcome})`);
+            warn(seriesId, `Kan episode ${url}: ${message} (${outcome})`, {
+              kan: 'episode',
+              url,
+              detail: message,
+              tries,
+              of: MAX_EPISODE_TRIES,
+              gaveUp: goOn ? 1 : 0,
+            });
             return goOn;
           };
           // Named by the app: its Kaltura entry gives the page's Redge stream when that stream answers (where the

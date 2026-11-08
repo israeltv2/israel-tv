@@ -103,9 +103,18 @@ test('a quiet run does not rewrite the status page: its times are left out of th
     renderStatusHtml({ generatedAt: at, health: 'ok', sources: [], failingShows: [], warnings: [] });
   writeSite(d, new Map([['status.html', page('2026-11-06T05:00:00.000Z')]]));
   expect(writeSite(d, new Map([['status.html', page('2026-11-06T09:41:00.000Z')]])).changed).toEqual([]);
+  // The Hebrew page the same way.
+  const he = (at: string) =>
+    renderStatusHtml(
+      { generatedAt: at, health: 'ok', sources: [], failingShows: [], warnings: [] },
+      {},
+      'he',
+    );
+  writeSite(d, new Map([['he/status.html', he('2026-11-06T05:00:00.000Z')]]));
+  expect(writeSite(d, new Map([['he/status.html', he('2026-11-06T09:41:00.000Z')]])).changed).toEqual([]);
 });
 
-describe('nothing private reaches status.json or /status', () => {
+describe('nothing private reaches status.json, /status or /he/status', () => {
   const LEAKS: [string, RegExp][] = [
     ['getaddrinfo ENOTFOUND tv-helper.example-owner.com', /tv-helper|example-owner/],
     ['connect ECONNREFUSED proxy.example.net:3128', /proxy\.example|3128/],
@@ -134,6 +143,8 @@ describe('nothing private reaches status.json or /status', () => {
       generatedAt: '2026-11-07T06:00:00Z',
       health: 'error' as const,
       publish: `last publish failed: ${text}`,
+      publishNote: { code: 'publish-failed', params: { at: '2026-11-07T01:30:00Z', inRow: 2, error: text } },
+      tmdbNote: { code: 'tmdb-failed', params: { at: '2026-11-07T01:30:00Z', error: text } },
       sources: [
         {
           source: 'mako',
@@ -141,14 +152,30 @@ describe('nothing private reaches status.json or /status', () => {
           shows: 1,
           episodes: 1,
           lastFullRun: { at: '2026-11-07T01:30:00Z', status: 'failed', error: text },
-          notes: [text],
+          notes: [text, text],
+          noteCodes: [{ code: 'last-run-failed', params: { error: text } }, { code: 'a-newer-note' }],
         },
       ],
       failingShows: [{ id: 'iltv_mako_1', title: 'x', error: text, lastOkAt: '2026-11-06T01:30:00Z' }],
-      warnings: [{ at: '2026-11-07T01:30:00Z', code: 'source-note', message: text }],
+      warnings: [
+        { at: '2026-11-07T01:30:00Z', code: 'source-note', message: text },
+        {
+          at: '2026-11-07T01:30:00Z',
+          code: 'source-note',
+          message: text,
+          params: { kan: 'episode', url: text, detail: text, tries: 1, of: 3, gaveUp: 0 },
+        },
+        {
+          at: '2026-11-07T01:30:00Z',
+          code: 'thin-result',
+          message: text,
+          params: { title: 'x', detail: text },
+        },
+      ],
     };
     expect(JSON.stringify(publicStatus(status))).not.toMatch(leak);
     expect(renderStatusHtml(status)).not.toMatch(leak);
+    expect(renderStatusHtml(status, {}, 'he')).not.toMatch(leak);
   });
 
   test('public addresses stay (origin and path only), and so do ids, keys and times', () => {

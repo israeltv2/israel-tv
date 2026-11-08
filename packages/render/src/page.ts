@@ -171,22 +171,28 @@ export interface NavLink {
 
 export type Section = 'home' | 'library' | 'live' | 'search' | 'status';
 
-/** The site's own links: the library, live channels, status, and the other language of the home page. */
-export function siteNav(lang: Lang, current?: Section, extra: NavLink[] = []): NavLink[] {
+/** The status page in a language. */
+export const statusHref = (lang: Lang) => (lang === 'he' ? '/he/status' : '/status');
+
+/**
+ * The site's own links: the library, live channels, status, and the other language: this page's own other version
+ * when it has one (`other`), else the other language's home page.
+ */
+export function siteNav(lang: Lang, current?: Section, extra: NavLink[] = [], other?: string): NavLink[] {
   const he = lang === 'he';
   return [
     ...extra,
     { href: '/library/', label: he ? 'ספרייה' : 'Library', current: current === 'library' },
     { href: '/live/', label: he ? 'שידור חי' : 'Live', current: current === 'live' },
     {
-      href: '/status',
+      href: statusHref(lang),
       label: he ? 'מצב' : 'Status',
       current: current === 'status',
       optional: current !== 'status',
     },
     he
-      ? { href: '/', label: 'English', hreflang: 'en', optional: true }
-      : { href: '/he/', label: 'עברית', hreflang: 'he', optional: true },
+      ? { href: other ?? '/', label: 'English', hreflang: 'en', optional: true }
+      : { href: other ?? '/he/', label: 'עברית', hreflang: 'he', optional: true },
   ];
 }
 
@@ -216,7 +222,7 @@ export function footer(lang: Lang, extra: Child = ''): Html {
 <a href="${he ? '/he/' : '/'}">${he ? 'דף הבית' : 'Home'}</a>
 <a href="/library/">${he ? 'ספרייה' : 'Library'}</a>
 <a href="/live/">${he ? 'שידור חי' : 'Live channels'}</a>
-<a href="/status">${he ? 'מצב השירות' : 'Status'}</a>
+<a href="${statusHref(lang)}">${he ? 'מצב השירות' : 'Status'}</a>
 <a href="${PROJECT_URL}">${he ? 'קוד המקור ב-GitHub' : 'Source code on GitHub'}</a>
 <a href="${DOCS_URL}">${he ? 'תיעוד' : 'Documentation'}</a>
 <a href="${ISSUES_URL}">${he ? 'דיווח על בעיה' : 'Report a problem'}</a>
