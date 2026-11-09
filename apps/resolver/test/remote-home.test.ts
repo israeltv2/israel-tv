@@ -1,10 +1,11 @@
 // The tunnel door at home: one installed link that also offers the relayed streams when the request comes from the
 // home network's own public address, pointing at the home-network door so video never crosses the tunnel.
-import type { ScrapedEpisode } from '@israel-tv/core';
+import { parseConfig, type ScrapedEpisode } from '@israel-tv/core';
 import { describe, expect, test } from 'vitest';
 import { createResolverApp } from '../src/app.ts';
 import { homeAddress, networkOf } from '../src/home-address.ts';
 import { createRemoteResolverApp } from '../src/remote.ts';
+import { homeRelayProblem } from '../src/server.ts';
 
 const HOME_IP = '203.0.113.50';
 const AWAY_IP = '198.51.100.9';
@@ -182,5 +183,24 @@ describe('the home address', () => {
     up = false;
     t = 20 * 60_000;
     expect(await h.isHome(HOME_IP)).toBe(true);
+  });
+});
+
+describe('homeRelayProblem: why the tunnel link would play Mako and live channels only', () => {
+  const proxy = { geo: { type: 'http-proxy', urls: ['https://proxy.example.net:89'] } };
+  const env = {};
+  const cfg = (resolver: Record<string, unknown>) =>
+    parseConfig({
+      ...proxy,
+      resolver: { remote: { enabled: true, publicUrl: 'https://h.example.net' }, ...resolver },
+    });
+
+  test('names the missing home-network address', () => {
+    expect(homeRelayProblem(cfg({}), env)).toMatch(/resolver\.remote\.home\.lanUrl is not set/);
+  });
+
+  test('nothing to report when the home-network address and a geo proxy are set', () => {
+    const c = cfg({ remote: { enabled: true, publicUrl: 'https://h.example.net', home: { lanUrl: LAN } } });
+    expect(homeRelayProblem(c, env)).toBeUndefined();
   });
 });

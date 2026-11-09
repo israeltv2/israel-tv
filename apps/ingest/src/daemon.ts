@@ -16,7 +16,13 @@ import {
 import { dashboardBuilt, dashboardCsp, dashboardFile, newNonce } from '@israel-tv/dashboard';
 import type { EventStore } from '@israel-tv/events';
 import { proxyEndpoints } from '@israel-tv/net';
-import { checkProxyAtStart, PlaySessions, remoteResolverApp, resolverApp } from '@israel-tv/resolver';
+import {
+  checkProxyAtStart,
+  homeRelayProblem,
+  PlaySessions,
+  remoteResolverApp,
+  resolverApp,
+} from '@israel-tv/resolver';
 import { type Logger, lanAddresses, listen } from '@israel-tv/runtime';
 import { STOPPED_FOR_RESTART, type Store } from '@israel-tv/store';
 import { Cron } from 'croner';
@@ -453,7 +459,10 @@ export class Daemon {
   /** Last outcome of relaying through the geo proxy (resolver), for /status. */
   geo: { proxies: string[]; lastOkAt?: string; lastErrorAt?: string; lastError?: string } = { proxies: [] };
 
-  /** Why the remote resolver is not running, when it is enabled but cannot start. */
+  /**
+   * Why the remote resolver is not running when it is enabled, or why its link plays only Mako and live channels
+   * (no relayed Reshet/Kan at home).
+   */
   remoteProblem: string | undefined;
   /** Why the last daily read of the public addon's usage failed (cleared when one succeeds). */
   publicUsageProblem: string | undefined;
@@ -905,6 +914,9 @@ export async function startDaemon(
       d.remoteProblem = `remote resolver not started: ${remote.error}`;
       log(d.remoteProblem);
     } else {
+      // Running, but without Reshet and Kan at home: say so where the owner looks, not only in the log.
+      const problem = homeRelayProblem(config);
+      if (problem) d.remoteProblem = `the helper's tunnel link offers no Reshet or Kan at home: ${problem}`;
       await listen(
         remote.fetch as never,
         config.resolver.remote.host,
