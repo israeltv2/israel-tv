@@ -3,6 +3,14 @@
 Versions follow [Semantic Versioning](https://semver.org/); entries come from the commit history
 ([Conventional Commits](https://www.conventionalcommits.org/)). Israel TV is in beta: anything may still change.
 
+## [0.14.3](https://github.com/israeltv2/israel-tv/compare/v0.14.2...v0.14.3) (2026-11-22)
+
+
+### Fixed
+
+* **live:** Keshet 12 plays abroad again; Kan's relay is always offered; lasting refusals are reported ([#193](https://github.com/israeltv2/israel-tv/issues/193)) ([3a82a4d](https://github.com/israeltv2/israel-tv/commit/3a82a4d61517963284b71ea9db22e470c015c608))
+* **live:** Keshet 12 plays in HD again from Mako's new live address ([#195](https://github.com/israeltv2/israel-tv/issues/195)) ([6432544](https://github.com/israeltv2/israel-tv/commit/6432544c1fc5b0ed3e1ae08502a0e3f2fbeefa99))
+
 ## [0.14.2](https://github.com/israeltv2/israel-tv/compare/v0.14.1...v0.14.2) (2026-11-08)
 
 
