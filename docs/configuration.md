@@ -74,7 +74,7 @@ Only needed **outside Israel**.
 | `urls`                       | required | One or more proxy URLs, tried in order.                                                    |
 | `usernameEnv`, `passwordEnv` | optional | Names of the `.env` variables with the proxy login. Leave out for a proxy without a login. |
 
-What goes through it: the resolver's "דרך החיבור הישראלי שלך" (via your Israeli connection) streams, offered only when the direct stream is refused from your network (checked about every 6 hours per show). `pnpm israel-tv check-proxy` (resolver-only: `pnpm resolver check-proxy`) tests it.
+What goes through it: the resolver's "דרך החיבור הישראלי שלך" (via your Israeli connection) streams, offered for a show only when its direct stream is refused from your network (checked about every 6 hours per show), and always for Kan's live channels, whose blocks change with the programme on air. `pnpm israel-tv check-proxy` (resolver-only: `pnpm resolver check-proxy`) tests it.
 
 A host with a proxy is taken to be **outside Israel**: it then asks Kan directly (without the proxy) whether each title
 plays abroad, and labels a title or live stream "זמין לצפייה רק בישראל" only when it is refused (see

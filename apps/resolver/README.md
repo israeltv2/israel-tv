@@ -3,7 +3,7 @@
 The resolver is a second Stremio addon that serves no catalogs: it answers stream requests that need work at
 play time. Its `mako-auth` module gets a fresh Mako ticket and the ~1 KB master playlist per play; its
 `geo-relay` module relays geo-blocked Reshet/Kan video through the geo proxy, only when the direct stream is
-refused from here. It is its own app so it can run anywhere, from any published Israel TV catalog, without the
+refused from here (Kan's live channels: always offered, since their blocks change with the programme). It is its own app so it can run anywhere, from any published Israel TV catalog, without the
 catalog's database.
 
 ## Responsibility
