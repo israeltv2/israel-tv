@@ -46,11 +46,11 @@ export function runHistory(
   days = HISTORY_DAYS,
 ): NonNullable<StatusFile['history']> {
   const day = dayIn(timeZone);
-  const list: string[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = day(now - i * 86_400_000);
-    if (list.at(-1) !== d) list.push(d);
-  }
+  // Calendar days back from today in this zone (steps of 24 hours repeat a day across a clock change).
+  const [y, m, dd] = day(now).split('-').map(Number) as [number, number, number];
+  const list = Array.from({ length: days }, (_, i) =>
+    new Date(Date.UTC(y, m - 1, dd - (days - 1 - i))).toISOString().slice(0, 10),
+  );
   const at = new Map(list.map((d, i) => [d, i]));
   // A day earlier than the first listed one in this zone, so the first day is complete.
   const since = new Date(now - (days + 1) * 86_400_000).toISOString();
