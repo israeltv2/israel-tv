@@ -87,8 +87,9 @@ export function geoRelay(d: GeoRelayDeps) {
   }
 
   /**
-   * The relayed stream for a direct URL, only when the direct stream is refused here. `directPlays` says the
-   * resolver offers nothing on purpose (the public addon's direct stream plays).
+   * The relayed stream for a direct URL, only when the direct stream is refused here (`always`: without asking, for a
+   * live channel whose blocks change with the programme on air). `directPlays` says the resolver offers nothing on
+   * purpose (the public addon's direct stream plays).
    */
   async function streamFor(
     origin: string,
@@ -97,8 +98,9 @@ export function geoRelay(d: GeoRelayDeps) {
     url: string,
     title: string,
     name = 'Israel TV',
+    always = false,
   ): Promise<{ stream?: Stream; note: string; directPlays: boolean }> {
-    const probe = await blockedHere(key, url);
+    const probe = always ? { blocked: true, note: 'live: always relayed' } : await blockedHere(key, url);
     if (!probe.blocked) return { note: probe.note, directPlays: true };
     return {
       stream: { url: relayUrl(origin, url, play.playId), name, title },

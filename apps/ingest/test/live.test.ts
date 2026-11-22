@@ -146,6 +146,33 @@ test('a stream that does not play is played once more before it counts; each che
   expect(store.lastRun('full', 'live')?.status).toBe('ok');
 });
 
+test('a stream that played abroad and is refused three checks running is named (not a geo channel)', async () => {
+  // Keshet 12 (2026-11-22): played abroad until ~11-10, then refused 12 checks running, and only its label changed.
+  const store = Store.open(':memory:');
+  const two: LiveChannel[] = [
+    {
+      id: 'iltv_live_a',
+      name: 'א',
+      description: '',
+      direct: [{ title: 'א', url: 'https://plays.test/a.m3u8' }],
+    },
+    {
+      id: 'iltv_live_b',
+      name: 'ב',
+      description: '',
+      direct: [{ title: 'ב', url: 'https://plays.test/b.m3u8' }],
+      geo: true,
+    },
+  ];
+  const opts = { channels: two, abroad: true, retryDelayMs: 0 };
+  await checkLive(store, { ...opts, fetchImpl: net([]) });
+  for (const expected of [[], [], ['א · א (stopped playing outside Israel: refused 3 checks running)']]) {
+    const r = await checkLive(store, { ...opts, fetchImpl: net(['plays.test']) });
+    expect(r.streamsFailed).toEqual(expected);
+  }
+  expect(store.lastRun('full', 'live')?.status).toBe('partial');
+});
+
 test('a DASH backup counts as playing when its manifest answers', async () => {
   const { playCheck } = await import('../src/canary.ts');
   const dash = (async () =>

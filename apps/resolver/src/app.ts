@@ -240,6 +240,7 @@ export function createResolverApp(deps: ResolverDeps) {
               l.url,
               rtl(`${l.title} · דרך החיבור הישראלי שלך`),
               rtl(ch.name),
+              true,
             );
             notes.push(r.note);
             if (r.stream) streams.push(r.stream);

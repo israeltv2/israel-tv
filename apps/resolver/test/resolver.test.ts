@@ -298,6 +298,33 @@ test('a Reshet episode is relayed only when its direct stream is refused from he
   expect(relayed[0]?.url).toContain('/relay/');
 });
 
+test('a geo-limited live channel always offers its relayed streams, even while its direct streams play here', async () => {
+  // Kan blocks per programme: a "plays here" answer goes stale when the next programme starts (2026-11-21: 403 in
+  // the morning, 200 that evening), so the relay is listed every time and carries video only when picked.
+  let probes = 0;
+  const app = createResolverApp({
+    episode: () => undefined,
+    geoFetch: (async () => new Response('')) as never,
+    fetch: async () => {
+      probes++;
+      return new Response('', { status: 200 });
+    },
+    channels: [
+      {
+        id: 'iltv_live_kan11',
+        name: 'כאן 11',
+        description: '',
+        direct: [{ title: 'כאן 11', url: 'https://r.il.cdn-redge.media/k/playlist.m3u8' }],
+        geo: true,
+      },
+    ],
+  });
+  const s = await (await app.request('http://h/stream/tv/iltv_live_kan11.json')).json();
+  expect(s.streams).toHaveLength(1);
+  expect(s.streams[0].url).toContain('/relay/');
+  expect(probes).toBe(0);
+});
+
 test('when Akamai refuses a Mako master, the next CDN Mako lists is tried', async () => {
   const events: { kind: string; detail?: Record<string, unknown> }[] = [];
   const app = createResolverApp({
