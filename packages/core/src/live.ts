@@ -49,22 +49,23 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     description: 'שידור חי של קשת 12 · צריך את העוזר הביתי',
     direct: [],
     mako: [
-      { title: 'קשת 12', path: '/stream/hls/live/2033791/k12/index.m3u8' },
-      // Mako's AWS edition: 360p only, but it still plays outside Israel (2026-11-22), where Akamai's variants now
-      // answer 403 for the two feeds above and below.
-      {
-        title: 'קשת 12 · 360p',
-        path: '/k12/index.m3u8',
-        host: 'https://d2249b6f08tjt0.cloudfront.net',
-        cdn: 'AWS',
-      },
+      // The address Mako's own live page plays (2026-11-23; up to 1080p, plays outside Israel too). The older
+      // /stream/hls/live/2033791/k12 lists its variants but refuses them (403), through an Israeli exit too, and
+      // its k12dvr twin does the same from abroad.
+      { title: 'קשת 12', path: '/stream/hls/live/20000821/k12rh-dvr/index.m3u8' },
       {
         title: 'קשת 12 · כתוביות לכבדי שמיעה',
         path: '/k12cc/index.m3u8?b-in-range=0-1800',
         host: 'https://d2249b6f08tjt0.cloudfront.net',
         cdn: 'AWS',
       },
-      { title: 'קשת 12 · גיבוי', path: '/stream/hls/live/2033791/k12dvr/index.m3u8' },
+      // Mako's AWS edition: 360p only, on another CDN.
+      {
+        title: 'קשת 12 · גיבוי (360p)',
+        path: '/k12/index.m3u8',
+        host: 'https://d2249b6f08tjt0.cloudfront.net',
+        cdn: 'AWS',
+      },
     ],
   },
   {
