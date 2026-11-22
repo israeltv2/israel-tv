@@ -164,15 +164,13 @@ test('integration: which addon answers what, at home and abroad', async () => {
       }
     }
 
-    // Live: Keshet 12 only through the resolver; Kan 11 from the catalog, relayed by the resolver only abroad,
-    // one relay per direct stream.
+    // Live: Keshet 12 only through the resolver; Kan 11 from the catalog, and relayed by any resolver with a geo
+    // proxy even while it plays directly (Kan's blocks change with the programme), one relay per direct stream.
     const k12 = await by('tv', 'iltv_live_keshet12');
     expect(Object.keys(k12)).toEqual(['io.github.israeltv2.israel-tv.resolver']);
     const kan11 = await by('tv', 'iltv_live_kan11');
     const direct = kan11['io.github.israeltv2.israel-tv'] ?? [];
     expect(direct.length).toBeGreaterThan(0);
-    expect(kan11['io.github.israeltv2.israel-tv.resolver']?.length ?? 0).toBe(
-      where === 'home' ? 0 : direct.length,
-    );
+    expect(kan11['io.github.israeltv2.israel-tv.resolver']?.length ?? 0).toBe(direct.length);
   }
 });

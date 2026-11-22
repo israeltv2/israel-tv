@@ -39,6 +39,8 @@ export interface LiveCheck {
 /** How many of a stream's latest outcomes are kept (`recent`). */
 export const LIVE_HISTORY = 20;
 const LETTER = { ok: 'o', refused: 'r', failed: 'f' } as const;
+/** Refused this many checks running after playing abroad: reported, not only labelled. */
+const STOPPED_ABROAD = 'rrr';
 
 /** A stream's outcomes, oldest first (a check from before histories were kept counts as its one outcome). */
 const historyOf = (x: LiveStreamCheck | undefined): string => (x ? (x.recent ?? LETTER[x.outcome]) : '');
@@ -185,6 +187,13 @@ export async function checkLive(
     const fine = (x: LiveStreamCheck) => x.outcome === 'ok' || (!!opts.abroad && x.outcome === 'refused');
     for (const s of list.filter((x) => !fine(x)))
       streamsFailed.push(`${c.name} · ${s.title} (${s.detail ?? s.statuses.join('/')})`);
+    // … unless a channel that does not block programmes (not `geo`) played abroad and is now refused check after
+    // check: the broadcaster changed something, and a label alone would hide it.
+    if (opts.abroad && !c.geo)
+      for (const s of list.filter((x) => x.recent?.includes('o') && x.recent.endsWith(STOPPED_ABROAD)))
+        streamsFailed.push(
+          `${c.name} · ${s.title} (stopped playing outside Israel: refused ${STOPPED_ABROAD.length} checks running)`,
+        );
     if (list.some(fine)) ok++;
     else failed.push(`${c.name} (${list[0]?.detail ?? 'no answer'})`);
   }

@@ -50,6 +50,14 @@ export const LIVE_CHANNELS: readonly LiveChannel[] = [
     direct: [],
     mako: [
       { title: 'קשת 12', path: '/stream/hls/live/2033791/k12/index.m3u8' },
+      // Mako's AWS edition: 360p only, but it still plays outside Israel (2026-11-22), where Akamai's variants now
+      // answer 403 for the two feeds above and below.
+      {
+        title: 'קשת 12 · 360p',
+        path: '/k12/index.m3u8',
+        host: 'https://d2249b6f08tjt0.cloudfront.net',
+        cdn: 'AWS',
+      },
       {
         title: 'קשת 12 · כתוביות לכבדי שמיעה',
         path: '/k12cc/index.m3u8?b-in-range=0-1800',

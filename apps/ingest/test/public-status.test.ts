@@ -37,6 +37,14 @@ test('history reads the runs table', () => {
   expect(h.sources.reshet?.at(-1)).toBe('ok');
 });
 
+test('history has 30 distinct days across a clock change (Israel, 2026-10-25; 23:30 there)', () => {
+  const store = Store.open(':memory:');
+  const h = runHistory(store, ['reshet'], 'Asia/Jerusalem', Date.parse('2026-11-22T21:30:00Z'));
+  expect(h.days).toHaveLength(30);
+  expect(new Set(h.days).size).toBe(30);
+  expect([h.days[0], h.days.at(-1)]).toEqual(['2026-10-24', '2026-11-22']);
+});
+
 test('live channels: up, down or unchecked, never a stream address', () => {
   const [a, b, c] = LIVE_CHANNELS;
   if (!a || !b || !c) throw new Error('channels');
